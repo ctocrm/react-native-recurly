@@ -9,10 +9,16 @@ const App = () => {
         Welcome to Nativewind!
       </Text>
       <Link
-        href="/onboarding"
+        href="/Onboarding"
         className="mt-4 rounded bg-primary text-white p-4"
       >
         Go to Onboarding
+      </Link>
+      <Link href="/SignIn" className="mt-4 rounded bg-primary text-white p-4">
+        Go to SignIn
+      </Link>
+      <Link href="/SignUp" className="mt-4 rounded bg-primary text-white p-4">
+        Go to SignUp
       </Link>
     </View>
   );
