@@ -9,15 +9,25 @@ const App = () => {
         Welcome to Nativewind!
       </Text>
       <Link
-        href="/Onboarding"
+        href="/onboarding"
         className="mt-4 rounded bg-primary text-white p-4"
       >
         Go to Onboarding
       </Link>
-      <Link href="/SignIn" className="mt-4 rounded bg-primary text-white p-4">
+      <Link href="/signIn" className="mt-4 rounded bg-primary text-white p-4">
         Go to SignIn
       </Link>
-      <Link href="/SignUp" className="mt-4 rounded bg-primary text-white p-4">
+      <Link href="/signUp" className="mt-4 rounded bg-primary text-white p-4">
+        Go to SignUp
+      </Link>
+      <Link href={"/subscriptions/spotify"}>Spotify Subscription</Link>
+
+      <Link
+        href={{
+          pathname: "/subscriptions/[id]",
+          params: { id: "claude" },
+        }}
+      >
         Go to SignUp
       </Link>
     </View>
