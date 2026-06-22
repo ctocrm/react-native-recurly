@@ -28,7 +28,7 @@ const App = () => {
           params: { id: "claude" },
         }}
       >
-        Go to SignUp
+        Go to Claude
       </Link>
     </View>
   );
