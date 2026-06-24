@@ -1,10 +1,10 @@
 import { tabs } from "@/constants/data";
 import { colors, components } from "@/constants/theme";
-// eslint-disable-next-line import/no-named-as-default
+ 
 import { useAuth } from "@clerk/expo";
 import clsx from "clsx";
 import { Redirect, Tabs } from "expo-router";
-import { Image, View } from "react-native";
+import { ActivityIndicator, Image, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const tabBar = components.tabBar;
@@ -22,7 +22,11 @@ const TabLayout = () => {
   const insets = useSafeAreaInsets();
 
   if (!isLoaded) {
-    return null;
+    return (
+      <View className="flex-1 items-center justify-center bg-white">
+        <ActivityIndicator />
+      </View>
+    );
   }
 
   if (!isSignedIn) {

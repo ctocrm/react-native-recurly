@@ -1,4 +1,4 @@
-import { useSignIn } from "@clerk/expo";
+import { useAuth, useSignIn } from "@clerk/expo";
 import { Link, useRouter, type Href } from "expo-router";
 import { styled } from "nativewind";
 import { useState } from "react";
@@ -18,6 +18,7 @@ const SafeAreaView = styled(RNSafeAreaView);
 
 const SignIn = () => {
   const { signIn, errors, fetchStatus } = useSignIn();
+  const { isSignedIn, signOut } = useAuth();
   const router = useRouter();
   // const posthog = usePostHog();
 
@@ -40,17 +41,48 @@ const SignIn = () => {
   const handleSubmit = async () => {
     if (!formValid) return;
 
+    // If already signed in, redirect to the main app
+    if (isSignedIn) {
+      router.replace("/(tabs)" as Href);
+      return;
+    }
+
     const { error } = await signIn.password({
       emailAddress,
       password,
     });
 
     if (error) {
-      console.error(JSON.stringify(error, null, 2));
-      // posthog.capture('user_sign_in_failed', {
-      //     error_message: error.message,
-      // });
-      return;
+      // Handle "already signed in" error — Clerk's local state is out of sync
+      // with the backend. Sign out first, then retry the sign-in.
+      if (
+        error.code === "api_response_error" &&
+        error.message === "You're already signed in."
+      ) {
+        await signOut();
+        // Retry sign-in after clearing the stale session
+        const retryResult = await signIn.password({
+          emailAddress,
+          password,
+        });
+        if (retryResult.error) {
+          console.error("Sign-in failed after session reset", {
+            code: retryResult.error.code,
+            message: retryResult.error.message,
+          });
+          return;
+        }
+        // Fall through to handle the successful sign-in below
+      } else {
+        console.error("Sign-in failed", {
+          code: error.code,
+          message: error.message,
+        });
+        // posthog.capture('user_sign_in_failed', {
+        //     error_message: error.message,
+        // });
+        return;
+      }
     }
 
     if (signIn.status === "complete") {
@@ -82,8 +114,9 @@ const SignIn = () => {
         },
       });
     } else if (signIn.status === "needs_second_factor") {
-      // Handle MFA if needed (not implemented in this basic flow)
-      console.log("MFA required");
+      console.log("Sign-in needs second factor", {
+        status: signIn.status,
+      });
     } else if (signIn.status === "needs_client_trust") {
       // Send email code for client trust verification
       const emailCodeFactor = signIn.supportedSecondFactors.find(
@@ -94,7 +127,9 @@ const SignIn = () => {
         await signIn.mfa.sendEmailCode();
       }
     } else {
-      console.error("Sign-in attempt not complete:", signIn);
+      console.error("Sign-in attempt not complete", {
+        status: signIn.status,
+      });
     }
   };
 
@@ -131,7 +166,9 @@ const SignIn = () => {
         },
       });
     } else {
-      console.error("Sign-in attempt not complete:", signIn);
+      console.error("Sign-in verification not complete", {
+        status: signIn.status,
+      });
     }
   };
 
