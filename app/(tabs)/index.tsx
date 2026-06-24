@@ -43,7 +43,10 @@ const App = () => {
                   {formatCurrency(HOME_BALANCE.amount)}
                 </Text>
                 <Text className="home-balance-date">
-                  {dayjs(HOME_BALANCE.nextRenewalDate).format("MM/DD")}
+                  {(() => {
+                    const next = dayjs(HOME_BALANCE.nextRenewalDate);
+                    return next.isValid() ? next.format("MM/DD") : "N/A";
+                  })()}
                 </Text>
               </View>
             </View>
