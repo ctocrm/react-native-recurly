@@ -1,6 +1,7 @@
 import { useAuth, useSignUp } from "@clerk/expo";
 import { Link, useRouter, type Href } from "expo-router";
 import { styled } from "nativewind";
+import { usePostHog } from "posthog-react-native";
 import { useState } from "react";
 import {
   KeyboardAvoidingView,
@@ -12,7 +13,6 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView as RNSafeAreaView } from "react-native-safe-area-context";
-import { usePostHog } from "posthog-react-native";
 
 const SafeAreaView = styled(RNSafeAreaView);
 
@@ -40,6 +40,8 @@ const SignUp = () => {
 
   const handleSubmit = async () => {
     if (!formValid) return;
+
+    posthog.capture("sign_up_form_submitted");
 
     const { error } = await signUp.password({
       emailAddress,
@@ -181,7 +183,10 @@ const SignUp = () => {
 
                   <Pressable
                     className="auth-secondary-button"
-                    onPress={() => signUp.verifications.sendEmailCode()}
+                    onPress={() => {
+                      posthog.capture("sign_up_verification_resend_code");
+                      signUp.verifications.sendEmailCode();
+                    }}
                     disabled={fetchStatus === "fetching"}
                   >
                     <Text className="auth-secondary-button-text">
@@ -302,7 +307,9 @@ const SignUp = () => {
             <View className="auth-link-row">
               <Text className="auth-link-copy">Already have an account?</Text>
               <Link href="/(auth)/signIn" asChild>
-                <Pressable>
+                <Pressable
+                  onPress={() => posthog.capture("sign_up_navigate_to_sign_in")}
+                >
                   <Text className="auth-link">Sign In</Text>
                 </Pressable>
               </Link>

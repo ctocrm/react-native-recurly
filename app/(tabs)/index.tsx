@@ -4,20 +4,19 @@ import UpcomingSubscriptionCard from "@/components/UpcomingSubscriptionCard";
 import {
   HOME_BALANCE,
   HOME_SUBSCRIPTIONS,
-  UPCOMING_SUBSCRIPTIONS
+  UPCOMING_SUBSCRIPTIONS,
 } from "@/constants/data";
 import { icons } from "@/constants/icons";
 import images from "@/constants/images";
 import "@/global.css";
-// import { Link } from "expo-router";
 import { formatCurrency } from "@/lib/utils";
 import { useUser } from "@clerk/expo";
 import dayjs from "dayjs";
 import { styled } from "nativewind";
-import { useState } from "react";
-import { FlatList, Image, Text, View } from "react-native";
-import { SafeAreaView as RNSafeAreaView } from "react-native-safe-area-context";
 import { usePostHog } from "posthog-react-native";
+import { useState } from "react";
+import { FlatList, Image, Pressable, Text, View } from "react-native";
+import { SafeAreaView as RNSafeAreaView } from "react-native-safe-area-context";
 
 const SafeAreaView = styled(RNSafeAreaView);
 
@@ -34,6 +33,23 @@ const App = () => {
     user?.emailAddresses[0]?.emailAddress ||
     "User";
 
+  const handleAddSubscriptionTap = () => {
+    posthog.capture("home_add_subscription_tapped");
+  };
+
+  const handleUpcomingSubscriptionTap = (item: UpcomingSubscription) => {
+    posthog.capture("home_upcoming_subscription_tapped", {
+      subscription_id: item.id,
+      subscription_name: item.name,
+      price: item.price,
+      days_left: item.daysLeft,
+    });
+  };
+
+  const handleViewAllTap = () => {
+    posthog.capture("home_view_all_tapped");
+  };
+
   return (
     <SafeAreaView className="flex-1 bg-background p-5">
       <FlatList
@@ -49,7 +65,9 @@ const App = () => {
                 />
                 <Text className="home-user-name">{displayName}</Text>
               </View>
-              <Image source={icons.add} className="home-add-icon" />
+              <Pressable onPress={handleAddSubscriptionTap}>
+                <Image source={icons.add} className="home-add-icon" />
+              </Pressable>
             </View>
             <View className="home-balance-card">
               <Text className="home-balance-label">Balance</Text>
@@ -63,11 +81,14 @@ const App = () => {
               </View>
             </View>
             <View className="mb-5">
-              <ListHeading title="Upcoming" />
+              <ListHeading title="Upcoming" onViewAll={handleViewAllTap} />
               <FlatList
                 data={UPCOMING_SUBSCRIPTIONS}
                 renderItem={({ item }) => (
-                  <UpcomingSubscriptionCard {...item} />
+                  <UpcomingSubscriptionCard
+                    {...item}
+                    onPress={() => handleUpcomingSubscriptionTap(item)}
+                  />
                 )}
                 keyExtractor={(item) => item.id}
                 horizontal
@@ -79,7 +100,10 @@ const App = () => {
                 }
               />
             </View>
-            <ListHeading title="All Subscriptions" />
+            <ListHeading
+              title="All Subscriptions"
+              onViewAll={handleViewAllTap}
+            />
           </>
         }
         data={HOME_SUBSCRIPTIONS}
@@ -100,7 +124,7 @@ const App = () => {
                 {
                   subscription_id: item.id,
                   subscription_name: item.name,
-                  subscription_category: item.category,
+                  subscription_category: item.category ?? "",
                   billing_cycle: item.billing,
                 },
               );
@@ -114,8 +138,6 @@ const App = () => {
           <Text className="home-empty-state">No subscription yet.</Text>
         }
         contentContainerClassName="pb-25"
-        // contentContainerStyle={{ paddingBottom: 120 }}
-        // removeClippedSubviews={false}
       />
     </SafeAreaView>
   );

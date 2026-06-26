@@ -1,6 +1,7 @@
 import { useAuth, useSignIn } from "@clerk/expo";
 import { Link, useRouter, type Href } from "expo-router";
 import { styled } from "nativewind";
+import { usePostHog } from "posthog-react-native";
 import { useState } from "react";
 import {
   KeyboardAvoidingView,
@@ -12,7 +13,6 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView as RNSafeAreaView } from "react-native-safe-area-context";
-import { usePostHog } from "posthog-react-native";
 
 const SafeAreaView = styled(RNSafeAreaView);
 
@@ -46,6 +46,8 @@ const SignIn = () => {
       router.replace("/(tabs)" as Href);
       return;
     }
+
+    posthog.capture("sign_in_form_submitted");
 
     const { error } = await signIn.password({
       emailAddress,
@@ -238,7 +240,10 @@ const SignIn = () => {
 
                   <Pressable
                     className="auth-secondary-button"
-                    onPress={() => signIn.mfa.sendEmailCode()}
+                    onPress={() => {
+                      posthog.capture("sign_in_mfa_resend_code");
+                      signIn.mfa.sendEmailCode();
+                    }}
                     disabled={fetchStatus === "fetching"}
                   >
                     <Text className="auth-secondary-button-text">
@@ -248,7 +253,10 @@ const SignIn = () => {
 
                   <Pressable
                     className="auth-secondary-button"
-                    onPress={() => signIn.reset()}
+                    onPress={() => {
+                      posthog.capture("sign_in_mfa_start_over");
+                      signIn.reset();
+                    }}
                     disabled={fetchStatus === "fetching"}
                   >
                     <Text className="auth-secondary-button-text">
@@ -360,7 +368,9 @@ const SignIn = () => {
             <View className="auth-link-row">
               <Text className="auth-link-copy">{`Don't have an account?`}</Text>
               <Link href="/(auth)/signUp" asChild>
-                <Pressable>
+                <Pressable
+                  onPress={() => posthog.capture("sign_in_navigate_to_sign_up")}
+                >
                   <Text className="auth-link">Create Account</Text>
                 </Pressable>
               </Link>
