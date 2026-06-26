@@ -1,6 +1,21 @@
 import { formatCurrency } from "@/lib/utils";
 import React from "react";
-import { Image, Text, View } from "react-native";
+import {
+  Image,
+  ImageSourcePropType,
+  Pressable,
+  Text,
+  View,
+} from "react-native";
+
+interface UpcomingSubscriptionCardProps {
+  name: string;
+  price: number;
+  daysLeft: number;
+  icon: ImageSourcePropType;
+  currency?: string;
+  onPress?: () => void;
+}
 
 const UpcomingSubscriptionCard = ({
   name,
@@ -8,9 +23,10 @@ const UpcomingSubscriptionCard = ({
   daysLeft,
   icon,
   currency,
-}: UpcomingSubscription) => {
+  onPress,
+}: UpcomingSubscriptionCardProps) => {
   return (
-    <View className="upcoming-card">
+    <Pressable onPress={onPress} className="upcoming-card">
       <View className="upcoming-row">
         <Image source={icon} className="upcoming-icon" />
         <View>
@@ -25,7 +41,7 @@ const UpcomingSubscriptionCard = ({
       <Text className="upcoming-name" numberOfLines={1}>
         {name}
       </Text>
-    </View>
+    </Pressable>
   );
 };
 
