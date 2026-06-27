@@ -217,6 +217,19 @@ const SignUp = () => {
                       Resend Code
                     </Text>
                   </Pressable>
+
+                  <Pressable
+                    className="auth-secondary-button"
+                    onPress={() => {
+                      posthog.capture("sign_up_verification_try_another_email");
+                      signUp.reset();
+                    }}
+                    disabled={fetchStatus === "fetching"}
+                  >
+                    <Text className="auth-secondary-button-text">
+                      Try another email
+                    </Text>
+                  </Pressable>
                 </View>
               </View>
             </View>

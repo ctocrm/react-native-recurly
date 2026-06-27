@@ -68,7 +68,13 @@ const App = () => {
                   }
                   className="home-avatar"
                 />
-                <Text className="home-user-name">{displayName}</Text>
+                <Text
+                  className="home-user-name"
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                >
+                  {displayName}
+                </Text>
               </View>
               <Pressable onPress={handleAddSubscriptionTap}>
                 <Image source={icons.add} className="home-add-icon" />
