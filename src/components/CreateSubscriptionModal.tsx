@@ -71,6 +71,14 @@ const CreateSubscriptionModal = ({
     resetForm();
   }, [visible, resetForm, posthog]);
 
+  const handleDismiss = useCallback(() => {
+    const hasInput = name.trim().length > 0 || price.length > 0;
+    posthog.capture("create_subscription_modal_dismissed", {
+      has_input: hasInput,
+    });
+    onClose();
+  }, [name, price, onClose, posthog]);
+
   const handleSubmit = () => {
     if (!formValid) return;
 
@@ -109,22 +117,13 @@ const CreateSubscriptionModal = ({
       visible={visible}
       animationType="slide"
       transparent
-      onRequestClose={onClose}
+      onRequestClose={handleDismiss}
     >
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         className="flex-1"
       >
-        <Pressable
-          className="modal-overlay"
-          onPress={() => {
-            const hasInput = name.trim().length > 0 || price.length > 0;
-            posthog.capture("create_subscription_modal_dismissed", {
-              has_input: hasInput,
-            });
-            onClose();
-          }}
-        >
+        <Pressable className="modal-overlay" onPress={handleDismiss}>
           <Pressable
             className="modal-container"
             onPress={(e) => e.stopPropagation()}
@@ -132,16 +131,7 @@ const CreateSubscriptionModal = ({
             {/* Header */}
             <View className="modal-header">
               <Text className="modal-title">New Subscription</Text>
-              <Pressable
-                className="modal-close"
-                onPress={() => {
-                  const hasInput = name.trim().length > 0 || price.length > 0;
-                  posthog.capture("create_subscription_modal_dismissed", {
-                    has_input: hasInput,
-                  });
-                  onClose();
-                }}
-              >
+              <Pressable className="modal-close" onPress={handleDismiss}>
                 <Text className="modal-close-text">✕</Text>
               </Pressable>
             </View>

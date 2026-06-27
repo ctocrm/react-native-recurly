@@ -222,6 +222,11 @@ const SignUp = () => {
                     className="auth-secondary-button"
                     onPress={() => {
                       posthog.capture("sign_up_verification_try_another_email");
+                      setEmailAddress("");
+                      setPassword("");
+                      setCode("");
+                      setEmailTouched(false);
+                      setPasswordTouched(false);
                       signUp.reset();
                     }}
                     disabled={fetchStatus === "fetching"}

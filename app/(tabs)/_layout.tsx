@@ -29,7 +29,7 @@ const TabLayout = () => {
   // Identify returning users whose session is restored from Clerk's token cache
   useEffect(() => {
     if (isLoaded && isSignedIn && user && !hasIdentified.current) {
-      const email = user.emailAddresses[0]?.emailAddress;
+      const email = user.primaryEmailAddress?.emailAddress;
       if (email) {
         posthog.identify(email, {
           $set: { email, name: user.fullName },
