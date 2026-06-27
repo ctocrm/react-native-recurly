@@ -2,17 +2,20 @@ import { useAuth, useSignIn } from "@clerk/expo";
 import { Link, useRouter, type Href } from "expo-router";
 import { styled } from "nativewind";
 import { usePostHog } from "posthog-react-native";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
+  Keyboard,
   KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   Text,
   TextInput,
   View,
 } from "react-native";
-import { SafeAreaView as RNSafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView as RNSafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 
 const SafeAreaView = styled(RNSafeAreaView);
 
@@ -21,6 +24,8 @@ const SignIn = () => {
   const { isSignedIn, signOut } = useAuth();
   const router = useRouter();
   const posthog = usePostHog();
+  const scrollRef = useRef<ScrollView>(null);
+  const insets = useSafeAreaInsets();
 
   const [emailAddress, setEmailAddress] = useState("");
   const [password, setPassword] = useState("");
@@ -29,6 +34,13 @@ const SignIn = () => {
   // Validation states
   const [emailTouched, setEmailTouched] = useState(false);
   const [passwordTouched, setPasswordTouched] = useState(false);
+
+  useEffect(() => {
+    const sub = Keyboard.addListener("keyboardDidShow", () => {
+      scrollRef.current?.scrollToEnd({ animated: true });
+    });
+    return () => sub.remove();
+  }, []);
 
   // Client-side validation
   const emailValid =
@@ -178,12 +190,13 @@ const SignIn = () => {
   // Show verification screen if client trust is needed
   if (signIn.status === "needs_client_trust") {
     return (
-      <SafeAreaView className="auth-safe-area">
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          className="auth-screen"
-        >
+      <SafeAreaView
+        className="auth-safe-area"
+        style={{ paddingBottom: insets.bottom }}
+      >
+        <KeyboardAvoidingView behavior="padding" className="auth-screen">
           <ScrollView
+            ref={scrollRef}
             className="auth-scroll"
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
@@ -274,12 +287,13 @@ const SignIn = () => {
 
   // Main sign-in form
   return (
-    <SafeAreaView className="auth-safe-area">
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        className="auth-screen"
-      >
+    <SafeAreaView
+      className="auth-safe-area"
+      style={{ paddingBottom: insets.bottom }}
+    >
+      <KeyboardAvoidingView behavior="padding" className="auth-screen">
         <ScrollView
+          ref={scrollRef}
           className="auth-scroll"
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
