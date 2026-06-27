@@ -1,15 +1,13 @@
 import ListHeading from "@/components/ListHeading";
 import SubscriptionCard from "@/components/SubscriptionCard";
 import UpcomingSubscriptionCard from "@/components/UpcomingSubscriptionCard";
-import {
-  HOME_BALANCE,
-  HOME_SUBSCRIPTIONS,
-  UPCOMING_SUBSCRIPTIONS,
-} from "@/constants/data";
+import { HOME_BALANCE, UPCOMING_SUBSCRIPTIONS } from "@/constants/data";
 import { icons } from "@/constants/icons";
 import images from "@/constants/images";
 import "@/global.css";
 import { formatCurrency } from "@/lib/utils";
+import CreateSubscriptionModal from "@/src/components/CreateSubscriptionModal";
+import { useSubscriptions } from "@/src/context/SubscriptionContext";
 import { useUser } from "@clerk/expo";
 import dayjs from "dayjs";
 import { styled } from "nativewind";
@@ -26,6 +24,8 @@ const App = () => {
   const [expandedSubscriptionId, setExpandedSubscriptionId] = useState<
     string | null
   >(null);
+  const { subscriptions, addSubscription } = useSubscriptions();
+  const [modalVisible, setModalVisible] = useState(false);
 
   const displayName =
     user?.firstName ||
@@ -35,6 +35,7 @@ const App = () => {
 
   const handleAddSubscriptionTap = () => {
     posthog.capture("home_add_subscription_tapped");
+    setModalVisible(true);
   };
 
   const handleUpcomingSubscriptionTap = (item: UpcomingSubscription) => {
@@ -48,6 +49,10 @@ const App = () => {
 
   const handleViewAllTap = () => {
     posthog.capture("home_view_all_tapped");
+  };
+
+  const handleCreateSubscription = (subscription: Subscription) => {
+    addSubscription(subscription);
   };
 
   return (
@@ -106,7 +111,7 @@ const App = () => {
             />
           </>
         }
-        data={HOME_SUBSCRIPTIONS}
+        data={subscriptions}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <SubscriptionCard
@@ -138,6 +143,12 @@ const App = () => {
           <Text className="home-empty-state">No subscription yet.</Text>
         }
         contentContainerClassName="pb-25"
+      />
+
+      <CreateSubscriptionModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        onCreate={handleCreateSubscription}
       />
     </SafeAreaView>
   );
