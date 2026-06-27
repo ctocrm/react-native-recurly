@@ -40,10 +40,16 @@ const Subscriptions = () => {
 
   const handleSearchChange = (text: string) => {
     setSearchQuery(text);
-    if (text.trim()) {
-      posthog.capture("subscriptions_search", { query: text.trim() });
-    }
   };
+
+  useEffect(() => {
+    if (searchQuery.trim()) {
+      posthog.capture("subscriptions_search", {
+        query_length: searchQuery.trim().length,
+        results_count: filteredSubscriptions.length,
+      });
+    }
+  }, [searchQuery, filteredSubscriptions.length, posthog]);
 
   return (
     <SafeAreaView className="flex-1 bg-background p-5">
