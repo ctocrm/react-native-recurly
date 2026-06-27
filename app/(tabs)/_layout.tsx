@@ -1,10 +1,12 @@
 import { tabs } from "@/constants/data";
 import { colors, components } from "@/constants/theme";
+import { posthog } from "@/src/config/posthog";
 import { SubscriptionProvider } from "@/src/context/SubscriptionContext";
 
-import { useAuth } from "@clerk/expo";
+import { useAuth, useUser } from "@clerk/expo";
 import clsx from "clsx";
 import { Redirect, Tabs } from "expo-router";
+import { useEffect, useRef } from "react";
 import { ActivityIndicator, Image, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -20,7 +22,23 @@ const TabIcon = ({ focused, icon }: TabIconProps) => {
 
 const TabLayout = () => {
   const { isSignedIn, isLoaded } = useAuth();
+  const { user } = useUser();
   const insets = useSafeAreaInsets();
+  const hasIdentified = useRef(false);
+
+  // Identify returning users whose session is restored from Clerk's token cache
+  useEffect(() => {
+    if (isLoaded && isSignedIn && user && !hasIdentified.current) {
+      const email = user.emailAddresses[0]?.emailAddress;
+      if (email) {
+        posthog.identify(email, {
+          $set: { email, name: user.fullName },
+          $set_once: { first_seen_date: new Date().toISOString() },
+        });
+        hasIdentified.current = true;
+      }
+    }
+  }, [isLoaded, isSignedIn, user]);
 
   if (!isLoaded) {
     return (
