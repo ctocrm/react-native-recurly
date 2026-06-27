@@ -1,7 +1,7 @@
 import ListHeading from "@/components/ListHeading";
 import SubscriptionCard from "@/components/SubscriptionCard";
-import { HOME_SUBSCRIPTIONS } from "@/constants/data";
 import "@/global.css";
+import { useSubscriptions } from "@/src/context/SubscriptionContext";
 import { styled } from "nativewind";
 import { usePostHog } from "posthog-react-native";
 import React, { useEffect, useMemo, useState } from "react";
@@ -12,6 +12,7 @@ const SafeAreaView = styled(RNSafeAreaView);
 
 const Subscriptions = () => {
   const posthog = usePostHog();
+  const { subscriptions } = useSubscriptions();
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedSubscriptionId, setExpandedSubscriptionId] = useState<
     string | null
@@ -22,10 +23,10 @@ const Subscriptions = () => {
   }, [posthog]);
 
   const filteredSubscriptions = useMemo(() => {
-    if (!searchQuery.trim()) return HOME_SUBSCRIPTIONS;
+    if (!searchQuery.trim()) return subscriptions;
 
     const query = searchQuery.toLowerCase().trim();
-    return HOME_SUBSCRIPTIONS.filter((sub) => {
+    return subscriptions.filter((sub) => {
       const searchableFields = [
         sub.name,
         sub.category,
