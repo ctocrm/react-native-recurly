@@ -1,16 +1,16 @@
 import { icons } from "@/constants/icons";
 import clsx from "clsx";
 import dayjs from "dayjs";
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    Pressable,
-    ScrollView,
-    Text,
-    TextInput,
-    View
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 
 const CATEGORIES = [
@@ -47,12 +47,24 @@ const CreateSubscriptionModal = ({
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
   const [frequency, setFrequency] = useState<"Monthly" | "Yearly">("Monthly");
-  const [category, setCategory] = useState<string>(CATEGORIES[0]);
+  const [category, setCategory] = useState<string>("Other");
 
   const isNameValid = name.trim().length > 0;
   const parsedPrice = parseFloat(price);
   const isPriceValid = !isNaN(parsedPrice) && parsedPrice > 0;
   const formValid = isNameValid && isPriceValid;
+
+  const resetForm = useCallback(() => {
+    setName("");
+    setPrice("");
+    setFrequency("Monthly");
+    setCategory("Other");
+  }, []);
+
+  // Reset form whenever the modal visibility changes
+  useEffect(() => {
+    resetForm();
+  }, [visible, resetForm]);
 
   const handleSubmit = () => {
     if (!formValid) return;
@@ -63,7 +75,7 @@ const CreateSubscriptionModal = ({
 
     const subscription: Subscription = {
       id: Date.now().toString(),
-      icon: icons.wallet,
+      icon: icons.plus,
       name: name.trim(),
       price: parsedPrice,
       currency: "USD",
@@ -77,12 +89,6 @@ const CreateSubscriptionModal = ({
     };
 
     onCreate(subscription);
-
-    // Reset form
-    setName("");
-    setPrice("");
-    setFrequency("Monthly");
-    setCategory(CATEGORIES[0]);
     onClose();
   };
 

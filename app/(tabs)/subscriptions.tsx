@@ -37,7 +37,7 @@ const Subscriptions = () => {
         (field) => field && field.toLowerCase().includes(query),
       );
     });
-  }, [searchQuery]);
+  }, [searchQuery, subscriptions]);
 
   const handleSearchChange = (text: string) => {
     setSearchQuery(text);
