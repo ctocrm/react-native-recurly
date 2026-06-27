@@ -1,9 +1,10 @@
 import { HOME_SUBSCRIPTIONS } from "@/constants/data";
+import { posthog } from "@/src/config/posthog";
 import React, {
-    createContext,
-    useContext,
-    useState,
-    type ReactNode,
+  createContext,
+  useContext,
+  useState,
+  type ReactNode,
 } from "react";
 
 interface SubscriptionContextType {
@@ -21,6 +22,13 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
 
   const addSubscription = (subscription: Subscription) => {
     setSubscriptions((prev) => [subscription, ...prev]);
+    posthog.capture("subscription_added", {
+      subscription_id: subscription.id,
+      subscription_name: subscription.name,
+      subscription_price: subscription.price,
+      subscription_category: subscription.category ?? "",
+      subscription_frequency: subscription.frequency ?? subscription.billing,
+    });
   };
 
   return (

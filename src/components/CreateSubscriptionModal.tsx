@@ -1,6 +1,7 @@
 import { icons } from "@/constants/icons";
 import clsx from "clsx";
 import dayjs from "dayjs";
+import { usePostHog } from "posthog-react-native";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   KeyboardAvoidingView,
@@ -44,6 +45,7 @@ const CreateSubscriptionModal = ({
   onClose,
   onCreate,
 }: CreateSubscriptionModalProps) => {
+  const posthog = usePostHog();
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
   const [frequency, setFrequency] = useState<"Monthly" | "Yearly">("Monthly");
@@ -61,10 +63,21 @@ const CreateSubscriptionModal = ({
     setCategory("Other");
   }, []);
 
-  // Reset form whenever the modal visibility changes
+  // Track modal open and reset form whenever the modal visibility changes
   useEffect(() => {
+    if (visible) {
+      posthog.capture("create_subscription_modal_opened");
+    }
     resetForm();
-  }, [visible, resetForm]);
+  }, [visible, resetForm, posthog]);
+
+  const handleDismiss = useCallback(() => {
+    const hasInput = name.trim().length > 0 || price.length > 0;
+    posthog.capture("create_subscription_modal_dismissed", {
+      has_input: hasInput,
+    });
+    onClose();
+  }, [name, price, onClose, posthog]);
 
   const handleSubmit = () => {
     if (!formValid) return;
@@ -88,6 +101,13 @@ const CreateSubscriptionModal = ({
       color: CATEGORY_COLORS[category] || CATEGORY_COLORS.Other,
     };
 
+    posthog.capture("subscription_created", {
+      subscription_name: name.trim(),
+      subscription_price: parsedPrice,
+      subscription_category: category,
+      subscription_frequency: frequency,
+    });
+
     onCreate(subscription);
     onClose();
   };
@@ -97,13 +117,13 @@ const CreateSubscriptionModal = ({
       visible={visible}
       animationType="slide"
       transparent
-      onRequestClose={onClose}
+      onRequestClose={handleDismiss}
     >
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         className="flex-1"
       >
-        <Pressable className="modal-overlay" onPress={onClose}>
+        <Pressable className="modal-overlay" onPress={handleDismiss}>
           <Pressable
             className="modal-container"
             onPress={(e) => e.stopPropagation()}
@@ -111,7 +131,7 @@ const CreateSubscriptionModal = ({
             {/* Header */}
             <View className="modal-header">
               <Text className="modal-title">New Subscription</Text>
-              <Pressable className="modal-close" onPress={onClose}>
+              <Pressable className="modal-close" onPress={handleDismiss}>
                 <Text className="modal-close-text">✕</Text>
               </Pressable>
             </View>
