@@ -79,9 +79,21 @@ const SignUp = () => {
   };
 
   const handleVerify = async () => {
-    await signUp.verifications.verifyEmailCode({
+    const { error } = await signUp.verifications.verifyEmailCode({
       code,
     });
+
+    if (error) {
+      console.error("Email verification failed", {
+        code: error.code,
+        message: error.message,
+      });
+      posthog.capture("sign_up_verification_failed", {
+        error_code: error.code,
+        error_message: error.message,
+      });
+      return;
+    }
 
     if (signUp.status === "complete") {
       await signUp.finalize({
