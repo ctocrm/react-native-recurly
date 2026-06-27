@@ -1,26 +1,30 @@
-import { useAuth, useSignUp } from "@clerk/expo";
+import { useSignUp } from "@clerk/expo";
 import { Link, useRouter, type Href } from "expo-router";
 import { styled } from "nativewind";
 import { usePostHog } from "posthog-react-native";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
+  Keyboard,
   KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   Text,
   TextInput,
   View,
 } from "react-native";
-import { SafeAreaView as RNSafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView as RNSafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 
 const SafeAreaView = styled(RNSafeAreaView);
 
 const SignUp = () => {
   const { signUp, errors, fetchStatus } = useSignUp();
-  const { isSignedIn } = useAuth();
   const router = useRouter();
   const posthog = usePostHog();
+  const scrollRef = useRef<ScrollView>(null);
+  const insets = useSafeAreaInsets();
 
   const [emailAddress, setEmailAddress] = useState("");
   const [password, setPassword] = useState("");
@@ -29,6 +33,13 @@ const SignUp = () => {
   // Validation states
   const [emailTouched, setEmailTouched] = useState(false);
   const [passwordTouched, setPasswordTouched] = useState(false);
+
+  useEffect(() => {
+    const sub = Keyboard.addListener("keyboardDidShow", () => {
+      scrollRef.current?.scrollToEnd({ animated: true });
+    });
+    return () => sub.remove();
+  }, []);
 
   // Client-side validation
   const emailValid =
@@ -107,8 +118,8 @@ const SignUp = () => {
     }
   };
 
-  // Don't show anything if already signed in or sign-up is complete
-  if (signUp.status === "complete" || isSignedIn) {
+  // Don't show anything if sign-up is complete
+  if (signUp.status === "complete") {
     return null;
   }
 
@@ -119,11 +130,11 @@ const SignUp = () => {
     signUp.missingFields.length === 0
   ) {
     return (
-      <SafeAreaView className="auth-safe-area">
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          className="auth-screen"
-        >
+      <SafeAreaView
+        className="auth-safe-area"
+        style={{ paddingBottom: insets.bottom }}
+      >
+        <KeyboardAvoidingView behavior="padding" className="auth-screen">
           <ScrollView
             className="auth-scroll"
             keyboardShouldPersistTaps="handled"
@@ -204,12 +215,13 @@ const SignUp = () => {
 
   // Main sign-up form
   return (
-    <SafeAreaView className="auth-safe-area">
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        className="auth-screen"
-      >
+    <SafeAreaView
+      className="auth-safe-area"
+      style={{ paddingBottom: insets.bottom }}
+    >
+      <KeyboardAvoidingView behavior="padding" className="auth-screen">
         <ScrollView
+          ref={scrollRef}
           className="auth-scroll"
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
