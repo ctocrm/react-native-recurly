@@ -1,0 +1,14 @@
+env: load .env
+env: export EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY POSTHOG_HOST POSTHOG_PROJECT_TOKEN
+Starting project at /home/d/Desktop/jsmastery
+✅ Clerk iOS plugin loaded
+✅ Clerk Android plugin loaded
+✅ Clerk iOS plugin loaded
+✅ Clerk Android plugin loaded
+✅ Clerk iOS plugin loaded
+✅ Clerk Android plugin loaded
+✅ Clerk iOS plugin loaded
+✅ Clerk Android plugin loaded
+Starting Metro Bundler
+
+warning: Bundler cache is empty, rebuilding (this may take a minute)
