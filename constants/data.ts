@@ -16,33 +16,6 @@ export const HOME_BALANCE = {
   nextRenewalDate: "2026-03-18T09:00:00.000Z",
 };
 
-export const UPCOMING_SUBSCRIPTIONS: UpcomingSubscription[] = [
-  {
-    id: "spotify",
-    icon: icons.spotify,
-    name: "Spotify",
-    price: 5.99,
-    currency: "USD",
-    daysLeft: 2,
-  },
-  {
-    id: "notion",
-    icon: icons.notion,
-    name: "Notion",
-    price: 12.0,
-    currency: "USD",
-    daysLeft: 4,
-  },
-  {
-    id: "figma",
-    icon: icons.figma,
-    name: "Figma",
-    price: 15.0,
-    currency: "USD",
-    daysLeft: 6,
-  },
-];
-
 export const HOME_SUBSCRIPTIONS: Subscription[] = [
   {
     id: "adobe-creative-cloud",

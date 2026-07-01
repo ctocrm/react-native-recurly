@@ -29,11 +29,15 @@ declare global {
     color?: string;
   }
 
-  interface SubscriptionCardProps extends Omit<Subscription, "id"> {
+  interface SubscriptionCardProps extends Subscription {
     expanded: boolean;
     onPress: () => void;
-    onCancelPress?: () => void;
-    isCancelling?: boolean;
+    onEdit?: () => void;
+    onDelete?: () => void;
+    onMarkActive?: () => void;
+    onMarkPaused?: () => void;
+    onMarkCancelled?: () => void;
+    onViewStats?: () => void;
   }
 
   interface UpcomingSubscription {

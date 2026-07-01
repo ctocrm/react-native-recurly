@@ -3,7 +3,7 @@ import { searchLogos } from "@/lib/resolveLogo";
 import clsx from "clsx";
 import dayjs from "dayjs";
 import { usePostHog } from "posthog-react-native";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   FlatList,
   Image,
@@ -39,50 +39,67 @@ const CATEGORY_COLORS: Record<string, string> = {
   Other: "#c4c4c4",
 };
 
-interface CreateSubscriptionModalProps {
+interface EditSubscriptionModalProps {
   visible: boolean;
+  subscription: Subscription | null;
   onClose: () => void;
-  onCreate: (subscription: Subscription) => void;
+  onSave: (id: string, data: Partial<Subscription>) => void;
 }
 
-const CreateSubscriptionModal = ({
+const EditSubscriptionModal = ({
   visible,
+  subscription,
   onClose,
-  onCreate,
-}: CreateSubscriptionModalProps) => {
+  onSave,
+}: EditSubscriptionModalProps) => {
   const posthog = usePostHog();
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
   const [frequency, setFrequency] = useState<"Monthly" | "Yearly">("Monthly");
   const [category, setCategory] = useState<string>("Other");
+  const [plan, setPlan] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("");
+  const [renewalDate, setRenewalDate] = useState("");
   const [selectedIcon, setSelectedIcon] = useState(icons.plus);
   const [showAutocomplete, setShowAutocomplete] = useState(false);
   const [autocompleteResults, setAutocompleteResults] = useState<
     { name: string; icon: any; category?: string }[]
   >([]);
 
+  // Populate form when subscription changes
+  useEffect(() => {
+    if (subscription) {
+      setName(subscription.name);
+      setPrice(subscription.price.toString());
+      setFrequency(
+        (subscription.frequency as "Monthly" | "Yearly") ||
+          (subscription.billing as "Monthly" | "Yearly") ||
+          "Monthly",
+      );
+      setCategory(subscription.category || "Other");
+      setPlan(subscription.plan || "");
+      setPaymentMethod(subscription.paymentMethod || "");
+      setRenewalDate(
+        subscription.renewalDate
+          ? dayjs(subscription.renewalDate).format("YYYY-MM-DD")
+          : "",
+      );
+      setSelectedIcon(subscription.icon || icons.plus);
+    }
+  }, [subscription]);
+
+  useEffect(() => {
+    if (visible && subscription?.id) {
+      posthog.capture("edit_subscription_modal_opened", {
+        subscription_id: subscription.id,
+      });
+    }
+  }, [visible, subscription, posthog]);
+
   const isNameValid = name.trim().length > 0;
   const parsedPrice = parseFloat(price);
   const isPriceValid = !isNaN(parsedPrice) && parsedPrice > 0;
   const formValid = isNameValid && isPriceValid;
-
-  const resetForm = useCallback(() => {
-    setName("");
-    setPrice("");
-    setFrequency("Monthly");
-    setCategory("Other");
-    setSelectedIcon(icons.plus);
-    setShowAutocomplete(false);
-    setAutocompleteResults([]);
-  }, []);
-
-  // Track modal open and reset form whenever the modal visibility changes
-  useEffect(() => {
-    if (visible) {
-      posthog.capture("create_subscription_modal_opened");
-    }
-    resetForm();
-  }, [visible, resetForm, posthog]);
 
   const handleNameChange = (text: string) => {
     setName(text);
@@ -93,7 +110,6 @@ const CreateSubscriptionModal = ({
     } else {
       setShowAutocomplete(false);
       setAutocompleteResults([]);
-      setSelectedIcon(icons.plus);
     }
   };
 
@@ -111,67 +127,58 @@ const CreateSubscriptionModal = ({
     setAutocompleteResults([]);
   };
 
-  const handleDismiss = useCallback(() => {
-    const hasInput = name.trim().length > 0 || price.length > 0;
-    posthog.capture("create_subscription_modal_dismissed", {
-      has_input: hasInput,
-    });
-    onClose();
-  }, [name, price, onClose, posthog]);
+  const handleSave = () => {
+    if (!formValid || !subscription) return;
 
-  const handleSubmit = () => {
-    if (!formValid) return;
-
-    const now = dayjs();
-    const renewalDate =
-      frequency === "Yearly" ? now.add(1, "year") : now.add(1, "month");
-
-    const subscription: Subscription = {
-      id: Date.now().toString(),
-      icon: selectedIcon,
+    const data: Partial<Subscription> = {
       name: name.trim(),
       price: parsedPrice,
       currency: "USD",
       category,
       frequency,
       billing: frequency,
-      status: "active",
-      startDate: now.toISOString(),
-      renewalDate: renewalDate.toISOString(),
+      icon: selectedIcon,
+      plan: plan.trim() || undefined,
+      paymentMethod: paymentMethod.trim() || undefined,
+      renewalDate: renewalDate
+        ? dayjs(renewalDate).toISOString()
+        : subscription.renewalDate,
       color: CATEGORY_COLORS[category] || CATEGORY_COLORS.Other,
     };
 
-    posthog.capture("subscription_created", {
+    posthog.capture("subscription_edited", {
+      subscription_id: subscription.id,
       subscription_name: name.trim(),
       subscription_price: parsedPrice,
       subscription_category: category,
-      subscription_frequency: frequency,
     });
 
-    onCreate(subscription);
+    onSave(subscription.id, data);
     onClose();
   };
+
+  if (!subscription) return null;
 
   return (
     <Modal
       visible={visible}
       animationType="slide"
       transparent
-      onRequestClose={handleDismiss}
+      onRequestClose={onClose}
     >
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         className="flex-1"
       >
-        <Pressable className="modal-overlay" onPress={handleDismiss}>
+        <Pressable className="modal-overlay" onPress={onClose}>
           <Pressable
             className="modal-container"
             onPress={(e) => e.stopPropagation()}
           >
             {/* Header */}
             <View className="modal-header">
-              <Text className="modal-title">New Subscription</Text>
-              <Pressable className="modal-close" onPress={handleDismiss}>
+              <Text className="modal-title">Edit Subscription</Text>
+              <Pressable className="modal-close" onPress={onClose}>
                 <Text className="modal-close-text">✕</Text>
               </Pressable>
             </View>
@@ -307,16 +314,55 @@ const CreateSubscriptionModal = ({
                 </View>
               </View>
 
-              {/* Submit */}
+              {/* Plan */}
+              <View className="auth-field">
+                <Text className="auth-label">Plan</Text>
+                <TextInput
+                  className="auth-input"
+                  value={plan}
+                  placeholder="e.g. Premium, Pro"
+                  placeholderTextColor="rgba(0, 0, 0, 0.4)"
+                  onChangeText={setPlan}
+                  autoCapitalize="words"
+                />
+              </View>
+
+              {/* Payment Method */}
+              <View className="auth-field">
+                <Text className="auth-label">Payment Method</Text>
+                <TextInput
+                  className="auth-input"
+                  value={paymentMethod}
+                  placeholder="e.g. Visa ending in 1234"
+                  placeholderTextColor="rgba(0, 0, 0, 0.4)"
+                  onChangeText={setPaymentMethod}
+                  autoCapitalize="sentences"
+                />
+              </View>
+
+              {/* Next Renewal Date */}
+              <View className="auth-field">
+                <Text className="auth-label">Next Renewal Date</Text>
+                <TextInput
+                  className="auth-input"
+                  value={renewalDate}
+                  placeholder="YYYY-MM-DD"
+                  placeholderTextColor="rgba(0, 0, 0, 0.4)"
+                  onChangeText={setRenewalDate}
+                  autoCapitalize="none"
+                />
+              </View>
+
+              {/* Save */}
               <Pressable
                 className={clsx(
                   "auth-button",
                   !formValid && "auth-button-disabled",
                 )}
-                onPress={handleSubmit}
+                onPress={handleSave}
                 disabled={!formValid}
               >
-                <Text className="auth-button-text">Create Subscription</Text>
+                <Text className="auth-button-text">Save Changes</Text>
               </Pressable>
             </ScrollView>
           </Pressable>
@@ -326,4 +372,4 @@ const CreateSubscriptionModal = ({
   );
 };
 
-export default CreateSubscriptionModal;
+export default EditSubscriptionModal;

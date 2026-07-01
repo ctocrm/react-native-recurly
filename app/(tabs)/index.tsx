@@ -1,37 +1,61 @@
 import ListHeading from "@/components/ListHeading";
 import SubscriptionCard from "@/components/SubscriptionCard";
 import UpcomingSubscriptionCard from "@/components/UpcomingSubscriptionCard";
-import { HOME_BALANCE, UPCOMING_SUBSCRIPTIONS } from "@/constants/data";
+import { HOME_BALANCE } from "@/constants/data";
 import { icons } from "@/constants/icons";
 import images from "@/constants/images";
 import "@/global.css";
 import { formatCurrency } from "@/lib/utils";
 import CreateSubscriptionModal from "@/src/components/CreateSubscriptionModal";
+import EditSubscriptionModal from "@/src/components/EditSubscriptionModal";
+import SubscriptionStatsModal from "@/src/components/SubscriptionStatsModal";
+import UserSettingsModal from "@/src/components/UserSettingsModal";
 import { useSubscriptions } from "@/src/context/SubscriptionContext";
 import { useUser } from "@clerk/expo";
 import dayjs from "dayjs";
+import { useRouter } from "expo-router";
 import { styled } from "nativewind";
 import { usePostHog } from "posthog-react-native";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { FlatList, Image, Pressable, Text, View } from "react-native";
 import { SafeAreaView as RNSafeAreaView } from "react-native-safe-area-context";
 
 const SafeAreaView = styled(RNSafeAreaView);
 
 const App = () => {
+  const router = useRouter();
   const { user } = useUser();
   const posthog = usePostHog();
   const [expandedSubscriptionId, setExpandedSubscriptionId] = useState<
     string | null
   >(null);
-  const { subscriptions, addSubscription } = useSubscriptions();
+  const {
+    subscriptions,
+    addSubscription,
+    updateSubscription,
+    deleteSubscription,
+    updateSubscriptionStatus,
+    getUpcomingSubscriptions,
+  } = useSubscriptions();
   const [modalVisible, setModalVisible] = useState(false);
+  const [editingSubscription, setEditingSubscription] =
+    useState<Subscription | null>(null);
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [statsModalSubscription, setStatsModalSubscription] =
+    useState<Subscription | null>(null);
+  const [statsModalVisible, setStatsModalVisible] = useState(false);
+  const [userSettingsVisible, setUserSettingsVisible] = useState(false);
 
   const displayName =
     user?.firstName ||
     user?.fullName ||
     user?.emailAddresses[0]?.emailAddress ||
     "User";
+
+  const upcomingSubscriptions = useMemo(
+    () => getUpcomingSubscriptions(7),
+    [getUpcomingSubscriptions],
+  );
 
   const handleAddSubscriptionTap = () => {
     posthog.capture("home_add_subscription_tapped");
@@ -47,12 +71,43 @@ const App = () => {
     });
   };
 
-  const handleViewAllTap = () => {
+  const handleViewAllUpcoming = () => {
+    posthog.capture("home_view_all_upcoming_tapped");
+    router.push("/(tabs)/subscriptions?filter=upcoming");
+  };
+
+  const handleViewAllSubscriptions = () => {
     posthog.capture("home_view_all_tapped");
+    router.push("/(tabs)/subscriptions");
   };
 
   const handleCreateSubscription = (subscription: Subscription) => {
     addSubscription(subscription);
+  };
+
+  const handleEdit = (sub: Subscription) => {
+    setEditingSubscription(sub);
+    setEditModalVisible(true);
+  };
+
+  const handleSaveEdit = (id: string, data: Partial<Subscription>) => {
+    updateSubscription(id, data);
+  };
+
+  const handleDelete = (sub: Subscription) => {
+    deleteSubscription(sub.id);
+  };
+
+  const handleStatusChange = (
+    sub: Subscription,
+    status: "active" | "paused" | "cancelled",
+  ) => {
+    updateSubscriptionStatus(sub.id, status);
+  };
+
+  const handleViewStats = (sub: Subscription) => {
+    setStatsModalSubscription(sub);
+    setStatsModalVisible(true);
   };
 
   return (
@@ -62,12 +117,14 @@ const App = () => {
           <>
             <View className="home-header">
               <View className="home-user">
-                <Image
-                  source={
-                    user?.imageUrl ? { uri: user.imageUrl } : images.avatar
-                  }
-                  className="home-avatar"
-                />
+                <Pressable onPress={() => setUserSettingsVisible(true)}>
+                  <Image
+                    source={
+                      user?.imageUrl ? { uri: user.imageUrl } : images.avatar
+                    }
+                    className="home-avatar"
+                  />
+                </Pressable>
                 <Text
                   className="home-user-name"
                   numberOfLines={1}
@@ -92,9 +149,9 @@ const App = () => {
               </View>
             </View>
             <View className="mb-5">
-              <ListHeading title="Upcoming" onViewAll={handleViewAllTap} />
+              <ListHeading title="Upcoming" onViewAll={handleViewAllUpcoming} />
               <FlatList
-                data={UPCOMING_SUBSCRIPTIONS}
+                data={upcomingSubscriptions}
                 renderItem={({ item }) => (
                   <UpcomingSubscriptionCard
                     {...item}
@@ -113,7 +170,7 @@ const App = () => {
             </View>
             <ListHeading
               title="All Subscriptions"
-              onViewAll={handleViewAllTap}
+              onViewAll={handleViewAllSubscriptions}
             />
           </>
         }
@@ -140,6 +197,12 @@ const App = () => {
                 },
               );
             }}
+            onEdit={() => handleEdit(item)}
+            onDelete={() => handleDelete(item)}
+            onMarkActive={() => handleStatusChange(item, "active")}
+            onMarkPaused={() => handleStatusChange(item, "paused")}
+            onMarkCancelled={() => handleStatusChange(item, "cancelled")}
+            onViewStats={() => handleViewStats(item)}
           />
         )}
         extraData={expandedSubscriptionId}
@@ -155,6 +218,33 @@ const App = () => {
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
         onCreate={handleCreateSubscription}
+      />
+
+      <EditSubscriptionModal
+        visible={editModalVisible}
+        subscription={editingSubscription}
+        onClose={() => {
+          setEditModalVisible(false);
+          setEditingSubscription(null);
+        }}
+        onSave={handleSaveEdit}
+      />
+
+      <SubscriptionStatsModal
+        visible={statsModalVisible}
+        subscription={statsModalSubscription}
+        onClose={() => {
+          setStatsModalVisible(false);
+          setStatsModalSubscription(null);
+        }}
+        onRenew={(id: string) => {
+          updateSubscription(id, {});
+        }}
+      />
+
+      <UserSettingsModal
+        visible={userSettingsVisible}
+        onClose={() => setUserSettingsVisible(false)}
       />
     </SafeAreaView>
   );
