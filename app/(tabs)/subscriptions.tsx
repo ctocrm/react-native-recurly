@@ -1,43 +1,88 @@
 import ListHeading from "@/components/ListHeading";
 import SubscriptionCard from "@/components/SubscriptionCard";
 import "@/global.css";
+import EditSubscriptionModal from "@/src/components/EditSubscriptionModal";
+import SubscriptionStatsModal from "@/src/components/SubscriptionStatsModal";
 import { useSubscriptions } from "@/src/context/SubscriptionContext";
+import clsx from "clsx";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { styled } from "nativewind";
 import { usePostHog } from "posthog-react-native";
 import React, { useEffect, useMemo, useState } from "react";
-import { FlatList, Text, TextInput, View } from "react-native";
+import { FlatList, Pressable, Text, TextInput, View } from "react-native";
 import { SafeAreaView as RNSafeAreaView } from "react-native-safe-area-context";
 
 const SafeAreaView = styled(RNSafeAreaView);
 
+const FILTER_OPTIONS = ["All", "Upcoming"] as const;
+
 const Subscriptions = () => {
   const posthog = usePostHog();
-  const { subscriptions } = useSubscriptions();
+  const router = useRouter();
+  const { filter: initialFilter } = useLocalSearchParams<{ filter?: string }>();
+  const {
+    subscriptions,
+    updateSubscription,
+    deleteSubscription,
+    updateSubscriptionStatus,
+    getUpcomingSubscriptions,
+  } = useSubscriptions();
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedSubscriptionId, setExpandedSubscriptionId] = useState<
     string | null
   >(null);
+  const [activeFilter, setActiveFilter] = useState<string>(
+    initialFilter === "upcoming" ? "Upcoming" : "All",
+  );
+  const [editingSubscription, setEditingSubscription] =
+    useState<Subscription | null>(null);
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [statsModalSubscription, setStatsModalSubscription] =
+    useState<Subscription | null>(null);
+  const [statsModalVisible, setStatsModalVisible] = useState(false);
 
   useEffect(() => {
     posthog.capture("subscriptions_viewed");
   }, [posthog]);
 
-  const filteredSubscriptions = useMemo(() => {
-    if (!searchQuery.trim()) return subscriptions;
+  // If navigated with filter=upcoming, switch to Upcoming filter
+  useEffect(() => {
+    if (initialFilter === "upcoming") {
+      setActiveFilter("Upcoming");
+    }
+  }, [initialFilter]);
 
-    const query = searchQuery.toLowerCase().trim();
-    return subscriptions.filter((sub) => {
-      const searchableFields = [
-        sub.name,
-        sub.category,
-        sub.plan,
-        sub.paymentMethod,
-      ];
-      return searchableFields.some(
-        (field) => field && field.toLowerCase().includes(query),
-      );
-    });
-  }, [searchQuery, subscriptions]);
+  const upcomingIds = useMemo(() => {
+    const upcoming = getUpcomingSubscriptions(7);
+    return new Set(upcoming.map((u) => u.id));
+  }, [getUpcomingSubscriptions]);
+
+  const filteredSubscriptions = useMemo(() => {
+    let filtered = subscriptions;
+
+    // Apply filter
+    if (activeFilter === "Upcoming") {
+      filtered = filtered.filter((sub) => upcomingIds.has(sub.id));
+    }
+
+    // Apply search
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter((sub) => {
+        const searchableFields = [
+          sub.name,
+          sub.category,
+          sub.plan,
+          sub.paymentMethod,
+        ];
+        return searchableFields.some(
+          (field) => field && field.toLowerCase().includes(query),
+        );
+      });
+    }
+
+    return filtered;
+  }, [searchQuery, subscriptions, activeFilter, upcomingIds]);
 
   const handleSearchChange = (text: string) => {
     setSearchQuery(text);
@@ -51,6 +96,31 @@ const Subscriptions = () => {
       });
     }
   }, [searchQuery, filteredSubscriptions.length, posthog]);
+
+  const handleEdit = (sub: Subscription) => {
+    setEditingSubscription(sub);
+    setEditModalVisible(true);
+  };
+
+  const handleSaveEdit = (id: string, data: Partial<Subscription>) => {
+    updateSubscription(id, data);
+  };
+
+  const handleDelete = (sub: Subscription) => {
+    deleteSubscription(sub.id);
+  };
+
+  const handleStatusChange = (
+    sub: Subscription,
+    status: "active" | "paused" | "cancelled",
+  ) => {
+    updateSubscriptionStatus(sub.id, status);
+  };
+
+  const handleViewStats = (sub: Subscription) => {
+    setStatsModalSubscription(sub);
+    setStatsModalVisible(true);
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-background p-5">
@@ -70,11 +140,47 @@ const Subscriptions = () => {
                 autoCorrect={false}
               />
             </View>
+
+            {/* Filter chips */}
+            <View className="mb-4 flex-row gap-2">
+              {FILTER_OPTIONS.map((filter) => (
+                <Pressable
+                  key={filter}
+                  className={clsx(
+                    "rounded-full border px-4 py-2",
+                    activeFilter === filter
+                      ? "border-accent bg-accent/10"
+                      : "border-border bg-background",
+                  )}
+                  onPress={() => {
+                    setActiveFilter(filter);
+                    posthog.capture("subscriptions_filter_changed", {
+                      filter,
+                    });
+                  }}
+                >
+                  <Text
+                    className={clsx(
+                      "text-sm font-sans-semibold",
+                      activeFilter === filter
+                        ? "text-accent"
+                        : "text-muted-foreground",
+                    )}
+                  >
+                    {filter}
+                    {filter === "Upcoming" && ` (${upcomingIds.size})`}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
             <ListHeading
               title={
                 searchQuery.trim()
                   ? `Results (${filteredSubscriptions.length})`
-                  : "All Subscriptions"
+                  : activeFilter === "Upcoming"
+                    ? `Upcoming (${filteredSubscriptions.length})`
+                    : "All Subscriptions"
               }
             />
           </>
@@ -102,6 +208,12 @@ const Subscriptions = () => {
                 },
               );
             }}
+            onEdit={() => handleEdit(item)}
+            onDelete={() => handleDelete(item)}
+            onMarkActive={() => handleStatusChange(item, "active")}
+            onMarkPaused={() => handleStatusChange(item, "paused")}
+            onMarkCancelled={() => handleStatusChange(item, "cancelled")}
+            onViewStats={() => handleViewStats(item)}
           />
         )}
         extraData={expandedSubscriptionId}
@@ -111,10 +223,36 @@ const Subscriptions = () => {
           <Text className="home-empty-state">
             {searchQuery.trim()
               ? "No subscriptions match your search."
-              : "No subscription yet."}
+              : activeFilter === "Upcoming"
+                ? "No upcoming subscriptions."
+                : "No subscription yet."}
           </Text>
         }
         contentContainerClassName="pb-25"
+      />
+
+      {/* Edit Modal */}
+      <EditSubscriptionModal
+        visible={editModalVisible}
+        subscription={editingSubscription}
+        onClose={() => {
+          setEditModalVisible(false);
+          setEditingSubscription(null);
+        }}
+        onSave={handleSaveEdit}
+      />
+
+      {/* Stats Modal */}
+      <SubscriptionStatsModal
+        visible={statsModalVisible}
+        subscription={statsModalSubscription}
+        onClose={() => {
+          setStatsModalVisible(false);
+          setStatsModalSubscription(null);
+        }}
+        onRenew={(id) => {
+          updateSubscription(id, {});
+        }}
       />
     </SafeAreaView>
   );

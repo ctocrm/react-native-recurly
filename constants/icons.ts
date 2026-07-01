@@ -8,8 +8,10 @@ import dropbox from "@/assets/icons/dropbox.png";
 import figma from "@/assets/icons/figma.png";
 import github from "@/assets/icons/github.png";
 import home from "@/assets/icons/home.png";
+import logo from "@/assets/icons/logo.png";
 import medium from "@/assets/icons/medium.png";
 import menu from "@/assets/icons/menu.png";
+import netflix from "@/assets/icons/netflix.png";
 import notion from "@/assets/icons/notion.png";
 import openai from "@/assets/icons/openai.png";
 import plus from "@/assets/icons/plus.png";
@@ -36,6 +38,8 @@ export const icons = {
   github,
   claude,
   canva,
+  netflix,
+  logo,
 } as const;
 
 export type IconKey = keyof typeof icons;
