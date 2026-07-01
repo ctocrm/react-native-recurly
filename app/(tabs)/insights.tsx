@@ -3,8 +3,15 @@ import { formatCurrency } from "@/lib/utils";
 import { useSubscriptions } from "@/src/context/SubscriptionContext";
 import { styled } from "nativewind";
 import { usePostHog } from "posthog-react-native";
-import React, { useEffect, useMemo } from "react";
-import { FlatList, Image, Pressable, Text, View } from "react-native";
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  FlatList,
+  Image,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
 import { SafeAreaView as RNSafeAreaView } from "react-native-safe-area-context";
 
 const SafeAreaView = styled(RNSafeAreaView);
@@ -24,11 +31,13 @@ const MONTHS = [
   "Dec",
 ];
 
-const currentMonthIndex = new Date().getMonth();
-const MONTH_LABELS = MONTHS.slice(
-  Math.max(0, currentMonthIndex - 5),
-  currentMonthIndex + 1,
-);
+const PERIODS = [
+  "This Month",
+  "Last 3 Months",
+  "Last 6 Months",
+  "Year",
+] as const;
+type Period = (typeof PERIODS)[number];
 
 const categoryIcons: Record<string, any> = {
   Design: icons.adobe,
@@ -45,6 +54,7 @@ const categoryColors: Record<string, string> = {
 const Insights = () => {
   const posthog = usePostHog();
   const { subscriptions } = useSubscriptions();
+  const [selectedPeriod, setSelectedPeriod] = useState<Period>("This Month");
 
   useEffect(() => {
     posthog.capture("insights_viewed");
@@ -53,8 +63,10 @@ const Insights = () => {
   // Calculate total monthly spend and category breakdown
   const { totalMonthlySpend, categoryBreakdown, monthlyChartData } =
     useMemo(() => {
-      // Filter active subscriptions and calculate monthly cost
-      const activeSubs = subscriptions.filter((s) => s.status !== "cancelled");
+      // Filter active subscriptions — exclude cancelled and paused
+      const activeSubs = subscriptions.filter(
+        (s) => s.status !== "cancelled" && s.status !== "paused",
+      );
 
       let total = 0;
       const categoryTotals: Record<
@@ -96,22 +108,34 @@ const Insights = () => {
         }))
         .sort((a, b) => b.total - a.total);
 
-      // Generate mock monthly chart data (since we don't have historical data)
-      const chartData = MONTH_LABELS.map((label, i) => {
-        const baseAmount = total / 3;
-        const variation = Math.sin(i * 1.2) * total * 0.15;
-        return {
-          label,
-          amount: Math.max(0, total + variation),
-        };
-      });
+      // Generate estimated monthly chart data as a run-rate projection
+      const currentMonth = new Date().getMonth();
+      const monthsToShow =
+        selectedPeriod === "This Month"
+          ? 1
+          : selectedPeriod === "Last 3 Months"
+            ? 3
+            : selectedPeriod === "Last 6 Months"
+              ? 6
+              : 12;
+
+      const chartData: { label: string; amount: number; estimated: boolean }[] =
+        [];
+      for (let i = monthsToShow - 1; i >= 0; i--) {
+        const monthIndex = (((currentMonth - i) % 12) + 12) % 12;
+        chartData.push({
+          label: MONTHS[monthIndex],
+          amount: total,
+          estimated: i > 0, // past months are estimated, current month is actual run-rate
+        });
+      }
 
       return {
         totalMonthlySpend: total,
         categoryBreakdown: sortedCategories,
         monthlyChartData: chartData,
       };
-    }, [subscriptions]);
+    }, [subscriptions, selectedPeriod]);
 
   const maxCategorySpend =
     categoryBreakdown.length > 0
@@ -124,7 +148,7 @@ const Insights = () => {
       : 1;
 
   const totalSubs = subscriptions.filter(
-    (s) => s.status !== "cancelled",
+    (s) => s.status !== "cancelled" && s.status !== "paused",
   ).length;
 
   const topCategory =
@@ -139,8 +163,17 @@ const Insights = () => {
             {/* Header */}
             <View className="insights-header">
               <Text className="insights-title">Insights</Text>
-              <Pressable className="insights-period">
-                <Text className="insights-period-text">This Month</Text>
+              <Pressable
+                className="insights-period"
+                onPress={() => {
+                  const idx = PERIODS.indexOf(selectedPeriod);
+                  setSelectedPeriod(PERIODS[(idx + 1) % PERIODS.length]);
+                  posthog.capture("insights_period_changed", {
+                    period: PERIODS[(idx + 1) % PERIODS.length],
+                  });
+                }}
+              >
+                <Text className="insights-period-text">{selectedPeriod}</Text>
                 <Image
                   source={icons.back}
                   className="insights-period-icon -rotate-90"
@@ -167,7 +200,7 @@ const Insights = () => {
                 </View>
                 <View className="insights-summary-item">
                   <Text className="insights-summary-item-value">
-                    {topCategory ? topCategory.name : "-"}
+                    {topCategory ? formatCurrency(topCategory.total) : "$0"}
                   </Text>
                   <Text className="insights-summary-item-label">
                     Most Spent
@@ -175,7 +208,7 @@ const Insights = () => {
                 </View>
                 <View className="insights-summary-item">
                   <Text className="insights-summary-item-value">
-                    {topCategory ? formatCurrency(topCategory.total) : "$0"}
+                    {topCategory ? topCategory.name : "-"}
                   </Text>
                   <Text className="insights-summary-item-label">
                     Top Category
@@ -230,9 +263,11 @@ const Insights = () => {
               );
             })}
 
-            {/* Monthly Chart */}
+            {/* Estimated Monthly Spending Chart */}
             <View className="insights-section-head mt-5">
-              <Text className="insights-section-title">Monthly Spending</Text>
+              <Text className="insights-section-title">
+                Estimated Monthly Spend
+              </Text>
             </View>
 
             <View className="rounded-2xl border border-border bg-muted p-5">
@@ -261,9 +296,12 @@ const Insights = () => {
                             height: barHeight as any,
                             backgroundColor:
                               data.label ===
-                              MONTH_LABELS[MONTH_LABELS.length - 1]
+                              monthlyChartData[monthlyChartData.length - 1]
+                                ?.label
                                 ? "#ea7a53"
-                                : "#f7d44c",
+                                : data.estimated
+                                  ? "#f7d44c"
+                                  : "#ea7a53",
                           }}
                         />
                       </View>
@@ -274,21 +312,29 @@ const Insights = () => {
               </View>
             </View>
 
-            {/* Monthly selector chips */}
-            <View className="insights-month-scroll mt-5">
-              {["This Month", "Last 3 Months", "Last 6 Months", "Year"].map(
-                (period) => (
+            {/* Period selector chips */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              className="mt-5"
+            >
+              <View className="insights-month-scroll flex-row gap-2">
+                {PERIODS.map((period) => (
                   <Pressable
                     key={period}
                     className={`insights-month-chip ${
-                      period === "This Month"
+                      period === selectedPeriod
                         ? "insights-month-chip-active"
                         : ""
                     }`}
+                    onPress={() => {
+                      setSelectedPeriod(period);
+                      posthog.capture("insights_period_changed", { period });
+                    }}
                   >
                     <Text
                       className={`insights-month-chip-text ${
-                        period === "This Month"
+                        period === selectedPeriod
                           ? "insights-month-chip-text-active"
                           : ""
                       }`}
@@ -296,9 +342,9 @@ const Insights = () => {
                       {period}
                     </Text>
                   </Pressable>
-                ),
-              )}
-            </View>
+                ))}
+              </View>
+            </ScrollView>
 
             {/* Bottom spacing */}
             <View className="h-4" />

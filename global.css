@@ -532,7 +532,7 @@
   }
 
   .insights-month-scroll {
-    @apply mb-5 flex-row gap-2;
+    @apply flex-row gap-2;
   }
 
   .insights-month-chip {
