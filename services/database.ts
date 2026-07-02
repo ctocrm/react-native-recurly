@@ -1,6 +1,7 @@
 import { icons } from "@/constants/icons";
 import * as Crypto from "expo-crypto";
-import { Directory, File, Paths } from "expo-file-system";
+import { CryptoDigestAlgorithm } from "expo-crypto";
+import { Directory, File, Paths, readAsStringAsync } from "expo-file-system";
 import * as SecureStore from "expo-secure-store";
 import { type SQLiteDatabase, openDatabaseAsync } from "expo-sqlite";
 
@@ -66,6 +67,18 @@ CREATE TABLE IF NOT EXISTS preferences (
 
 -- Seed default preferences if not present
 INSERT OR IGNORE INTO preferences (key, value) VALUES ('notification_enabled', 'true');
+
+-- Cloud sync metadata
+CREATE TABLE IF NOT EXISTS sync_metadata (
+  id                     INTEGER PRIMARY KEY CHECK (id = 1),
+  sync_enabled           INTEGER DEFAULT 0,
+  provider               TEXT,
+  provider_user_id       TEXT,
+  remote_file_id         TEXT,
+  remote_file_hash       TEXT,
+  remote_file_modified   TEXT,
+  last_sync_timestamp    TEXT
+);
 `;
 
 // ---------------------------------------------------------------------------
@@ -655,4 +668,122 @@ export async function deleteTempImportFile(uri: string): Promise<void> {
   } catch {
     // ignore
   }
+}
+
+// ---------------------------------------------------------------------------
+// Cloud Sync Metadata
+// ---------------------------------------------------------------------------
+
+export interface SyncMetadata {
+  syncEnabled: boolean;
+  provider: string | null;
+  providerUserId: string | null;
+  remoteFileId: string | null;
+  remoteFileHash: string | null;
+  remoteFileModified: string | null;
+  lastSyncTimestamp: string | null;
+}
+
+export async function getSyncMetadata(): Promise<SyncMetadata> {
+  const db = getDatabase();
+  const row = await db.getFirstAsync<{
+    sync_enabled: number;
+    provider: string;
+    provider_user_id: string;
+    remote_file_id: string;
+    remote_file_hash: string;
+    remote_file_modified: string;
+    last_sync_timestamp: string;
+  }>("SELECT * FROM sync_metadata WHERE id = 1");
+
+  if (!row) {
+    return {
+      syncEnabled: false,
+      provider: null,
+      providerUserId: null,
+      remoteFileId: null,
+      remoteFileHash: null,
+      remoteFileModified: null,
+      lastSyncTimestamp: null,
+    };
+  }
+
+  return {
+    syncEnabled: row.sync_enabled === 1,
+    provider: row.provider ?? null,
+    providerUserId: row.provider_user_id ?? null,
+    remoteFileId: row.remote_file_id ?? null,
+    remoteFileHash: row.remote_file_hash ?? null,
+    remoteFileModified: row.remote_file_modified ?? null,
+    lastSyncTimestamp: row.last_sync_timestamp ?? null,
+  };
+}
+
+export async function updateSyncMetadata(updates: {
+  syncEnabled?: boolean;
+  provider?: string;
+  providerUserId?: string;
+  remoteFileId?: string;
+  remoteFileHash?: string;
+  remoteFileModified?: string;
+  lastSyncTimestamp?: string;
+}): Promise<void> {
+  const db = getDatabase();
+
+  const current = await getSyncMetadata();
+
+  const syncEnabled = updates.syncEnabled ?? current.syncEnabled;
+  const provider = updates.provider ?? current.provider;
+  const providerUserId = updates.providerUserId ?? current.providerUserId;
+  const remoteFileId = updates.remoteFileId ?? current.remoteFileId;
+  const remoteFileHash = updates.remoteFileHash ?? current.remoteFileHash;
+  const remoteFileModified =
+    updates.remoteFileModified ?? current.remoteFileModified;
+  const lastSyncTimestamp =
+    updates.lastSyncTimestamp ?? current.lastSyncTimestamp;
+
+  await db.runAsync(
+    `INSERT OR REPLACE INTO sync_metadata (id, sync_enabled, provider, provider_user_id, remote_file_id, remote_file_hash, remote_file_modified, last_sync_timestamp)
+     VALUES (1, ?, ?, ?, ?, ?, ?, ?)`,
+    syncEnabled ? 1 : 0,
+    provider,
+    providerUserId,
+    remoteFileId,
+    remoteFileHash,
+    remoteFileModified,
+    lastSyncTimestamp,
+  );
+}
+
+export async function computeDatabaseHash(): Promise<string> {
+  const db = getDatabase();
+  const dbPath = db.databasePath;
+
+  // Read the database file as a string
+  const buffer = await readAsStringAsync(dbPath);
+
+  // Compute SHA256 hash
+  const hash = await Crypto.digestStringAsync(
+    CryptoDigestAlgorithm.SHA256,
+    buffer,
+  );
+
+  return hash;
+}
+
+export async function needsSync(): Promise<boolean> {
+  const localHash = await computeDatabaseHash();
+  const metadata = await getSyncMetadata();
+
+  // If sync is not enabled, no need to sync
+  if (!metadata.syncEnabled) {
+    return false;
+  }
+
+  // If hashes match, nothing changed
+  if (localHash === metadata.remoteFileHash) {
+    return false;
+  }
+
+  return true;
 }
