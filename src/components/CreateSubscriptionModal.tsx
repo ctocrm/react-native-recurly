@@ -5,7 +5,6 @@ import dayjs from "dayjs";
 import { usePostHog } from "posthog-react-native";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  FlatList,
   Image,
   KeyboardAvoidingView,
   Modal,
@@ -14,7 +13,7 @@ import {
   ScrollView,
   Text,
   TextInput,
-  View,
+  View
 } from "react-native";
 
 const CATEGORIES = [
@@ -126,9 +125,16 @@ const CreateSubscriptionModal = ({
     const renewalDate =
       frequency === "Yearly" ? now.add(1, "year") : now.add(1, "month");
 
+    // Resolve the icon key from the selected icon
+    const iconEntry = Object.entries(icons).find(
+      ([, val]) => val === selectedIcon,
+    );
+    const iconKey = iconEntry ? iconEntry[0] : "plus";
+
     const subscription: Subscription = {
       id: Date.now().toString(),
       icon: selectedIcon,
+      icon_key: iconKey,
       name: name.trim(),
       price: parsedPrice,
       currency: "USD",
@@ -205,12 +211,13 @@ const CreateSubscriptionModal = ({
                   />
                   {showAutocomplete && autocompleteResults.length > 0 && (
                     <View className="absolute left-0 right-0 top-full z-30 mt-1 max-h-48 overflow-hidden rounded-2xl border border-border bg-card shadow-lg">
-                      <FlatList
-                        data={autocompleteResults}
-                        keyExtractor={(item, index) => `${item.name}-${index}`}
+                      <ScrollView
                         keyboardShouldPersistTaps="handled"
-                        renderItem={({ item }) => (
+                        showsVerticalScrollIndicator={false}
+                      >
+                        {autocompleteResults.map((item, index) => (
                           <Pressable
+                            key={`${item.name}-${index}`}
                             className="flex-row items-center gap-3 px-4 py-3"
                             onPress={() => handleSelectBrand(item)}
                           >
@@ -222,8 +229,8 @@ const CreateSubscriptionModal = ({
                               {item.name}
                             </Text>
                           </Pressable>
-                        )}
-                      />
+                        ))}
+                      </ScrollView>
                     </View>
                   )}
                 </View>

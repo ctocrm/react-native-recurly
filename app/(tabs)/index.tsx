@@ -1,7 +1,6 @@
 import ListHeading from "@/components/ListHeading";
 import SubscriptionCard from "@/components/SubscriptionCard";
 import UpcomingSubscriptionCard from "@/components/UpcomingSubscriptionCard";
-import { HOME_BALANCE } from "@/constants/data";
 import { icons } from "@/constants/icons";
 import images from "@/constants/images";
 import "@/global.css";
@@ -137,17 +136,7 @@ const App = () => {
                 <Image source={icons.add} className="home-add-icon" />
               </Pressable>
             </View>
-            <View className="home-balance-card">
-              <Text className="home-balance-label">Balance</Text>
-              <View className="home-balance-row">
-                <Text className="home-balance-amount">
-                  {formatCurrency(HOME_BALANCE.amount)}
-                </Text>
-                <Text className="home-balance-date">
-                  {dayjs(HOME_BALANCE.nextRenewalDate).format("MM/DD")}
-                </Text>
-              </View>
-            </View>
+            <BalanceCard subscriptions={subscriptions} />
             <View className="mb-5">
               <ListHeading title="Upcoming" onViewAll={handleViewAllUpcoming} />
               <FlatList
@@ -247,6 +236,65 @@ const App = () => {
         onClose={() => setUserSettingsVisible(false)}
       />
     </SafeAreaView>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// BalanceCard – derives total monthly spend from subscriptions
+// ---------------------------------------------------------------------------
+
+const BalanceCard = ({ subscriptions }: { subscriptions: Subscription[] }) => {
+  // Calculate total monthly spend from active subscriptions
+  const totalMonthlySpend = useMemo(() => {
+    const activeSubs = subscriptions.filter(
+      (s) => s.status !== "cancelled" && s.status !== "paused",
+    );
+
+    let total = 0;
+    activeSubs.forEach((sub) => {
+      let monthlyAmount = sub.price;
+      if (sub.billing === "Yearly" || sub.frequency === "Yearly") {
+        monthlyAmount = sub.price / 12;
+      } else if (sub.billing === "Weekly" || sub.frequency === "Weekly") {
+        monthlyAmount = sub.price * 4.33;
+      }
+      total += monthlyAmount;
+    });
+
+    return total;
+  }, [subscriptions]);
+
+  // Find the nearest upcoming renewal date
+  const nearestRenewal = useMemo<dayjs.Dayjs | null>(() => {
+    const now = dayjs();
+    let nearest: dayjs.Dayjs | null = null;
+
+    subscriptions.forEach((sub) => {
+      if (!sub.renewalDate) return;
+      if (sub.status === "cancelled" || sub.status === "paused") return;
+      const d = dayjs(sub.renewalDate);
+      if (d.isAfter(now) && (!nearest || d.isBefore(nearest))) {
+        nearest = d;
+      }
+    });
+
+    return nearest;
+  }, [subscriptions]);
+
+  return (
+    <View className="home-balance-card">
+      <Text className="home-balance-label">Monthly Spend</Text>
+      <View className="home-balance-row">
+        <Text className="home-balance-amount">
+          {formatCurrency(totalMonthlySpend)}
+        </Text>
+        {nearestRenewal && (
+          <Text className="home-balance-date">
+            {nearestRenewal.format("MM/DD")}
+          </Text>
+        )}
+      </View>
+    </View>
   );
 };
 
