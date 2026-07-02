@@ -22,17 +22,20 @@ import { useDatabase } from "./DatabaseProvider";
 
 interface SubscriptionContextType {
   subscriptions: Subscription[];
-  addSubscription: (subscription: Subscription) => void;
-  updateSubscription: (id: string, data: Partial<Subscription>) => void;
-  deleteSubscription: (id: string) => void;
+  addSubscription: (subscription: Subscription) => Promise<void>;
+  updateSubscription: (
+    id: string,
+    data: Partial<Subscription>,
+  ) => Promise<void>;
+  deleteSubscription: (id: string) => Promise<void>;
   updateSubscriptionStatus: (
     id: string,
     status: "active" | "paused" | "cancelled",
-  ) => void;
-  renewSubscription: (id: string) => void;
+  ) => Promise<void>;
+  renewSubscription: (id: string) => Promise<void>;
   getUpcomingSubscriptions: (daysAhead?: number) => UpcomingSubscription[];
   notificationEnabled: boolean;
-  setNotificationEnabled: (enabled: boolean) => void;
+  setNotificationEnabled: (enabled: boolean) => Promise<void>;
   refreshSubscriptions: () => Promise<void>;
 }
 
@@ -84,6 +87,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
       });
     } catch (error) {
       console.error("Failed to add subscription:", error);
+      throw error;
     }
   }, []);
 
@@ -115,6 +119,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
       });
     } catch (error) {
       console.error("Failed to delete subscription:", error);
+      throw error;
     }
   }, []);
 
@@ -131,6 +136,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
         });
       } catch (error) {
         console.error("Failed to update subscription status:", error);
+        throw error;
       }
     },
     [],
@@ -149,10 +155,20 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  const setNotificationEnabled = useCallback(async (enabled: boolean) => {
-    setNotificationEnabledState(enabled);
-    await setPreference("notification_enabled", enabled ? "true" : "false");
-  }, []);
+  const setNotificationEnabled = useCallback(
+    async (enabled: boolean) => {
+      const previous = notificationEnabled;
+      setNotificationEnabledState(enabled);
+      try {
+        await setPreference("notification_enabled", enabled ? "true" : "false");
+      } catch (error) {
+        setNotificationEnabledState(previous);
+        console.error("Failed to update notification preference:", error);
+        throw error;
+      }
+    },
+    [notificationEnabled],
+  );
 
   const getUpcomingSubscriptions = useCallback(
     (daysAhead = 7): UpcomingSubscription[] => {

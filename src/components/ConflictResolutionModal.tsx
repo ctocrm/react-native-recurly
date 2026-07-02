@@ -243,6 +243,9 @@ const ConflictResolutionModal = ({
                       ? "border-accent bg-accent/10"
                       : "border-border bg-background"
                   }`}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: applyToAll }}
+                  accessibilityLabel="Apply to all remaining conflicts"
                 >
                   <View
                     className={`size-5 items-center justify-center rounded border-2 ${

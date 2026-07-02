@@ -15,6 +15,7 @@ import {
   executeNonConflictingImport,
   exportBackup,
   importBackup,
+  type ImportScanResult,
 } from "../../services/database";
 
 const SafeAreaView = styled(RNSafeAreaView);
@@ -33,6 +34,7 @@ const Settings = () => {
   const [importResult, setImportResult] = useState<{
     totalRows: number;
     conflictingIds: string[];
+    conflictingRows: Record<string, any>[];
     merged?: number;
     duplicated?: number;
   } | null>(null);
@@ -125,19 +127,24 @@ const Settings = () => {
       setImportUri(fileUri);
       setImportStep("scanning");
 
-      const scanResult = await importBackup(fileUri);
+      const scanResult: ImportScanResult = await importBackup(fileUri);
 
       if (scanResult.conflictingIds.length > 0) {
         setImportResult({
           totalRows: scanResult.totalRows,
           conflictingIds: scanResult.conflictingIds,
+          conflictingRows: scanResult.conflictingRows,
         });
 
-        // Build conflict rows from IDs
-        const rows = scanResult.conflictingIds.map((id) => ({
-          id,
-          name: `Subscription ${id.substring(0, 8)}...`,
-          price: 0,
+        // Map real imported rows for the conflict resolution modal
+        const rows = scanResult.conflictingRows.map((row) => ({
+          id: row.id,
+          name: row.name,
+          price: row.price,
+          plan: row.plan,
+          category: row.category,
+          billing: row.billing,
+          status: row.status,
         }));
         setConflictRows(rows);
 
@@ -145,16 +152,24 @@ const Settings = () => {
         setImportStep("resolving");
         setConflictModalVisible(true);
       } else {
-        // No conflicts — direct import of all rows
+        // No conflicts — import all rows
         setImportStep("importing");
         const imported = await executeNonConflictingImport(fileUri, []);
-        setImportResult({
-          totalRows: imported,
-          conflictingIds: [],
-          merged: 0,
-          duplicated: imported,
-        });
         await refreshSubscriptions();
+        setImportResult((prev) =>
+          prev
+            ? {
+                ...prev,
+                totalRows: imported,
+                duplicated: imported,
+              }
+            : {
+                totalRows: imported,
+                conflictingIds: [],
+                conflictingRows: [],
+                duplicated: imported,
+              },
+        );
         setImportStep("done");
         posthog.capture("settings_import_completed", {
           rows_imported: imported,
@@ -192,31 +207,23 @@ const Settings = () => {
         actions,
       );
 
-      // Import non-conflicting rows (rows that were not in the conflict list at all)
-      const resolvedConflictIds = new Set(actions.map((a) => a.id));
-      const nonConflictIds =
-        importResult?.conflictingIds.filter(
-          (id) => !resolvedConflictIds.has(id),
-        ) ?? [];
-
-      if (nonConflictIds.length > 0) {
-        const imported = await executeNonConflictingImport(
-          importUri,
-          importResult?.conflictingIds ?? [],
-        );
-        setImportResult({
-          totalRows: (importResult?.totalRows ?? 0) + imported,
-          conflictingIds: importResult?.conflictingIds ?? [],
-          merged,
-          duplicated: duplicated + imported,
-        });
-      } else {
-        setImportResult((prev) =>
-          prev ? { ...prev, merged, duplicated } : null,
-        );
-      }
+      // Import non-conflicting rows unconditionally from the backup
+      const imported = await executeNonConflictingImport(
+        importUri,
+        importResult?.conflictingIds ?? [],
+      );
 
       await refreshSubscriptions();
+      setImportResult((prev) =>
+        prev
+          ? {
+              ...prev,
+              totalRows: (prev.totalRows ?? 0) + imported,
+              merged,
+              duplicated: duplicated + imported,
+            }
+          : null,
+      );
       setImportStep("done");
       posthog.capture("settings_import_resolved", { merged, duplicated });
     } catch (error) {

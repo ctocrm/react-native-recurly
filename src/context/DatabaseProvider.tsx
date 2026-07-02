@@ -9,7 +9,7 @@ import React, {
   useState,
   type ReactNode,
 } from "react";
-import { ActivityIndicator, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { closeDatabase, openDatabase } from "../../services/database";
 
 interface DatabaseContextType {
@@ -18,17 +18,19 @@ interface DatabaseContextType {
   isReady: boolean;
 }
 
-const DatabaseContext = createContext<DatabaseContextType>({
-  db: null,
-  userId: null,
-  isReady: false,
-});
+const DatabaseContext = createContext<DatabaseContextType | null>(null);
 
 export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
   const { isSignedIn, isLoaded, userId: clerkUserId } = useAuth();
   const [db, setDb] = useState<SQLiteDatabase | null>(null);
   const [dbError, setDbError] = useState<string | null>(null);
-  const isOpening = useRef(false);
+  const openingRef = useRef<{
+    userId: string | null;
+    promise: Promise<void> | null;
+  }>({
+    userId: null,
+    promise: null,
+  });
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -43,25 +45,43 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
     let cancelled = false;
 
     const init = async () => {
-      if (isOpening.current) return;
-      isOpening.current = true;
+      const currentUserId = clerkUserId;
 
-      try {
-        const database = await openDatabase(clerkUserId);
-        if (!cancelled) {
-          setDb(database);
-          setDbError(null);
-        }
-      } catch (error) {
-        if (!cancelled) {
-          console.error("Failed to open database:", error);
-          setDbError(
-            error instanceof Error ? error.message : "Unknown database error",
-          );
-        }
-      } finally {
-        isOpening.current = false;
+      // If already opening for this user, wait for that promise
+      if (
+        openingRef.current.userId === currentUserId &&
+        openingRef.current.promise
+      ) {
+        await openingRef.current.promise;
+        return;
       }
+
+      // If a different user's open is in flight, start fresh after it settles
+      if (openingRef.current.promise) {
+        await openingRef.current.promise;
+      }
+
+      const openPromise = (async () => {
+        try {
+          const database = await openDatabase(currentUserId);
+          if (!cancelled) {
+            setDb(database);
+            setDbError(null);
+          }
+        } catch (error) {
+          if (!cancelled) {
+            console.error("Failed to open database:", error);
+            setDbError(
+              error instanceof Error ? error.message : "Unknown database error",
+            );
+          }
+        }
+      })();
+
+      openingRef.current = { userId: currentUserId, promise: openPromise };
+
+      await openPromise;
+      openingRef.current = { userId: null, promise: null };
     };
 
     init();
@@ -69,7 +89,7 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
     return () => {
       cancelled = true;
     };
-  }, [isLoaded, isSignedIn, clerkUserId]);
+  }, [isLoaded, isSignedIn, clerkUserId, db]);
 
   const value = useMemo(
     () => ({
@@ -104,6 +124,26 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
                 {dbError}
               </Text>
             </View>
+            <Pressable
+              className="mt-2 rounded-xl bg-accent px-6 py-2"
+              onPress={() => {
+                setDbError(null);
+                const currentUserId = clerkUserId;
+                if (currentUserId) {
+                  openDatabase(currentUserId)
+                    .then((database) => setDb(database))
+                    .catch((error) =>
+                      setDbError(
+                        error instanceof Error
+                          ? error.message
+                          : "Unknown database error",
+                      ),
+                    );
+                }
+              }}
+            >
+              <Text className="text-sm font-sans-bold text-white">Retry</Text>
+            </Pressable>
           </View>
         </View>
       </View>

@@ -1,6 +1,6 @@
 import { icons } from "@/constants/icons";
 import * as Crypto from "expo-crypto";
-import { File, Paths } from "expo-file-system";
+import { Directory, File, Paths } from "expo-file-system";
 import * as SecureStore from "expo-secure-store";
 import { type SQLiteDatabase, openDatabaseAsync } from "expo-sqlite";
 
@@ -151,6 +151,7 @@ function rowToSubscription(row: Record<string, any>): Subscription {
   return {
     id: row.id,
     icon: icon as any,
+    icon_key: iconKey ?? undefined,
     name: row.name,
     plan: row.plan ?? undefined,
     category: row.category ?? undefined,
@@ -237,6 +238,7 @@ export async function updateSubscription(
     frequency: "frequency",
     renewalDate: "renewal_date",
     color: "color",
+    icon_key: "icon_key",
   };
 
   const setClauses: string[] = [];
@@ -290,7 +292,9 @@ export async function renewSubscription(id: string): Promise<void> {
   const newDate =
     frequency === "Yearly"
       ? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString()
-      : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+      : frequency === "Weekly"
+        ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+        : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
   await db.runAsync(
     `UPDATE subscriptions SET status = 'active', start_date = ?, renewal_date = ?, updated_at = datetime('now') WHERE id = ?`,
@@ -360,45 +364,46 @@ export async function exportBackup(): Promise<string> {
   if (!userId) throw new Error("No active user session for backup");
 
   const db = getDatabase();
-
-  // Get the path to the database file from the active connection
   const dbPath = db.databasePath;
 
   // Close DB to ensure all WAL content is checkpointed
   await closeDatabase();
 
-  const sourceFile = new File(dbPath);
-  const tempDir = new File(Paths.cache, "backups");
-  // Ensure directory exists
-  const cacheDir = new File(Paths.cache, "backups").parentDirectory;
-  await tempDir.parentDirectory.create();
+  const backupsDir = new Directory(Paths.cache, "backups");
+  await backupsDir.create({ intermediates: true });
 
-  const tempFileName = `backup_${userId}_${Date.now()}.db`;
-  const tempFile = new File(Paths.cache, "backups", tempFileName);
+  const tempFile = new File(backupsDir, `backup_${userId}_${Date.now()}.db`);
 
-  // Copy the raw encrypted .db file to temp location
-  await sourceFile.copy(tempFile);
-
-  // Re-open the DB
-  await openDatabase(userId);
+  try {
+    const sourceFile = new File(dbPath);
+    await sourceFile.copy(tempFile);
+  } finally {
+    // Always re-open the DB after copy succeeds or fails
+    await openDatabase(userId);
+  }
 
   return tempFile.uri;
 }
 
-export async function importBackup(sourceUri: string): Promise<{
+export interface ImportScanResult {
   totalRows: number;
   conflictingIds: string[];
-}> {
+  conflictingRows: Record<string, any>[];
+}
+
+export async function importBackup(
+  sourceUri: string,
+): Promise<ImportScanResult> {
   const userId = getCurrentUserId();
   if (!userId) throw new Error("No active user session for import");
 
   const passphrase = await getOrCreateDbKey(userId);
 
   // Copy the imported file to a temp location
-  const importTempPath = `${Paths.cache.uri}imports/import_${Date.now()}.db`;
-  const importDir = new File(Paths.cache, "imports");
-  await importDir.parentDirectory.create();
+  const importsDir = new Directory(Paths.cache, "imports");
+  await importsDir.create({ intermediates: true });
 
+  const importTempPath = `${importsDir.uri}import_${Date.now()}.db`;
   const sourceFile = new File(sourceUri);
   const importTempFile = new File(importTempPath);
   await sourceFile.copy(importTempFile);
@@ -424,23 +429,33 @@ export async function importBackup(sourceUri: string): Promise<{
       "SELECT * FROM subscriptions",
     );
 
-    // Check which IDs conflict with the active DB
+    // Check which IDs conflict with the active DB in a single query
     const db = getDatabase();
+    const importedIds = importedRows.map((r) => r.id);
     const conflictingIds: string[] = [];
 
-    for (const row of importedRows) {
-      const existing = await db.getFirstAsync<{ id: string }>(
-        "SELECT id FROM subscriptions WHERE id = ?",
-        row.id,
+    if (importedIds.length > 0) {
+      const placeholders = importedIds.map(() => "?").join(",");
+      const existingRows = await db.getAllAsync<{ id: string }>(
+        `SELECT id FROM subscriptions WHERE id IN (${placeholders})`,
+        ...importedIds,
       );
-      if (existing) {
-        conflictingIds.push(row.id);
+      const existingIdSet = new Set(existingRows.map((r) => r.id));
+      for (const row of importedRows) {
+        if (existingIdSet.has(row.id)) {
+          conflictingIds.push(row.id);
+        }
       }
     }
+
+    const conflictingRows = importedRows.filter((r) =>
+      conflictingIds.includes(r.id),
+    );
 
     return {
       totalRows: importedRows.length,
       conflictingIds,
+      conflictingRows,
     };
   } finally {
     await importDb.closeAsync();
@@ -473,10 +488,10 @@ export async function executeImportActions(
   const passphrase = await getOrCreateDbKey(userId);
 
   // Copy and open the imported DB again
-  const importTempPath = `${Paths.cache.uri}imports/import_exec_${Date.now()}.db`;
-  const importDir = new File(Paths.cache, "imports");
-  await importDir.parentDirectory.create();
+  const importsDir = new Directory(Paths.cache, "imports");
+  await importsDir.create({ intermediates: true });
 
+  const importTempPath = `${importsDir.uri}import_exec_${Date.now()}.db`;
   const sourceFile = new File(sourceUri);
   const importTempFile = new File(importTempPath);
   await sourceFile.copy(importTempFile);
@@ -490,67 +505,69 @@ export async function executeImportActions(
     let merged = 0;
     let duplicated = 0;
 
-    for (const conflict of conflicts) {
-      if (conflict.action === "merge_skip") {
-        merged++;
-      } else if (conflict.action === "merge_overwrite") {
-        const importedRow = await importDb.getFirstAsync<Record<string, any>>(
-          "SELECT * FROM subscriptions WHERE id = ?",
-          conflict.id,
-        );
-        if (importedRow) {
-          await db.runAsync(
-            `UPDATE subscriptions SET
-               name = ?, plan = ?, category = ?, payment_method = ?,
-               status = ?, start_date = ?, price = ?, currency = ?,
-               billing = ?, frequency = ?, renewal_date = ?, color = ?,
-               icon_key = ?, updated_at = datetime('now')
-             WHERE id = ?`,
-            importedRow.name,
-            importedRow.plan,
-            importedRow.category,
-            importedRow.payment_method,
-            importedRow.status,
-            importedRow.start_date,
-            importedRow.price,
-            importedRow.currency,
-            importedRow.billing,
-            importedRow.frequency,
-            importedRow.renewal_date,
-            importedRow.color,
-            importedRow.icon_key,
+    await db.withTransactionAsync(async () => {
+      for (const conflict of conflicts) {
+        if (conflict.action === "merge_skip") {
+          merged++;
+        } else if (conflict.action === "merge_overwrite") {
+          const importedRow = await importDb.getFirstAsync<Record<string, any>>(
+            "SELECT * FROM subscriptions WHERE id = ?",
             conflict.id,
           );
-          merged++;
-        }
-      } else if (conflict.action === "duplicate") {
-        const importedRow = await importDb.getFirstAsync<Record<string, any>>(
-          "SELECT * FROM subscriptions WHERE id = ?",
-          conflict.id,
-        );
-        if (importedRow && conflict.newId) {
-          await db.runAsync(
-            `INSERT INTO subscriptions (id, name, plan, category, payment_method, status, start_date, price, currency, billing, frequency, renewal_date, color, icon_key)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            conflict.newId,
-            importedRow.name,
-            importedRow.plan,
-            importedRow.category,
-            importedRow.payment_method,
-            importedRow.status,
-            importedRow.start_date,
-            importedRow.price,
-            importedRow.currency,
-            importedRow.billing,
-            importedRow.frequency,
-            importedRow.renewal_date,
-            importedRow.color,
-            importedRow.icon_key,
+          if (importedRow) {
+            await db.runAsync(
+              `UPDATE subscriptions SET
+                 name = ?, plan = ?, category = ?, payment_method = ?,
+                 status = ?, start_date = ?, price = ?, currency = ?,
+                 billing = ?, frequency = ?, renewal_date = ?, color = ?,
+                 icon_key = ?, updated_at = datetime('now')
+               WHERE id = ?`,
+              importedRow.name,
+              importedRow.plan,
+              importedRow.category,
+              importedRow.payment_method,
+              importedRow.status,
+              importedRow.start_date,
+              importedRow.price,
+              importedRow.currency,
+              importedRow.billing,
+              importedRow.frequency,
+              importedRow.renewal_date,
+              importedRow.color,
+              importedRow.icon_key,
+              conflict.id,
+            );
+            merged++;
+          }
+        } else if (conflict.action === "duplicate") {
+          const importedRow = await importDb.getFirstAsync<Record<string, any>>(
+            "SELECT * FROM subscriptions WHERE id = ?",
+            conflict.id,
           );
-          duplicated++;
+          if (importedRow && conflict.newId) {
+            await db.runAsync(
+              `INSERT INTO subscriptions (id, name, plan, category, payment_method, status, start_date, price, currency, billing, frequency, renewal_date, color, icon_key)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              conflict.newId,
+              importedRow.name,
+              importedRow.plan,
+              importedRow.category,
+              importedRow.payment_method,
+              importedRow.status,
+              importedRow.start_date,
+              importedRow.price,
+              importedRow.currency,
+              importedRow.billing,
+              importedRow.frequency,
+              importedRow.renewal_date,
+              importedRow.color,
+              importedRow.icon_key,
+            );
+            duplicated++;
+          }
         }
       }
-    }
+    });
 
     return { merged, duplicated };
   } finally {
@@ -572,10 +589,10 @@ export async function executeNonConflictingImport(
 
   const passphrase = await getOrCreateDbKey(userId);
 
-  const importTempPath = `${Paths.cache.uri}imports/import_nonconf_${Date.now()}.db`;
-  const importDir = new File(Paths.cache, "imports");
-  await importDir.parentDirectory.create();
+  const importsDir = new Directory(Paths.cache, "imports");
+  await importsDir.create({ intermediates: true });
 
+  const importTempPath = `${importsDir.uri}import_nonconf_${Date.now()}.db`;
   const sourceFile = new File(sourceUri);
   const importTempFile = new File(importTempPath);
   await sourceFile.copy(importTempFile);
@@ -586,37 +603,39 @@ export async function executeNonConflictingImport(
   try {
     await importDb.execAsync(`PRAGMA key = '${passphrase}';`);
 
-    let inserted = 0;
-
     const allRows = await importDb.getAllAsync<Record<string, any>>(
       "SELECT * FROM subscriptions",
     );
 
     const conflictSet = new Set(nonConflictingIds);
 
-    for (const row of allRows) {
-      if (!conflictSet.has(row.id)) {
-        await db.runAsync(
-          `INSERT OR IGNORE INTO subscriptions (id, name, plan, category, payment_method, status, start_date, price, currency, billing, frequency, renewal_date, color, icon_key)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          row.id,
-          row.name,
-          row.plan,
-          row.category,
-          row.payment_method,
-          row.status,
-          row.start_date,
-          row.price,
-          row.currency,
-          row.billing,
-          row.frequency,
-          row.renewal_date,
-          row.color,
-          row.icon_key,
-        );
-        inserted++;
+    let inserted = 0;
+
+    await db.withTransactionAsync(async () => {
+      for (const row of allRows) {
+        if (!conflictSet.has(row.id)) {
+          await db.runAsync(
+            `INSERT OR IGNORE INTO subscriptions (id, name, plan, category, payment_method, status, start_date, price, currency, billing, frequency, renewal_date, color, icon_key)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            row.id,
+            row.name,
+            row.plan,
+            row.category,
+            row.payment_method,
+            row.status,
+            row.start_date,
+            row.price,
+            row.currency,
+            row.billing,
+            row.frequency,
+            row.renewal_date,
+            row.color,
+            row.icon_key,
+          );
+          inserted++;
+        }
       }
-    }
+    });
 
     return inserted;
   } finally {

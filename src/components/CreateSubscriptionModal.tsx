@@ -5,7 +5,6 @@ import dayjs from "dayjs";
 import { usePostHog } from "posthog-react-native";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  FlatList,
   Image,
   KeyboardAvoidingView,
   Modal,
@@ -14,7 +13,7 @@ import {
   ScrollView,
   Text,
   TextInput,
-  View,
+  View
 } from "react-native";
 
 const CATEGORIES = [
@@ -212,12 +211,13 @@ const CreateSubscriptionModal = ({
                   />
                   {showAutocomplete && autocompleteResults.length > 0 && (
                     <View className="absolute left-0 right-0 top-full z-30 mt-1 max-h-48 overflow-hidden rounded-2xl border border-border bg-card shadow-lg">
-                      <FlatList
-                        data={autocompleteResults}
-                        keyExtractor={(item, index) => `${item.name}-${index}`}
+                      <ScrollView
                         keyboardShouldPersistTaps="handled"
-                        renderItem={({ item }) => (
+                        showsVerticalScrollIndicator={false}
+                      >
+                        {autocompleteResults.map((item, index) => (
                           <Pressable
+                            key={`${item.name}-${index}`}
                             className="flex-row items-center gap-3 px-4 py-3"
                             onPress={() => handleSelectBrand(item)}
                           >
@@ -229,8 +229,8 @@ const CreateSubscriptionModal = ({
                               {item.name}
                             </Text>
                           </Pressable>
-                        )}
-                      />
+                        ))}
+                      </ScrollView>
                     </View>
                   )}
                 </View>
