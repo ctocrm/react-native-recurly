@@ -126,9 +126,16 @@ const CreateSubscriptionModal = ({
     const renewalDate =
       frequency === "Yearly" ? now.add(1, "year") : now.add(1, "month");
 
+    // Resolve the icon key from the selected icon
+    const iconEntry = Object.entries(icons).find(
+      ([, val]) => val === selectedIcon,
+    );
+    const iconKey = iconEntry ? iconEntry[0] : "plus";
+
     const subscription: Subscription = {
       id: Date.now().toString(),
       icon: selectedIcon,
+      icon_key: iconKey,
       name: name.trim(),
       price: parsedPrice,
       currency: "USD",
