@@ -65,16 +65,13 @@ export const CloudSyncProvider = ({ children }: { children: ReactNode }) => {
       // If sync is enabled, initialize the provider
       if (metadata.syncEnabled && metadata.provider) {
         const service = new CloudSyncService(userId || "anonymous");
+        // Use dedicated serverUrl field for ownCloud/Nextcloud (not remoteFileId)
         const serverUrl =
-          (metadata.provider === "owncloud" ||
-            metadata.provider === "nextcloud") &&
-          metadata.lastSyncTimestamp
-            ? (metadata.provider ?? undefined)
+          metadata.provider === "owncloud" || metadata.provider === "nextcloud"
+            ? (metadata.serverUrl ?? undefined)
             : undefined;
         await service.initializeProvider(metadata.provider as CloudProvider, {
-          serverUrl: metadata.remoteFileId?.startsWith("http")
-            ? metadata.remoteFileId
-            : undefined,
+          serverUrl,
         });
         cloudSyncServiceRef.current = service;
         setCloudSyncService(service);
@@ -101,16 +98,15 @@ export const CloudSyncProvider = ({ children }: { children: ReactNode }) => {
         setCloudSyncService(service);
 
         // Persist serverUrl in sync metadata for ownCloud/Nextcloud
+        // Clear stale remote fields when switching providers
         const metadataUpdates: any = {
           provider,
           syncEnabled: true,
+          serverUrl:
+            provider === "owncloud" || provider === "nextcloud"
+              ? (config?.serverUrl ?? null)
+              : null,
         };
-        if (
-          (provider === "owncloud" || provider === "nextcloud") &&
-          config?.serverUrl
-        ) {
-          metadataUpdates.remoteFileId = config.serverUrl;
-        }
 
         await updateSyncMetadata(metadataUpdates);
 
@@ -331,6 +327,8 @@ export const CloudSyncProvider = ({ children }: { children: ReactNode }) => {
       remoteFileId: null,
       remoteFileHash: null,
       remoteFileModified: null,
+      lastSyncTimestamp: null,
+      serverUrl: null,
     });
 
     await loadSyncMetadata();

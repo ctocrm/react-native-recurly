@@ -78,7 +78,8 @@ CREATE TABLE IF NOT EXISTS sync_metadata (
   remote_file_id         TEXT,
   remote_file_hash       TEXT,
   remote_file_modified   TEXT,
-  last_sync_timestamp    TEXT
+  last_sync_timestamp    TEXT,
+  server_url             TEXT
 );
 `;
 
@@ -721,6 +722,7 @@ export interface SyncMetadata {
   remoteFileHash: string | null;
   remoteFileModified: string | null;
   lastSyncTimestamp: string | null;
+  serverUrl: string | null;
 }
 
 export async function getSyncMetadata(): Promise<SyncMetadata> {
@@ -733,6 +735,7 @@ export async function getSyncMetadata(): Promise<SyncMetadata> {
     remote_file_hash: string;
     remote_file_modified: string;
     last_sync_timestamp: string;
+    server_url: string;
   }>("SELECT * FROM sync_metadata WHERE id = 1");
 
   if (!row) {
@@ -744,6 +747,7 @@ export async function getSyncMetadata(): Promise<SyncMetadata> {
       remoteFileHash: null,
       remoteFileModified: null,
       lastSyncTimestamp: null,
+      serverUrl: null,
     };
   }
 
@@ -755,6 +759,7 @@ export async function getSyncMetadata(): Promise<SyncMetadata> {
     remoteFileHash: row.remote_file_hash ?? null,
     remoteFileModified: row.remote_file_modified ?? null,
     lastSyncTimestamp: row.last_sync_timestamp ?? null,
+    serverUrl: row.server_url ?? null,
   };
 }
 
@@ -766,6 +771,7 @@ export async function updateSyncMetadata(updates: {
   remoteFileHash?: string | null;
   remoteFileModified?: string | null;
   lastSyncTimestamp?: string | null;
+  serverUrl?: string | null;
 }): Promise<void> {
   const db = getDatabase();
 
@@ -798,10 +804,12 @@ export async function updateSyncMetadata(updates: {
     "lastSyncTimestamp" in updates
       ? (updates.lastSyncTimestamp ?? null)
       : current.lastSyncTimestamp;
+  const serverUrl =
+    "serverUrl" in updates ? (updates.serverUrl ?? null) : current.serverUrl;
 
   await db.runAsync(
-    `INSERT OR REPLACE INTO sync_metadata (id, sync_enabled, provider, provider_user_id, remote_file_id, remote_file_hash, remote_file_modified, last_sync_timestamp)
-     VALUES (1, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT OR REPLACE INTO sync_metadata (id, sync_enabled, provider, provider_user_id, remote_file_id, remote_file_hash, remote_file_modified, last_sync_timestamp, server_url)
+     VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)`,
     syncEnabled ? 1 : 0,
     provider,
     providerUserId,
@@ -809,19 +817,28 @@ export async function updateSyncMetadata(updates: {
     remoteFileHash,
     remoteFileModified,
     lastSyncTimestamp,
+    serverUrl,
   );
 }
 
 export async function computeDatabaseHash(): Promise<string> {
+  const userId = getCurrentUserId();
+  if (!userId) throw new Error("No active user session");
+
   const db = getDatabase();
   const dbPath = db.databasePath;
 
-  // Read the database file as base64 to preserve exact binary content
+  // Close and reopen DB to checkpoint WAL changes
+  await closeDatabase();
+
   // dbPath from SQLite is a raw filesystem path; prefix with file:// for expo-file-system
   const sourceUri = dbPath.startsWith("file://") ? dbPath : `file://${dbPath}`;
   const base64Content = await readAsStringAsync(sourceUri, {
     encoding: "base64",
   });
+
+  // Reopen the DB
+  await openDatabase(userId);
 
   // Compute SHA256 hash of the base64-encoded bytes
   const hash = await Crypto.digestStringAsync(

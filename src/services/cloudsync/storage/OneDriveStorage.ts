@@ -38,6 +38,32 @@ export class OneDriveStorage implements CloudStorageProvider {
     this.tokens = null;
   }
 
+  // Ensure the SubTracker folder exists in OneDrive
+  private async ensureFolderExists(): Promise<void> {
+    if (!this.tokens?.accessToken) return;
+
+    try {
+      // Try to create the folder - will fail silently if it exists
+      await fetch(
+        `${ONEDRIVE_API_BASE}/me/drive/root:/Documents/SubTracker:/children`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${this.tokens.accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: "SubTracker",
+            folder: {},
+            "@microsoft.graph.conflictBehavior": "replace",
+          }),
+        },
+      );
+    } catch {
+      // Ignore errors - folder may already exist or creation failed
+    }
+  }
+
   async uploadFile(
     localPath: string,
     remotePath: string,
@@ -50,6 +76,9 @@ export class OneDriveStorage implements CloudStorageProvider {
       throw new Error("Not authenticated");
     }
 
+    // Ensure folder exists first
+    await this.ensureFolderExists();
+
     const fileName = remotePath.split("/").pop() || "backup.db";
 
     // OneDrive path: /Documents/SubTracker/
@@ -59,15 +88,21 @@ export class OneDriveStorage implements CloudStorageProvider {
       encoding: FileSystem.EncodingType.Base64,
     } as any);
 
+    // Convert base64 to binary for OneDrive API
+    const binaryString = atob(fileContent);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+
     const response = await fetch(
       `${ONEDRIVE_API_BASE}/me/drive/root:${onedrivePath}:/content`,
       {
         method: "PUT",
         headers: {
           Authorization: `Bearer ${this.tokens.accessToken}`,
-          "Content-Type": "application/octet-stream",
         },
-        body: fileContent,
+        body: bytes,
       },
     );
 
@@ -187,7 +222,8 @@ export class OneDriveStorage implements CloudStorageProvider {
         exists: true,
       };
     } catch (error) {
-      return null;
+      // Return exists: false instead of null - this preserves sync metadata for transient errors
+      return { modified: "", size: 0, exists: false };
     }
   }
 
