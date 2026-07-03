@@ -1,7 +1,8 @@
 import * as FileSystem from "expo-file-system/legacy";
 import * as SecureStore from "expo-secure-store";
+import { CloudStorageProvider } from "../types";
 
-export class OwnCloudNextcloudStorage {
+export class OwnCloudNextcloudStorage implements CloudStorageProvider {
   private tokens: any = null;
   private userId: string = "";
   private serverUrl: string = "";
@@ -43,7 +44,13 @@ export class OwnCloudNextcloudStorage {
   }
 
   private getRemotePath(fileName: string): string {
-    return `${this.serverUrl}/remote.php/dav/files/${this.tokens?.user_id || "user"}/SubTracker/${fileName}`;
+    const userId = this.tokens?.user_id;
+    if (!userId) {
+      throw new Error(
+        `${this.provider}: user_id not available. Ensure authentication completed successfully.`,
+      );
+    }
+    return `${this.serverUrl}/remote.php/dav/files/${userId}/SubTracker/${fileName}`;
   }
 
   async uploadFile(
@@ -115,14 +122,18 @@ export class OwnCloudNextcloudStorage {
 
     const blob = await response.blob();
 
-    const reader = new FileReader();
-    reader.onloadend = async () => {
-      const base64 = (reader.result as string).split(",")[1];
-      await FileSystem.writeAsStringAsync(localPath, base64, {
-        encoding: FileSystem.EncodingType.Base64,
-      } as any);
-    };
-    reader.readAsDataURL(blob);
+    const base64 = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        resolve((reader.result as string).split(",")[1]);
+      };
+      reader.onerror = () => reject(new Error("Failed to read blob"));
+      reader.readAsDataURL(blob);
+    });
+
+    await FileSystem.writeAsStringAsync(localPath, base64, {
+      encoding: FileSystem.EncodingType.Base64,
+    } as any);
 
     return {
       size: blob.size,

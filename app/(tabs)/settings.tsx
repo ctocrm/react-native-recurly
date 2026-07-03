@@ -16,6 +16,7 @@ import {
   Pressable,
   ScrollView,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { SafeAreaView as RNSafeAreaView } from "react-native-safe-area-context";
@@ -41,6 +42,7 @@ const Settings = () => {
     isSyncing,
     lastSyncResult,
     initializeProvider,
+    connectProvider,
     authenticate,
     disconnect,
     sync,
@@ -285,13 +287,11 @@ const Settings = () => {
       ) {
         config.serverUrl = owncloudServerUrl;
       }
-      await initializeProvider(
+      // connectProvider performs both initialization and OAuth in one call
+      const authResult = await connectProvider(
         selectedProvider,
         config.serverUrl ? config : undefined,
       );
-
-      // Trigger authentication flow
-      const authResult = await authenticate();
       if (authResult) {
         Alert.alert("Success", "Cloud provider connected successfully");
         posthog.capture("cloud_provider_connected", {
@@ -342,6 +342,12 @@ const Settings = () => {
           result.message || "Your data has been synchronized successfully",
         );
         posthog.capture("cloud_sync_completed");
+      } else if (result.success && !result.synced) {
+        // Sync succeeded but no changes were needed
+        Alert.alert(
+          "No Changes",
+          result.message || "Your data is already up to date",
+        );
       } else if (!result.success) {
         Alert.alert("Sync Failed", result.error || "Unknown error occurred");
         if (result.error) {
@@ -467,8 +473,12 @@ const Settings = () => {
               {lastSyncResult && (
                 <View className="rounded-xl border border-border bg-card p-3 mb-3">
                   <Text className="text-xs font-sans-medium text-muted-foreground">
-                    Last sync: {lastSyncResult.success ? "Success" : "Failed"}
-                    {lastSyncResult.error && ` - ${lastSyncResult.error}`}
+                    Last sync:{" "}
+                    {lastSyncResult.success ? (
+                      "Success"
+                    ) : (
+                      <>{`Failed${lastSyncResult.error ? ` - ${lastSyncResult.error}` : ""}`}</>
+                    )}
                   </Text>
                 </View>
               )}
@@ -552,23 +562,16 @@ const Settings = () => {
                   <Text className="text-sm font-sans-medium text-muted-foreground mb-2">
                     Server URL
                   </Text>
-                  <Pressable
-                    className="rounded-xl border border-border bg-card p-3"
-                    onPress={() => {
-                      // In a real app, you'd use a proper input here
-                      const url = prompt(
-                        "Enter your ownCloud/Nextcloud server URL:",
-                        owncloudServerUrl,
-                      );
-                      if (url !== null) {
-                        setOwncloudServerUrl(url);
-                      }
-                    }}
-                  >
-                    <Text className="text-sm font-sans-medium text-primary">
-                      {owncloudServerUrl || "Tap to enter server URL"}
-                    </Text>
-                  </Pressable>
+                  <TextInput
+                    className="rounded-xl border border-border bg-card p-3 text-sm font-sans-medium text-primary"
+                    placeholder="Enter your ownCloud/Nextcloud server URL"
+                    placeholderTextColor="#9CA3AF"
+                    value={owncloudServerUrl}
+                    onChangeText={setOwncloudServerUrl}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    keyboardType="url"
+                  />
                 </View>
               )}
 

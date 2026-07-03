@@ -1,9 +1,11 @@
 import * as FileSystem from "expo-file-system/legacy";
 import * as SecureStore from "expo-secure-store";
+import { CloudStorageProvider } from "../types";
 
 const DROPBOX_API_BASE = "https://api.dropboxapi.com/2";
+const DROPBOX_CONTENT_BASE = "https://content.dropboxapi.com/2";
 
-export class DropboxStorage {
+export class DropboxStorage implements CloudStorageProvider {
   private tokens: any = null;
   private userId: string = "";
 
@@ -56,7 +58,7 @@ export class DropboxStorage {
       encoding: FileSystem.EncodingType.Base64,
     } as any);
 
-    const response = await fetch(`${DROPBOX_API_BASE}/files/upload`, {
+    const response = await fetch(`${DROPBOX_CONTENT_BASE}/files/upload`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${this.tokens.accessToken}`,
@@ -95,7 +97,7 @@ export class DropboxStorage {
       throw new Error("Not authenticated");
     }
 
-    const response = await fetch(`${DROPBOX_API_BASE}/files/download`, {
+    const response = await fetch(`${DROPBOX_CONTENT_BASE}/files/download`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${this.tokens.accessToken}`,
@@ -111,14 +113,18 @@ export class DropboxStorage {
     // Dropbox returns metadata in header and file in body
     const blob = await response.blob();
 
-    const reader = new FileReader();
-    reader.onloadend = async () => {
-      const base64 = (reader.result as string).split(",")[1];
-      await FileSystem.writeAsStringAsync(localPath, base64, {
-        encoding: FileSystem.EncodingType.Base64,
-      } as any);
-    };
-    reader.readAsDataURL(blob);
+    const base64 = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        resolve((reader.result as string).split(",")[1]);
+      };
+      reader.onerror = () => reject(new Error("Failed to read blob"));
+      reader.readAsDataURL(blob);
+    });
+
+    await FileSystem.writeAsStringAsync(localPath, base64, {
+      encoding: FileSystem.EncodingType.Base64,
+    } as any);
 
     return {
       size: blob.size,

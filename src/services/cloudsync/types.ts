@@ -47,6 +47,12 @@ export interface CloudStorageProvider {
     size: number;
     exists: boolean;
   } | null>;
+
+  findBackupFile(fileName: string): Promise<{
+    fileId: string;
+    modified: string;
+    size: number;
+  } | null>;
 }
 
 export interface ProviderOAuthTokens {

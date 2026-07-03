@@ -1,9 +1,10 @@
 import * as FileSystem from "expo-file-system/legacy";
 import * as SecureStore from "expo-secure-store";
+import { CloudStorageProvider } from "../types";
 
 const ONEDRIVE_API_BASE = "https://graph.microsoft.com/v1.0";
 
-export class OneDriveStorage {
+export class OneDriveStorage implements CloudStorageProvider {
   private tokens: any = null;
   private userId: string = "";
 
@@ -111,14 +112,18 @@ export class OneDriveStorage {
 
     const blob = await response.blob();
 
-    const reader = new FileReader();
-    reader.onloadend = async () => {
-      const base64 = (reader.result as string).split(",")[1];
-      await FileSystem.writeAsStringAsync(localPath, base64, {
-        encoding: FileSystem.EncodingType.Base64,
-      } as any);
-    };
-    reader.readAsDataURL(blob);
+    const base64 = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        resolve((reader.result as string).split(",")[1]);
+      };
+      reader.onerror = () => reject(new Error("Failed to read blob"));
+      reader.readAsDataURL(blob);
+    });
+
+    await FileSystem.writeAsStringAsync(localPath, base64, {
+      encoding: FileSystem.EncodingType.Base64,
+    } as any);
 
     return {
       size: blob.size,

@@ -1,7 +1,8 @@
 import { icons } from "@/constants/icons";
 import * as Crypto from "expo-crypto";
 import { CryptoDigestAlgorithm } from "expo-crypto";
-import { Directory, File, Paths, readAsStringAsync } from "expo-file-system";
+import { Directory, File, Paths } from "expo-file-system";
+import { readAsStringAsync, writeAsStringAsync } from "expo-file-system/legacy";
 import * as SecureStore from "expo-secure-store";
 import { type SQLiteDatabase, openDatabaseAsync } from "expo-sqlite";
 
@@ -382,20 +383,28 @@ export async function exportBackup(): Promise<string> {
   // Close DB to ensure all WAL content is checkpointed
   await closeDatabase();
 
-  const backupsDir = new Directory(Paths.cache, "backups");
-  await backupsDir.create({ intermediates: true });
-
-  const tempFile = new File(backupsDir, `backup_${userId}_${Date.now()}.db`);
-
   try {
-    const sourceFile = new File(dbPath);
+    const backupsDir = new Directory(Paths.cache, "backups");
+    try {
+      await backupsDir.create({ intermediates: true });
+    } catch {
+      // Directory already exists - that's fine
+    }
+
+    const tempFile = new File(backupsDir, `backup_${userId}_${Date.now()}.db`);
+
+    // dbPath from SQLite is a raw filesystem path; prefix with file:// for expo-file-system File
+    const sourceUri = dbPath.startsWith("file://")
+      ? dbPath
+      : `file://${dbPath}`;
+    const sourceFile = new File(sourceUri);
     await sourceFile.copy(tempFile);
+
+    return tempFile.uri;
   } finally {
     // Always re-open the DB after copy succeeds or fails
     await openDatabase(userId);
   }
-
-  return tempFile.uri;
 }
 
 export interface ImportScanResult {
@@ -414,12 +423,21 @@ export async function importBackup(
 
   // Copy the imported file to a temp location
   const importsDir = new Directory(Paths.cache, "imports");
-  await importsDir.create({ intermediates: true });
+  try {
+    await importsDir.create({ intermediates: true });
+  } catch {
+    // Directory already exists - that's fine
+  }
 
   const importTempPath = `${importsDir.uri}import_${Date.now()}.db`;
-  const sourceFile = new File(sourceUri);
-  const importTempFile = new File(importTempPath);
-  await sourceFile.copy(importTempFile);
+
+  // Use legacy FileSystem to handle content:// URIs from DocumentPicker
+  const content = await readAsStringAsync(sourceUri, {
+    encoding: "base64",
+  });
+  await writeAsStringAsync(importTempPath, content, {
+    encoding: "base64",
+  });
 
   // Open the imported database with the SAME passphrase
   const importDb = await openDatabaseAsync(importTempPath);
@@ -474,7 +492,8 @@ export async function importBackup(
     await importDb.closeAsync();
     // Clean up temp file after reading
     try {
-      await importTempFile.delete();
+      const tempFile = new File(importTempPath);
+      await tempFile.delete();
     } catch {
       // ignore cleanup errors
     }
@@ -502,12 +521,21 @@ export async function executeImportActions(
 
   // Copy and open the imported DB again
   const importsDir = new Directory(Paths.cache, "imports");
-  await importsDir.create({ intermediates: true });
+  try {
+    await importsDir.create({ intermediates: true });
+  } catch {
+    // Directory already exists - that's fine
+  }
 
   const importTempPath = `${importsDir.uri}import_exec_${Date.now()}.db`;
-  const sourceFile = new File(sourceUri);
-  const importTempFile = new File(importTempPath);
-  await sourceFile.copy(importTempFile);
+
+  // Use legacy FileSystem to handle content:// URIs from DocumentPicker
+  const content = await readAsStringAsync(sourceUri, {
+    encoding: "base64",
+  });
+  await writeAsStringAsync(importTempPath, content, {
+    encoding: "base64",
+  });
 
   const importDb = await openDatabaseAsync(importTempPath);
   const db = getDatabase();
@@ -586,7 +614,8 @@ export async function executeImportActions(
   } finally {
     await importDb.closeAsync();
     try {
-      await importTempFile.delete();
+      const tempFile = new File(importTempPath);
+      await tempFile.delete();
     } catch {
       // ignore
     }
@@ -603,12 +632,21 @@ export async function executeNonConflictingImport(
   const passphrase = await getOrCreateDbKey(userId);
 
   const importsDir = new Directory(Paths.cache, "imports");
-  await importsDir.create({ intermediates: true });
+  try {
+    await importsDir.create({ intermediates: true });
+  } catch {
+    // Directory already exists - that's fine
+  }
 
   const importTempPath = `${importsDir.uri}import_nonconf_${Date.now()}.db`;
-  const sourceFile = new File(sourceUri);
-  const importTempFile = new File(importTempPath);
-  await sourceFile.copy(importTempFile);
+
+  // Use legacy FileSystem to handle content:// URIs from DocumentPicker
+  const content = await readAsStringAsync(sourceUri, {
+    encoding: "base64",
+  });
+  await writeAsStringAsync(importTempPath, content, {
+    encoding: "base64",
+  });
 
   const importDb = await openDatabaseAsync(importTempPath);
   const db = getDatabase();
@@ -654,7 +692,8 @@ export async function executeNonConflictingImport(
   } finally {
     await importDb.closeAsync();
     try {
-      await importTempFile.delete();
+      const tempFile = new File(importTempPath);
+      await tempFile.delete();
     } catch {
       // ignore
     }
@@ -721,26 +760,44 @@ export async function getSyncMetadata(): Promise<SyncMetadata> {
 
 export async function updateSyncMetadata(updates: {
   syncEnabled?: boolean;
-  provider?: string;
-  providerUserId?: string;
-  remoteFileId?: string;
-  remoteFileHash?: string;
-  remoteFileModified?: string;
-  lastSyncTimestamp?: string;
+  provider?: string | null;
+  providerUserId?: string | null;
+  remoteFileId?: string | null;
+  remoteFileHash?: string | null;
+  remoteFileModified?: string | null;
+  lastSyncTimestamp?: string | null;
 }): Promise<void> {
   const db = getDatabase();
 
   const current = await getSyncMetadata();
 
-  const syncEnabled = updates.syncEnabled ?? current.syncEnabled;
-  const provider = updates.provider ?? current.provider;
-  const providerUserId = updates.providerUserId ?? current.providerUserId;
-  const remoteFileId = updates.remoteFileId ?? current.remoteFileId;
-  const remoteFileHash = updates.remoteFileHash ?? current.remoteFileHash;
+  // Use "key in updates" to distinguish "not provided" from "explicitly set to null/undefined"
+  const syncEnabled =
+    "syncEnabled" in updates
+      ? (updates.syncEnabled ?? false)
+      : current.syncEnabled;
+  const provider =
+    "provider" in updates ? (updates.provider ?? null) : current.provider;
+  const providerUserId =
+    "providerUserId" in updates
+      ? (updates.providerUserId ?? null)
+      : current.providerUserId;
+  const remoteFileId =
+    "remoteFileId" in updates
+      ? (updates.remoteFileId ?? null)
+      : current.remoteFileId;
+  const remoteFileHash =
+    "remoteFileHash" in updates
+      ? (updates.remoteFileHash ?? null)
+      : current.remoteFileHash;
   const remoteFileModified =
-    updates.remoteFileModified ?? current.remoteFileModified;
+    "remoteFileModified" in updates
+      ? (updates.remoteFileModified ?? null)
+      : current.remoteFileModified;
   const lastSyncTimestamp =
-    updates.lastSyncTimestamp ?? current.lastSyncTimestamp;
+    "lastSyncTimestamp" in updates
+      ? (updates.lastSyncTimestamp ?? null)
+      : current.lastSyncTimestamp;
 
   await db.runAsync(
     `INSERT OR REPLACE INTO sync_metadata (id, sync_enabled, provider, provider_user_id, remote_file_id, remote_file_hash, remote_file_modified, last_sync_timestamp)
@@ -759,13 +816,17 @@ export async function computeDatabaseHash(): Promise<string> {
   const db = getDatabase();
   const dbPath = db.databasePath;
 
-  // Read the database file as a string
-  const buffer = await readAsStringAsync(dbPath);
+  // Read the database file as base64 to preserve exact binary content
+  // dbPath from SQLite is a raw filesystem path; prefix with file:// for expo-file-system
+  const sourceUri = dbPath.startsWith("file://") ? dbPath : `file://${dbPath}`;
+  const base64Content = await readAsStringAsync(sourceUri, {
+    encoding: "base64",
+  });
 
-  // Compute SHA256 hash
+  // Compute SHA256 hash of the base64-encoded bytes
   const hash = await Crypto.digestStringAsync(
     CryptoDigestAlgorithm.SHA256,
-    buffer,
+    base64Content,
   );
 
   return hash;

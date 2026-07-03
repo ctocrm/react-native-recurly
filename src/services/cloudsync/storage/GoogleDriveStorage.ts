@@ -1,9 +1,10 @@
 import * as FileSystem from "expo-file-system/legacy";
 import * as SecureStore from "expo-secure-store";
+import { CloudStorageProvider } from "../types";
 
 const GOOGLE_DRIVE_API_BASE = "https://www.googleapis.com/drive/v3";
 
-export class GoogleDriveStorage {
+export class GoogleDriveStorage implements CloudStorageProvider {
   private tokens: any = null;
   private userId: string = "";
 
@@ -65,7 +66,7 @@ export class GoogleDriveStorage {
     };
 
     const response = await fetch(
-      `${GOOGLE_DRIVE_API_BASE}/files?uploadType=multipart`,
+      `${GOOGLE_DRIVE_API_BASE}/files?uploadType=multipart&fields=id,modifiedTime,size`,
       {
         method: "POST",
         headers: {
@@ -129,14 +130,18 @@ export class GoogleDriveStorage {
     const blob = await response.blob();
 
     // Convert blob to base64 and write to file
-    const reader = new FileReader();
-    reader.onloadend = async () => {
-      const base64 = (reader.result as string).split(",")[1];
-      await FileSystem.writeAsStringAsync(localPath, base64, {
-        encoding: FileSystem.EncodingType.Base64,
-      } as any);
-    };
-    reader.readAsDataURL(blob);
+    const base64 = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        resolve((reader.result as string).split(",")[1]);
+      };
+      reader.onerror = () => reject(new Error("Failed to read blob"));
+      reader.readAsDataURL(blob);
+    });
+
+    await FileSystem.writeAsStringAsync(localPath, base64, {
+      encoding: FileSystem.EncodingType.Base64,
+    } as any);
 
     return {
       size: blob.size,

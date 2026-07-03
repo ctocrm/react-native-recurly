@@ -1,6 +1,7 @@
 import * as Crypto from "expo-crypto";
 import { CryptoDigestAlgorithm } from "expo-crypto";
-import * as FileSystem from "expo-file-system";
+import { Directory, Paths } from "expo-file-system";
+import { deleteAsync, readAsStringAsync } from "expo-file-system/legacy";
 import {
   computeDatabaseHash,
   executeNonConflictingImport,
@@ -98,37 +99,33 @@ export class CloudSyncService {
       // Compute local database hash
       const localHash = await computeDatabaseHash();
 
-      // If hashes match, no sync needed
-      if (localHash === metadata.remoteFileHash) {
-        return { success: true, synced: false, message: "Already in sync" };
+      // If no remote file exists yet, upload local database
+      if (!metadata.remoteFileHash) {
+        return await this.uploadToCloud();
       }
 
-      // Determine sync direction
-      const hasRemoteFile = metadata.remoteFileHash !== null;
+      // If local hash matches the last synced hash, local is unchanged
+      const localUnchanged = localHash === metadata.remoteFileHash;
 
-      if (!hasRemoteFile) {
-        // First sync - upload local database
+      // Check if remote has changes
+      const remoteHash = await this.getRemoteHash();
+
+      // If remote hash matches the last synced hash, remote is unchanged
+      const remoteUnchanged =
+        remoteHash === metadata.remoteFileHash || remoteHash === null;
+
+      if (localUnchanged && remoteUnchanged) {
+        // Both unchanged - nothing to sync
+        return { success: true, synced: false, message: "Already in sync" };
+      } else if (localUnchanged && remoteHash !== null) {
+        // Only remote changed - download it
+        return await this.downloadFromCloud();
+      } else if (remoteUnchanged) {
+        // Only local changed - upload it
         return await this.uploadToCloud();
       } else {
-        // Check if remote has changes
-        const remoteHash = await this.getRemoteHash();
-
-        if (remoteHash === metadata.remoteFileHash) {
-          // Remote unchanged, upload local changes
-          return await this.uploadToCloud();
-        } else if (
-          localHash !== metadata.remoteFileHash &&
-          remoteHash !== metadata.remoteFileHash
-        ) {
-          // Both changed - need merge
-          return await this.mergeWithCloud();
-        } else if (remoteHash !== metadata.remoteFileHash) {
-          // Remote changed, download it
-          return await this.downloadFromCloud();
-        } else {
-          // Local changed, upload it
-          return await this.uploadToCloud();
-        }
+        // Both changed - need merge
+        return await this.mergeWithCloud();
       }
     } catch (error) {
       return {
@@ -142,7 +139,8 @@ export class CloudSyncService {
   }
 
   private async getRemoteHash(): Promise<string | null> {
-    if (!this.provider || !this.provider.isAuthenticated) return null;
+    if (!this.provider) return null;
+    if (!(await this.provider.isAuthenticated())) return null;
 
     const metadata = await getSyncMetadata();
     if (!metadata.remoteFileId) return null;
@@ -151,19 +149,21 @@ export class CloudSyncService {
     if (!fileMeta || !fileMeta.exists) {
       // File was deleted remotely, clear metadata
       await updateSyncMetadata({
-        remoteFileId: undefined,
-        remoteFileHash: undefined,
-        remoteFileModified: undefined,
+        remoteFileId: null,
+        remoteFileHash: null,
+        remoteFileModified: null,
       });
       return null;
     }
 
     // Download and compute hash
-    const tempPath = `${FileSystem.Paths.cache}/sync_check_${Date.now()}.db`;
+    const tempPath = `${Paths.cache}/sync_check_${Date.now()}.db`;
     await this.provider.downloadFile(metadata.remoteFileId, tempPath);
 
-    // Compute hash from file content
-    const content = await FileSystem.readAsStringAsync(tempPath);
+    // Compute hash from file content using base64 to preserve binary data
+    const content = await readAsStringAsync(tempPath, {
+      encoding: "base64",
+    });
     const hash = await Crypto.digestStringAsync(
       CryptoDigestAlgorithm.SHA256,
       content,
@@ -171,7 +171,7 @@ export class CloudSyncService {
 
     // Clean up temp file
     try {
-      await FileSystem.deleteAsync(tempPath, { idempotent: true });
+      await deleteAsync(tempPath, { idempotent: true });
     } catch {
       // Ignore cleanup errors
     }
@@ -203,7 +203,7 @@ export class CloudSyncService {
 
       // Clean up temp file
       try {
-        await FileSystem.deleteAsync(backupPath, { idempotent: true });
+        await deleteAsync(backupPath, { idempotent: true });
       } catch {
         // Ignore
       }
@@ -234,10 +234,7 @@ export class CloudSyncService {
       }
 
       // Download remote backup
-      const importsDir = new FileSystem.Directory(
-        FileSystem.Paths.cache,
-        "cloud_sync_imports",
-      );
+      const importsDir = new Directory(Paths.cache, "cloud_sync_imports");
       await importsDir.create({ intermediates: true });
 
       const importPath = `${importsDir.uri}import_${Date.now()}.db`;
@@ -255,7 +252,7 @@ export class CloudSyncService {
 
       // Clean up temp file
       try {
-        await FileSystem.deleteAsync(importPath, { idempotent: true });
+        await deleteAsync(importPath, { idempotent: true });
       } catch {
         // Ignore
       }
@@ -298,16 +295,13 @@ export class CloudSyncService {
       }
 
       // Download remote backup
-      const importsDir = new FileSystem.Directory(
-        FileSystem.Paths.cache,
-        "cloud_sync_merge",
-      );
+      const importsDir = new Directory(Paths.cache, "cloud_sync_merge");
       await importsDir.create({ intermediates: true });
 
       const remotePath = `${importsDir.uri}remote_${Date.now()}.db`;
       await this.provider.downloadFile(metadata.remoteFileId, remotePath);
 
-      // Perform SQL merge
+      // Perform SQL merge under a single transaction
       const mergeResult = await this.performMerge(remotePath);
 
       // Upload merged result
@@ -326,8 +320,8 @@ export class CloudSyncService {
 
       // Clean up temp files
       try {
-        await FileSystem.deleteAsync(remotePath, { idempotent: true });
-        await FileSystem.deleteAsync(backupPath, { idempotent: true });
+        await deleteAsync(remotePath, { idempotent: true });
+        await deleteAsync(backupPath, { idempotent: true });
       } catch {
         // Ignore
       }
@@ -353,72 +347,85 @@ export class CloudSyncService {
   }> {
     const db = getDatabase();
 
-    // Import the remote database
-    const scanResult = await this.importBackup(remoteDbPath);
+    // Run the entire merge inside a single transaction
+    let mergeResult: { conflicts: any[]; message: string } = {
+      conflicts: [],
+      message: "Merge failed",
+    };
+    await db.withTransactionAsync(async () => {
+      // Import the remote database
+      const scanResult = await this.importBackup(remoteDbPath);
 
-    if (scanResult.conflictingIds.length === 0) {
-      // No conflicts, just import non-conflicting
-      await this.importNonConflicting(remoteDbPath, scanResult.conflictingIds);
-      return {
-        conflicts: [],
-        message: "Merge completed successfully",
-      };
-    }
+      if (scanResult.conflictingIds.length === 0) {
+        // No conflicts, just import non-conflicting
+        await this.importNonConflicting(
+          remoteDbPath,
+          scanResult.conflictingIds,
+        );
+        mergeResult = {
+          conflicts: [],
+          message: "Merge completed successfully",
+        };
+        return undefined;
+      }
 
-    // For conflicts, use timestamp-based resolution (newer wins)
-    const conflicts: any[] = [];
+      // For conflicts, use timestamp-based resolution (newer wins)
+      const conflicts: any[] = [];
 
-    for (const conflictId of scanResult.conflictingIds) {
-      const localRow = await db.getFirstAsync(
-        "SELECT * FROM subscriptions WHERE id = ?",
-        conflictId,
-      );
+      for (const conflictId of scanResult.conflictingIds) {
+        const localRow = await db.getFirstAsync(
+          "SELECT * FROM subscriptions WHERE id = ?",
+          conflictId,
+        );
 
-      const remoteRows = scanResult.conflictingRows.filter(
-        (r: any) => r.id === conflictId,
-      );
-      const remoteRow = remoteRows[0];
+        const remoteRows = scanResult.conflictingRows.filter(
+          (r: any) => r.id === conflictId,
+        );
+        const remoteRow = remoteRows[0];
 
-      if (localRow && remoteRow) {
-        // Compare timestamps, newer wins
-        const localUpdated =
-          (localRow as any).updated_at || (localRow as any).created_at;
-        const remoteUpdated =
-          (remoteRow as any).updated_at || (remoteRow as any).created_at;
+        if (localRow && remoteRow) {
+          // Compare timestamps, newer wins
+          const localUpdated =
+            (localRow as any).updated_at || (localRow as any).created_at;
+          const remoteUpdated =
+            (remoteRow as any).updated_at || (remoteRow as any).created_at;
 
-        if (remoteUpdated > localUpdated) {
-          // Remote is newer, overwrite local
-          await this.overwriteSubscription(remoteRow);
-          conflicts.push({
-            id: conflictId,
-            resolution: "remote_wins",
-            reason: "Remote version was newer",
-          });
-        } else if (localUpdated > remoteUpdated) {
-          // Local is newer, keep it
-          conflicts.push({
-            id: conflictId,
-            resolution: "local_wins",
-            reason: "Local version was newer",
-          });
-        } else {
-          // Same timestamp, keep local
-          conflicts.push({
-            id: conflictId,
-            resolution: "local_wins",
-            reason: "Same timestamp, kept local",
-          });
+          if (remoteUpdated > localUpdated) {
+            // Remote is newer, overwrite local
+            await this.overwriteSubscription(remoteRow);
+            conflicts.push({
+              id: conflictId,
+              resolution: "remote_wins",
+              reason: "Remote version was newer",
+            });
+          } else if (localUpdated > remoteUpdated) {
+            // Local is newer, keep it
+            conflicts.push({
+              id: conflictId,
+              resolution: "local_wins",
+              reason: "Local version was newer",
+            });
+          } else {
+            // Same timestamp, keep local
+            conflicts.push({
+              id: conflictId,
+              resolution: "local_wins",
+              reason: "Same timestamp, kept local",
+            });
+          }
         }
       }
-    }
 
-    // Import non-conflicting
-    await this.importNonConflicting(remoteDbPath, scanResult.conflictingIds);
+      // Import non-conflicting inside the same transaction
+      await this.importNonConflicting(remoteDbPath, scanResult.conflictingIds);
 
-    return {
-      conflicts,
-      message: `Merged with ${conflicts.length} conflict(s) resolved`,
-    };
+      mergeResult = {
+        conflicts,
+        message: `Merged with ${conflicts.length} conflict(s) resolved`,
+      };
+    });
+
+    return mergeResult;
   }
 
   private async overwriteSubscription(row: Record<string, any>): Promise<void> {
