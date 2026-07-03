@@ -46,9 +46,14 @@ const categoryIcons: Record<string, any> = {
 };
 
 const categoryColors: Record<string, string> = {
-  Design: "#f5c542",
+  Design: "#ff8c42",
   "Developer Tools": "#e8def8",
   "AI Tools": "#b8d4e3",
+  Entertainment: "#f5c542",
+  Productivity: "#8fd1bd",
+  Cloud: "#b8e8d0",
+  Music: "#d4a8e8",
+  Other: "#c4c4c4",
 };
 
 const Insights = () => {

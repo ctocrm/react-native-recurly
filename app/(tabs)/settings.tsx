@@ -1,5 +1,6 @@
 import images from "@/constants/images";
 import ConflictResolutionModal from "@/src/components/ConflictResolutionModal";
+import UserSettingsModal from "@/src/components/UserSettingsModal";
 import { useCloudSync } from "@/src/context/CloudSyncContext";
 import { useDatabase } from "@/src/context/DatabaseProvider";
 import { useSubscriptions } from "@/src/context/SubscriptionContext";
@@ -33,6 +34,9 @@ const SafeAreaView = styled(RNSafeAreaView);
 const Settings = () => {
   const { signOut } = useClerk();
   const { user } = useUser();
+
+  // State for user settings modal
+  const [userSettingsVisible, setUserSettingsVisible] = useState(false);
   const posthog = usePostHog();
   const { isReady } = useDatabase();
   const { refreshSubscriptions } = useSubscriptions();
@@ -62,7 +66,12 @@ const Settings = () => {
   } | null>(null);
   const [importUri, setImportUri] = useState<string | null>(null);
   const [selectedProvider, setSelectedProvider] = useState<
-    "google_drive" | "onedrive" | "dropbox" | "owncloud" | "nextcloud"
+    | "google_drive"
+    | "onedrive"
+    | "dropbox"
+    | "owncloud"
+    | "nextcloud"
+    | "icloud"
   >("google_drive");
   const [owncloudServerUrl, setOwncloudServerUrl] = useState("");
 
@@ -394,23 +403,39 @@ const Settings = () => {
 
         {/* User Profile Section */}
         <View className="auth-card mb-5">
-          <View className="flex-row items-center gap-4 mb-4">
-            <Image
-              source={user?.imageUrl ? { uri: user.imageUrl } : images.avatar}
-              className="size-16 rounded-full"
-            />
-            <View className="flex-1">
-              <Text className="text-lg font-sans-bold text-primary">
-                {displayName}
-              </Text>
-              {email && (
-                <Text className="text-sm font-sans-medium text-muted-foreground">
-                  {email}
+          <View className="flex-row items-center justify-between mb-4">
+            <View className="flex-row items-center gap-4">
+              <Image
+                source={user?.imageUrl ? { uri: user.imageUrl } : images.avatar}
+                className="size-16 rounded-full"
+              />
+              <View className="flex-1">
+                <Text className="text-lg font-sans-bold text-primary">
+                  {displayName}
                 </Text>
-              )}
+                {email && (
+                  <Text className="text-sm font-sans-medium text-muted-foreground">
+                    {email}
+                  </Text>
+                )}
+              </View>
             </View>
+            <Pressable
+              className="rounded-xl bg-accent/10 px-4 py-2"
+              onPress={() => setUserSettingsVisible(true)}
+            >
+              <Text className="text-sm font-sans-semibold text-accent">
+                Edit Profile
+              </Text>
+            </Pressable>
           </View>
         </View>
+
+        {/* User Settings Modal */}
+        <UserSettingsModal
+          visible={userSettingsVisible}
+          onClose={() => setUserSettingsVisible(false)}
+        />
 
         {/* Account Section */}
         <View className="auth-card mb-5">
@@ -526,6 +551,7 @@ const Settings = () => {
                   { id: "google_drive", label: "Google Drive" },
                   { id: "onedrive", label: "OneDrive" },
                   { id: "dropbox", label: "Dropbox" },
+                  { id: "icloud", label: "iCloud" },
                   { id: "owncloud", label: "ownCloud" },
                   { id: "nextcloud", label: "Nextcloud" },
                 ].map((provider) => (

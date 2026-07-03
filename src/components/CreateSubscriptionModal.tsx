@@ -13,7 +13,7 @@ import {
   ScrollView,
   Text,
   TextInput,
-  View
+  View,
 } from "react-native";
 
 const CATEGORIES = [
@@ -34,7 +34,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   Productivity: "#8fd1bd",
   Cloud: "#b8e8d0",
   Music: "#d4a8e8",
-  Design: "#f5c542",
+  Design: "#ff8c42",
   Other: "#c4c4c4",
 };
 

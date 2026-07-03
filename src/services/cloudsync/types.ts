@@ -1,5 +1,5 @@
 export type CloudProvider =
-  "google_drive" | "onedrive" | "dropbox" | "owncloud" | "nextcloud";
+  "google_drive" | "onedrive" | "dropbox" | "owncloud" | "nextcloud" | "icloud";
 
 export interface CloudProviderConfig {
   name: string;
