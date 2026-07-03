@@ -166,9 +166,11 @@ export const CloudSyncProvider = ({ children }: { children: ReactNode }) => {
             ? !!process.env.EXPO_PUBLIC_ONEDRIVE_CLIENT_ID
             : provider === "dropbox"
               ? !!process.env.EXPO_PUBLIC_DROPBOX_APP_KEY
-              : provider === "owncloud" || provider === "nextcloud"
-                ? true // ownCloud/Nextcloud use their own auth
-                : false;
+              : provider === "icloud"
+                ? true // iCloud uses Apple Sign-In / iCloud Drive entitlements
+                : provider === "owncloud" || provider === "nextcloud"
+                  ? true // ownCloud/Nextcloud use their own auth
+                  : false;
 
       if (!hasOAuthCredentials) {
         Alert.alert(
@@ -282,6 +284,10 @@ export const CloudSyncProvider = ({ children }: { children: ReactNode }) => {
               authSuccess = true;
             }
           }
+        } else if (provider === "icloud") {
+          // iCloud uses Apple Sign-In / iCloud Drive entitlements
+          // For now, we skip OAuth and just check if available
+          authSuccess = true;
         } else if (provider === "owncloud" || provider === "nextcloud") {
           // ownCloud/Nextcloud use their own authentication
           authSuccess = await service.isAuthenticated();
@@ -289,6 +295,7 @@ export const CloudSyncProvider = ({ children }: { children: ReactNode }) => {
 
         if (
           !authSuccess &&
+          provider !== "icloud" &&
           provider !== "owncloud" &&
           provider !== "nextcloud"
         ) {

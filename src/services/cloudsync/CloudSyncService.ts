@@ -13,6 +13,7 @@ import {
 } from "../../../services/database";
 import { DropboxStorage } from "./storage/DropboxStorage";
 import { GoogleDriveStorage } from "./storage/GoogleDriveStorage";
+import { ICloudStorage } from "./storage/ICloudStorage";
 import { OneDriveStorage } from "./storage/OneDriveStorage";
 import { OwnCloudNextcloudStorage } from "./storage/OwnCloudNextcloudStorage";
 import { CloudProvider, CloudStorageProvider, SyncResult } from "./types";
@@ -42,6 +43,9 @@ export class CloudSyncService {
       case "dropbox":
         this.provider = new DropboxStorage(this.userId);
         break;
+      case "icloud":
+        this.provider = new ICloudStorage(this.userId);
+        break;
       case "owncloud":
       case "nextcloud":
         if (!config?.serverUrl) {
@@ -58,7 +62,7 @@ export class CloudSyncService {
     }
 
     // Load existing tokens if available
-    await this.provider.authenticate();
+    await this.provider?.authenticate();
   }
 
   async isAuthenticated(): Promise<boolean> {
