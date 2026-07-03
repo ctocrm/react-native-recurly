@@ -1,22 +1,26 @@
-import PostHog from 'posthog-react-native'
-import Constants from 'expo-constants'
+import Constants from "expo-constants";
+import PostHog from "posthog-react-native";
 
-const apiKey = Constants.expoConfig?.extra?.posthogProjectToken as string | undefined
-const host = (Constants.expoConfig?.extra?.posthogHost as string) || 'https://us.i.posthog.com'
-const isPostHogConfigured = Boolean(apiKey && apiKey !== 'phc_your_project_token_here')
+const apiKey = Constants.expoConfig?.extra?.posthogProjectToken as
+  string | undefined;
+const host =
+  (Constants.expoConfig?.extra?.posthogHost as string) ||
+  "https://us.i.posthog.com";
+const isPostHogConfigured = Boolean(
+  apiKey && apiKey !== "phc_your_project_token_here",
+);
 
 if (!isPostHogConfigured) {
   console.warn(
-    'PostHog project token not configured. Analytics will be disabled. ' +
-      'Set POSTHOG_PROJECT_TOKEN in your .env file to enable analytics.'
-  )
+    "PostHog project token not configured. Analytics will be disabled. " +
+      "Set POSTHOG_PROJECT_TOKEN in your .env file to enable analytics.",
+  );
 }
 
-export const posthog = new PostHog(apiKey || 'placeholder_key', {
+export const posthog = new PostHog(apiKey || "placeholder_key", {
   host,
   disabled: !isPostHogConfigured,
   captureAppLifecycleEvents: true,
-  debug: __DEV__,
   flushAt: 20,
   flushInterval: 10000,
   maxBatchSize: 100,
@@ -27,4 +31,4 @@ export const posthog = new PostHog(apiKey || 'placeholder_key', {
   requestTimeout: 10000,
   fetchRetryCount: 3,
   fetchRetryDelay: 3000,
-})
+});

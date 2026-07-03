@@ -1,6 +1,8 @@
 import { icons } from "@/constants/icons";
 import * as Crypto from "expo-crypto";
+import { CryptoDigestAlgorithm } from "expo-crypto";
 import { Directory, File, Paths } from "expo-file-system";
+import { readAsStringAsync, writeAsStringAsync } from "expo-file-system/legacy";
 import * as SecureStore from "expo-secure-store";
 import { type SQLiteDatabase, openDatabaseAsync } from "expo-sqlite";
 
@@ -66,6 +68,19 @@ CREATE TABLE IF NOT EXISTS preferences (
 
 -- Seed default preferences if not present
 INSERT OR IGNORE INTO preferences (key, value) VALUES ('notification_enabled', 'true');
+
+-- Cloud sync metadata
+CREATE TABLE IF NOT EXISTS sync_metadata (
+  id                     INTEGER PRIMARY KEY CHECK (id = 1),
+  sync_enabled           INTEGER DEFAULT 0,
+  provider               TEXT,
+  provider_user_id       TEXT,
+  remote_file_id         TEXT,
+  remote_file_hash       TEXT,
+  remote_file_modified   TEXT,
+  last_sync_timestamp    TEXT,
+  server_url             TEXT
+);
 `;
 
 // ---------------------------------------------------------------------------
@@ -369,20 +384,28 @@ export async function exportBackup(): Promise<string> {
   // Close DB to ensure all WAL content is checkpointed
   await closeDatabase();
 
-  const backupsDir = new Directory(Paths.cache, "backups");
-  await backupsDir.create({ intermediates: true });
-
-  const tempFile = new File(backupsDir, `backup_${userId}_${Date.now()}.db`);
-
   try {
-    const sourceFile = new File(dbPath);
+    const backupsDir = new Directory(Paths.cache, "backups");
+    try {
+      await backupsDir.create({ intermediates: true });
+    } catch {
+      // Directory already exists - that's fine
+    }
+
+    const tempFile = new File(backupsDir, `backup_${userId}_${Date.now()}.db`);
+
+    // dbPath from SQLite is a raw filesystem path; prefix with file:// for expo-file-system File
+    const sourceUri = dbPath.startsWith("file://")
+      ? dbPath
+      : `file://${dbPath}`;
+    const sourceFile = new File(sourceUri);
     await sourceFile.copy(tempFile);
+
+    return tempFile.uri;
   } finally {
     // Always re-open the DB after copy succeeds or fails
     await openDatabase(userId);
   }
-
-  return tempFile.uri;
 }
 
 export interface ImportScanResult {
@@ -401,12 +424,21 @@ export async function importBackup(
 
   // Copy the imported file to a temp location
   const importsDir = new Directory(Paths.cache, "imports");
-  await importsDir.create({ intermediates: true });
+  try {
+    await importsDir.create({ intermediates: true });
+  } catch {
+    // Directory already exists - that's fine
+  }
 
   const importTempPath = `${importsDir.uri}import_${Date.now()}.db`;
-  const sourceFile = new File(sourceUri);
-  const importTempFile = new File(importTempPath);
-  await sourceFile.copy(importTempFile);
+
+  // Use legacy FileSystem to handle content:// URIs from DocumentPicker
+  const content = await readAsStringAsync(sourceUri, {
+    encoding: "base64",
+  });
+  await writeAsStringAsync(importTempPath, content, {
+    encoding: "base64",
+  });
 
   // Open the imported database with the SAME passphrase
   const importDb = await openDatabaseAsync(importTempPath);
@@ -461,7 +493,8 @@ export async function importBackup(
     await importDb.closeAsync();
     // Clean up temp file after reading
     try {
-      await importTempFile.delete();
+      const tempFile = new File(importTempPath);
+      await tempFile.delete();
     } catch {
       // ignore cleanup errors
     }
@@ -489,12 +522,21 @@ export async function executeImportActions(
 
   // Copy and open the imported DB again
   const importsDir = new Directory(Paths.cache, "imports");
-  await importsDir.create({ intermediates: true });
+  try {
+    await importsDir.create({ intermediates: true });
+  } catch {
+    // Directory already exists - that's fine
+  }
 
   const importTempPath = `${importsDir.uri}import_exec_${Date.now()}.db`;
-  const sourceFile = new File(sourceUri);
-  const importTempFile = new File(importTempPath);
-  await sourceFile.copy(importTempFile);
+
+  // Use legacy FileSystem to handle content:// URIs from DocumentPicker
+  const content = await readAsStringAsync(sourceUri, {
+    encoding: "base64",
+  });
+  await writeAsStringAsync(importTempPath, content, {
+    encoding: "base64",
+  });
 
   const importDb = await openDatabaseAsync(importTempPath);
   const db = getDatabase();
@@ -573,7 +615,8 @@ export async function executeImportActions(
   } finally {
     await importDb.closeAsync();
     try {
-      await importTempFile.delete();
+      const tempFile = new File(importTempPath);
+      await tempFile.delete();
     } catch {
       // ignore
     }
@@ -590,12 +633,21 @@ export async function executeNonConflictingImport(
   const passphrase = await getOrCreateDbKey(userId);
 
   const importsDir = new Directory(Paths.cache, "imports");
-  await importsDir.create({ intermediates: true });
+  try {
+    await importsDir.create({ intermediates: true });
+  } catch {
+    // Directory already exists - that's fine
+  }
 
   const importTempPath = `${importsDir.uri}import_nonconf_${Date.now()}.db`;
-  const sourceFile = new File(sourceUri);
-  const importTempFile = new File(importTempPath);
-  await sourceFile.copy(importTempFile);
+
+  // Use legacy FileSystem to handle content:// URIs from DocumentPicker
+  const content = await readAsStringAsync(sourceUri, {
+    encoding: "base64",
+  });
+  await writeAsStringAsync(importTempPath, content, {
+    encoding: "base64",
+  });
 
   const importDb = await openDatabaseAsync(importTempPath);
   const db = getDatabase();
@@ -641,7 +693,8 @@ export async function executeNonConflictingImport(
   } finally {
     await importDb.closeAsync();
     try {
-      await importTempFile.delete();
+      const tempFile = new File(importTempPath);
+      await tempFile.delete();
     } catch {
       // ignore
     }
@@ -655,4 +708,160 @@ export async function deleteTempImportFile(uri: string): Promise<void> {
   } catch {
     // ignore
   }
+}
+
+// ---------------------------------------------------------------------------
+// Cloud Sync Metadata
+// ---------------------------------------------------------------------------
+
+export interface SyncMetadata {
+  syncEnabled: boolean;
+  provider: string | null;
+  providerUserId: string | null;
+  remoteFileId: string | null;
+  remoteFileHash: string | null;
+  remoteFileModified: string | null;
+  lastSyncTimestamp: string | null;
+  serverUrl: string | null;
+}
+
+export async function getSyncMetadata(): Promise<SyncMetadata> {
+  const db = getDatabase();
+  const row = await db.getFirstAsync<{
+    sync_enabled: number;
+    provider: string;
+    provider_user_id: string;
+    remote_file_id: string;
+    remote_file_hash: string;
+    remote_file_modified: string;
+    last_sync_timestamp: string;
+    server_url: string;
+  }>("SELECT * FROM sync_metadata WHERE id = 1");
+
+  if (!row) {
+    return {
+      syncEnabled: false,
+      provider: null,
+      providerUserId: null,
+      remoteFileId: null,
+      remoteFileHash: null,
+      remoteFileModified: null,
+      lastSyncTimestamp: null,
+      serverUrl: null,
+    };
+  }
+
+  return {
+    syncEnabled: row.sync_enabled === 1,
+    provider: row.provider ?? null,
+    providerUserId: row.provider_user_id ?? null,
+    remoteFileId: row.remote_file_id ?? null,
+    remoteFileHash: row.remote_file_hash ?? null,
+    remoteFileModified: row.remote_file_modified ?? null,
+    lastSyncTimestamp: row.last_sync_timestamp ?? null,
+    serverUrl: row.server_url ?? null,
+  };
+}
+
+export async function updateSyncMetadata(updates: {
+  syncEnabled?: boolean;
+  provider?: string | null;
+  providerUserId?: string | null;
+  remoteFileId?: string | null;
+  remoteFileHash?: string | null;
+  remoteFileModified?: string | null;
+  lastSyncTimestamp?: string | null;
+  serverUrl?: string | null;
+}): Promise<void> {
+  const db = getDatabase();
+
+  const current = await getSyncMetadata();
+
+  // Use "key in updates" to distinguish "not provided" from "explicitly set to null/undefined"
+  const syncEnabled =
+    "syncEnabled" in updates
+      ? (updates.syncEnabled ?? false)
+      : current.syncEnabled;
+  const provider =
+    "provider" in updates ? (updates.provider ?? null) : current.provider;
+  const providerUserId =
+    "providerUserId" in updates
+      ? (updates.providerUserId ?? null)
+      : current.providerUserId;
+  const remoteFileId =
+    "remoteFileId" in updates
+      ? (updates.remoteFileId ?? null)
+      : current.remoteFileId;
+  const remoteFileHash =
+    "remoteFileHash" in updates
+      ? (updates.remoteFileHash ?? null)
+      : current.remoteFileHash;
+  const remoteFileModified =
+    "remoteFileModified" in updates
+      ? (updates.remoteFileModified ?? null)
+      : current.remoteFileModified;
+  const lastSyncTimestamp =
+    "lastSyncTimestamp" in updates
+      ? (updates.lastSyncTimestamp ?? null)
+      : current.lastSyncTimestamp;
+  const serverUrl =
+    "serverUrl" in updates ? (updates.serverUrl ?? null) : current.serverUrl;
+
+  await db.runAsync(
+    `INSERT OR REPLACE INTO sync_metadata (id, sync_enabled, provider, provider_user_id, remote_file_id, remote_file_hash, remote_file_modified, last_sync_timestamp, server_url)
+     VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    syncEnabled ? 1 : 0,
+    provider,
+    providerUserId,
+    remoteFileId,
+    remoteFileHash,
+    remoteFileModified,
+    lastSyncTimestamp,
+    serverUrl,
+  );
+}
+
+export async function computeDatabaseHash(): Promise<string> {
+  const userId = getCurrentUserId();
+  if (!userId) throw new Error("No active user session");
+
+  const db = getDatabase();
+  const dbPath = db.databasePath;
+
+  // Close and reopen DB to checkpoint WAL changes
+  await closeDatabase();
+
+  // dbPath from SQLite is a raw filesystem path; prefix with file:// for expo-file-system
+  const sourceUri = dbPath.startsWith("file://") ? dbPath : `file://${dbPath}`;
+  const base64Content = await readAsStringAsync(sourceUri, {
+    encoding: "base64",
+  });
+
+  // Reopen the DB
+  await openDatabase(userId);
+
+  // Compute SHA256 hash of the base64-encoded bytes
+  const hash = await Crypto.digestStringAsync(
+    CryptoDigestAlgorithm.SHA256,
+    base64Content,
+  );
+
+  return hash;
+}
+
+export async function needsSync(): Promise<boolean> {
+  const localHash = await computeDatabaseHash();
+  const metadata = await getSyncMetadata();
+
+  // If sync is not enabled, no need to sync
+  if (!metadata.syncEnabled) {
+    return false;
+  }
+
+  // If hashes match, nothing changed
+  if (localHash === metadata.remoteFileHash) {
+    return false;
+  }
+
+  return true;
 }
