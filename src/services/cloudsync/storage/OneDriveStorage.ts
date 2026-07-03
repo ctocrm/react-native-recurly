@@ -43,20 +43,17 @@ export class OneDriveStorage implements CloudStorageProvider {
     if (!this.tokens?.accessToken) return;
 
     try {
-      // Try to create the folder - will fail silently if it exists
+      // Create the folder under Documents - OneDrive will create it if it doesn't exist
+      // If it exists, OneDrive returns 409 which we can ignore
       await fetch(
-        `${ONEDRIVE_API_BASE}/me/drive/root:/Documents/SubTracker:/children`,
+        `${ONEDRIVE_API_BASE}/me/drive/root:/Documents/SubTracker:/content`,
         {
-          method: "POST",
+          method: "PUT",
           headers: {
             Authorization: `Bearer ${this.tokens.accessToken}`,
-            "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            name: "SubTracker",
-            folder: {},
-            "@microsoft.graph.conflictBehavior": "replace",
-          }),
+          // Empty PUT creates an empty folder
+          body: "",
         },
       );
     } catch {
@@ -101,6 +98,7 @@ export class OneDriveStorage implements CloudStorageProvider {
         method: "PUT",
         headers: {
           Authorization: `Bearer ${this.tokens.accessToken}`,
+          "Content-Type": "application/octet-stream",
         },
         body: bytes,
       },
