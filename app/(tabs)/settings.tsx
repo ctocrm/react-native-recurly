@@ -5,15 +5,17 @@ import { useCloudSync } from "@/src/context/CloudSyncContext";
 import { useDatabase } from "@/src/context/DatabaseProvider";
 import { useSubscriptions } from "@/src/context/SubscriptionContext";
 import { useClerk, useUser } from "@clerk/expo";
+import FontAwesome6 from "@expo/vector-icons/FontAwesome6";
 import * as DocumentPicker from "expo-document-picker";
 import * as Sharing from "expo-sharing";
 import { styled } from "nativewind";
 import { usePostHog } from "posthog-react-native";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   Image,
+  Platform,
   Pressable,
   ScrollView,
   Text,
@@ -30,6 +32,39 @@ import {
 } from "../../services/database";
 
 const SafeAreaView = styled(RNSafeAreaView);
+
+// Cloud Sync Providers - ordered by platform (computed once at module scope)
+const getOrderedProviders = () => {
+  const providers = [
+    { id: "google_drive", label: "Google Drive", icon: "google" as const },
+    { id: "onedrive", label: "OneDrive", icon: "microsoft" as const },
+    { id: "dropbox", label: "Dropbox", icon: "dropbox" as const },
+    { id: "icloud", label: "iCloud", icon: "apple" as const },
+    { id: "owncloud", label: "ownCloud", icon: "cloud" as const },
+    { id: "nextcloud", label: "Nextcloud", icon: "cloud" as const },
+  ];
+
+  if (Platform.OS === "ios") {
+    return [
+      providers.find((p) => p.id === "icloud")!,
+      providers.find((p) => p.id === "google_drive")!,
+      providers.find((p) => p.id === "onedrive")!,
+      providers.find((p) => p.id === "dropbox")!,
+      providers.find((p) => p.id === "owncloud")!,
+      providers.find((p) => p.id === "nextcloud")!,
+    ];
+  }
+
+  // Android and other platforms - google drive first, then icloud
+  return [
+    providers.find((p) => p.id === "google_drive")!,
+    providers.find((p) => p.id === "icloud")!,
+    providers.find((p) => p.id === "onedrive")!,
+    providers.find((p) => p.id === "dropbox")!,
+    providers.find((p) => p.id === "owncloud")!,
+    providers.find((p) => p.id === "nextcloud")!,
+  ];
+};
 
 const Settings = () => {
   const { signOut } = useClerk();
@@ -88,6 +123,9 @@ const Settings = () => {
       status?: string;
     }[]
   >([]);
+
+  // Compute ordered providers once using useMemo
+  const orderedProviders = useMemo(() => getOrderedProviders(), []);
 
   // ---------------------------------------------------------------------------
   // Sign Out
@@ -547,14 +585,7 @@ const Settings = () => {
               </Text>
 
               <View className="gap-2 mb-3">
-                {[
-                  { id: "google_drive", label: "Google Drive" },
-                  { id: "onedrive", label: "OneDrive" },
-                  { id: "dropbox", label: "Dropbox" },
-                  { id: "icloud", label: "iCloud" },
-                  { id: "owncloud", label: "ownCloud" },
-                  { id: "nextcloud", label: "Nextcloud" },
-                ].map((provider) => (
+                {orderedProviders.map((provider) => (
                   <Pressable
                     key={provider.id}
                     className={`flex-row items-center gap-3 p-3 rounded-xl border ${
@@ -575,6 +606,13 @@ const Settings = () => {
                         <Text className="text-white text-xs">✓</Text>
                       )}
                     </View>
+                    <FontAwesome6
+                      name={provider.icon}
+                      size={20}
+                      color="#6B7280"
+                      iconStyle={provider.icon === "cloud" ? "solid" : "brand"}
+                      style={{ width: 24 }}
+                    />
                     <Text className="text-sm font-sans-medium text-primary">
                       {provider.label}
                     </Text>
