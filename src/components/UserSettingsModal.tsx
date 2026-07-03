@@ -3,7 +3,7 @@ import { useSubscriptions } from "@/src/context/SubscriptionContext";
 import { useUser } from "@clerk/expo";
 import * as DocumentPicker from "expo-document-picker";
 import { readAsStringAsync } from "expo-file-system/legacy";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Alert,
   Image,
@@ -27,9 +27,19 @@ const UserSettingsModal = ({ visible, onClose }: UserSettingsModalProps) => {
 
   // Profile editing state
   const [editMode, setEditMode] = useState(false);
-  const [firstName, setFirstName] = useState(user?.firstName || "");
-  const [lastName, setLastName] = useState(user?.lastName || "");
-  const [avatarUrl, setAvatarUrl] = useState(user?.imageUrl || "");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  // Sync form state when user changes
+  useEffect(() => {
+    if (user) {
+      setFirstName(user.firstName || "");
+      setLastName(user.lastName || "");
+      setAvatarUrl(user.imageUrl || "");
+    }
+  }, [user?.id]);
 
   const displayName =
     user?.firstName ||
@@ -39,6 +49,9 @@ const UserSettingsModal = ({ visible, onClose }: UserSettingsModalProps) => {
   const email = user?.emailAddresses[0]?.emailAddress;
 
   const handleSaveProfile = async () => {
+    if (saving) return;
+
+    setSaving(true);
     try {
       // Update Clerk user
       if (firstName || lastName) {
@@ -46,6 +59,15 @@ const UserSettingsModal = ({ visible, onClose }: UserSettingsModalProps) => {
           firstName: firstName || undefined,
           lastName: lastName || undefined,
         });
+      }
+
+      // Update profile image via Clerk if avatarUrl changed
+      if (avatarUrl && avatarUrl !== user?.imageUrl) {
+        try {
+          await user?.setProfileImage({ file: avatarUrl });
+        } catch (profileImageError) {
+          console.error("Failed to update profile image:", profileImageError);
+        }
       }
 
       // Store in SQLite preferences for offline/local access
@@ -62,6 +84,9 @@ const UserSettingsModal = ({ visible, onClose }: UserSettingsModalProps) => {
       setEditMode(false);
     } catch (error) {
       console.error("Failed to update profile:", error);
+      Alert.alert("Error", "Failed to update profile. Please try again.");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -100,10 +125,6 @@ const UserSettingsModal = ({ visible, onClose }: UserSettingsModalProps) => {
   };
 
   const handleChangePassword = () => {
-    // Clerk doesn't have a direct password change method in the user object
-    // We would typically open a Clerk-powered UI or redirect to a password change screen
-    // For now, we'll show an alert with instructions
-    // In a real app, you'd integrate with Clerk's password change flow or use appearance settings
     Alert.alert(
       "Change Password",
       "To change your password, please visit your account settings in the Clerk-powered authentication.",
@@ -196,11 +217,12 @@ const UserSettingsModal = ({ visible, onClose }: UserSettingsModalProps) => {
 
           {editMode && (
             <Pressable
-              className="auth-button bg-accent mb-4"
+              className={`auth-button bg-accent mb-4 ${saving ? "opacity-50" : ""}`}
               onPress={handleSaveProfile}
+              disabled={saving}
             >
               <Text className="auth-button-text text-primary">
-                Save Profile
+                {saving ? "Saving..." : "Save Profile"}
               </Text>
             </Pressable>
           )}
