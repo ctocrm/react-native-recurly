@@ -1,4 +1,5 @@
 import { posthog } from "@/src/config/posthog";
+import { processIconQueue } from "@/src/services/iconBackgroundCrawler";
 import dayjs from "dayjs";
 import React, {
   createContext,
@@ -8,6 +9,7 @@ import React, {
   useState,
   type ReactNode,
 } from "react";
+import { AppState } from "react-native";
 import {
   addSubscription as dbAddSubscription,
   deleteSubscription as dbDeleteSubscription,
@@ -53,8 +55,25 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
     if (isReady && db) {
       refreshSubscriptions();
       loadPreferences();
+      // Process any queued icons on startup
+      processIconQueue().catch(console.error);
     }
   }, [isReady, db]);
+
+  // Process queued icons when app comes to foreground
+  useEffect(() => {
+    const handleAppStateChange = (state: string) => {
+      if (state === "active") {
+        processIconQueue().catch(console.error);
+      }
+    };
+
+    const subscription = AppState.addEventListener(
+      "change",
+      handleAppStateChange,
+    );
+    return () => subscription.remove();
+  }, []);
 
   const refreshSubscriptions = useCallback(async () => {
     try {

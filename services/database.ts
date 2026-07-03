@@ -58,7 +58,18 @@ CREATE TABLE IF NOT EXISTS icon_cache (
   icon_key      TEXT PRIMARY KEY,
   image_data    TEXT,
   source        TEXT DEFAULT 'local',
+  original_url  TEXT,
+  format        TEXT DEFAULT 'png',
+  fallback_tier INTEGER DEFAULT 0,
   updated_at    TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS icon_crawl_queue (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  icon_key        TEXT NOT NULL UNIQUE,
+  subscription_id TEXT NOT NULL,
+  created_at      TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (subscription_id) REFERENCES subscriptions(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS preferences (
@@ -367,6 +378,47 @@ export async function setCachedIcon(
     iconKey,
     imageData,
     source,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Icon Crawl Queue
+// ---------------------------------------------------------------------------
+
+export async function enqueueIconScrape(
+  iconKey: string,
+  subscriptionId: string,
+): Promise<void> {
+  const db = getDatabase();
+  await db.runAsync(
+    "INSERT OR IGNORE INTO icon_crawl_queue (icon_key, subscription_id) VALUES (?, ?)",
+    iconKey,
+    subscriptionId,
+  );
+}
+
+export async function getQueuedIcons(): Promise<
+  { icon_key: string; subscription_id: string }[]
+> {
+  const db = getDatabase();
+  const rows = await db.getAllAsync<{
+    icon_key: string;
+    subscription_id: string;
+  }>(
+    "SELECT icon_key, subscription_id FROM icon_crawl_queue ORDER BY created_at DESC",
+  );
+  return rows;
+}
+
+export async function dequeueIcon(iconKey: string): Promise<void> {
+  const db = getDatabase();
+  await db.runAsync("DELETE FROM icon_crawl_queue WHERE icon_key = ?", iconKey);
+}
+
+export async function clearProcessedIconQueues(): Promise<void> {
+  const db = getDatabase();
+  await db.runAsync(
+    "DELETE FROM icon_crawl_queue WHERE icon_key IN (SELECT icon_key FROM icon_cache)",
   );
 }
 

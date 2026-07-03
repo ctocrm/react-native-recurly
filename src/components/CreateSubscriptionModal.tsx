@@ -1,5 +1,7 @@
 import { icons } from "@/constants/icons";
 import { searchLogos } from "@/lib/resolveLogo";
+import { queueIconForScraping } from "@/src/services/iconBackgroundCrawler";
+import { nameToSlug } from "@/src/services/iconScraper";
 import clsx from "clsx";
 import dayjs from "dayjs";
 import { usePostHog } from "posthog-react-native";
@@ -88,7 +90,8 @@ const CreateSubscriptionModal = ({
     if (text.trim().length > 0) {
       const results = searchLogos(text);
       setAutocompleteResults(results);
-      setShowAutocomplete(results.length > 0);
+      // Show autocomplete when typing
+      setShowAutocomplete(true);
     } else {
       setShowAutocomplete(false);
       setAutocompleteResults([]);
@@ -118,18 +121,18 @@ const CreateSubscriptionModal = ({
     onClose();
   }, [name, price, onClose, posthog]);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!formValid) return;
 
     const now = dayjs();
     const renewalDate =
       frequency === "Yearly" ? now.add(1, "year") : now.add(1, "month");
 
-    // Resolve the icon key from the selected icon
-    const iconEntry = Object.entries(icons).find(
-      ([, val]) => val === selectedIcon,
-    );
-    const iconKey = iconEntry ? iconEntry[0] : "plus";
+    // Generate icon key from name (for unknown brands)
+    const iconKey = nameToSlug(name);
+
+    // Queue icon for background scraping (runs automatically)
+    queueIconForScraping(iconKey, Date.now().toString());
 
     const subscription: Subscription = {
       id: Date.now().toString(),
@@ -203,9 +206,14 @@ const CreateSubscriptionModal = ({
                     placeholder="e.g. Netflix"
                     placeholderTextColor="rgba(0, 0, 0, 0.4)"
                     onChangeText={handleNameChange}
-                    onFocus={() => {
-                      if (autocompleteResults.length > 0)
-                        setShowAutocomplete(true);
+                    onBlur={() => {
+                      // Auto-trigger icon scrape when user leaves the field
+                      if (name.trim()) {
+                        queueIconForScraping(
+                          nameToSlug(name),
+                          Date.now().toString(),
+                        );
+                      }
                     }}
                     autoCapitalize="words"
                   />

@@ -3,35 +3,66 @@ import {
   formatStatusLabel,
   formatSubscriptionDateTime,
 } from "@/lib/utils";
+import { useCachedIcon } from "@/src/hooks/useCachedIcon";
 import clsx from "clsx";
 import React, { useState } from "react";
-import { Image, Pressable, Text, View } from "react-native";
+import { ActivityIndicator, Image, Pressable, Text, View } from "react-native";
 import SubscriptionCardMenu from "./SubscriptionCardMenu";
 
+interface SubscriptionCardProps {
+  id: string;
+  icon: any;
+  icon_key?: string;
+  name: string;
+  price: number;
+  currency?: string;
+  billing: string;
+  category?: string;
+  plan?: string;
+  renewalDate?: string;
+  status?: string;
+  paymentMethod?: string;
+  startDate?: string;
+  expanded: boolean;
+  color?: string;
+  onPress: () => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
+  onMarkActive?: () => void;
+  onMarkPaused?: () => void;
+  onMarkCancelled?: () => void;
+  onViewStats?: () => void;
+}
+
 const SubscriptionCard = ({
+  id,
   name,
   price,
   currency,
   icon,
+  icon_key,
   billing,
   color,
   category,
   plan,
   renewalDate,
   expanded,
-  onPress,
   paymentMethod,
   startDate,
   status,
+  onPress,
   onEdit,
   onDelete,
   onMarkActive,
   onMarkPaused,
   onMarkCancelled,
   onViewStats,
-  id,
 }: SubscriptionCardProps) => {
   const [menuVisible, setMenuVisible] = useState(false);
+  const { status: iconStatus, iconUri } = useCachedIcon(icon_key);
+
+  // Use cached icon if available, otherwise use default icon prop
+  const displayIcon = iconUri ? { uri: iconUri } : icon;
 
   return (
     <>
@@ -42,7 +73,14 @@ const SubscriptionCard = ({
       >
         <View className="sub-head">
           <View className="sub-main">
-            <Image source={icon} className="sub-icon" />
+            <View className="relative">
+              <Image source={displayIcon} className="sub-icon" />
+              {iconStatus === "loading" && (
+                <View className="absolute inset-0 items-center justify-center">
+                  <ActivityIndicator size="small" />
+                </View>
+              )}
+            </View>
             <View className="sub-copy">
               <Text numberOfLines={1} className="sub-title">
                 {name}
