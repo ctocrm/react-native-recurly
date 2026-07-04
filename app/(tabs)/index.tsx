@@ -82,11 +82,12 @@ const App = () => {
   };
 
   const handleViewAllSubscriptionsTap = () => {
+    posthog.capture("home_view_all_tapped");
     router.push("/(tabs)/subscriptions");
   };
 
-  const handleCreateSubscription = (subscription: Subscription) => {
-    addSubscription(subscription);
+  const handleCreateSubscription = async (subscription: Subscription) => {
+    await addSubscription(subscription);
   };
 
   const handleEdit = (sub: Subscription) => {

@@ -1,143 +1,129 @@
 import {
   dequeueIcon,
   enqueueIconScrape,
-  getQueuedIcons,
   saveCrawlResult,
   setCachedIcon,
-} from "../../services/database";
-import { downloadFaviconAsBase64, extractFavicon } from "./faviconExtractor";
-import { setIconLoading } from "./iconLoadingRegistry";
+} from "@/services/database";
 import {
-  downloadIconAsBase64,
-  findAllIconSources
-} from "./iconScraper";
+  downloadFaviconAsBase64,
+  extractFavicon,
+} from "@/src/services/faviconExtractor";
+import { setIconLoading } from "@/src/services/iconLoadingRegistry";
+import { findAllIconSources } from "@/src/services/iconScraper";
 
-// Reentrancy guard: prevents concurrent runs of processIconQueue
-let isProcessing = false;
+interface DiscoveredIcon {
+  base64: string;
+  source: string;
+  format: string;
+  originalUrl: string;
+  fallbackTier: number;
+}
 
-// Process queued icons in FIFO order
-export async function processIconQueue(): Promise<void> {
-  if (isProcessing) {
-    console.log("processIconQueue already running, skipping...");
-    return;
+async function crawlIcon(icon_key: string): Promise<void> {
+  console.log(`Crawling icon for ${icon_key}`);
+
+  const discoveredIcons: DiscoveredIcon[] = [];
+
+  // First, try library icons (simple-icons, tabler)
+  const libraryIcons = await findAllIconSources(icon_key);
+  for (const libIcon of libraryIcons) {
+    const base64Data = await downloadFaviconAsBase64(
+      libIcon.url,
+      libIcon.format,
+    );
+    if (base64Data) {
+      discoveredIcons.push({
+        base64: base64Data,
+        source: libIcon.source,
+        format: libIcon.format,
+        originalUrl: libIcon.url,
+        fallbackTier: discoveredIcons.length,
+      });
+      // Save to crawl results for icon picker
+      await saveCrawlResult(
+        icon_key,
+        base64Data,
+        libIcon.source,
+        libIcon.format,
+        libIcon.url,
+      );
+    }
   }
 
-  isProcessing = true;
-
-  try {
-    const queuedIcons = await getQueuedIcons();
-    console.log(`Processing ${queuedIcons.length} queued icons`);
-
-    for (const { icon_key } of queuedIcons) {
-      try {
-        // Mark as loading
-        setIconLoading(icon_key, true);
-
-        // Try ALL icon libraries and save each discovered icon
-        const allLibraryResults = await findAllIconSources(icon_key);
-        const discoveredIcons: {
-          base64: string;
-          source: string;
-          format: string;
-          originalUrl: string;
-          fallbackTier: number;
-        }[] = [];
-
-        // Process each library source
-        for (const [idx, libraryResult] of allLibraryResults.entries()) {
-          const base64Data = await downloadIconAsBase64(
-            libraryResult.url,
-            libraryResult.format,
-          );
-          if (base64Data) {
-            // Save all discovered icons to crawl results
-            await saveCrawlResult(
-              icon_key,
-              base64Data,
-              libraryResult.source,
-              libraryResult.format,
-              libraryResult.url,
-              idx,
-            );
-            discoveredIcons.push({
-              base64: base64Data,
-              source: libraryResult.source,
-              format: libraryResult.format,
-              originalUrl: libraryResult.url,
-              fallbackTier: idx,
-            });
-          }
-        }
-
-        // If no library icon, try favicon extraction
-        let faviconResult = await extractFavicon(icon_key);
-        while (faviconResult) {
-          const base64Data = await downloadFaviconAsBase64(
-            faviconResult.url,
-            faviconResult.format,
-          );
-          if (base64Data) {
-            // Save favicon as crawl result
-            await saveCrawlResult(
-              icon_key,
-              base64Data,
-              "favicon",
-              faviconResult.format,
-              faviconResult.url,
-              discoveredIcons.length,
-            );
-            discoveredIcons.push({
-              base64: base64Data,
-              source: "favicon",
-              format: faviconResult.format,
-              originalUrl: faviconResult.url,
-              fallbackTier: discoveredIcons.length,
-            });
-            break; // Only save first successful favicon
-          }
-          // Try next favicon result if available
-          faviconResult = null;
-        }
-
-        // Cache the best icon (lowest fallback tier) if any discovered
-        if (discoveredIcons.length > 0) {
-          const bestIcon = discoveredIcons.reduce((prev, curr) =>
-            prev.fallbackTier < curr.fallbackTier ? prev : curr,
-          );
-
-          await setCachedIcon(
-            icon_key,
-            bestIcon.base64,
-            "base64",
-            bestIcon.format,
-            bestIcon.originalUrl,
-          );
-          await dequeueIcon(icon_key);
-          console.log(
-            `Cached icon for ${icon_key} (${bestIcon.format}) from ${bestIcon.source}`,
-          );
-        } else {
-          // No icon found - definitive "not found", remove from queue
-          await dequeueIcon(icon_key);
-          console.log(`No icon found for ${icon_key}, removed from queue`);
-        }
-      } catch (error) {
-        // On error, do NOT dequeue - leave it for retry on next run
-        console.error(`Error processing icon ${icon_key}, will retry:`, error);
-      } finally {
-        // Mark as no longer loading
-        setIconLoading(icon_key, false);
+  // If no library icon, try favicon extraction
+  if (discoveredIcons.length === 0) {
+    const faviconResult = await extractFavicon(icon_key);
+    if (faviconResult) {
+      const base64Data = await downloadFaviconAsBase64(
+        faviconResult.url,
+        faviconResult.format,
+      );
+      if (base64Data) {
+        // Save favicon as crawl result
+        await saveCrawlResult(
+          icon_key,
+          base64Data,
+          "favicon",
+          faviconResult.format,
+          faviconResult.url,
+        );
+        discoveredIcons.push({
+          base64: base64Data,
+          source: "favicon",
+          format: faviconResult.format,
+          originalUrl: faviconResult.url,
+          fallbackTier: 0,
+        });
       }
     }
-  } finally {
-    isProcessing = false;
+  }
+
+  // Cache the best icon (lowest fallback tier) if any discovered
+  if (discoveredIcons.length > 0) {
+    const bestIcon = discoveredIcons.reduce((prev, curr) =>
+      prev.fallbackTier < curr.fallbackTier ? prev : curr,
+    );
+
+    await setCachedIcon(
+      icon_key,
+      bestIcon.base64,
+      "base64",
+      bestIcon.format,
+      bestIcon.originalUrl,
+    );
+    await dequeueIcon(icon_key);
+    console.log(
+      `Cached icon for ${icon_key} (${bestIcon.format}) from ${bestIcon.source}`,
+    );
+  } else {
+    // No icon found - leave in queue for retry on next app launch
+    console.log(`No icon found for ${icon_key}, leaving in queue for retry`);
   }
 }
 
-// Queue icon for background processing
+// Process all queued icons (used on app startup)
+export async function processIconQueue(): Promise<void> {
+  const { getQueuedIcons } = await import("@/services/database");
+  const queued = await getQueuedIcons();
+
+  for (const item of queued) {
+    setIconLoading(item.icon_key, true);
+    try {
+      await crawlIcon(item.icon_key);
+    } catch (error) {
+      console.error(`Failed to crawl icon for ${item.icon_key}:`, error);
+      // Leave in queue for retry
+    } finally {
+      setIconLoading(item.icon_key, false);
+    }
+  }
+}
+
+// Public API for adding to queue and processing
 export async function queueIconForScraping(
-  iconKey: string,
+  icon_key: string,
   subscriptionId?: string,
 ): Promise<void> {
-  await enqueueIconScrape(iconKey, subscriptionId);
+  await enqueueIconScrape(icon_key, subscriptionId);
+  await processIconQueue();
 }

@@ -1,5 +1,9 @@
 import { icons } from "@/constants/icons";
-import { getCrawlResults, setCachedIcon } from "@/services/database";
+import {
+  deleteCachedIcon,
+  getCrawlResults,
+  setCachedIcon,
+} from "@/services/database";
 import { queueIconForScraping } from "@/src/services/iconBackgroundCrawler";
 import { usePostHog } from "posthog-react-native";
 import React, { useEffect, useState } from "react";
@@ -102,11 +106,18 @@ const SubscriptionIconPickerModal = ({
     onClose();
   };
 
-  const handleUseDefault = () => {
+  const handleUseDefault = async () => {
     posthog.capture("icon_picker_use_default", {
       subscription_name: subscriptionName,
       icon_key: iconKey,
     });
+
+    // Delete cached icon so default will be used
+    if (iconKey) {
+      await deleteCachedIcon(iconKey);
+    }
+
+    onIconChange();
     onClose();
   };
 

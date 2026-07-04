@@ -210,10 +210,7 @@ const CreateSubscriptionModal = ({
                     onBlur={() => {
                       // Auto-trigger icon scrape when user leaves the field
                       if (name.trim()) {
-                        queueIconForScraping(
-                          nameToSlug(name),
-                          Date.now().toString(),
-                        );
+                        queueIconForScraping(nameToSlug(name));
                       }
                     }}
                     autoCapitalize="words"
