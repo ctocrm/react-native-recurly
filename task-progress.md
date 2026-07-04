@@ -50,3 +50,19 @@
 
 - [x] Add findBackupFile to CloudStorageProvider interface
 - [x] Add implements CloudStorageProvider to all 4 storage provider classes (compile-time check)
+
+## Icon Picker Feature
+
+- [x] `src/services/iconScraper.ts` - Add `findAllIconSources()` to collect ALL discovered icons (simple-icons + tabler)
+- [x] `src/services/iconBackgroundCrawler.ts` - Refactor to save each discovered icon to `icon_crawl_results` before selecting best
+- [x] `src/services/iconLoadingRegistry.ts` - Add `addCacheUpdateListener` and `notifyCacheUpdate` for real-time updates
+- [x] `services/database.ts` - Update `setCachedIcon` to notify cache listeners on update
+- [x] `src/hooks/useCachedIcon.ts` - Add cache update listener to re-fetch icon when changed
+- [x] `src/components/SubscriptionIconPickerModal.tsx` - Create new modal with grid display and action buttons
+  - "Use" button selects icon and updates cache
+  - "✕" (Wrong icon) and "⚠" (Broken icon) report to PostHog with source/fallback_tier
+  - "Use Default Icon" button resets to plus icon
+  - "Search for Icon Online" button triggers background crawl for new icons
+- [x] `components/SubscriptionCard.tsx` - Add `onIconLongPress` prop with touch position detection
+- [x] `app/(tabs)/subscriptions.tsx` - Wire up icon picker state management with `handleIconLongPress`
+- [x] `app/(tabs)/index.tsx` - Integrate icon picker into home page "All Subscriptions" section

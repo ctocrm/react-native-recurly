@@ -32,6 +32,7 @@ interface SubscriptionCardProps {
   onMarkPaused?: () => void;
   onMarkCancelled?: () => void;
   onViewStats?: () => void;
+  onIconLongPress?: () => void;
 }
 
 const SubscriptionCard = ({
@@ -57,6 +58,7 @@ const SubscriptionCard = ({
   onMarkPaused,
   onMarkCancelled,
   onViewStats,
+  onIconLongPress,
 }: SubscriptionCardProps) => {
   const [menuVisible, setMenuVisible] = useState(false);
   const { status: iconStatus, iconUri } = useCachedIcon(icon_key);
@@ -74,12 +76,21 @@ const SubscriptionCard = ({
         <View className="sub-head">
           <View className="sub-main">
             <View className="relative">
-              <Image source={displayIcon} className="sub-icon" />
+              {/* Loading indicator - shows when icon is being fetched */}
               {iconStatus === "loading" && (
                 <View className="absolute inset-0 items-center justify-center">
                   <ActivityIndicator size="small" />
                 </View>
               )}
+              {/* Icon image - long press will trigger picker */}
+              <Image source={displayIcon} className="sub-icon" />
+              {/* Transparent overlay for icon long press detection */}
+              <Pressable
+                onLongPress={onIconLongPress}
+                delayLongPress={300}
+                className="absolute left-0 top-0 size-16"
+                style={{ backgroundColor: "transparent" }}
+              />
             </View>
             <View className="sub-copy">
               <Text numberOfLines={1} className="sub-title">
@@ -111,7 +122,7 @@ const SubscriptionCard = ({
         </Pressable>
 
         {expanded && (
-          <View className="sub-bdy">
+          <View className="sub-body">
             <View className="sub-details">
               <View className="sub-row">
                 <View className="sub-row-copy">

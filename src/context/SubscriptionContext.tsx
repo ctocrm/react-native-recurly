@@ -6,6 +6,7 @@ import React, {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -49,21 +50,15 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
   const { db, isReady } = useDatabase();
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [notificationEnabled, setNotificationEnabledState] = useState(true);
+  const hasProcessedOnStartup = useRef(false);
 
-  // Load all subscriptions from DB when the database becomes ready
-  useEffect(() => {
-    if (isReady && db) {
-      refreshSubscriptions();
-      loadPreferences();
-      // Process any queued icons on startup
-      processIconQueue().catch(console.error);
-    }
-  }, [isReady, db]);
-
-  // Process queued icons when app comes to foreground
+  // Process queued icons when app comes to foreground.
+  // This runs inside DatabaseProvider, so the DB is always ready.
+  // Guarded to not double-trigger on startup when state is already "active".
   useEffect(() => {
     const handleAppStateChange = (state: string) => {
-      if (state === "active") {
+      if (state === "active" && !hasProcessedOnStartup.current) {
+        hasProcessedOnStartup.current = true;
         processIconQueue().catch(console.error);
       }
     };
@@ -72,8 +67,26 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
       "change",
       handleAppStateChange,
     );
+    // Check initial state - if already active, mark as processed
+    if (AppState.currentState === "active") {
+      hasProcessedOnStartup.current = true;
+    }
     return () => subscription.remove();
   }, []);
+
+  // Load all subscriptions from DB when the database becomes ready
+   
+  useEffect(() => {
+    if (isReady && db) {
+      refreshSubscriptions();
+      loadPreferences();
+      // Process any queued icons on startup (first time only)
+      if (!hasProcessedOnStartup.current) {
+        hasProcessedOnStartup.current = true;
+        processIconQueue().catch(console.error);
+      }
+    }
+  }, [isReady, db]);
 
   const refreshSubscriptions = useCallback(async () => {
     try {

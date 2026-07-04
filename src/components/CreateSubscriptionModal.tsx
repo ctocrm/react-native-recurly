@@ -43,7 +43,7 @@ const CATEGORY_COLORS: Record<string, string> = {
 interface CreateSubscriptionModalProps {
   visible: boolean;
   onClose: () => void;
-  onCreate: (subscription: Subscription) => void;
+  onCreate: (subscription: Subscription) => Promise<void> | void;
 }
 
 const CreateSubscriptionModal = ({
@@ -130,12 +130,10 @@ const CreateSubscriptionModal = ({
 
     // Generate icon key from name (for unknown brands)
     const iconKey = nameToSlug(name);
-
-    // Queue icon for background scraping (runs automatically)
-    queueIconForScraping(iconKey, Date.now().toString());
+    const subscriptionId = Date.now().toString();
 
     const subscription: Subscription = {
-      id: Date.now().toString(),
+      id: subscriptionId,
       icon: selectedIcon,
       icon_key: iconKey,
       name: name.trim(),
@@ -157,7 +155,10 @@ const CreateSubscriptionModal = ({
       subscription_frequency: frequency,
     });
 
-    onCreate(subscription);
+    // Persist subscription first, then queue icon scraping
+    await onCreate(subscription);
+    queueIconForScraping(iconKey, subscriptionId);
+
     onClose();
   };
 

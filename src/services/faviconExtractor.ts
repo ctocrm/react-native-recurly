@@ -1,9 +1,34 @@
-import { Directory, File, Paths } from "expo-file-system";
-import { writeAsStringAsync } from "expo-file-system/legacy";
+import { cacheIconToFileSystem, downloadIconAsBase64 } from "./iconScraper";
 
 interface FaviconResult {
   url: string;
   format: "svg" | "png" | "ico";
+}
+
+const FETCH_TIMEOUT_MS = 5000;
+const MAX_CONCURRENT_DOMAINS = 3;
+
+// Timeout-aware fetch
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit = {},
+  timeoutMs: number = FETCH_TIMEOUT_MS,
+): Promise<Response | null> {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+      });
+      return response;
+    } finally {
+      clearTimeout(timer);
+    }
+  } catch {
+    return null;
+  }
 }
 
 // Generate likely domain names from brand name
@@ -46,127 +71,123 @@ async function tryCommonFaviconPaths(
 
   for (const path of paths) {
     const url = `https://${domain}${path}`;
-    try {
-      const response = await fetch(url, { method: "HEAD" });
-      if (response.ok) {
-        const format = path.endsWith(".svg")
-          ? "svg"
-          : path.endsWith(".png")
-            ? "png"
-            : "ico";
-        return { url, format };
-      }
-    } catch {
-      // Continue to next path
+    const response = await fetchWithTimeout(url, { method: "HEAD" });
+    if (response?.ok) {
+      const format = path.endsWith(".svg")
+        ? "svg"
+        : path.endsWith(".png")
+          ? "png"
+          : "ico";
+      return { url, format };
     }
   }
 
   return null;
 }
 
-// Scrape HTML for favicon links
+// Scrape HTML for favicon links - order-agnostic attribute matching
 async function scrapeHtmlForFavicons(
   domain: string,
 ): Promise<FaviconResult | null> {
-  try {
-    const response = await fetch(`https://${domain}`, {
-      headers: { "User-Agent": "SubTrack/1.0" },
-    });
+  const response = await fetchWithTimeout(`https://${domain}`, {
+    headers: { "User-Agent": "SubTrack/1.0" },
+  });
+  if (!response?.ok) return null;
 
-    if (!response.ok) return null;
+  const html = await response.text();
 
-    const html = await response.text();
+  // Find all <link> tags and check attributes independently
+  const linkTagRegex = /<link\s+[^>]*\/?>/gi;
+  let match: RegExpExecArray | null;
 
-    // Find <link rel="icon" or <link rel="shortcut icon">
-    const iconMatch = html.match(
-      /<link[^>]+rel=["'](?:icon|shortcut icon)["'][^>]+href=["']([^"']+)["']/i,
-    );
+  while ((match = linkTagRegex.exec(html)) !== null) {
+    const tag = match[0];
 
-    if (iconMatch && iconMatch[1]) {
-      let href = iconMatch[1];
-      // Resolve relative URLs
+    // Extract rel and href independently (order-agnostic)
+    const relMatch = tag.match(/rel\s*=\s*["']([^"']*)["']/i);
+    const hrefMatch = tag.match(/href\s*=\s*["']([^"']*)["']/i);
+
+    if (!relMatch || !hrefMatch) continue;
+
+    const rel = relMatch[1].toLowerCase();
+
+    // Check for icon/shortcut icon
+    if (rel === "icon" || rel === "shortcut icon") {
+      let href = hrefMatch[1];
       if (!href.startsWith("http")) {
         href = new URL(href, `https://${domain}`).toString();
       }
       return { url: href, format: "png" };
     }
 
-    // Find apple-touch-icon
-    const appleMatch = html.match(
-      /<link[^>]+rel=["']apple-touch-icon["'][^>]+href=["']([^"']+)["']/i,
-    );
-
-    if (appleMatch && appleMatch[1]) {
-      let href = appleMatch[1];
+    // Check for apple-touch-icon
+    if (rel === "apple-touch-icon") {
+      let href = hrefMatch[1];
       if (!href.startsWith("http")) {
         href = new URL(href, `https://${domain}`).toString();
       }
       return { url: href, format: "png" };
     }
-
-    return null;
-  } catch {
-    return null;
   }
+
+  return null;
 }
 
-// Main favicon extraction function
+// Check a single domain for favicon
+async function checkDomain(domain: string): Promise<FaviconResult | null> {
+  // Try common paths first
+  const common = await tryCommonFaviconPaths(extractDomain(domain));
+  if (common) return common;
+
+  // Then try HTML scraping
+  const scraped = await scrapeHtmlForFavicons(extractDomain(domain));
+  if (scraped) return scraped;
+
+  return null;
+}
+
+// Main favicon extraction function with bounded concurrency
 export async function extractFavicon(
   brandName: string,
 ): Promise<FaviconResult | null> {
   const domains = generateLikelyDomains(brandName);
 
-  for (const domain of domains) {
-    // Try common paths first
-    const common = await tryCommonFaviconPaths(extractDomain(domain));
-    if (common) return common;
+  // Process domains with bounded concurrency, short-circuit on first success
+  let nextIndex = 0;
+  let resolved = false;
 
-    // Then try HTML scraping
-    const scraped = await scrapeHtmlForFavicons(extractDomain(domain));
-    if (scraped) return scraped;
-  }
+  const tryNext = async (): Promise<FaviconResult | null> => {
+    while (nextIndex < domains.length && !resolved) {
+      const idx = nextIndex++;
+      const result = await checkDomain(domains[idx]);
+      if (result && !resolved) {
+        resolved = true;
+        return result;
+      }
+    }
+    return null;
+  };
 
-  return null;
+  // Start MAX_CONCURRENT_DOMAINS workers
+  const workers = Array.from({ length: MAX_CONCURRENT_DOMAINS }, () =>
+    tryNext(),
+  );
+  const results = await Promise.all(workers);
+  return results.find((r) => r !== null) ?? null;
 }
 
-// Download favicon as base64
+// Download favicon as base64 - delegates to shared helper from iconScraper
 export async function downloadFaviconAsBase64(
   faviconUrl: string,
   format: "svg" | "png" | "ico",
 ): Promise<string | null> {
-  try {
-    const response = await fetch(faviconUrl);
-    if (!response.ok) return null;
-
-    const arrayBuffer = await response.arrayBuffer();
-    const uint8Array = new Uint8Array(arrayBuffer);
-    let binary = "";
-    for (let i = 0; i < uint8Array.byteLength; i++) {
-      binary += String.fromCharCode(uint8Array[i]);
-    }
-    return btoa(binary);
-  } catch (error) {
-    console.error("Failed to download favicon:", error);
-    return null;
-  }
+  return downloadIconAsBase64(faviconUrl, format === "svg" ? "svg" : "png");
 }
 
-// Cache favicon to file system
+// Cache favicon to file system - delegates to shared helper from iconScraper
 export async function cacheFavicon(
   iconKey: string,
   base64Data: string,
 ): Promise<string> {
-  const cacheDir = new Directory(Paths.cache, "icons");
-  try {
-    await cacheDir.create({ intermediates: true });
-  } catch {
-    // Directory already exists
-  }
-
-  const cacheFile = new File(cacheDir, `${iconKey}.txt`);
-  await writeAsStringAsync(cacheFile.uri, base64Data, {
-    encoding: "base64",
-  });
-
-  return cacheFile.uri;
+  return cacheIconToFileSystem(iconKey, base64Data);
 }

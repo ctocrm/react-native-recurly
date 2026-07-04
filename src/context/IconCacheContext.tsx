@@ -1,13 +1,10 @@
-import { processIconQueue } from "@/src/services/iconBackgroundCrawler";
 import React, {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useState,
   type ReactNode,
 } from "react";
-import { AppState } from "react-native";
 import { getCachedIcon } from "../../services/database";
 
 interface IconCacheContextType {
@@ -28,6 +25,11 @@ export const IconCacheProvider = ({ children }: { children: ReactNode }) => {
     new Map(),
   );
 
+  // Sync the exposed cache state with the in-memory map
+  const syncCachedIcons = useCallback(() => {
+    setCachedIcons(new Map(iconCacheMap));
+  }, []);
+
   // Load cached icon into memory
   const getCachedIconData = useCallback(
     async (iconKey: string): Promise<string | null> => {
@@ -40,12 +42,14 @@ export const IconCacheProvider = ({ children }: { children: ReactNode }) => {
       const cached = await getCachedIcon(iconKey);
       if (cached?.imageData) {
         iconCacheMap.set(iconKey, cached.imageData);
+        // Keep exposed state in sync
+        syncCachedIcons();
         return cached.imageData;
       }
 
       return null;
     },
-    [],
+    [syncCachedIcons],
   );
 
   const isIconCached = useCallback(
@@ -55,20 +59,9 @@ export const IconCacheProvider = ({ children }: { children: ReactNode }) => {
     [cachedIcons],
   );
 
-  // Process crawled icons when app comes to foreground
-  useEffect(() => {
-    const handleAppStateChange = (state: string) => {
-      if (state === "active") {
-        processIconQueue().catch(console.error);
-      }
-    };
-
-    const subscription = AppState.addEventListener(
-      "change",
-      handleAppStateChange,
-    );
-    return () => subscription.remove();
-  }, []);
+  // No AppState listener here: DatabaseProvider is a child of this provider,
+  // so the database may not be ready yet. Foreground queue processing is
+  // handled by SubscriptionProvider which is inside DatabaseProvider.
 
   return (
     <IconCacheContext.Provider
