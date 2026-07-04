@@ -64,10 +64,12 @@ CREATE TABLE IF NOT EXISTS icon_cache (
 );
 
 CREATE TABLE IF NOT EXISTS icon_crawl_queue (
-  id              INTEGER PRIMARY KEY AUTOINCREMENT,
-  icon_key        TEXT NOT NULL UNIQUE,
-  subscription_id TEXT,
-  created_at      TEXT DEFAULT (datetime('now'))
+  id                INTEGER PRIMARY KEY AUTOINCREMENT,
+  icon_key          TEXT NOT NULL UNIQUE,
+  subscription_id   TEXT,
+  attempt_count     INTEGER DEFAULT 0,
+  last_attempt_at   TEXT,
+  created_at        TEXT DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS preferences (
@@ -136,6 +138,23 @@ const MIGRATIONS = [
     if (!names.includes("fallback_tier")) {
       await db.execAsync(
         "ALTER TABLE icon_cache ADD COLUMN fallback_tier INTEGER DEFAULT 0",
+      );
+    }
+  },
+  // Migration 3: Add attempt tracking to icon_crawl_queue
+  async (db: SQLiteDatabase) => {
+    const columns = await db.getAllAsync<{ name: string }>(
+      "PRAGMA table_info(icon_crawl_queue)",
+    );
+    const names = columns.map((c: any) => c.name);
+    if (!names.includes("attempt_count")) {
+      await db.execAsync(
+        "ALTER TABLE icon_crawl_queue ADD COLUMN attempt_count INTEGER DEFAULT 0",
+      );
+    }
+    if (!names.includes("last_attempt_at")) {
+      await db.execAsync(
+        "ALTER TABLE icon_crawl_queue ADD COLUMN last_attempt_at TEXT",
       );
     }
   },
@@ -506,6 +525,14 @@ export async function saveCrawlResult(
   );
 }
 
+export async function deleteCrawlResults(iconKey: string): Promise<void> {
+  const db = getDatabase();
+  await db.runAsync(
+    "DELETE FROM icon_crawl_results WHERE icon_key = ?",
+    iconKey,
+  );
+}
+
 export async function getCrawlResults(
   iconKey: string,
 ): Promise<CrawlResultData[]> {
@@ -542,6 +569,13 @@ export async function deleteCachedIcon(iconKey: string): Promise<void> {
 // Icon Crawl Queue
 // ---------------------------------------------------------------------------
 
+export interface QueuedIcon {
+  icon_key: string;
+  subscription_id: string | null;
+  attempt_count: number;
+  last_attempt_at: string | null;
+}
+
 export async function enqueueIconScrape(
   iconKey: string,
   subscriptionId?: string,
@@ -554,18 +588,33 @@ export async function enqueueIconScrape(
   );
 }
 
-export async function getQueuedIcons(): Promise<
-  { icon_key: string; subscription_id: string | null }[]
-> {
+export async function getQueuedIcons(): Promise<QueuedIcon[]> {
   const db = getDatabase();
-  return db.getAllAsync<{ icon_key: string; subscription_id: string | null }>(
-    "SELECT icon_key, subscription_id FROM icon_crawl_queue ORDER BY created_at ASC",
+  return db.getAllAsync<QueuedIcon>(
+    "SELECT icon_key, subscription_id, attempt_count, last_attempt_at FROM icon_crawl_queue ORDER BY created_at ASC",
   );
 }
 
 export async function dequeueIcon(iconKey: string): Promise<void> {
   const db = getDatabase();
   await db.runAsync("DELETE FROM icon_crawl_queue WHERE icon_key = ?", iconKey);
+}
+
+export async function incrementQueueAttempt(iconKey: string): Promise<void> {
+  const db = getDatabase();
+  await db.runAsync(
+    "UPDATE icon_crawl_queue SET attempt_count = attempt_count + 1, last_attempt_at = datetime('now') WHERE icon_key = ?",
+    iconKey,
+  );
+}
+
+export async function getQueueAttemptCount(iconKey: string): Promise<number> {
+  const db = getDatabase();
+  const row = await db.getFirstAsync<{ attempt_count: number }>(
+    "SELECT attempt_count FROM icon_crawl_queue WHERE icon_key = ?",
+    iconKey,
+  );
+  return row?.attempt_count ?? 0;
 }
 
 export async function clearProcessedIconQueues(): Promise<void> {
