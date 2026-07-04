@@ -2,10 +2,11 @@ import ListHeading from "@/components/ListHeading";
 import SubscriptionCard from "@/components/SubscriptionCard";
 import "@/global.css";
 import EditSubscriptionModal from "@/src/components/EditSubscriptionModal";
+import SubscriptionIconPickerModal from "@/src/components/SubscriptionIconPickerModal";
 import SubscriptionStatsModal from "@/src/components/SubscriptionStatsModal";
 import { useSubscriptions } from "@/src/context/SubscriptionContext";
 import clsx from "clsx";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams } from "expo-router";
 import { styled } from "nativewind";
 import { usePostHog } from "posthog-react-native";
 import React, { useEffect, useMemo, useState } from "react";
@@ -18,7 +19,6 @@ const FILTER_OPTIONS = ["All", "Upcoming"] as const;
 
 const Subscriptions = () => {
   const posthog = usePostHog();
-  const router = useRouter();
   const { filter: initialFilter } = useLocalSearchParams<{ filter?: string }>();
   const {
     subscriptions,
@@ -26,6 +26,7 @@ const Subscriptions = () => {
     deleteSubscription,
     updateSubscriptionStatus,
     getUpcomingSubscriptions,
+    refreshSubscriptions,
   } = useSubscriptions();
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedSubscriptionId, setExpandedSubscriptionId] = useState<
@@ -40,6 +41,11 @@ const Subscriptions = () => {
   const [statsModalSubscription, setStatsModalSubscription] =
     useState<Subscription | null>(null);
   const [statsModalVisible, setStatsModalVisible] = useState(false);
+
+  // Icon picker state
+  const [iconPickerSubscription, setIconPickerSubscription] =
+    useState<Subscription | null>(null);
+  const [iconPickerVisible, setIconPickerVisible] = useState(false);
 
   useEffect(() => {
     posthog.capture("subscriptions_viewed");
@@ -120,6 +126,17 @@ const Subscriptions = () => {
   const handleViewStats = (sub: Subscription) => {
     setStatsModalSubscription(sub);
     setStatsModalVisible(true);
+  };
+
+  // Icon picker handlers
+  const handleIconLongPress = (sub: Subscription) => {
+    setIconPickerSubscription(sub);
+    setIconPickerVisible(true);
+  };
+
+  const handleIconChange = () => {
+    // Refresh subscriptions to pick up the new icon
+    refreshSubscriptions();
   };
 
   return (
@@ -214,6 +231,7 @@ const Subscriptions = () => {
             onMarkPaused={() => handleStatusChange(item, "paused")}
             onMarkCancelled={() => handleStatusChange(item, "cancelled")}
             onViewStats={() => handleViewStats(item)}
+            onIconLongPress={() => handleIconLongPress(item)}
           />
         )}
         extraData={expandedSubscriptionId}
@@ -253,6 +271,18 @@ const Subscriptions = () => {
         onRenew={(id) => {
           updateSubscription(id, {});
         }}
+      />
+
+      {/* Icon Picker Modal */}
+      <SubscriptionIconPickerModal
+        visible={iconPickerVisible}
+        iconKey={iconPickerSubscription?.icon_key ?? null}
+        subscriptionName={iconPickerSubscription?.name ?? ""}
+        onClose={() => {
+          setIconPickerVisible(false);
+          setIconPickerSubscription(null);
+        }}
+        onIconChange={handleIconChange}
       />
     </SafeAreaView>
   );
