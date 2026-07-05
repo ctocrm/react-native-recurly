@@ -72,14 +72,13 @@ export async function reportIcon(
   try {
     await ensureTable();
     const db = getDatabase();
-    const dataHash = hashBase64(imageData);
     await db.runAsync(
       `INSERT INTO icon_reports (icon_key, report_type, source, image_data, rejected)
        VALUES (?, ?, ?, ?, 0)`,
       iconKey,
       reportType,
       source,
-      dataHash,
+      imageData,
     );
     console.log(`Icon reported: ${iconKey} (${reportType}) from ${source}`);
     return true;
