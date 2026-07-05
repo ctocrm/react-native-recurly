@@ -63,8 +63,27 @@ const SubscriptionCard = ({
   const [menuVisible, setMenuVisible] = useState(false);
   const { status: iconStatus, iconUri } = useCachedIcon(icon_key);
 
-  // Use cached icon if available, otherwise use default icon prop
-  const displayIcon = iconUri ? { uri: iconUri } : icon;
+  // Determine which icon to display
+  // Priority: cached web icon > static icon asset from subscription
+  const renderIcon = () => {
+    // Loading state (crawl in progress)
+    if (iconStatus === "loading") {
+      return (
+        <View className="size-16 items-center justify-center rounded-xl border-2 border-border bg-card">
+          <ActivityIndicator size="small" />
+        </View>
+      );
+    }
+
+    // Cached icon from web crawl (take priority)
+    if (iconStatus === "cached" && iconUri) {
+      return <Image source={{ uri: iconUri }} className="size-16 rounded-xl" />;
+    }
+
+    // No cached icon available - use the static icon asset
+    // This is either the brand icon or the "plus" default icon set at creation time
+    return <Image source={icon} className="size-16 rounded-xl" />;
+  };
 
   return (
     <>
@@ -76,14 +95,8 @@ const SubscriptionCard = ({
         <View className="sub-head">
           <View className="sub-main">
             <View className="relative">
-              {/* Loading indicator - shows when icon is being fetched */}
-              {iconStatus === "loading" && (
-                <View className="absolute inset-0 items-center justify-center">
-                  <ActivityIndicator size="small" />
-                </View>
-              )}
-              {/* Icon image - long press will trigger picker */}
-              <Image source={displayIcon} className="sub-icon" />
+              {/* Icon */}
+              {renderIcon()}
               {/* Transparent overlay for icon long press detection */}
               <Pressable
                 onLongPress={onIconLongPress}

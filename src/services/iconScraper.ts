@@ -2,7 +2,7 @@ import { Directory, File, Paths } from "expo-file-system";
 import { writeAsStringAsync } from "expo-file-system/legacy";
 
 interface ScrapedIcon {
-  source: "simple-icons" | "tabler";
+  source: "simple-icons" | "tabler" | "devicons" | "boxicons" | "icons8";
   url: string;
   format: "svg" | "png";
 }
@@ -65,16 +65,53 @@ async function tryTabler(slug: string): Promise<ScrapedIcon | null> {
   return null;
 }
 
+// Try Devicons (developer icons)
+async function tryDevicons(slug: string): Promise<ScrapedIcon | null> {
+  const url = `https://cdn.jsdelivr.net/gh/devicons/devicon/icons/${slug}/${slug}-original.svg`;
+  const url2 = `https://cdn.jsdelivr.net/gh/devicons/devicon/icons/${slug}/${slug}-original-wordmark.svg`;
+  if (await urlExists(url)) {
+    return { source: "devicons", url, format: "svg" };
+  }
+  if (await urlExists(url2)) {
+    return { source: "devicons", url: url2, format: "svg" };
+  }
+  return null;
+}
+
+// Try Boxicons
+async function tryBoxicons(slug: string): Promise<ScrapedIcon | null> {
+  const url = `https://cdn.jsdelivr.net/gh/atisawd/boxicons/svg/bxl-${slug}.svg`;
+  const url2 = `https://cdn.jsdelivr.net/gh/atisawd/boxicons@master/svg/regular/bx-${slug}.svg`;
+  if (await urlExists(url)) {
+    return { source: "boxicons", url, format: "svg" };
+  }
+  if (await urlExists(url2)) {
+    return { source: "boxicons", url: url2, format: "svg" };
+  }
+  return null;
+}
+
+// Try Icons8 (line awesome alternative)
+async function tryIcons8(slug: string): Promise<ScrapedIcon | null> {
+  const url = `https://img.icons8.com/color/512/${slug}.png`;
+  if (await urlExists(url)) {
+    return { source: "icons8", url, format: "png" };
+  }
+  return null;
+}
+
 // Main function to find icon from libraries (returns first match)
 export async function findIconFromLibraries(
   brandName: string,
 ): Promise<ScrapedIcon | null> {
   const slug = nameToSlug(brandName);
 
-  // Try each source in order - skip Lucide for brand icons (it doesn't host brand logos)
   const sources: ((slug: string) => Promise<ScrapedIcon | null>)[] = [
     trySimpleIcons,
     tryTabler,
+    tryDevicons,
+    tryBoxicons,
+    tryIcons8,
   ];
 
   for (const fetchSource of sources) {
@@ -98,6 +135,9 @@ export async function findAllIconSources(
   const sources: ((slug: string) => Promise<ScrapedIcon | null>)[] = [
     trySimpleIcons,
     tryTabler,
+    tryDevicons,
+    tryBoxicons,
+    tryIcons8,
   ];
 
   for (const fetchSource of sources) {

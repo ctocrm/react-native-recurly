@@ -11,8 +11,13 @@ import {
   downloadFaviconAsBase64,
   extractFavicon,
 } from "@/src/services/faviconExtractor";
+import { extractIconsFromUrls } from "@/src/services/htmlIconExtractor";
 import { setIconLoading } from "@/src/services/iconLoadingRegistry";
-import { findAllIconSources } from "@/src/services/iconScraper";
+import {
+  downloadIconAsBase64,
+  findAllIconSources,
+} from "@/src/services/iconScraper";
+import { searchAllSources } from "@/src/services/searchEngines";
 
 interface DiscoveredIcon {
   base64: string;
@@ -29,13 +34,52 @@ let pendingReprocess = false;
 // Max retry attempts for icons that fail to be discovered
 const MAX_RETRY_ATTEMPTS = 3;
 
+/**
+ * Download an icon URL to base64, with format auto-detection.
+ */
+async function downloadImageAsBase64(url: string): Promise<string | null> {
+  // Try as SVG first (which may be in an SVG context)
+  const svgResult = await downloadIconAsBase64(url, "svg");
+  if (svgResult) return svgResult;
+
+  // Try as PNG
+  const pngResult = await downloadIconAsBase64(url, "png");
+  if (pngResult) return pngResult;
+
+  // Fallback to generic fetch
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+      },
+    });
+    clearTimeout(timer);
+    if (!response.ok) return null;
+
+    const arrayBuffer = await response.arrayBuffer();
+    const uint8Array = new Uint8Array(arrayBuffer);
+    let binary = "";
+    for (let i = 0; i < uint8Array.byteLength; i++) {
+      binary += String.fromCharCode(uint8Array[i]);
+    }
+    return btoa(binary);
+  } catch {
+    return null;
+  }
+}
+
 async function crawlIcon(icon_key: string): Promise<boolean> {
-  // Returns true if icon was found and cached, false otherwise
   console.log(`Crawling icon for ${icon_key}`);
 
   const discoveredIcons: DiscoveredIcon[] = [];
 
-  // First, try library icons (simple-icons, tabler)
+  // =========================================================
+  // TIER 1: Icon library CDNs (simple-icons, tabler, devicons, etc.)
+  // =========================================================
   const libraryIcons = await findAllIconSources(icon_key);
   for (const libIcon of libraryIcons) {
     const base64Data = await downloadFaviconAsBase64(
@@ -53,7 +97,9 @@ async function crawlIcon(icon_key: string): Promise<boolean> {
     }
   }
 
-  // If no library icon, try favicon extraction
+  // =========================================================
+  // TIER 2: Favicon extraction from likely domains
+  // =========================================================
   if (discoveredIcons.length === 0) {
     const faviconResult = await extractFavicon(icon_key);
     if (faviconResult) {
@@ -73,7 +119,93 @@ async function crawlIcon(icon_key: string): Promise<boolean> {
     }
   }
 
-  // Save results (idempotently: delete existing for this icon_key first if any found)
+  // =========================================================
+  // TIER 3: Multi-engine image search + Google dork searches (REAL WEB CRAWLER)
+  // =========================================================
+  if (discoveredIcons.length === 0) {
+    console.log(`Searching web for ${icon_key} (engines + dorks)...`);
+
+    // Run all search engine queries + dorks
+    const searchResults = await searchAllSources(icon_key);
+
+    // Extract link URLs from search results to spider
+    const linkUrls: string[] = [];
+    const directImageUrls: string[] = [];
+
+    for (const result of searchResults) {
+      // Direct image URLs (from image search results)
+      if (
+        result.url.endsWith(".svg") ||
+        result.url.endsWith(".png") ||
+        result.url.endsWith(".jpg") ||
+        result.url.endsWith(".jpeg") ||
+        result.url.endsWith(".ico") ||
+        result.url.endsWith(".webp")
+      ) {
+        directImageUrls.push(result.url);
+      } else if (
+        !result.url.includes("google.com") &&
+        !result.url.includes("bing.com") &&
+        !result.url.includes("duckduckgo.com") &&
+        !result.url.includes("yandex.com")
+      ) {
+        // Non-image URLs from search results - these are pages to spider
+        linkUrls.push(result.url);
+      }
+    }
+
+    // Download direct image URLs (limit to first 15)
+    const directDownloadLimit = Math.min(directImageUrls.length, 15);
+    for (let i = 0; i < directDownloadLimit; i++) {
+      const url = directImageUrls[i];
+      const base64Data = await downloadImageAsBase64(url);
+      if (base64Data) {
+        discoveredIcons.push({
+          base64: base64Data,
+          source: "web_search",
+          format: url.endsWith(".svg") ? "svg" : "png",
+          originalUrl: url,
+          fallbackTier: discoveredIcons.length,
+        });
+        // Limit to 5 successful downloads from direct URLs
+        if (
+          discoveredIcons.filter((d) => d.source === "web_search").length >= 5
+        )
+          break;
+      }
+    }
+
+    // If still no icons found, spider the link URLs (follow them and extract icons from HTML)
+    if (discoveredIcons.length === 0 && linkUrls.length > 0) {
+      console.log(`Spidering ${linkUrls.length} URLs for ${icon_key}...`);
+      const spideredIcons = await extractIconsFromUrls(linkUrls, icon_key);
+
+      // Download icons found from spidering (limit to first 5 unique)
+      let spiderDownloads = 0;
+      for (const icon of spideredIcons) {
+        if (spiderDownloads >= 5) break;
+
+        // Skip URLs we've already tried
+        if (discoveredIcons.some((d) => d.originalUrl === icon.url)) continue;
+
+        const base64Data = await downloadImageAsBase64(icon.url);
+        if (base64Data) {
+          discoveredIcons.push({
+            base64: base64Data,
+            source: `spider:${icon.source}`,
+            format: icon.format,
+            originalUrl: icon.url,
+            fallbackTier: discoveredIcons.length,
+          });
+          spiderDownloads++;
+        }
+      }
+    }
+  }
+
+  // =========================================================
+  // Save results
+  // =========================================================
   if (discoveredIcons.length > 0) {
     await deleteCrawlResults(icon_key);
     for (const icon of discoveredIcons) {
@@ -86,7 +218,7 @@ async function crawlIcon(icon_key: string): Promise<boolean> {
       );
     }
 
-    // Cache the best icon (lowest fallback tier)
+    // Cache the best icon (lowest fallback tier = first discovered)
     const bestIcon = discoveredIcons.reduce((prev, curr) =>
       prev.fallbackTier < curr.fallbackTier ? prev : curr,
     );
@@ -94,7 +226,7 @@ async function crawlIcon(icon_key: string): Promise<boolean> {
     await setCachedIcon(
       icon_key,
       bestIcon.base64,
-      "base64",
+      bestIcon.source,
       bestIcon.format,
       bestIcon.originalUrl,
     );
@@ -104,8 +236,9 @@ async function crawlIcon(icon_key: string): Promise<boolean> {
     );
     return true;
   } else {
-    // No icon found - leave in queue for retry on next app launch
-    console.log(`No icon found for ${icon_key}, leaving in queue for retry`);
+    console.log(
+      `No icon found for ${icon_key} after all searches, leaving in queue for retry`,
+    );
     return false;
   }
 }
