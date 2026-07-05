@@ -35,9 +35,9 @@ async function fetchWithTimeout(
   timeoutMs: number = FETCH_TIMEOUT_MS,
 ): Promise<Response | null> {
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), timeoutMs);
       const response = await fetch(url, {
         ...options,
         signal: controller.signal,
@@ -49,10 +49,11 @@ async function fetchWithTimeout(
           "Accept-Language": "en-US,en;q=0.9",
         },
       });
-      clearTimeout(timer);
       if (response.ok) return response;
     } catch {
       // Retry
+    } finally {
+      clearTimeout(timer);
     }
   }
   return null;
@@ -419,14 +420,15 @@ export async function searchAllSources(
     runDorkSearches(brand),
   ]);
 
-  // Deduplicate by URL
+  // Deduplicate by URL (normalized for comparison, but keep original URL with query params)
   const dedupe = (results: ImageSearchResult[]) => {
     for (const r of results) {
-      // Normalize URL
-      const cleanUrl = r.url.replace(/^\/\//, "https://").split("?")[0];
-      if (!seenUrls.has(cleanUrl)) {
-        seenUrls.add(cleanUrl);
-        allResults.push({ ...r, url: cleanUrl });
+      // Use normalized URL only for dedup comparison
+      const normalizedUrl = r.url.replace(/^\/\//, "https://").split("?")[0];
+      const storedUrl = r.url.replace(/^\/\//, "https://");
+      if (!seenUrls.has(normalizedUrl)) {
+        seenUrls.add(normalizedUrl);
+        allResults.push({ ...r, url: storedUrl });
       }
     }
   };

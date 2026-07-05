@@ -15,9 +15,9 @@ interface ExtractedIcon {
 const FETCH_TIMEOUT_MS = 6000;
 
 async function fetchPage(url: string): Promise<string | null> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
     const response = await fetch(url, {
       signal: controller.signal,
       headers: {
@@ -28,12 +28,13 @@ async function fetchPage(url: string): Promise<string | null> {
         "Accept-Language": "en-US,en;q=0.9",
       },
     });
-    clearTimeout(timer);
     if (!response.ok) return null;
     const text = await response.text();
     return text;
   } catch {
     return null;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -49,8 +50,8 @@ function detectImageFormat(url: string): ExtractedIcon["format"] {
 function resolveUrl(href: string, baseUrl: string): string {
   if (href.startsWith("http://") || href.startsWith("https://")) return href;
   try {
-    const base = new URL(baseUrl);
-    return new URL(href, base.origin).href;
+    // Use the full page URL as the base so document-relative paths resolve correctly
+    return new URL(href, baseUrl).href;
   } catch {
     return href;
   }
@@ -186,9 +187,13 @@ function extractIconsFromHtml(html: string, pageUrl: string): ExtractedIcon[] {
     /<script[^>]+type\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
   while ((match = jsonldRegex.exec(html)) !== null) {
     try {
-      const json = JSON.parse(match[1].trim());
-      // Handle @graph arrays
-      const items = Array.isArray(json["@graph"]) ? json["@graph"] : [json];
+      const parsed = JSON.parse(match[1].trim());
+      // Handle both root arrays and objects
+      const items: any[] = Array.isArray(parsed)
+        ? parsed
+        : Array.isArray(parsed["@graph"])
+          ? parsed["@graph"]
+          : [parsed];
       for (const item of items) {
         // Look for logo in Organization schema
         if (item.logo) {

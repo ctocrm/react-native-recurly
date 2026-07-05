@@ -14,8 +14,7 @@ import {
 import { extractIconsFromUrls } from "@/src/services/htmlIconExtractor";
 import { setIconLoading } from "@/src/services/iconLoadingRegistry";
 import {
-  downloadIconAsBase64,
-  findAllIconSources,
+  findAllIconSources
 } from "@/src/services/iconScraper";
 import { searchAllSources } from "@/src/services/searchEngines";
 
@@ -35,18 +34,23 @@ let pendingReprocess = false;
 const MAX_RETRY_ATTEMPTS = 3;
 
 /**
+ * Detect image format from a URL's file extension.
+ */
+function detectUrlFormat(url: string): string {
+  const clean = url.toLowerCase().split("?")[0].split("#")[0];
+  if (clean.endsWith(".svg")) return "svg";
+  if (clean.endsWith(".ico")) return "ico";
+  if (clean.endsWith(".jpg") || clean.endsWith(".jpeg")) return "jpg";
+  if (clean.endsWith(".webp")) return "webp";
+  if (clean.endsWith(".gif")) return "gif";
+  return "png"; // default fallback
+}
+
+/**
  * Download an icon URL to base64, with format auto-detection.
+ * Uses a single fetch path since downloadIconAsBase64 doesn't vary by format.
  */
 async function downloadImageAsBase64(url: string): Promise<string | null> {
-  // Try as SVG first (which may be in an SVG context)
-  const svgResult = await downloadIconAsBase64(url, "svg");
-  if (svgResult) return svgResult;
-
-  // Try as PNG
-  const pngResult = await downloadIconAsBase64(url, "png");
-  if (pngResult) return pngResult;
-
-  // Fallback to generic fetch
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 8000);
@@ -163,7 +167,7 @@ async function crawlIcon(icon_key: string): Promise<boolean> {
         discoveredIcons.push({
           base64: base64Data,
           source: "web_search",
-          format: url.endsWith(".svg") ? "svg" : "png",
+          format: detectUrlFormat(url),
           originalUrl: url,
           fallbackTier: discoveredIcons.length,
         });

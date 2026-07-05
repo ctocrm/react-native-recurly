@@ -31,6 +31,20 @@ CREATE TABLE IF NOT EXISTS icon_reports (
 CREATE INDEX IF NOT EXISTS idx_icon_reports_key ON icon_reports(icon_key);
 `;
 
+/**
+ * Generate a stable hash of a base64 string for comparison/storage.
+ * Uses a simple but deterministic hash (Fowler-Noll-Vo-1a) that avoids
+ * storing full base64 payloads in the database.
+ */
+function hashBase64(data: string): string {
+  let hash = 0x811c9dc5; // FNV offset basis
+  for (let i = 0; i < data.length; i++) {
+    hash ^= data.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193); // FNV prime
+  }
+  return hash.toString(16);
+}
+
 let tableEnsured = false;
 
 async function ensureTable(): Promise<void> {
@@ -58,13 +72,14 @@ export async function reportIcon(
   try {
     await ensureTable();
     const db = getDatabase();
+    const dataHash = hashBase64(imageData);
     await db.runAsync(
       `INSERT INTO icon_reports (icon_key, report_type, source, image_data, rejected)
        VALUES (?, ?, ?, ?, 0)`,
       iconKey,
       reportType,
       source,
-      imageData,
+      dataHash,
     );
     console.log(`Icon reported: ${iconKey} (${reportType}) from ${source}`);
     return true;
@@ -112,10 +127,11 @@ export async function isImageReported(
   try {
     await ensureTable();
     const db = getDatabase();
+    const dataHash = hashBase64(imageData);
     const row = await db.getFirstAsync<{ count: number }>(
       "SELECT COUNT(*) as count FROM icon_reports WHERE icon_key = ? AND image_data = ?",
       iconKey,
-      imageData,
+      dataHash,
     );
     return (row?.count ?? 0) > 0;
   } catch {
@@ -133,10 +149,11 @@ export async function rejectReportedIcon(
   try {
     await ensureTable();
     const db = getDatabase();
+    const dataHash = hashBase64(imageData);
     await db.runAsync(
       "UPDATE icon_reports SET rejected = 1 WHERE icon_key = ? AND image_data = ?",
       iconKey,
-      imageData,
+      dataHash,
     );
   } catch (error) {
     console.error("Failed to reject icon:", error);

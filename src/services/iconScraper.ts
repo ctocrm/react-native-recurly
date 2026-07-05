@@ -80,7 +80,7 @@ async function tryDevicons(slug: string): Promise<ScrapedIcon | null> {
 
 // Try Boxicons
 async function tryBoxicons(slug: string): Promise<ScrapedIcon | null> {
-  const url = `https://cdn.jsdelivr.net/gh/atisawd/boxicons/svg/bxl-${slug}.svg`;
+  const url = `https://cdn.jsdelivr.net/gh/atisawd/boxicons@master/svg/logos/bxl-${slug}.svg`;
   const url2 = `https://cdn.jsdelivr.net/gh/atisawd/boxicons@master/svg/regular/bx-${slug}.svg`;
   if (await urlExists(url)) {
     return { source: "boxicons", url, format: "svg" };
@@ -131,7 +131,7 @@ export async function findAllIconSources(
   const slug = nameToSlug(brandName);
   const results: ScrapedIcon[] = [];
 
-  // Try each source and collect all successful results
+  // Try each source in parallel and collect all successful results
   const sources: ((slug: string) => Promise<ScrapedIcon | null>)[] = [
     trySimpleIcons,
     tryTabler,
@@ -140,8 +140,10 @@ export async function findAllIconSources(
     tryIcons8,
   ];
 
-  for (const fetchSource of sources) {
-    const result = await fetchSource(slug);
+  const outcomes = await Promise.all(
+    sources.map((fetchSource) => fetchSource(slug)),
+  );
+  for (const result of outcomes) {
     if (result) {
       results.push(result);
     }

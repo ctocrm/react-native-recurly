@@ -79,6 +79,12 @@ const SubscriptionIconPickerModal = ({
   const [isSearching, setIsSearching] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const isMounted = useRef(true);
+  const latestKeyRef = useRef(iconKey);
+
+  // Keep latestKeyRef in sync with the current iconKey
+  useEffect(() => {
+    latestKeyRef.current = iconKey;
+  }, [iconKey]);
 
   /**
    * Load ALL available icons from multiple sources:
@@ -88,6 +94,7 @@ const SubscriptionIconPickerModal = ({
    */
   const loadIcons = useCallback(async () => {
     if (!iconKey) return;
+    const requestKey = iconKey;
     setIsLoading(true);
     try {
       const resultMap = new Map<string, PickerIcon>();
@@ -95,6 +102,7 @@ const SubscriptionIconPickerModal = ({
 
       // --- Source 1: Currently cached icon ---
       const cached = await getCachedIcon(iconKey);
+      if (requestKey !== latestKeyRef.current) return;
       if (cached?.imageData && !resultMap.has(cached.imageData)) {
         resultMap.set(cached.imageData, {
           id: nextId++,
@@ -109,8 +117,10 @@ const SubscriptionIconPickerModal = ({
 
       // --- Source 2: Crawl results (previously found icons) ---
       const results = await getCrawlResults(iconKey);
+      if (requestKey !== latestKeyRef.current) return;
       for (const r of results) {
         const reported = await isImageReported(iconKey, r.imageData);
+        if (requestKey !== latestKeyRef.current) return;
         if (!reported && !resultMap.has(r.imageData)) {
           resultMap.set(r.imageData, {
             id: nextId++,
@@ -128,8 +138,10 @@ const SubscriptionIconPickerModal = ({
       if (resultMap.size < 3) {
         try {
           const libIcons = await findAllIconSources(iconKey);
+          if (requestKey !== latestKeyRef.current) return;
           for (const lib of libIcons) {
             const base64Data = await downloadIconAsBase64(lib.url, lib.format);
+            if (requestKey !== latestKeyRef.current) return;
             if (base64Data && !resultMap.has(base64Data)) {
               resultMap.set(base64Data, {
                 id: nextId++,
@@ -147,10 +159,13 @@ const SubscriptionIconPickerModal = ({
       }
 
       if (isMounted.current) {
-        // Sort: currently cached icon first, then by fallbackTier
-        const sorted = Array.from(resultMap.values()).sort(
-          (a, b) => a.fallbackTier - b.fallbackTier,
-        );
+        // Sort: currently cached icon first (explicit priority), then by fallbackTier
+        const sorted = Array.from(resultMap.values()).sort((a, b) => {
+          // Cached icon always comes first
+          if (a.source === "cached" && b.source !== "cached") return -1;
+          if (b.source === "cached" && a.source !== "cached") return 1;
+          return a.fallbackTier - b.fallbackTier;
+        });
         setAvailableIcons(sorted);
         setIsSearching(false);
       }
@@ -203,8 +218,18 @@ const SubscriptionIconPickerModal = ({
     });
 
     setIsSearching(true);
-    // Queue icon for background crawling - the loading listener will update state
-    await queueIconForScraping(iconKey);
+    try {
+      // Queue icon for background crawling - the loading listener will update state
+      await queueIconForScraping(iconKey);
+    } catch (error) {
+      console.error("Failed to queue icon for scraping:", error);
+      Alert.alert(
+        "Search Failed",
+        "Could not search for icons. Please try again.",
+      );
+    } finally {
+      setIsSearching(false);
+    }
   };
 
   const handleSelectIcon = async (icon: PickerIcon) => {
@@ -249,80 +274,61 @@ const SubscriptionIconPickerModal = ({
     onClose();
   };
 
-  const handleReportWrong = async (icon: PickerIcon) => {
+  const reportIconAndNotify = async (
+    icon: PickerIcon,
+    reportType: "wrong" | "broken",
+    successMessage: string,
+  ) => {
     if (!iconKey) return;
 
-    posthog.capture("icon_picker_report_wrong", {
+    const captureEvent =
+      reportType === "wrong"
+        ? "icon_picker_report_wrong"
+        : "icon_picker_report_broken";
+
+    posthog.capture(captureEvent, {
       subscription_name: subscriptionName,
       icon_key: iconKey,
       source: icon.source,
       fallback_tier: icon.fallbackTier,
     });
 
-    // Save the report locally
     const saved = await reportIcon(
       iconKey,
-      "wrong",
+      reportType,
       icon.source,
       icon.imageData,
     );
     if (saved) {
-      Alert.alert(
-        "Icon Reported",
-        `This icon has been reported as incorrect. It will be hidden from future searches for "${subscriptionName}".`,
-        [
-          {
-            text: "OK",
-            onPress: () => {
-              // Remove from displayed list
-              setAvailableIcons((prev) =>
-                prev.filter((i) => i.imageData !== icon.imageData),
-              );
-            },
+      Alert.alert("Icon Reported", successMessage, [
+        {
+          text: "OK",
+          onPress: () => {
+            setAvailableIcons((prev) =>
+              prev.filter((i) => i.imageData !== icon.imageData),
+            );
           },
-        ],
-      );
+        },
+      ]);
     } else {
       Alert.alert("Error", "Failed to report icon. Please try again.");
     }
   };
 
-  const handleReportBroken = async (icon: PickerIcon) => {
-    if (!iconKey) return;
-
-    posthog.capture("icon_picker_report_broken", {
-      subscription_name: subscriptionName,
-      icon_key: iconKey,
-      source: icon.source,
-      fallback_tier: icon.fallbackTier,
-    });
-
-    // Save the report locally
-    const saved = await reportIcon(
-      iconKey,
-      "broken",
-      icon.source,
-      icon.imageData,
+  const handleReportWrong = async (icon: PickerIcon) => {
+    await reportIconAndNotify(
+      icon,
+      "wrong",
+      `This icon has been reported as incorrect. It will be hidden from future searches for "${subscriptionName}".`,
     );
-    if (saved) {
-      Alert.alert(
-        "Icon Reported",
-        `This icon has been reported as broken. It will be hidden from future searches for "${subscriptionName}".`,
-        [
-          {
-            text: "OK",
-            onPress: () => {
-              // Remove from displayed list
-              setAvailableIcons((prev) =>
-                prev.filter((i) => i.imageData !== icon.imageData),
-              );
-            },
-          },
-        ],
-      );
-    } else {
-      Alert.alert("Error", "Failed to report icon. Please try again.");
-    }
+  };
+
+  const handleReportBroken = async (icon: PickerIcon) => {
+    await reportIconAndNotify(
+      icon,
+      "broken",
+      `This icon has been reported as broken. It will be hidden from future searches for "${subscriptionName}".`,
+    );
   };
 
   const renderIconItem = ({
@@ -389,7 +395,7 @@ const SubscriptionIconPickerModal = ({
                 Searching for icons online...
               </Text>
               <Text className="mt-1 text-xs text-muted-foreground">
-                Checking icon libraries, search engines, and dork queries
+                Checking icon libraries and search engine results
               </Text>
             </View>
           )}
