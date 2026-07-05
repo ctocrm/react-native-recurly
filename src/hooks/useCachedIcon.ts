@@ -27,8 +27,11 @@ function mimeForFormat(format: string): string {
   }
 }
 
+export type IconStatus =
+  "placeholder" | "loading" | "cached" | "error" | "no_icon";
+
 interface IconState {
-  status: "placeholder" | "loading" | "cached" | "error";
+  status: IconStatus;
   iconUri: string | null;
   format: string | null;
 }
@@ -133,7 +136,7 @@ export function useCachedIcon(iconKey: string | undefined): IconState {
 
   // Determine status
   if (!iconKey) {
-    return { status: "placeholder", iconUri: null, format: null };
+    return { status: "no_icon", iconUri: null, format: null };
   }
 
   if (loading) {
@@ -144,5 +147,6 @@ export function useCachedIcon(iconKey: string | undefined): IconState {
     return { status: "cached", iconUri, format };
   }
 
-  return { status: "placeholder", iconUri: null, format: null };
+  // iconKey exists but no cached data and not loading = no_icon
+  return { status: "no_icon", iconUri: null, format: null };
 }
