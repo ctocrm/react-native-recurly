@@ -10,12 +10,11 @@ const MAX_RETRIES = 2;
 interface ImageSearchResult {
   url: string;
   format: "svg" | "png" | "ico" | "jpg" | "jpeg" | "gif" | "webp";
-  source: string; // which engine or dork found it
+  source: string;
   width?: number;
   height?: number;
 }
 
-// Rotating User-Agent pool to avoid blocks
 const USER_AGENTS = [
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
@@ -59,9 +58,6 @@ async function fetchWithTimeout(
   return null;
 }
 
-// ---------------------------------------------------------------------------
-// Helper to detect image format from URL
-// ---------------------------------------------------------------------------
 function detectFormat(url: string): ImageSearchResult["format"] {
   const clean = url.toLowerCase().split("?")[0].split("#")[0];
   if (clean.endsWith(".svg")) return "svg";
@@ -69,19 +65,14 @@ function detectFormat(url: string): ImageSearchResult["format"] {
   if (clean.endsWith(".jpg") || clean.endsWith(".jpeg")) return "jpeg";
   if (clean.endsWith(".gif")) return "gif";
   if (clean.endsWith(".webp")) return "webp";
-  return "png"; // default
+  return "png";
 }
 
-// ---------------------------------------------------------------------------
-// Extract image URLs from HTML using regex (engine-specific patterns)
-// ---------------------------------------------------------------------------
-
-// Google Images: extract from img data-src or src attributes within result divs
+// Extract image URLs from HTML
 function extractGoogleImages(html: string, brand: string): ImageSearchResult[] {
   const results: ImageSearchResult[] = [];
   const seen = new Set<string>();
 
-  // Google puts images in <img> tags with data-src, or in script JSON
   const imgRegex = /<img[^>]+(?:src|data-src)\s*=\s*["']([^"']+)["'][^>]*>/gi;
   let match: RegExpExecArray | null;
   while ((match = imgRegex.exec(html)) !== null) {
@@ -97,30 +88,23 @@ function extractGoogleImages(html: string, brand: string): ImageSearchResult[] {
     }
   }
 
-  // Also try to find image URLs in inline JSON
   const jsonRegex =
     /"(?:src|ou|s)\s*"\s*:\s*"((?:https?:)?\/\/[^"\\]+(?:png|svg|jpg|jpeg|ico|webp)[^"]*)"/gi;
   while ((match = jsonRegex.exec(html)) !== null) {
     const url = match[1].replace(/\\u003d/g, "=").replace(/\\\//g, "/");
     if (!seen.has(url) && !url.includes("gstatic.com")) {
       seen.add(url);
-      results.push({
-        url,
-        format: detectFormat(url),
-        source: "google_images",
-      });
+      results.push({ url, format: detectFormat(url), source: "google_images" });
     }
   }
 
   return results;
 }
 
-// Bing Images: extract from mimg or img elements
 function extractBingImages(html: string, brand: string): ImageSearchResult[] {
   const results: ImageSearchResult[] = [];
   const seen = new Set<string>();
 
-  // Bing uses <img class="mimg" ... src="...">
   const imgRegex =
     /<img[^>]+class\s*=\s*["'][^"']*\bmimg\b[^"']*["'][^>]+src\s*=\s*["']([^"']+)["'][^>]*>/gi;
   let match: RegExpExecArray | null;
@@ -132,7 +116,6 @@ function extractBingImages(html: string, brand: string): ImageSearchResult[] {
     }
   }
 
-  // Also generic img src
   const genericRegex =
     /<img[^>]+src\s*=\s*["']((?:https?:)?\/\/[^"']+(?:png|svg|jpg|jpeg|ico)[^"']*)["']/gi;
   while ((match = genericRegex.exec(html)) !== null) {
@@ -150,7 +133,6 @@ function extractBingImages(html: string, brand: string): ImageSearchResult[] {
   return results;
 }
 
-// DuckDuckGo: extract from img elements in results
 function extractDuckDuckGoImages(
   html: string,
   brand: string,
@@ -158,7 +140,6 @@ function extractDuckDuckGoImages(
   const results: ImageSearchResult[] = [];
   const seen = new Set<string>();
 
-  // DuckDuckGo stores tiles in <img> with data-src
   const dataSrcRegex =
     /<img[^>]+data-src\s*=\s*["']((?:https?:)?\/\/[^"']+)["'][^>]*>/gi;
   let match: RegExpExecArray | null;
@@ -178,7 +159,6 @@ function extractDuckDuckGoImages(
     }
   }
 
-  // Generic img src
   const srcRegex =
     /<img[^>]+src\s*=\s*["']((?:https?:)?\/\/[^"']+(?:png|svg|jpg|jpeg|ico)[^"']*)["']/gi;
   while ((match = srcRegex.exec(html)) !== null) {
@@ -196,12 +176,10 @@ function extractDuckDuckGoImages(
   return results;
 }
 
-// Yandex Images: extract from img tags
 function extractYandexImages(html: string, brand: string): ImageSearchResult[] {
   const results: ImageSearchResult[] = [];
   const seen = new Set<string>();
 
-  // Yandex uses <img class="serp-item__thumb" src="...">
   const imgRegex =
     /<img[^>]+(?:src|data-src)\s*=\s*["']((?:https?:)?\/\/[^"']+(?:png|svg|jpg|jpeg|ico)[^"']*)["']/gi;
   let match: RegExpExecArray | null;
@@ -220,7 +198,6 @@ function extractYandexImages(html: string, brand: string): ImageSearchResult[] {
   return results;
 }
 
-// Extract image and link URLs from Google search results (for dorks)
 function extractGoogleSearchResults(html: string): {
   imageUrls: string[];
   linkUrls: string[];
@@ -228,7 +205,6 @@ function extractGoogleSearchResults(html: string): {
   const imageUrls: string[] = [];
   const linkUrls: string[] = [];
 
-  // Extract link URLs from <a> tags
   const linkRegex =
     /<a[^>]+href\s*=\s*["']((?:https?:)?\/\/[^"']+)["'][^>]*>/gi;
   let match: RegExpExecArray | null;
@@ -243,7 +219,6 @@ function extractGoogleSearchResults(html: string): {
     }
   }
 
-  // Extract image URLs
   const imgRegex =
     /<img[^>]+(?:src|data-src)\s*=\s*["']((?:https?:)?\/\/[^"']+)["'][^>]*>/gi;
   while ((match = imgRegex.exec(html)) !== null) {
@@ -256,14 +231,27 @@ function extractGoogleSearchResults(html: string): {
   return { imageUrls, linkUrls };
 }
 
-// ---------------------------------------------------------------------------
-// Search Engine Queries
-// ---------------------------------------------------------------------------
+// Search variations for comprehensive coverage
+const SEARCH_VARIATIONS = [
+  (b: string) => `${b} logo`,
+  (b: string) => `${b} icon`,
+  (b: string) => `${b} logo svg`,
+  (b: string) => `${b} icon svg`,
+  (b: string) => `${b} logo transparent png`,
+  (b: string) => `${b} icon transparent png`,
+  (b: string) => `${b} logo 512x512`,
+  (b: string) => `${b} logo hd`,
+  (b: string) => `${b} brand logo`,
+  (b: string) => `${b} official logo`,
+];
 
 export async function searchGoogleImages(
   brand: string,
+  index: number = 0,
 ): Promise<ImageSearchResult[]> {
-  const query = encodeURIComponent(`${brand} logo`);
+  const query = encodeURIComponent(
+    SEARCH_VARIATIONS[index % SEARCH_VARIATIONS.length](brand),
+  );
   const url = `https://www.google.com/images?q=${query}&tbm=isch&hl=en`;
   const response = await fetchWithTimeout(url, { method: "GET" });
   if (!response) return [];
@@ -273,8 +261,11 @@ export async function searchGoogleImages(
 
 export async function searchBingImages(
   brand: string,
+  index: number = 0,
 ): Promise<ImageSearchResult[]> {
-  const query = encodeURIComponent(`${brand} logo`);
+  const query = encodeURIComponent(
+    SEARCH_VARIATIONS[index % SEARCH_VARIATIONS.length](brand),
+  );
   const url = `https://www.bing.com/images/search?q=${query}&hl=en`;
   const response = await fetchWithTimeout(url, { method: "GET" });
   if (!response) return [];
@@ -284,8 +275,11 @@ export async function searchBingImages(
 
 export async function searchDuckDuckGoImages(
   brand: string,
+  index: number = 0,
 ): Promise<ImageSearchResult[]> {
-  const query = encodeURIComponent(`${brand} logo`);
+  const query = encodeURIComponent(
+    SEARCH_VARIATIONS[index % SEARCH_VARIATIONS.length](brand),
+  );
   const url = `https://duckduckgo.com/?q=${query}&iax=images&ia=images`;
   const response = await fetchWithTimeout(url, { method: "GET" });
   if (!response) return [];
@@ -295,8 +289,11 @@ export async function searchDuckDuckGoImages(
 
 export async function searchYandexImages(
   brand: string,
+  index: number = 0,
 ): Promise<ImageSearchResult[]> {
-  const query = encodeURIComponent(`${brand} logo`);
+  const query = encodeURIComponent(
+    SEARCH_VARIATIONS[index % SEARCH_VARIATIONS.length](brand),
+  );
   const url = `https://yandex.com/images/search?text=${query}`;
   const response = await fetchWithTimeout(url, { method: "GET" });
   if (!response) return [];
@@ -304,32 +301,44 @@ export async function searchYandexImages(
   return extractYandexImages(html, brand);
 }
 
-// ---------------------------------------------------------------------------
-// Google Dork Queries
-// ---------------------------------------------------------------------------
-
+// Enhanced dork queries with multiple search variations
 const DORK_QUERIES = [
-  `intitle:"{brand}" "logo" filetype:svg`,
-  `site:github.com "{brand}" "logo" "svg"`,
-  `inurl:icon "{brand}" svg`,
+  // SVG searches (highest priority)
+  `{brand} logo filetype:svg`,
+  `{brand} icon filetype:svg`,
   `site:simpleicons.org "{brand}"`,
   `site:worldvectorlogo.com "{brand}"`,
-  `site:seeklogo.com "{brand}"`,
-  `inurl:press "{brand}" logo`,
-  `inurl:brand "{brand}" logo`,
-  `"{brand}" "logo.svg"`,
+  `site:wikimedia.org "{brand} logo"`,
+  `intitle:"{brand}" "logo" filetype:svg`,
+  `site:github.com "{brand}" "svg"`,
+  `inurl:icon "{brand}" filetype:svg`,
+  // PNG searches (transparent backgrounds)
+  `{brand} logo png transparent`,
+  `{brand} icon png transparent`,
   `site:icons8.com "{brand}"`,
   `site:iconfinder.com "{brand}"`,
   `site:flaticon.com "{brand}" logo`,
   `site:thenounproject.com "{brand}"`,
-  `"{brand}" "favicon.ico"`,
-  `inurl:"{brand}" "apple-touch-icon"`,
+  // High-res searches
+  `{brand} logo high resolution`,
+  `{brand} logo hd filetype:png`,
+  `{brand} logo 512x512`,
+  `{brand} logo 256x256`,
+  // Official brand assets
+  `site:{brand}.com "asset" "logo" "download"`,
+  `inurl:press "{brand}" logo filetype:png`,
+  `inurl:brand "{brand}" logo filetype:svg`,
+  `"{brand}" "logo.svg"`,
+  `{brand} brand guidelines logo`,
+  // Alternative icon packs
+  `site:cdnjs.com "{brand} icon"`,
+  `site:unpkg.com "{brand} icon"`,
+  // Favicon searches
+  `{brand} favicon.ico`,
+  `inurl:{brand} "apple-touch-icon"`,
+  `inurl:{brand} "favicon"`,
 ];
 
-/**
- * Run all Google dork searches for a brand.
- * Each dork is a Google search URL that we scrape for results.
- */
 export async function runDorkSearches(
   brand: string,
 ): Promise<ImageSearchResult[]> {
@@ -338,7 +347,6 @@ export async function runDorkSearches(
 
   const queries = DORK_QUERIES.map((q) => q.replace(/\{brand\}/g, brand));
 
-  // Process dorks with concurrency limit (2 at a time to avoid detection)
   for (let i = 0; i < queries.length; i += 2) {
     const batch = queries.slice(i, i + 2);
     const batchResults = await Promise.all(
@@ -353,7 +361,6 @@ export async function runDorkSearches(
 
         const results: ImageSearchResult[] = [];
 
-        // Add image URLs
         for (const imgUrl of imageUrls) {
           if (!seen.has(imgUrl)) {
             seen.add(imgUrl);
@@ -365,7 +372,6 @@ export async function runDorkSearches(
           }
         }
 
-        // Extract logo URLs from link URLs
         for (const linkUrl of linkUrls) {
           if (
             !seen.has(linkUrl) &&
@@ -392,7 +398,6 @@ export async function runDorkSearches(
       allResults.push(...results);
     }
 
-    // Small delay between batches to avoid rate limiting
     if (i + 2 < queries.length) {
       await new Promise((r) => setTimeout(r, 1000));
     }
@@ -401,29 +406,27 @@ export async function runDorkSearches(
   return allResults;
 }
 
-// ---------------------------------------------------------------------------
-// All-in-one: search all engines and dorks
-// ---------------------------------------------------------------------------
-
 export async function searchAllSources(
   brand: string,
 ): Promise<ImageSearchResult[]> {
   const allResults: ImageSearchResult[] = [];
   const seenUrls = new Set<string>();
 
-  // Run all engine searches + dorks in parallel
+  // Run multiple searches per engine with different variations
   const [googleRes, bingRes, ddgRes, yandexRes, dorkRes] = await Promise.all([
-    searchGoogleImages(brand),
-    searchBingImages(brand),
-    searchDuckDuckGoImages(brand),
-    searchYandexImages(brand),
+    Promise.all(
+      SEARCH_VARIATIONS.slice(0, 3).map((_, i) => searchGoogleImages(brand, i)),
+    ).then((results) => results.flat()),
+    Promise.all(
+      SEARCH_VARIATIONS.slice(0, 2).map((_, i) => searchBingImages(brand, i)),
+    ).then((results) => results.flat()),
+    searchDuckDuckGoImages(brand, 0),
+    searchYandexImages(brand, 0),
     runDorkSearches(brand),
   ]);
 
-  // Deduplicate by URL (normalized for comparison, but keep original URL with query params)
   const dedupe = (results: ImageSearchResult[]) => {
     for (const r of results) {
-      // Use normalized URL only for dedup comparison
       const normalizedUrl = r.url.replace(/^\/\//, "https://").split("?")[0];
       const storedUrl = r.url.replace(/^\/\//, "https://");
       if (!seenUrls.has(normalizedUrl)) {
@@ -439,13 +442,11 @@ export async function searchAllSources(
   dedupe(yandexRes);
   dedupe(dorkRes);
 
-  // Prioritize SVG and PNG results, sort by preference
   const sorted = allResults.sort((a, b) => {
     const aScore = a.format === "svg" ? 3 : a.format === "png" ? 2 : 1;
     const bScore = b.format === "svg" ? 3 : b.format === "png" ? 2 : 1;
     return bScore - aScore;
   });
 
-  // Limit to top 50 results to avoid overwhelming the download step
   return sorted.slice(0, 50);
 }
