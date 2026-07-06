@@ -111,14 +111,22 @@ const SubscriptionIconPickerModal = ({
     return unsubscribeCache;
   }, [iconKey, visible, loadIcons]);
 
-  const handleSearchOnline = () => {
+  const handleSearchOnline = async () => {
     if (!iconKey) return;
+    console.log(`[MODAL] Search button pressed for ${iconKey}`);
     posthog.capture("icon_picker_search_online", {
       subscription_name: subscriptionName,
       icon_key: iconKey,
     });
     setIsSearching(true);
-    queueIconForScraping(iconKey);
+    try {
+      await queueIconForScraping(iconKey);
+      console.log(`[MODAL] Search triggered for ${iconKey}`);
+    } catch (err) {
+      console.error(`[MODAL] Search failed for ${iconKey}:`, err);
+    } finally {
+      setIsSearching(false);
+    }
   };
 
   const handleSelectIcon = async (icon: PickerIcon) => {

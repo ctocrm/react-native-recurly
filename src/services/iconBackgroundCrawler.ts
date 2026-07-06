@@ -5,17 +5,12 @@ import {
   getCachedIcon,
   getCrawlResults,
   getQueuedIcons,
-  incrementQueueAttempt,
   isUrlAlreadyCrawled,
   isUrlAlreadyCrawledBatch,
-  markUrlAsCrawled,
   saveCrawlResult,
   setCachedIcon,
 } from "@/services/database";
-import {
-  downloadFaviconAsBase64,
-  extractFavicon,
-} from "@/src/services/faviconExtractor";
+import { extractFavicon } from "@/src/services/faviconExtractor";
 import { extractIconsFromUrls } from "@/src/services/htmlIconExtractor";
 import {
   notifyCacheUpdate,
@@ -26,11 +21,8 @@ import { searchAllSources } from "@/src/services/searchEngines";
 
 // In-flight guard
 let isProcessingQueue = false;
-let pendingReprocess = false;
 
-const MAX_RETRY_ATTEMPTS = 3;
 const MAX_LIBRARY_CANDIDATES = 50;
-const MAX_DIRECT_IMAGES = 30;
 const MAX_SPIDERED_URLS = 20;
 const MAX_SPIDERED_ICONS = 15;
 const MAX_WEB_SEARCH_RESULTS = 50;
@@ -49,47 +41,35 @@ function detectUrlFormat(url: string): string {
 async function loadLocalIconAsBase64(iconKey: string): Promise<string | null> {
   const iconSource = icons[iconKey as keyof typeof icons];
   if (!iconSource) {
-    console.log(`[CRAWL] No local icon found for key: ${iconKey}`);
+    console.log(`[LOCAL] No local icon found for key: ${iconKey}`);
     return null;
   }
-
-  try {
-    console.log(`[CRAWL] Loading local icon for ${iconKey}`);
-    // For Expo bundled static assets, they're already in the bundle
-    // We return a marker to indicate this is a subscription icon
-    // The modal will handle displaying it directly
-    return `local_asset:${iconKey}`;
-  } catch (err) {
-    console.log(`[CRAWL] Failed to load local icon ${iconKey}:`, err);
-  }
-  return null;
+  console.log(`[LOCAL] Using local icon for ${iconKey}`);
+  return `local_asset:${iconKey}`;
 }
 
-async function downloadImageAsBase64(url: string): Promise<string | null> {
+// Download image and save to DB
+async function downloadImageAsBase64(
+  url: string,
+  source: string,
+  iconKey: string,
+): Promise<boolean> {
   try {
-    const alreadyTried = await isUrlAlreadyCrawled(url);
-    if (alreadyTried) {
-      console.log(`[CRAWL] SKIP: ${url} (already tried)`);
-      return null;
-    }
-
-    console.log(`[CRAWL] DOWNLOAD: ${url}`);
+    console.log(`[FETCH] DOWNLOAD: ${source} ${url}`);
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 10000);
     const response = await fetch(url, {
       signal: controller.signal,
       headers: {
         "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
         Accept: "image/*,*/*;q=0.8",
-        Referer: "https://www.google.com/",
       },
     });
     clearTimeout(timer);
     if (!response.ok) {
-      console.log(`[CRAWL] DOWNLOAD FAILED ${url}: ${response.status}`);
-      await markUrlAsCrawled(url);
-      return null;
+      console.log(`[FETCH] FAILED ${url}: ${response.status}`);
+      return false;
     }
 
     const arrayBuffer = await response.arrayBuffer();
@@ -99,18 +79,20 @@ async function downloadImageAsBase64(url: string): Promise<string | null> {
       binary += String.fromCharCode(uint8Array[i]);
     }
     const b64 = btoa(binary);
-    await markUrlAsCrawled(url);
-    console.log(`[CRAWL] DOWNLOAD SUCCESS: ${url} (${b64.length} bytes)`);
-    return b64;
+    console.log(`[FETCH] SUCCESS: ${url} (${b64.length} bytes)`);
+
+    await saveCrawlResult(iconKey, b64, source, detectUrlFormat(url), url);
+    notifyCacheUpdate();
+    return true;
   } catch (err: any) {
     if (err.name !== "AbortError") {
-      console.log(`[CRAWL] DOWNLOAD ERROR ${url}: ${err.message || err}`);
+      console.log(`[FETCH] ERROR ${url}:`, err);
     }
-    await markUrlAsCrawled(url);
-    return null;
+    return false;
   }
 }
 
+// Get icon collection for picker
 export async function getIconCollection(iconKey: string): Promise<{
   cachedIconUri: string | null;
   cachedFormat: string | null;
@@ -122,7 +104,7 @@ export async function getIconCollection(iconKey: string): Promise<{
   }[];
 }> {
   try {
-    console.log(`[PICKER] Loading icons for ${iconKey}`);
+    console.log(`[COLLECTION] Loading icons for ${iconKey}`);
     const cached = await getCachedIcon(iconKey);
     const results = await getCrawlResults(iconKey);
 
@@ -138,7 +120,7 @@ export async function getIconCollection(iconKey: string): Promise<{
 
     // Add cached icon to collection FIRST
     if (cached) {
-      console.log(`[PICKER] Found cached icon for ${iconKey}`);
+      console.log(`[COLLECTION] Found cached icon for ${iconKey}`);
       iconMap.set(cached.imageData, {
         imageData: cached.imageData,
         source: cached.source,
@@ -159,9 +141,7 @@ export async function getIconCollection(iconKey: string): Promise<{
       }
     }
 
-    // ALWAYS add subscription's local icon asset to collection (not just when empty!)
-    // This ensures the current icon is always visible in the picker
-    console.log(`[PICKER] Loading local asset for ${iconKey}`);
+    // ALWAYS add subscription's local icon asset to collection
     const localBase64 = await loadLocalIconAsBase64(iconKey);
     if (localBase64 && !iconMap.has(localBase64)) {
       iconMap.set(localBase64, {
@@ -170,9 +150,7 @@ export async function getIconCollection(iconKey: string): Promise<{
         format: "png",
         originalUrl: null,
       });
-      console.log(
-        `[PICKER] Added subscription icon to collection for ${iconKey}`,
-      );
+      console.log(`[COLLECTION] Added subscription icon to collection`);
     }
 
     // Sort: subscription first, then cached, then others
@@ -182,7 +160,7 @@ export async function getIconCollection(iconKey: string): Promise<{
       return 0;
     });
 
-    console.log(`[PICKER] Returning ${sorted.length} icons for ${iconKey}`);
+    console.log(`[COLLECTION] Returning ${sorted.length} icons`);
     return {
       cachedIconUri: cached?.imageData
         ? `data:${detectUrlFormat(cached.format)};base64,${cached.imageData}`
@@ -191,74 +169,72 @@ export async function getIconCollection(iconKey: string): Promise<{
       icons: sorted,
     };
   } catch (err) {
-    console.error("[PICKER] Failed:", err);
+    console.error("[COLLECTION] Failed:", err);
     return { cachedIconUri: null, cachedFormat: null, icons: [] };
   }
 }
 
-async function crawlIcon(icon_key: string): Promise<boolean> {
-  console.log(`[CRAWL] Starting for ${icon_key}`);
+// PHASE 1: Find URLs to download (LOCAL + LIBRARIES + CDN + FAVICON + SEARCH + SPIDER)
+// This is called when user types or taps search - spinner stops after this returns
+export async function findIconUrls(iconKey: string): Promise<void> {
+  console.log(`[SEARCH] ===== STARTING SEARCH for ${iconKey} =====`);
 
-  const existing = await getCrawlResults(icon_key);
+  const existing = await getCrawlResults(iconKey);
   const existingUrls = new Set(
     existing.map((r) => r.originalUrl).filter((u): u is string => Boolean(u)),
   );
-  const existingData = new Set(existing.map((r) => r.imageData));
-  let newIconCount = 0;
 
-  // TIER 1: Library CDNs
-  const libraryIcons = await findAllIconSources(icon_key);
+  // LOCAL ICON - immediate, no download needed
+  console.log(`[SEARCH] LOCAL: Checking for ${iconKey}`);
+  const localIcon = icons[iconKey as keyof typeof icons];
+  if (localIcon) {
+    console.log(`[SEARCH] LOCAL: Found local icon`);
+  }
+
+  // TIER 1: Library CDNs (Simple Icons, Tabler, Lucide, etc.) - FIND URLs
+  console.log(`[SEARCH] TIER 1: Library CDNs`);
+  const libraryIcons = await findAllIconSources(iconKey);
+  console.log(`[SEARCH] TIER 1: Found ${libraryIcons.length} library icons`);
   const alreadyCrawledLibraries = await isUrlAlreadyCrawledBatch(
     libraryIcons.slice(0, MAX_LIBRARY_CANDIDATES).map((i) => i.url),
   );
 
+  // Add library URLs to crawl_results (so they're tracked)
   for (const libIcon of libraryIcons.slice(0, MAX_LIBRARY_CANDIDATES)) {
-    if (existingUrls.has(libIcon.url)) continue;
-    if (alreadyCrawledLibraries.has(libIcon.url)) continue;
-    const b64 = await downloadFaviconAsBase64(libIcon.url, libIcon.format);
-    if (b64 && !existingData.has(b64)) {
-      existingData.add(b64);
-      existingUrls.add(libIcon.url);
-      newIconCount++;
+    if (
+      !existingUrls.has(libIcon.url) &&
+      !alreadyCrawledLibraries.has(libIcon.url)
+    ) {
       await saveCrawlResult(
-        icon_key,
-        b64,
+        iconKey,
+        "",
         libIcon.source,
         libIcon.format,
         libIcon.url,
       );
-      notifyCacheUpdate();
-      console.log(`[CRAWL] Saved ${libIcon.source}`);
     }
   }
 
-  // TIER 2: Favicon
-  const faviconResult = await extractFavicon(icon_key);
+  // TIER 2: Favicon extraction - FIND URL
+  console.log(`[SEARCH] TIER 2: Favicon`);
+  const faviconResult = await extractFavicon(iconKey);
   if (faviconResult && !existingUrls.has(faviconResult.url)) {
-    if (!(await isUrlAlreadyCrawled(faviconResult.url))) {
-      const b64 = await downloadFaviconAsBase64(
-        faviconResult.url,
-        faviconResult.format,
-      );
-      if (b64 && !existingData.has(b64)) {
-        existingData.add(b64);
-        existingUrls.add(faviconResult.url);
-        newIconCount++;
-        await saveCrawlResult(
-          icon_key,
-          b64,
-          "favicon",
-          faviconResult.format,
-          faviconResult.url,
-        );
-        notifyCacheUpdate();
-      }
-    }
+    await saveCrawlResult(
+      iconKey,
+      "",
+      "favicon",
+      faviconResult.format,
+      faviconResult.url,
+    );
+    console.log(`[SEARCH] TIER 2: Found favicon URL`);
+  } else {
+    console.log(`[SEARCH] TIER 2: No favicon found`);
   }
 
-  // TIER 3: Web search
-  const searchResults = await searchAllSources(icon_key);
-  const directImageUrls: string[] = [];
+  // TIER 3: Web search + SPIDER - FIND URLs
+  console.log(`[SEARCH] TIER 3: Web search`);
+  const searchResults = await searchAllSources(iconKey);
+  console.log(`[SEARCH] TIER 3: Found ${searchResults.length} results`);
   const linkUrls: string[] = [];
 
   for (const result of searchResults.slice(0, MAX_WEB_SEARCH_RESULTS)) {
@@ -268,7 +244,13 @@ async function crawlIcon(icon_key: string): Promise<boolean> {
       result.url.includes("logo") ||
       result.url.includes("icon");
     if (isImage) {
-      directImageUrls.push(result.url);
+      await saveCrawlResult(
+        iconKey,
+        "",
+        "web_search",
+        detectUrlFormat(result.url),
+        result.url,
+      );
     } else if (
       !result.url.includes("google.com") &&
       !result.url.includes("bing.com") &&
@@ -279,33 +261,8 @@ async function crawlIcon(icon_key: string): Promise<boolean> {
     }
   }
 
-  const uncrawledDirect = (
-    await Promise.all(
-      directImageUrls
-        .slice(0, MAX_DIRECT_IMAGES)
-        .map(async (u) => ((await isUrlAlreadyCrawled(u)) ? null : u)),
-    )
-  ).filter((u): u is string => u !== null);
-
-  for (const url of uncrawledDirect) {
-    if (existingUrls.has(url)) continue;
-    const b64 = await downloadImageAsBase64(url);
-    if (b64 && !existingData.has(b64)) {
-      existingData.add(b64);
-      existingUrls.add(url);
-      newIconCount++;
-      await saveCrawlResult(
-        icon_key,
-        b64,
-        "web_search",
-        detectUrlFormat(url),
-        url,
-      );
-      notifyCacheUpdate();
-    }
-  }
-
-  // SPIDER
+  // SPIDER: Extract icons from link pages - FIND URLs
+  console.log(`[SEARCH] SPIDER: Processing ${linkUrls.length} links`);
   if (linkUrls.length > 0) {
     const uncrawledLinks = (
       await Promise.all(
@@ -316,120 +273,115 @@ async function crawlIcon(icon_key: string): Promise<boolean> {
     ).filter((u): u is string => u !== null);
 
     if (uncrawledLinks.length > 0) {
-      const spideredIcons = await extractIconsFromUrls(
-        uncrawledLinks,
-        icon_key,
-      );
+      console.log(`[SEARCH] SPIDER: Fetching ${uncrawledLinks.length} pages`);
+      const spideredIcons = await extractIconsFromUrls(uncrawledLinks, iconKey);
+      console.log(`[SEARCH] SPIDER: Found ${spideredIcons.length} icon URLs`);
       for (const icon of spideredIcons.slice(0, MAX_SPIDERED_ICONS)) {
-        if (existingUrls.has(icon.url)) continue;
-        if (await isUrlAlreadyCrawled(icon.url)) continue;
-        const b64 = await downloadImageAsBase64(icon.url);
-        if (b64 && !existingData.has(b64)) {
-          existingData.add(b64);
-          existingUrls.add(icon.url);
-          newIconCount++;
+        if (!existingUrls.has(icon.url)) {
           await saveCrawlResult(
-            icon_key,
-            b64,
+            iconKey,
+            "",
             `spider:${icon.source}`,
             icon.format,
             icon.url,
           );
-          notifyCacheUpdate();
         }
       }
     }
   }
 
-  if (newIconCount > 0) {
-    const cached = await getCachedIcon(icon_key);
-    if (!cached?.imageData) {
-      const all = await getCrawlResults(icon_key);
-      if (all.length > 0) {
-        const best = all.reduce((prev, curr) =>
-          prev.fallbackTier < curr.fallbackTier ? prev : curr,
-        );
-        await setCachedIcon(
-          icon_key,
-          best.imageData,
-          best.source,
-          best.format,
-          best.originalUrl,
-        );
-      }
-    }
-    return true;
-  }
-  return false;
+  console.log(`[SEARCH] Search completed for ${iconKey}`);
+
+  // Queue icon key for background fetching
+  await enqueueIconScrape(iconKey, undefined);
+  console.log(`[SEARCH] Queued ${iconKey} for background fetching`);
 }
 
+// PHASE 2: Background fetch worker - processes queued downloads
+// This runs separately and downloads images
 export async function processIconQueue(): Promise<void> {
+  console.log(`[QUEUE] processIconQueue starting`);
   if (isProcessingQueue) {
-    pendingReprocess = true;
+    console.log(`[QUEUE] Already processing, skipping`);
     return;
   }
   isProcessingQueue = true;
   try {
-    do {
-      pendingReprocess = false;
-      const initialQueueCount = (await getQueuedIcons()).length;
-      const queued = await getQueuedIcons();
+    const queued = await getQueuedIcons();
+    console.log(`[QUEUE] Found ${queued.length} items in queue`);
 
-      for (const item of queued) {
-        if (item.attempt_count >= MAX_RETRY_ATTEMPTS) {
-          await dequeueIcon(item.icon_key);
-          continue;
-        }
+    for (const item of queued) {
+      console.log(`[QUEUE] Fetching icons for ${item.icon_key}`);
+      setIconLoading(item.icon_key, true);
 
-        setIconLoading(item.icon_key, true);
-        try {
-          const found = await crawlIcon(item.icon_key);
-          if (!found) {
-            await incrementQueueAttempt(item.icon_key);
-            const updatedItem = await getQueuedIcons().then((i) =>
-              i.find((x) => x.icon_key === item.icon_key),
+      try {
+        // Get URLs from crawl results (found during search)
+        const crawlResults = await getCrawlResults(item.icon_key);
+        const unfetchedUrls = crawlResults
+          .filter((r) => !r.imageData) // No image data means not yet downloaded
+          .map((r) => r.originalUrl)
+          .filter((u): u is string => Boolean(u));
+
+        console.log(`[QUEUE] Found ${unfetchedUrls.length} URLs to fetch`);
+
+        // Fetch all unfetched URLs
+        for (const url of unfetchedUrls) {
+          if (await isUrlAlreadyCrawled(url)) continue;
+          const crawlResult = crawlResults.find((r) => r.originalUrl === url);
+          if (crawlResult) {
+            const success = await downloadImageAsBase64(
+              url,
+              crawlResult.source,
+              item.icon_key,
             );
-            if (
-              updatedItem &&
-              (updatedItem?.attempt_count ?? 0) >= MAX_RETRY_ATTEMPTS
-            ) {
-              await dequeueIcon(item.icon_key);
+            if (success) {
+              console.log(`[QUEUE] Fetched ${url}`);
             }
           }
-        } catch (error) {
-          console.error(`[CRAWL] Failed ${item.icon_key}:`, error);
-          await incrementQueueAttempt(item.icon_key);
-          const updatedItem = await getQueuedIcons().then((i) =>
-            i.find((x) => x.icon_key === item.icon_key),
-          );
-          if (
-            updatedItem &&
-            (updatedItem?.attempt_count ?? 0) >= MAX_RETRY_ATTEMPTS
-          ) {
-            await dequeueIcon(item.icon_key);
-          }
-        } finally {
-          setIconLoading(item.icon_key, false);
         }
-      }
 
-      const finalQueueCount = (await getQueuedIcons()).length;
-      if (pendingReprocess || finalQueueCount > initialQueueCount) {
-        pendingReprocess = true;
+        // After fetching, set best icon as cached
+        const cached = await getCachedIcon(item.icon_key);
+        if (!cached?.imageData) {
+          const all = await getCrawlResults(item.icon_key);
+          if (all.length > 0) {
+            const best = all.reduce((prev, curr) =>
+              prev.fallbackTier < curr.fallbackTier ? prev : curr,
+            );
+            await setCachedIcon(
+              item.icon_key,
+              best.imageData,
+              best.source,
+              best.format,
+              best.originalUrl,
+            );
+            console.log(`[QUEUE] Set best icon as cached: ${best.source}`);
+          }
+        }
+      } catch (error) {
+        console.error(`[QUEUE] Error:`, error);
+      } finally {
+        setIconLoading(item.icon_key, false);
+        await dequeueIcon(item.icon_key);
       }
-    } while (pendingReprocess);
+    }
   } finally {
     isProcessingQueue = false;
-    pendingReprocess = false;
   }
 }
 
-export function queueIconForScraping(
-  icon_key: string,
+// Search button handler - triggers search ONLY (spinner stops after search)
+export async function queueIconForScraping(
+  iconKey: string,
   subscriptionId?: string,
-): void {
-  (async () => {
-    await enqueueIconScrape(icon_key, subscriptionId);
-    await processIconQueue();
-  })().catch((err) => console.error(`[CRAWL] Failed:`, err));
+): Promise<void> {
+  console.log(`[BUTTON] Search pressed for ${iconKey}`);
+
+  // Run search to find URLs (spinner stops here)
+  await findIconUrls(iconKey);
+
+  // Start queue processing in background
+  processIconQueue().catch(console.error);
+
+  console.log(`[BUTTON] Search completed for ${iconKey}`);
 }

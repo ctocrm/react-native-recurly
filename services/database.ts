@@ -616,6 +616,27 @@ export async function getCrawledUrlCount(): Promise<number> {
   return row?.cnt ?? 0;
 }
 
+export interface CrawledUrlEntry {
+  url: string;
+  first_seen: string;
+  last_attempt: string | null;
+}
+
+// Get old URLs for background crawler to revisit
+export async function getOldCrawledUrls(
+  limit: number = 10,
+): Promise<CrawledUrlEntry[]> {
+  const db = getDatabase();
+  const rows = await db.getAllAsync<CrawledUrlEntry>(
+    `SELECT url, first_seen, last_attempt 
+     FROM crawled_urls 
+     ORDER BY first_seen ASC 
+     LIMIT ?`,
+    limit,
+  );
+  return rows;
+}
+
 export async function deleteCachedIcon(iconKey: string): Promise<void> {
   const db = getDatabase();
   await db.runAsync("DELETE FROM icon_cache WHERE icon_key = ?", iconKey);
