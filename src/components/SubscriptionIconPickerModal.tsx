@@ -17,6 +17,7 @@ import {
   Alert,
   FlatList,
   Image,
+  ImageSourcePropType,
   Modal,
   Pressable,
   Text,
@@ -26,7 +27,7 @@ import {
 interface IconPickerProps {
   visible: boolean;
   iconKey: string | null;
-  subscriptionIcon?: any;
+  subscriptionIcon?: ImageSourcePropType;
   subscriptionName: string;
   onClose: () => void;
   onIconChange: () => void;
@@ -231,9 +232,11 @@ const SubscriptionIconPickerModal = ({
   }) => {
     // Handle local_asset prefix - use the subscription icon directly
     const isLocalAsset = item.imageData.startsWith("local_asset:");
-    const iconUri = isLocalAsset
-      ? subscriptionIcon
-      : `data:image/${item.format === "svg" ? "svg+xml" : item.format};base64,${item.imageData}`;
+    // Build a safe data URI for non-local assets
+    const dataUri = `data:image/${item.format === "svg" ? "svg+xml" : item.format};base64,${item.imageData}`;
+    const imageSource = isLocalAsset
+      ? (subscriptionIcon ?? icons.plus)
+      : { uri: dataUri };
 
     return (
       <View className="items-center gap-2 px-2 py-3">
@@ -241,10 +244,7 @@ const SubscriptionIconPickerModal = ({
           className="size-16 items-center justify-center rounded-xl border-2 border-border bg-card"
           onPress={() => handleSelectIcon(item)}
         >
-          <Image
-            source={isLocalAsset ? iconUri : { uri: iconUri }}
-            className="size-12"
-          />
+          <Image source={imageSource} className="size-12" />
         </Pressable>
         <View className="flex-row gap-1">
           <Pressable

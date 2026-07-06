@@ -20,7 +20,8 @@ import {
   getAllSubscriptions,
   getOldCrawledUrls,
   getPreference,
-  setPreference
+  setPreference,
+  updateCrawledUrlAttempt,
 } from "../../services/database";
 import { useDatabase } from "./DatabaseProvider";
 
@@ -106,15 +107,12 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
 
             if (response.ok) {
               const arrayBuffer = await response.arrayBuffer();
-              const uint8Array = new Uint8Array(arrayBuffer);
-              let binary = "";
-              for (let i = 0; i < uint8Array.byteLength; i++) {
-                binary += String.fromCharCode(uint8Array[i]);
-              }
-              const b64 = btoa(binary);
+              // Log the actual byte length directly without Base64 conversion
               console.log(
-                `[CRAWLER] Re-fetched ${entry.url} (${b64.length} bytes)`,
+                `[CRAWLER] Re-fetched ${entry.url} (${arrayBuffer.byteLength} bytes)`,
               );
+              // Bump last_attempt so this URL rotates out of the re-crawl query
+              await updateCrawledUrlAttempt(entry.url);
             } else {
               console.log(
                 `[CRAWLER] Re-fetch failed ${entry.url}: ${response.status}`,

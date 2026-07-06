@@ -163,10 +163,13 @@ export async function getIconCollection(iconKey: string): Promise<{
       return 0;
     });
 
+    // Derive the MIME subtype directly from the format string
+    const mimeSubtype =
+      cached?.format === "svg" ? "svg+xml" : (cached?.format ?? "png");
     console.log(`[COLLECTION] Returning ${sorted.length} icons`);
     return {
       cachedIconUri: cached?.imageData
-        ? `data:image/${detectUrlFormat(cached.format)};base64,${cached.imageData}`
+        ? `data:image/${mimeSubtype};base64,${cached.imageData}`
         : null,
       cachedFormat: cached?.format ?? null,
       icons: sorted,

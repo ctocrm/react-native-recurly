@@ -586,6 +586,14 @@ export async function markUrlAsCrawled(url: string): Promise<void> {
   await db.runAsync("INSERT OR IGNORE INTO crawled_urls (url) VALUES (?)", url);
 }
 
+export async function updateCrawledUrlAttempt(url: string): Promise<void> {
+  const db = getDatabase();
+  await db.runAsync(
+    "UPDATE crawled_urls SET last_attempt = datetime('now') WHERE url = ?",
+    url,
+  );
+}
+
 export async function isUrlAlreadyCrawled(url: string): Promise<boolean> {
   const db = getDatabase();
   const row = await db.getFirstAsync<{ url: string }>(
@@ -630,7 +638,7 @@ export async function getOldCrawledUrls(
   const rows = await db.getAllAsync<CrawledUrlEntry>(
     `SELECT url, first_seen, last_attempt 
      FROM crawled_urls 
-     ORDER BY first_seen ASC 
+     ORDER BY last_attempt ASC NULLS FIRST 
      LIMIT ?`,
     limit,
   );

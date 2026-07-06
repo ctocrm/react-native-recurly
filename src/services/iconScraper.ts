@@ -146,16 +146,18 @@ async function tryDevicons(
   const allSlugs = [slug, ...altSlugs, `${slug}-original`];
 
   for (const s of allSlugs) {
-    const url = `https://cdn.jsdelivr.net/gh/devicons/devicon/icons/${slug}/${s}.svg`;
+    // Try folder = s, filename = s
+    const url = `https://cdn.jsdelivr.net/gh/devicons/devicon/icons/${s}/${s}.svg`;
     if (await urlExists(url)) {
       return { source: "devicons", url, format: "svg" };
     }
-    // Also try as subfolder
-    const url2 = `https://cdn.jsdelivr.net/gh/devicons/devicon/icons/${slug}/${slug}-original.svg`;
+    // Try folder = s, filename = {s}-original
+    const url2 = `https://cdn.jsdelivr.net/gh/devicons/devicon/icons/${s}/${s}-original.svg`;
     if (await urlExists(url2)) {
       return { source: "devicons", url: url2, format: "svg" };
     }
-    const url3 = `https://cdn.jsdelivr.net/gh/devicons/devicon/icons/${slug}/${slug}-original-wordmark.svg`;
+    // Try folder = s, filename = {s}-original-wordmark
+    const url3 = `https://cdn.jsdelivr.net/gh/devicons/devicon/icons/${s}/${s}-original-wordmark.svg`;
     if (await urlExists(url3)) {
       return { source: "devicons", url: url3, format: "svg" };
     }

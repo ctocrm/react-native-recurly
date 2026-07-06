@@ -9,6 +9,14 @@
 
 const FETCH_TIMEOUT_MS = 10000;
 const MAX_RETRIES = 2;
+const MIN_RESULTS_FOR_SHORT_CIRCUIT = 15;
+
+// Per-brand result cache to avoid re-hitting engines for repeated calls
+const brandResultCache = new Map<
+  string,
+  { results: ImageSearchResult[]; ts: number }
+>();
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 interface ImageSearchResult {
   url: string;
@@ -36,7 +44,8 @@ async function fetchWithTimeout(
   options: RequestInit = {},
   timeoutMs: number = FETCH_TIMEOUT_MS,
 ): Promise<Response | null> {
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+  const maxRetries = MAX_RETRIES;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
@@ -60,6 +69,19 @@ async function fetchWithTimeout(
         );
         return response;
       }
+      // Detect 429 rate-limit and honor Retry-After with exponential backoff
+      if (response.status === 429) {
+        const retryAfter = response.headers.get("Retry-After");
+        const delaySec = retryAfter
+          ? parseInt(retryAfter, 10)
+          : Math.pow(2, attempt + 1);
+        const delayMs = Math.min(delaySec * 1000, 30000); // cap at 30s
+        console.log(
+          `[SEARCH_ENGINE] 429 rate-limited, waiting ${delayMs}ms (attempt ${attempt + 1})`,
+        );
+        await new Promise((r) => setTimeout(r, delayMs));
+        continue; // skip the generic retry delay below
+      }
       console.log(
         `[SEARCH_ENGINE] Non-ok status ${response.status}: ${url.substring(0, 80)}`,
       );
@@ -72,6 +94,10 @@ async function fetchWithTimeout(
       }
     } finally {
       clearTimeout(timer);
+    }
+    // Exponential backoff between retries (except 429 which handles its own delay)
+    if (attempt < maxRetries) {
+      await new Promise((r) => setTimeout(r, Math.pow(2, attempt) * 500));
     }
   }
   console.log(`[SEARCH_ENGINE] All attempts failed: ${url.substring(0, 80)}`);
@@ -468,6 +494,16 @@ export async function searchAllSources(
   console.log(
     `[SEARCH_ENGINE] ===== searchAllSources starting for "${brand}" =====`,
   );
+
+  // Check per-brand cache first
+  const cached = brandResultCache.get(brand);
+  if (cached && Date.now() - cached.ts < CACHE_TTL_MS) {
+    console.log(
+      `[SEARCH_ENGINE] Returning ${cached.results.length} cached results for "${brand}"`,
+    );
+    return cached.results;
+  }
+
   const allResults: ImageSearchResult[] = [];
   const seenUrls = new Set<string>();
 
@@ -492,11 +528,41 @@ export async function searchAllSources(
   console.log(`[SEARCH_ENGINE] DuckDuckGo total: ${ddgResults.length} results`);
   dedupe(ddgResults);
 
+  // Short-circuit if we already have enough results
+  if (allResults.length >= MIN_RESULTS_FOR_SHORT_CIRCUIT) {
+    console.log(
+      `[SEARCH_ENGINE] Short-circuiting with ${allResults.length} results from DuckDuckGo`,
+    );
+    const sorted = allResults.sort((a, b) => {
+      const aScore = a.format === "svg" ? 3 : a.format === "png" ? 2 : 1;
+      const bScore = b.format === "svg" ? 3 : b.format === "png" ? 2 : 1;
+      return bScore - aScore;
+    });
+    const top = sorted.slice(0, 50);
+    brandResultCache.set(brand, { results: top, ts: Date.now() });
+    return top;
+  }
+
   // Run Google dork searches
   console.log(`[SEARCH_ENGINE] Running Google dork searches`);
   const dorkResults = await runDorkSearches(brand);
   console.log(`[SEARCH_ENGINE] Dork total: ${dorkResults.length} results`);
   dedupe(dorkResults);
+
+  // Short-circuit again after dorks
+  if (allResults.length >= MIN_RESULTS_FOR_SHORT_CIRCUIT) {
+    console.log(
+      `[SEARCH_ENGINE] Short-circuiting with ${allResults.length} results after dork searches`,
+    );
+    const sorted = allResults.sort((a, b) => {
+      const aScore = a.format === "svg" ? 3 : a.format === "png" ? 2 : 1;
+      const bScore = b.format === "svg" ? 3 : b.format === "png" ? 2 : 1;
+      return bScore - aScore;
+    });
+    const top = sorted.slice(0, 50);
+    brandResultCache.set(brand, { results: top, ts: Date.now() });
+    return top;
+  }
 
   // Try Google Images as well (may be blocked)
   console.log(`[SEARCH_ENGINE] Running Google Images search`);
@@ -527,5 +593,7 @@ export async function searchAllSources(
     );
   });
 
+  // Store in cache before returning
+  brandResultCache.set(brand, { results: top, ts: Date.now() });
   return top;
 }
