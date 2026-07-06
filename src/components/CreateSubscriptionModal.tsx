@@ -1,6 +1,8 @@
 import { icons } from "@/constants/icons";
 import { searchLogos } from "@/lib/resolveLogo";
-import { queueIconForScraping } from "@/src/services/iconBackgroundCrawler";
+import {
+  queueIconForScraping
+} from "@/src/services/iconBackgroundCrawler";
 import { nameToSlug } from "@/src/services/iconScraper";
 import clsx from "clsx";
 import dayjs from "dayjs";

@@ -121,6 +121,23 @@ const MIGRATIONS = [
       `);
     }
   },
+  // Migration 5: Add universal crawled URLs history table
+  async (db: SQLiteDatabase) => {
+    const tables = await db.getAllAsync<{ name: string }>(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='crawled_urls'",
+    );
+    if (tables.length === 0) {
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS crawled_urls (
+          id           INTEGER PRIMARY KEY AUTOINCREMENT,
+          url          TEXT NOT NULL UNIQUE,
+          first_seen   TEXT DEFAULT (datetime('now')),
+          last_attempt TEXT DEFAULT (datetime('now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_crawled_urls_url ON crawled_urls(url);
+      `);
+    }
+  },
   // Migration 2: Add format, original_url, fallback_tier columns to icon_cache
   async (db: SQLiteDatabase) => {
     const columns = await db.getAllAsync<{ name: string }>(
@@ -558,6 +575,74 @@ export async function getCrawlResults(
     originalUrl: r.original_url ?? null,
     fallbackTier: r.fallback_tier,
   }));
+}
+
+// ---------------------------------------------------------------------------
+// Universal Crawled URLs History (for deduplication across all icon searches)
+// ---------------------------------------------------------------------------
+
+export async function markUrlAsCrawled(url: string): Promise<void> {
+  const db = getDatabase();
+  await db.runAsync("INSERT OR IGNORE INTO crawled_urls (url) VALUES (?)", url);
+}
+
+export async function updateCrawledUrlAttempt(url: string): Promise<void> {
+  const db = getDatabase();
+  await db.runAsync(
+    "UPDATE crawled_urls SET last_attempt = datetime('now') WHERE url = ?",
+    url,
+  );
+}
+
+export async function isUrlAlreadyCrawled(url: string): Promise<boolean> {
+  const db = getDatabase();
+  const row = await db.getFirstAsync<{ url: string }>(
+    "SELECT url FROM crawled_urls WHERE url = ?",
+    url,
+  );
+  return !!row;
+}
+
+export async function isUrlAlreadyCrawledBatch(
+  urls: string[],
+): Promise<Set<string>> {
+  if (urls.length === 0) return new Set();
+  const db = getDatabase();
+  const placeholders = urls.map(() => "?").join(",");
+  const rows = await db.getAllAsync<{ url: string }>(
+    `SELECT url FROM crawled_urls WHERE url IN (${placeholders})`,
+    ...urls,
+  );
+  return new Set(rows.map((r) => r.url));
+}
+
+export async function getCrawledUrlCount(): Promise<number> {
+  const db = getDatabase();
+  const row = await db.getFirstAsync<{ cnt: number }>(
+    "SELECT COUNT(*) as cnt FROM crawled_urls",
+  );
+  return row?.cnt ?? 0;
+}
+
+export interface CrawledUrlEntry {
+  url: string;
+  first_seen: string;
+  last_attempt: string | null;
+}
+
+// Get old URLs for background crawler to revisit
+export async function getOldCrawledUrls(
+  limit: number = 10,
+): Promise<CrawledUrlEntry[]> {
+  const db = getDatabase();
+  const rows = await db.getAllAsync<CrawledUrlEntry>(
+    `SELECT url, first_seen, last_attempt 
+     FROM crawled_urls 
+     ORDER BY last_attempt ASC NULLS FIRST 
+     LIMIT ?`,
+    limit,
+  );
+  return rows;
 }
 
 export async function deleteCachedIcon(iconKey: string): Promise<void> {

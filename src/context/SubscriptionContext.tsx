@@ -18,8 +18,10 @@ import {
   updateSubscription as dbUpdateSubscription,
   updateSubscriptionStatus as dbUpdateSubscriptionStatus,
   getAllSubscriptions,
+  getOldCrawledUrls,
   getPreference,
   setPreference,
+  updateCrawledUrlAttempt,
 } from "../../services/database";
 import { useDatabase } from "./DatabaseProvider";
 
@@ -74,8 +76,71 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
     return () => subscription.remove();
   }, []);
 
+  // Background crawler: periodically re-fetch old crawled URLs to check for updates
+  useEffect(() => {
+    const BACKGROUND_CRAWL_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
+    const MAX_URLS_PER_CRAWL = 5;
+
+    async function crawlOldUrls() {
+      try {
+        console.log(`[CRAWLER] Background crawl starting`);
+        const oldUrls = await getOldCrawledUrls(MAX_URLS_PER_CRAWL);
+        if (oldUrls.length === 0) {
+          console.log(`[CRAWLER] No old URLs to crawl`);
+          return;
+        }
+
+        console.log(`[CRAWLER] Re-fetching ${oldUrls.length} old URLs`);
+        for (const entry of oldUrls) {
+          try {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 10000);
+            const response = await fetch(entry.url, {
+              signal: controller.signal,
+              headers: {
+                "User-Agent":
+                  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                Accept: "image/*,*/*;q=0.8",
+              },
+            });
+            clearTimeout(timer);
+
+            if (response.ok) {
+              const arrayBuffer = await response.arrayBuffer();
+              // Log the actual byte length directly without Base64 conversion
+              console.log(
+                `[CRAWLER] Re-fetched ${entry.url} (${arrayBuffer.byteLength} bytes)`,
+              );
+              // Bump last_attempt so this URL rotates out of the re-crawl query
+              await updateCrawledUrlAttempt(entry.url);
+            } else {
+              console.log(
+                `[CRAWLER] Re-fetch failed ${entry.url}: ${response.status}`,
+              );
+            }
+          } catch (err: any) {
+            if (err.name !== "AbortError") {
+              console.log(`[CRAWLER] Error re-fetching ${entry.url}:`, err);
+            }
+          }
+        }
+        console.log(`[CRAWLER] Background crawl complete`);
+      } catch (err) {
+        console.error(`[CRAWLER] Background crawl error:`, err);
+      }
+    }
+
+    const intervalId = setInterval(crawlOldUrls, BACKGROUND_CRAWL_INTERVAL_MS);
+    console.log(`[CRAWLER] Background crawler started (every 30 min)`);
+
+    return () => {
+      clearInterval(intervalId);
+      console.log(`[CRAWLER] Background crawler stopped`);
+    };
+  }, []);
+
   // Load all subscriptions from DB when the database becomes ready
-   
+
   useEffect(() => {
     if (isReady && db) {
       refreshSubscriptions();

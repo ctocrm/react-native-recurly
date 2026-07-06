@@ -306,6 +306,7 @@ const App = () => {
       <SubscriptionIconPickerModal
         visible={iconPickerVisible}
         iconKey={iconPickerSubscription?.icon_key ?? null}
+        subscriptionIcon={iconPickerSubscription?.icon}
         subscriptionName={iconPickerSubscription?.name ?? ""}
         onClose={() => {
           setIconPickerVisible(false);
