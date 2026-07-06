@@ -7,6 +7,7 @@ import {
   getQueuedIcons,
   isUrlAlreadyCrawled,
   isUrlAlreadyCrawledBatch,
+  markUrlAsCrawled,
   saveCrawlResult,
   setCachedIcon,
 } from "@/services/database";
@@ -57,7 +58,7 @@ async function downloadImageAsBase64(
   try {
     console.log(`[FETCH] DOWNLOAD: ${source} ${url}`);
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 10000);
+    const timer = setTimeout(() => controller.abort(), 15000);
     const response = await fetch(url, {
       signal: controller.signal,
       headers: {
@@ -87,6 +88,8 @@ async function downloadImageAsBase64(
   } catch (err: any) {
     if (err.name !== "AbortError") {
       console.log(`[FETCH] ERROR ${url}:`, err);
+    } else {
+      console.log(`[FETCH] TIMEOUT ${url}`);
     }
     return false;
   }
@@ -119,7 +122,7 @@ export async function getIconCollection(iconKey: string): Promise<{
     >();
 
     // Add cached icon to collection FIRST
-    if (cached) {
+    if (cached?.imageData) {
       console.log(`[COLLECTION] Found cached icon for ${iconKey}`);
       iconMap.set(cached.imageData, {
         imageData: cached.imageData,
@@ -129,9 +132,9 @@ export async function getIconCollection(iconKey: string): Promise<{
       });
     }
 
-    // Add database crawl results to collection
+    // Add database crawl results to collection (only those with actual image data)
     for (const r of results) {
-      if (!iconMap.has(r.imageData)) {
+      if (r.imageData && !iconMap.has(r.imageData)) {
         iconMap.set(r.imageData, {
           imageData: r.imageData,
           source: r.source,
@@ -163,7 +166,7 @@ export async function getIconCollection(iconKey: string): Promise<{
     console.log(`[COLLECTION] Returning ${sorted.length} icons`);
     return {
       cachedIconUri: cached?.imageData
-        ? `data:${detectUrlFormat(cached.format)};base64,${cached.imageData}`
+        ? `data:image/${detectUrlFormat(cached.format)};base64,${cached.imageData}`
         : null,
       cachedFormat: cached?.format ?? null,
       icons: sorted,
@@ -172,6 +175,22 @@ export async function getIconCollection(iconKey: string): Promise<{
     console.error("[COLLECTION] Failed:", err);
     return { cachedIconUri: null, cachedFormat: null, icons: [] };
   }
+}
+
+// Immediately download a single URL and save to DB
+async function fetchAndSaveUrl(
+  url: string,
+  source: string,
+  iconKey: string,
+  format: string,
+): Promise<boolean> {
+  console.log(`[FETCH] Immediate fetch: ${source} ${url}`);
+  const success = await downloadImageAsBase64(url, source, iconKey);
+  if (success) {
+    await markUrlAsCrawled(url);
+    return true;
+  }
+  return false;
 }
 
 // PHASE 1: Find URLs to download (LOCAL + LIBRARIES + CDN + FAVICON + SEARCH + SPIDER)
@@ -191,6 +210,9 @@ export async function findIconUrls(iconKey: string): Promise<void> {
     console.log(`[SEARCH] LOCAL: Found local icon`);
   }
 
+  // Track URLs we need to fetch immediately
+  const urlsToFetch: { url: string; source: string; format: string }[] = [];
+
   // TIER 1: Library CDNs (Simple Icons, Tabler, Lucide, etc.) - FIND URLs
   console.log(`[SEARCH] TIER 1: Library CDNs`);
   const libraryIcons = await findAllIconSources(iconKey);
@@ -199,7 +221,7 @@ export async function findIconUrls(iconKey: string): Promise<void> {
     libraryIcons.slice(0, MAX_LIBRARY_CANDIDATES).map((i) => i.url),
   );
 
-  // Add library URLs to crawl_results (so they're tracked)
+  // Add library URLs to crawl_results AND queue for immediate fetch
   for (const libIcon of libraryIcons.slice(0, MAX_LIBRARY_CANDIDATES)) {
     if (
       !existingUrls.has(libIcon.url) &&
@@ -212,6 +234,11 @@ export async function findIconUrls(iconKey: string): Promise<void> {
         libIcon.format,
         libIcon.url,
       );
+      urlsToFetch.push({
+        url: libIcon.url,
+        source: libIcon.source,
+        format: libIcon.format,
+      });
     }
   }
 
@@ -226,6 +253,11 @@ export async function findIconUrls(iconKey: string): Promise<void> {
       faviconResult.format,
       faviconResult.url,
     );
+    urlsToFetch.push({
+      url: faviconResult.url,
+      source: "favicon",
+      format: faviconResult.format,
+    });
     console.log(`[SEARCH] TIER 2: Found favicon URL`);
   } else {
     console.log(`[SEARCH] TIER 2: No favicon found`);
@@ -251,6 +283,11 @@ export async function findIconUrls(iconKey: string): Promise<void> {
         detectUrlFormat(result.url),
         result.url,
       );
+      urlsToFetch.push({
+        url: result.url,
+        source: "web_search",
+        format: detectUrlFormat(result.url),
+      });
     } else if (
       !result.url.includes("google.com") &&
       !result.url.includes("bing.com") &&
@@ -285,6 +322,11 @@ export async function findIconUrls(iconKey: string): Promise<void> {
             icon.format,
             icon.url,
           );
+          urlsToFetch.push({
+            url: icon.url,
+            source: `spider:${icon.source}`,
+            format: icon.format,
+          });
         }
       }
     }
@@ -292,13 +334,36 @@ export async function findIconUrls(iconKey: string): Promise<void> {
 
   console.log(`[SEARCH] Search completed for ${iconKey}`);
 
-  // Queue icon key for background fetching
-  await enqueueIconScrape(iconKey, undefined);
-  console.log(`[SEARCH] Queued ${iconKey} for background fetching`);
+  // START IMMEDIATE FETCH of discovered URLs in parallel
+  // This replaces the old queue-based approach which had race conditions
+  console.log(`[SEARCH] Immediately fetching ${urlsToFetch.length} URLs`);
+  if (urlsToFetch.length > 0) {
+    // Fetch first 5 immediately (user gets instant feedback)
+    const immediate = urlsToFetch.slice(0, 5);
+    const rest = urlsToFetch.slice(5);
+
+    // Fetch first batch in parallel
+    await Promise.all(
+      immediate.map((u) => fetchAndSaveUrl(u.url, u.source, iconKey, u.format)),
+    );
+
+    // For remaining URLs, queue via the old method but also try fetching now
+    if (rest.length > 0) {
+      // Enqueue for background processing
+      await enqueueIconScrape(iconKey, undefined);
+      console.log(
+        `[SEARCH] Queued ${iconKey} for background fetching (${rest.length} remaining URLs)`,
+      );
+
+      // Also start background processing immediately for the rest
+      processIconQueue().catch(console.error);
+    }
+  }
+
+  console.log(`[SEARCH] ===== FINISHED SEARCH for ${iconKey} =====`);
 }
 
 // PHASE 2: Background fetch worker - processes queued downloads
-// This runs separately and downloads images
 export async function processIconQueue(): Promise<void> {
   console.log(`[QUEUE] processIconQueue starting`);
   if (isProcessingQueue) {
@@ -322,19 +387,24 @@ export async function processIconQueue(): Promise<void> {
           .map((r) => r.originalUrl)
           .filter((u): u is string => Boolean(u));
 
-        console.log(`[QUEUE] Found ${unfetchedUrls.length} URLs to fetch`);
+        console.log(
+          `[QUEUE] Found ${unfetchedUrls.length} URLs to fetch for ${item.icon_key}`,
+        );
 
-        // Fetch all unfetched URLs
+        // Fetch all unfetched URLs, but mark them as crawled first to avoid duplication
         for (const url of unfetchedUrls) {
-          if (await isUrlAlreadyCrawled(url)) continue;
           const crawlResult = crawlResults.find((r) => r.originalUrl === url);
           if (crawlResult) {
+            const alreadyCrawled = await isUrlAlreadyCrawled(url);
+            if (alreadyCrawled) continue;
+
             const success = await downloadImageAsBase64(
               url,
               crawlResult.source,
               item.icon_key,
             );
             if (success) {
+              await markUrlAsCrawled(url);
               console.log(`[QUEUE] Fetched ${url}`);
             }
           }
@@ -344,8 +414,9 @@ export async function processIconQueue(): Promise<void> {
         const cached = await getCachedIcon(item.icon_key);
         if (!cached?.imageData) {
           const all = await getCrawlResults(item.icon_key);
-          if (all.length > 0) {
-            const best = all.reduce((prev, curr) =>
+          const withData = all.filter((r) => r.imageData);
+          if (withData.length > 0) {
+            const best = withData.reduce((prev, curr) =>
               prev.fallbackTier < curr.fallbackTier ? prev : curr,
             );
             await setCachedIcon(
@@ -370,7 +441,7 @@ export async function processIconQueue(): Promise<void> {
   }
 }
 
-// Search button handler - triggers search ONLY (spinner stops after search)
+// Search button handler - triggers search THEN immediately starts fetching
 export async function queueIconForScraping(
   iconKey: string,
   subscriptionId?: string,
@@ -379,9 +450,6 @@ export async function queueIconForScraping(
 
   // Run search to find URLs (spinner stops here)
   await findIconUrls(iconKey);
-
-  // Start queue processing in background
-  processIconQueue().catch(console.error);
 
   console.log(`[BUTTON] Search completed for ${iconKey}`);
 }
