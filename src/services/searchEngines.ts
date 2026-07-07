@@ -6,6 +6,8 @@
  * FIXED: Added comprehensive error logging, improved DuckDuckGo parsing,
  * removed unreliable engines, simplified search strategy, integrated
  * per-domain rate limit tracking so we don't hammer rate-limited targets.
+ *
+ * MOBILE: Uses WebView fallback when fetch is blocked by anti-bot measures.
  */
 
 import {
@@ -13,6 +15,22 @@ import {
   recordRateLimit,
   recordSuccess,
 } from "./rateLimitTracker";
+
+// Lazy import WebView search - only available on mobile
+let webViewSearchModule: {
+  searchForLinksWithWebView: (brand: string) => Promise<string[]>;
+} | null = null;
+
+async function getWebViewSearchModule() {
+  if (!webViewSearchModule) {
+    try {
+      webViewSearchModule = await import("./webViewSearchEngine");
+    } catch {
+      // WebView module not available
+    }
+  }
+  return webViewSearchModule;
+}
 
 const FETCH_TIMEOUT_MS = 10000;
 const MAX_RETRIES = 2;
@@ -385,7 +403,7 @@ function extractGoogleImages(html: string, brand: string): ImageSearchResult[] {
 
   // JSON-encoded image URLs in inline scripts/data
   const jsonRegex =
-    /"(?:src|ou|s)\s*"\s*:\s*"((?:https?:)?\/\/[^"\\]+(?:png|svg|jpg|jpeg|ico|webp)[^"]*)"/gi;
+    /"(?:src|ou|s)\\s*"\s*:\s*"((?:https?:)?\/\/[^"\\]+(?:png|svg|jpg|jpeg|ico|webp)[^"]*)"/gi;
   while ((match = jsonRegex.exec(html)) !== null) {
     const url = match[1].replace(/\\u003d/g, "=").replace(/\\\//g, "/");
     if (!seen.has(url) && !url.includes("gstatic.com")) {
@@ -484,7 +502,7 @@ function extractGoogleSearchResults(html: string): {
     }
 
     // Also try to find data-s or data-url attributes in result divs
-    const dataSRegex = /data-s=["'](([^"']+\.(?:png|svg|jpg|jpeg)))["']/gi;
+    const dataSRegex = /data-s=["'](([^"']+\\.(?:png|svg|jpg|jpeg)))["']/gi;
     let sMatch;
     while ((sMatch = dataSRegex.exec(html)) !== null) {
       imageUrls.push(sMatch[1]);
@@ -893,6 +911,36 @@ export async function searchForLinksToSpider(brand: string): Promise<string[]> {
       }
     }
     console.log(`[SEARCH_ENGINE] Text search found ${allLinks.length} links`);
+  }
+
+  // If fetch returned 0 links, consider using WebView as fallback
+  // This happens when anti-bot measures block the fetch response
+  if (allLinks.length === 0) {
+    console.log(
+      `[SEARCH_ENGINE] Fetch returned 0 links, trying WebView fallback for "${brand}"`,
+    );
+    const webViewModule = await getWebViewSearchModule();
+    if (webViewModule?.searchForLinksWithWebView) {
+      try {
+        const webViewLinks =
+          await webViewModule.searchForLinksWithWebView(brand);
+        for (const link of webViewLinks) {
+          if (
+            !seenLinks.has(link) &&
+            link.startsWith("http") &&
+            !link.includes("duckduckgo.com")
+          ) {
+            seenLinks.add(link);
+            allLinks.push(link);
+          }
+        }
+        console.log(
+          `[SEARCH_ENGINE] WebView fallback found ${allLinks.length} links`,
+        );
+      } catch (err) {
+        console.log(`[SEARCH_ENGINE] WebView fallback failed:`, err);
+      }
+    }
   }
 
   console.log(
