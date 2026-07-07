@@ -366,7 +366,7 @@ const SubscriptionIconPickerModal = ({
                 {/* Red rate-limit indicator */}
                 {rateLimitedDomains.length > 0 && (
                   <Text className="mt-0.5 text-[10px] text-red-500">
-                    ⚠️ {rateLimitedDomains.join(", ")}
+                    ⚠️ Rate limited: {rateLimitedDomains.join(", ")}
                   </Text>
                 )}
               </View>

@@ -18,6 +18,7 @@ import {
   setIconLoading,
 } from "@/src/services/iconLoadingRegistry";
 import { findAllIconSources } from "@/src/services/iconScraper";
+import { isDomainRateLimited } from "@/src/services/rateLimitTracker";
 import { searchAllSources } from "@/src/services/searchEngines";
 
 // In-flight guard
@@ -215,6 +216,118 @@ export async function findIconUrls(iconKey: string): Promise<void> {
 
   // Track URLs we need to fetch immediately
   const urlsToFetch: { url: string; source: string; format: string }[] = [];
+
+  // TIER 0: Discover official website - smarter first step
+  // Use a simple text search to find the brand's official site
+  console.log(`[SEARCH] TIER 0: Discovering official website`);
+  let officialSiteUrl: string | null = null;
+  try {
+    const ddgUrl = "https://duckduckgo.com";
+    if (!(await isDomainRateLimited(`${ddgUrl}`))) {
+      const response = await fetch(
+        `${ddgUrl}/?q=${encodeURIComponent(iconKey)}&ia=web`,
+        {
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          },
+        },
+      );
+      if (response.ok) {
+        const html = await response.text();
+        // Extract first result URL
+        const resultMatch = html.match(
+          /<a[^>]+class="result__a"[^>]*href\s*=\s*["'](https?:\/\/[^"']+)["']/i,
+        );
+        if (resultMatch) {
+          officialSiteUrl = resultMatch[1];
+          console.log(
+            `[SEARCH] TIER 0: Found official site: ${officialSiteUrl}`,
+          );
+        }
+      }
+    }
+  } catch (err) {
+    console.log(`[SEARCH] TIER 0: Error finding official site: ${err}`);
+  }
+
+  // TIER 0.5: Scrape official website for icons and favicon
+  if (officialSiteUrl) {
+    console.log(`[SEARCH] TIER 0.5: Scraping official site for icons`);
+
+    // Get favicon from official site
+    const officialFavicon = `${officialSiteUrl}/favicon.ico`;
+    if (!existingUrls.has(officialFavicon)) {
+      await saveCrawlResult(
+        iconKey,
+        "",
+        "official_favicon",
+        "ico",
+        officialFavicon,
+      );
+      urlsToFetch.push({
+        url: officialFavicon,
+        source: "official_favicon",
+        format: "ico",
+      });
+    }
+
+    // Scrape official site for images
+    try {
+      if (!(await isDomainRateLimited(officialSiteUrl))) {
+        const siteResponse = await fetch(officialSiteUrl, {
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          },
+        });
+        if (siteResponse.ok) {
+          const siteHtml = await siteResponse.text();
+          // Find all image URLs on the site
+          const imgMatches =
+            siteHtml.match(
+              /src=["']([^"']+\.(?:svg|png|jpg|jpeg|ico|webp))["']/gi,
+            ) || [];
+          for (const match of imgMatches.slice(0, 5)) {
+            const urlMatch = match.match(/src=["']([^"']+)["']/i);
+            if (urlMatch) {
+              let imgUrl = urlMatch[1];
+              // Make relative URLs absolute
+              if (imgUrl.startsWith("/") && !imgUrl.startsWith("//")) {
+                const domain = officialSiteUrl.replace(
+                  /https?:\/\/(www\.)?/,
+                  "",
+                );
+                imgUrl = domain + imgUrl;
+              }
+              if (!imgUrl.startsWith("http")) {
+                imgUrl = new URL(imgUrl, officialSiteUrl).toString();
+              }
+              if (!existingUrls.has(imgUrl) && !imgUrl.includes("favicon")) {
+                await saveCrawlResult(
+                  iconKey,
+                  "",
+                  "official_site",
+                  detectUrlFormat(imgUrl),
+                  imgUrl,
+                );
+                urlsToFetch.push({
+                  url: imgUrl,
+                  source: "official_site",
+                  format: detectUrlFormat(imgUrl),
+                });
+              }
+            }
+          }
+          console.log(
+            `[SEARCH] TIER 0.5: Found ${imgMatches.length} potential images on official site`,
+          );
+        }
+      }
+    } catch (err) {
+      console.log(`[SEARCH] TIER 0.5: Error scraping official site: ${err}`);
+    }
+  }
 
   // TIER 1: Library CDNs (Simple Icons, Tabler, Lucide, etc.) - FIND URLs
   console.log(`[SEARCH] TIER 1: Library CDNs`);
