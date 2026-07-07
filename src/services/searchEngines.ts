@@ -394,6 +394,36 @@ function extractGoogleImages(html: string, brand: string): ImageSearchResult[] {
     }
   }
 
+  // Pattern: Try to extract ANY src/data-src that contains image extensions
+  // This catches modern Google and DDG formats that don't match other patterns
+  const anyImgRegex = /src=["']([^"']+)["']/gi;
+  let anyMatch;
+  while ((anyMatch = anyImgRegex.exec(html)) !== null) {
+    const url = anyMatch[1].replace(/^\/\//, "https://");
+    // Filter out non-http URLs and known trackers
+    if (
+      !seen.has(url) &&
+      (url.includes(".png") ||
+        url.includes(".svg") ||
+        url.includes(".jpg") ||
+        url.includes(".jpeg") ||
+        url.includes(".ico") ||
+        url.includes(".webp")) &&
+      !url.includes("google") &&
+      !url.includes("gstatic") &&
+      !url.includes("duckduckgo") &&
+      !url.includes("base64") &&
+      url.startsWith("http")
+    ) {
+      seen.add(url);
+      results.push({
+        url,
+        format: detectFormat(url),
+        source: "google_images",
+      });
+    }
+  }
+
   console.log(
     `[SEARCH_ENGINE] Google extracted ${results.length} unique image URLs for "${brand}"`,
   );
@@ -432,6 +462,32 @@ function extractGoogleSearchResults(html: string): {
     const url = match[1].replace(/^\/\//, "https://");
     if (!url.includes("google") && !url.includes("gstatic")) {
       imageUrls.push(url);
+    }
+  }
+
+  // Fallback: Extract any URLs from Google's result divs
+  if (linkUrls.length === 0 && imageUrls.length === 0) {
+    // Modern Google uses <div class="g"> with <a> inside
+    const divLinkRegex =
+      /<div[^>]*class="g"[^>]*>[\s\S]*?<a[^>]+href\s*=\s*["'](([^"']+))["'][^>]*>/gi;
+    let divMatch;
+    while ((divMatch = divLinkRegex.exec(html)) !== null) {
+      const url = divMatch[1].replace(/^\/\//, "https://");
+      if (
+        !url.includes("google") &&
+        !url.includes("accounts") &&
+        !url.includes("support") &&
+        url.startsWith("http")
+      ) {
+        linkUrls.push(url);
+      }
+    }
+
+    // Also try to find data-s or data-url attributes in result divs
+    const dataSRegex = /data-s=["'](([^"']+\.(?:png|svg|jpg|jpeg)))["']/gi;
+    let sMatch;
+    while ((sMatch = dataSRegex.exec(html)) !== null) {
+      imageUrls.push(sMatch[1]);
     }
   }
 
