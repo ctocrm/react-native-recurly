@@ -1,5 +1,6 @@
 import { tabs } from "@/constants/data";
 import { colors, components } from "@/constants/theme";
+import HiddenSearchWebView from "@/src/components/HiddenSearchWebView";
 import { posthog } from "@/src/config/posthog";
 import { CloudSyncProvider } from "@/src/context/CloudSyncContext";
 import { DatabaseProvider } from "@/src/context/DatabaseProvider";
@@ -13,6 +14,11 @@ import { ActivityIndicator, Image, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const tabBar = components.tabBar;
+
+interface TabIconProps {
+  focused: boolean;
+  icon: any; // Static imports return number (require) or ImageSourcePropType
+}
 
 const TabIcon = ({ focused, icon }: TabIconProps) => {
   return (
@@ -58,6 +64,8 @@ const TabLayout = () => {
     <DatabaseProvider>
       <SubscriptionProvider>
         <CloudSyncProvider>
+          {/* Hidden WebView for background scraping - bypasses anti-bot measures */}
+          <HiddenSearchWebView />
           <Tabs
             screenOptions={{
               headerShown: false,
