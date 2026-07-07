@@ -19,9 +19,7 @@ import {
 } from "@/src/services/iconLoadingRegistry";
 import { findAllIconSources } from "@/src/services/iconScraper";
 import { isDomainRateLimited } from "@/src/services/rateLimitTracker";
-import {
-  searchForLinksToSpider
-} from "@/src/services/searchEngines";
+import { searchForLinksToSpider } from "@/src/services/searchEngines";
 
 // In-flight guard
 let isProcessingQueue = false;
@@ -225,50 +223,76 @@ export async function findIconUrls(iconKey: string): Promise<void> {
   let officialSiteUrl: string | null = null;
   try {
     const ddgUrl = "https://duckduckgo.com";
-    if (!(await isDomainRateLimited(`${ddgUrl}`))) {
-      const response = await fetch(
-        `${ddgUrl}/?q=${encodeURIComponent(iconKey)}&ia=web`,
-        {
-          headers: {
-            "User-Agent":
-              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-          },
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
+    const response = await fetch(
+      `${ddgUrl}/?q=${encodeURIComponent(iconKey)}&ia=web`,
+      {
+        signal: controller.signal,
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
         },
-      );
-      if (response.ok) {
-        const html = await response.text();
-        // Extract first result URL
-        const resultMatch = html.match(
-          /<a[^>]+class="result__a"[^>]*href\s*=\s*["'](https?:\/\/[^"']+)["']/i,
-        );
-        if (resultMatch) {
-          officialSiteUrl = resultMatch[1];
+      },
+    );
+    clearTimeout(timer);
+
+    if (response.ok) {
+      const html = await response.text();
+      // DDG web results use different structure - try multiple patterns
+      const patterns = [
+        /<a[^>]+class="result__a"[^>]*href\s*=\s*["'](https?:\/\/[^"']+)["']/i,
+        /<a[^>]+href\s*=\s*["'](https?:\/\/[^"']+)"[^>]*class="result__a"/i,
+        /<div[^>]*class="result__body"[^>]*>[\s\S]*?<a[^>]+href\s*=\s*["'](https?:\/\/[^"']+)["']/i,
+        /<a[^>]+class="result__a"[^>]*href="([^"]+)"/i,
+      ];
+      for (const pattern of patterns) {
+        const match = html.match(pattern);
+        if (match) {
+          officialSiteUrl = match[1];
           console.log(
             `[SEARCH] TIER 0: Found official site: ${officialSiteUrl}`,
           );
+          break;
         }
       }
+      // If no match, try generic link extraction
+      if (!officialSiteUrl) {
+        const linkMatch = html.match(
+          /<a[^>]+href\s*=\s*["'](https?:\/\/[^"']+)["'][^>]*>/i,
+        );
+        if (linkMatch) {
+          officialSiteUrl = linkMatch[1];
+          console.log(
+            `[SEARCH] TIER 0: Found official site (fallback): ${officialSiteUrl}`,
+          );
+        }
+      }
+    } else {
+      // Record rate limit for non-200 responses
+      if (response.status === 429 || response.status === 403) {
+        const { recordRateLimit } = await import("./rateLimitTracker");
+        await recordRateLimit(ddgUrl);
+      }
     }
-  } catch (err) {
-    console.log(`[SEARCH] TIER 0: Error finding official site: ${err}`);
+  } catch (err: any) {
+    if (err.name !== "AbortError") {
+      console.log(`[SEARCH] TIER 0: Error finding official site: ${err}`);
+    } else {
+      console.log(`[SEARCH] TIER 0: Timeout finding official site`);
+    }
   }
 
   // TIER 0.5: Scrape official website for icons and favicon
   if (officialSiteUrl) {
     console.log(`[SEARCH] TIER 0.5: Scraping official site for icons`);
 
-    // Get favicon from official site
-    const officialFavicon = `${officialSiteUrl}/favicon.ico`;
-    if (!existingUrls.has(officialFavicon)) {
-      await saveCrawlResult(
-        iconKey,
-        "",
-        "official_favicon",
-        "ico",
-        officialFavicon,
-      );
+    // Get favicon from official site - use origin URL
+    const faviconUrl = new URL("/favicon.ico", officialSiteUrl).toString();
+    if (!existingUrls.has(faviconUrl)) {
+      await saveCrawlResult(iconKey, "", "official_favicon", "ico", faviconUrl);
       urlsToFetch.push({
-        url: officialFavicon,
+        url: faviconUrl,
         source: "official_favicon",
         format: "ico",
       });
@@ -294,18 +318,14 @@ export async function findIconUrls(iconKey: string): Promise<void> {
             const urlMatch = match.match(/src=["']([^"']+)["']/i);
             if (urlMatch) {
               let imgUrl = urlMatch[1];
-              // Make relative URLs absolute
-              if (imgUrl.startsWith("/") && !imgUrl.startsWith("//")) {
-                const domain = officialSiteUrl.replace(
-                  /https?:\/\/(www\.)?/,
-                  "",
-                );
-                imgUrl = domain + imgUrl;
-              }
+              // Use URL constructor for all relative URLs - works for both relative and root-relative
               if (!imgUrl.startsWith("http")) {
                 imgUrl = new URL(imgUrl, officialSiteUrl).toString();
               }
-              if (!existingUrls.has(imgUrl) && !imgUrl.includes("favicon")) {
+              if (
+                !existingUrls.has(imgUrl) &&
+                !imgUrl.toLowerCase().includes("favicon")
+              ) {
                 await saveCrawlResult(
                   iconKey,
                   "",

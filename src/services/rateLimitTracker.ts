@@ -72,8 +72,12 @@ async function saveState(): Promise<void> {
     const store = await getSecureStore();
     if (!store) return;
     const obj: Record<string, DomainRateState> = {};
+    const now = Date.now();
+    // Only persist active cooldown entries - filter expired/stale entries
     stateMap.forEach((v, k) => {
-      obj[k] = v;
+      if (v.cooldownUntil > now) {
+        obj[k] = v;
+      }
     });
     await store.setItemAsync(STORAGE_KEY, JSON.stringify(obj));
   } catch (err) {
@@ -94,6 +98,7 @@ async function loadState(): Promise<void> {
       const obj = JSON.parse(raw) as Record<string, DomainRateState>;
       const now = Date.now();
       for (const [domain, state] of Object.entries(obj)) {
+        // Only restore entries that haven't expired
         if (state.cooldownUntil > now) {
           stateMap.set(domain, state);
         }
@@ -105,8 +110,19 @@ async function loadState(): Promise<void> {
   }
 }
 
+// Cache the in-flight load promise to prevent race conditions
+let loadPromise: Promise<void> | null = null;
+
 async function ensureLoaded(): Promise<void> {
-  if (!loaded) await loadState();
+  if (!loaded) {
+    // Cache the in-flight promise to avoid duplicate loads
+    if (!loadPromise) {
+      loadPromise = loadState().finally(() => {
+        loadPromise = null;
+      });
+    }
+    await loadPromise;
+  }
 }
 
 // ---- Core API ----
@@ -144,6 +160,15 @@ export async function recordSuccess(url: string): Promise<void> {
   await ensureLoaded();
   const domain = getDomainFromUrl(url);
   const now = Date.now();
+  const existing = stateMap.get(domain);
+
+  // If this domain was rate-limited, notify listeners that it recovered
+  if (existing?.isRateLimited) {
+    await saveState();
+    notifyListeners();
+    console.log(`[RATE_LIMIT] ${domain}: Recovered (success recorded)`);
+    return;
+  }
 
   stateMap.set(domain, {
     isRateLimited: false,
