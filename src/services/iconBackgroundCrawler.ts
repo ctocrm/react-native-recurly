@@ -18,7 +18,8 @@ import {
   setIconLoading,
 } from "@/src/services/iconLoadingRegistry";
 import { findAllIconSources } from "@/src/services/iconScraper";
-import { searchAllSources } from "@/src/services/searchEngines";
+import { isDomainRateLimited } from "@/src/services/rateLimitTracker";
+import { searchForLinksToSpider } from "@/src/services/searchEngines";
 
 // In-flight guard
 let isProcessingQueue = false;
@@ -216,6 +217,140 @@ export async function findIconUrls(iconKey: string): Promise<void> {
   // Track URLs we need to fetch immediately
   const urlsToFetch: { url: string; source: string; format: string }[] = [];
 
+  // TIER 0: Discover official website - smarter first step
+  // Use a simple text search to find the brand's official site
+  console.log(`[SEARCH] TIER 0: Discovering official website`);
+  let officialSiteUrl: string | null = null;
+  try {
+    const ddgUrl = "https://duckduckgo.com";
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
+    const response = await fetch(
+      `${ddgUrl}/?q=${encodeURIComponent(iconKey)}&ia=web`,
+      {
+        signal: controller.signal,
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        },
+      },
+    );
+    clearTimeout(timer);
+
+    if (response.ok) {
+      const html = await response.text();
+      // DDG web results use different structure - try multiple patterns
+      const patterns = [
+        /<a[^>]+class="result__a"[^>]*href\s*=\s*["'](https?:\/\/[^"']+)["']/i,
+        /<a[^>]+href\s*=\s*["'](https?:\/\/[^"']+)"[^>]*class="result__a"/i,
+        /<div[^>]*class="result__body"[^>]*>[\s\S]*?<a[^>]+href\s*=\s*["'](https?:\/\/[^"']+)["']/i,
+        /<a[^>]+class="result__a"[^>]*href="([^"]+)"/i,
+      ];
+      for (const pattern of patterns) {
+        const match = html.match(pattern);
+        if (match) {
+          officialSiteUrl = match[1];
+          console.log(
+            `[SEARCH] TIER 0: Found official site: ${officialSiteUrl}`,
+          );
+          break;
+        }
+      }
+      // If no match, try generic link extraction
+      if (!officialSiteUrl) {
+        const linkMatch = html.match(
+          /<a[^>]+href\s*=\s*["'](https?:\/\/[^"']+)["'][^>]*>/i,
+        );
+        if (linkMatch) {
+          officialSiteUrl = linkMatch[1];
+          console.log(
+            `[SEARCH] TIER 0: Found official site (fallback): ${officialSiteUrl}`,
+          );
+        }
+      }
+    } else {
+      // Record rate limit for non-200 responses
+      if (response.status === 429 || response.status === 403) {
+        const { recordRateLimit } = await import("./rateLimitTracker");
+        await recordRateLimit(ddgUrl);
+      }
+    }
+  } catch (err: any) {
+    if (err.name !== "AbortError") {
+      console.log(`[SEARCH] TIER 0: Error finding official site: ${err}`);
+    } else {
+      console.log(`[SEARCH] TIER 0: Timeout finding official site`);
+    }
+  }
+
+  // TIER 0.5: Scrape official website for icons and favicon
+  if (officialSiteUrl) {
+    console.log(`[SEARCH] TIER 0.5: Scraping official site for icons`);
+
+    // Get favicon from official site - use origin URL
+    const faviconUrl = new URL("/favicon.ico", officialSiteUrl).toString();
+    if (!existingUrls.has(faviconUrl)) {
+      await saveCrawlResult(iconKey, "", "official_favicon", "ico", faviconUrl);
+      urlsToFetch.push({
+        url: faviconUrl,
+        source: "official_favicon",
+        format: "ico",
+      });
+    }
+
+    // Scrape official site for images
+    try {
+      if (!(await isDomainRateLimited(officialSiteUrl))) {
+        const siteResponse = await fetch(officialSiteUrl, {
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          },
+        });
+        if (siteResponse.ok) {
+          const siteHtml = await siteResponse.text();
+          // Find all image URLs on the site
+          const imgMatches =
+            siteHtml.match(
+              /src=["']([^"']+\.(?:svg|png|jpg|jpeg|ico|webp))["']/gi,
+            ) || [];
+          for (const match of imgMatches.slice(0, 5)) {
+            const urlMatch = match.match(/src=["']([^"']+)["']/i);
+            if (urlMatch) {
+              let imgUrl = urlMatch[1];
+              // Use URL constructor for all relative URLs - works for both relative and root-relative
+              if (!imgUrl.startsWith("http")) {
+                imgUrl = new URL(imgUrl, officialSiteUrl).toString();
+              }
+              if (
+                !existingUrls.has(imgUrl) &&
+                !imgUrl.toLowerCase().includes("favicon")
+              ) {
+                await saveCrawlResult(
+                  iconKey,
+                  "",
+                  "official_site",
+                  detectUrlFormat(imgUrl),
+                  imgUrl,
+                );
+                urlsToFetch.push({
+                  url: imgUrl,
+                  source: "official_site",
+                  format: detectUrlFormat(imgUrl),
+                });
+              }
+            }
+          }
+          console.log(
+            `[SEARCH] TIER 0.5: Found ${imgMatches.length} potential images on official site`,
+          );
+        }
+      }
+    } catch (err) {
+      console.log(`[SEARCH] TIER 0.5: Error scraping official site: ${err}`);
+    }
+  }
+
   // TIER 1: Library CDNs (Simple Icons, Tabler, Lucide, etc.) - FIND URLs
   console.log(`[SEARCH] TIER 1: Library CDNs`);
   const libraryIcons = await findAllIconSources(iconKey);
@@ -267,37 +402,21 @@ export async function findIconUrls(iconKey: string): Promise<void> {
   }
 
   // TIER 3: Web search + SPIDER - FIND URLs
-  console.log(`[SEARCH] TIER 3: Web search`);
-  const searchResults = await searchAllSources(iconKey);
-  console.log(`[SEARCH] TIER 3: Found ${searchResults.length} results`);
+  console.log(`[SEARCH] TIER 3: Web search for links to spider`);
+  const linkResults = await searchForLinksToSpider(iconKey);
+  console.log(`[SEARCH] TIER 3: Found ${linkResults.length} links to spider`);
   const linkUrls: string[] = [];
 
-  for (const result of searchResults.slice(0, MAX_WEB_SEARCH_RESULTS)) {
-    if (existingUrls.has(result.url)) continue;
-    const isImage =
-      result.url.match(/\.(svg|png|jpg|jpeg|ico|webp|gif)(\?|$)/i) ||
-      result.url.includes("logo") ||
-      result.url.includes("icon");
-    if (isImage) {
-      await saveCrawlResult(
-        iconKey,
-        "",
-        "web_search",
-        detectUrlFormat(result.url),
-        result.url,
-      );
-      urlsToFetch.push({
-        url: result.url,
-        source: "web_search",
-        format: detectUrlFormat(result.url),
-      });
-    } else if (
-      !result.url.includes("google.com") &&
-      !result.url.includes("bing.com") &&
-      !result.url.includes("duckduckgo.com") &&
-      !result.url.includes("yandex.com")
+  // searchForLinksToSpider returns website URLs - all should be spidered
+  for (const linkUrl of linkResults.slice(0, MAX_WEB_SEARCH_RESULTS)) {
+    if (existingUrls.has(linkUrl)) continue;
+    if (
+      !linkUrl.includes("google.com") &&
+      !linkUrl.includes("bing.com") &&
+      !linkUrl.includes("duckduckgo.com") &&
+      !linkUrl.includes("yandex.com")
     ) {
-      linkUrls.push(result.url);
+      linkUrls.push(linkUrl);
     }
   }
 
