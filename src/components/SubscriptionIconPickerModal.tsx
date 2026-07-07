@@ -10,6 +10,10 @@ import {
   isIconLoading,
 } from "@/src/services/iconLoadingRegistry";
 import { reportIcon } from "@/src/services/iconReportService";
+import {
+  addRateLimitListener,
+  getRateLimitedDomains,
+} from "@/src/services/rateLimitTracker";
 import { usePostHog } from "posthog-react-native";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -52,12 +56,43 @@ const SubscriptionIconPickerModal = ({
   const posthog = usePostHog();
   const [availableIcons, setAvailableIcons] = useState<PickerIcon[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [rateLimitedDomains, setRateLimitedDomains] = useState<string[]>([]);
   const isMounted = useRef(true);
   const latestKeyRef = useRef(iconKey);
 
   useEffect(() => {
     latestKeyRef.current = iconKey;
   }, [iconKey]);
+
+  // Poll rate-limited domains for the red indicator
+  const refreshRateLimitedDomains = useCallback(async () => {
+    try {
+      const domains = await getRateLimitedDomains();
+      if (isMounted.current) {
+        setRateLimitedDomains(
+          domains.map((d) => {
+            const remainingMin = Math.ceil(d.remainingMs / 60000);
+            return `${d.domain} (${remainingMin}min)`;
+          }),
+        );
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshRateLimitedDomains();
+    const interval = setInterval(refreshRateLimitedDomains, 30000);
+    return () => clearInterval(interval);
+  }, [refreshRateLimitedDomains]);
+
+  useEffect(() => {
+    const unsubscribeRateLimit = addRateLimitListener(() => {
+      refreshRateLimitedDomains();
+    });
+    return unsubscribeRateLimit;
+  }, [refreshRateLimitedDomains]);
 
   const loadIcons = useCallback(async () => {
     if (!iconKey) return;
@@ -324,9 +359,17 @@ const SubscriptionIconPickerModal = ({
               ) : (
                 <Text className="font-sans-medium text-accent">🔍</Text>
               )}
-              <Text className="font-sans-medium text-accent">
-                {isSearching ? "Searching..." : "Search for Icon Online"}
-              </Text>
+              <View className="items-center">
+                <Text className="font-sans-medium text-accent">
+                  {isSearching ? "Searching..." : "Search for Icon Online"}
+                </Text>
+                {/* Red rate-limit indicator */}
+                {rateLimitedDomains.length > 0 && (
+                  <Text className="mt-0.5 text-[10px] text-red-500">
+                    ⚠️ {rateLimitedDomains.join(", ")}
+                  </Text>
+                )}
+              </View>
             </View>
           </Pressable>
 

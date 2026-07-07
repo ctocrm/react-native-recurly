@@ -1,11 +1,18 @@
 /**
  * Multi-engine image search + Google dork search scraper.
  * No API keys required — scrapes HTML results directly.
- * Uses rotating User-Agents and timeouts.
+ * Uses rotating User-Agents, timeouts, and domain-level rate limiting.
  *
  * FIXED: Added comprehensive error logging, improved DuckDuckGo parsing,
- * removed unreliable engines, simplified search strategy.
+ * removed unreliable engines, simplified search strategy, integrated
+ * per-domain rate limit tracking so we don't hammer rate-limited targets.
  */
+
+import {
+  isDomainRateLimited,
+  recordRateLimit,
+  recordSuccess,
+} from "./rateLimitTracker";
 
 const FETCH_TIMEOUT_MS = 10000;
 const MAX_RETRIES = 2;
@@ -39,11 +46,24 @@ function getRandomUserAgent(): string {
   return USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
 }
 
+/**
+ * Fetch with timeout, rate-limit awareness, and retry logic.
+ * Checks domain rate-limit state before attempting, and records rate-limit hits.
+ */
 async function fetchWithTimeout(
   url: string,
   options: RequestInit = {},
   timeoutMs: number = FETCH_TIMEOUT_MS,
 ): Promise<Response | null> {
+  // Check if the domain is rate-limited before attempting
+  const rateLimited = await isDomainRateLimited(url);
+  if (rateLimited) {
+    console.log(
+      `[SEARCH_ENGINE] Skipping rate-limited domain: ${url.substring(0, 80)}`,
+    );
+    return null;
+  }
+
   const maxRetries = MAX_RETRIES;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     const controller = new AbortController();
@@ -63,12 +83,16 @@ async function fetchWithTimeout(
           "Accept-Language": "en-US,en;q=0.9",
         },
       });
+
+      // Success - record it for rate limit tracking
       if (response.ok) {
         console.log(
           `[SEARCH_ENGINE] Success (${response.status}): ${url.substring(0, 80)}`,
         );
+        await recordSuccess(url);
         return response;
       }
+
       // Detect 429 rate-limit and honor Retry-After with exponential backoff
       if (response.status === 429) {
         const retryAfter = response.headers.get("Retry-After");
@@ -79,9 +103,19 @@ async function fetchWithTimeout(
         console.log(
           `[SEARCH_ENGINE] 429 rate-limited, waiting ${delayMs}ms (attempt ${attempt + 1})`,
         );
+        await recordRateLimit(url);
         await new Promise((r) => setTimeout(r, delayMs));
-        continue; // skip the generic retry delay below
+        continue;
       }
+
+      // 403 likely means blocked entirely
+      if (response.status === 403) {
+        console.log(
+          `[SEARCH_ENGINE] 403 forbidden, recording rate limit: ${url.substring(0, 80)}`,
+        );
+        await recordRateLimit(url);
+      }
+
       console.log(
         `[SEARCH_ENGINE] Non-ok status ${response.status}: ${url.substring(0, 80)}`,
       );
@@ -95,7 +129,7 @@ async function fetchWithTimeout(
     } finally {
       clearTimeout(timer);
     }
-    // Exponential backoff between retries (except 429 which handles its own delay)
+    // Exponential backoff between retries
     if (attempt < maxRetries) {
       await new Promise((r) => setTimeout(r, Math.pow(2, attempt) * 500));
     }
@@ -117,6 +151,7 @@ function detectFormat(url: string): ImageSearchResult["format"] {
 /**
  * DuckDuckGo image search - most reliable for scraping.
  * Uses the standard image search URL pattern.
+ * FIXED: Added multiple extraction patterns for DDG's various HTML formats.
  */
 function extractDuckDuckGoImages(
   html: string,
@@ -193,6 +228,129 @@ function extractDuckDuckGoImages(
         format: detectFormat(url),
         source: "duckduckgo_images",
       });
+    }
+  }
+
+  // Pattern 5: Try to find vqd/encoded image data in script content
+  // DDG often embeds image data in JSON within <script> tags
+  const scriptJsonRegex =
+    /<script[^>]*>[\s\S]*?"image"\s*:\s*"(https?:\/\/[^"]+\.(?:png|svg|jpg|jpeg|ico|webp)[^"]*)"[\s\S]*?<\/script>/gi;
+  while ((match = scriptJsonRegex.exec(html)) !== null) {
+    const url = match[1].replace(/\\u0026/g, "&").replace(/\\\//g, "/");
+    if (!seen.has(url) && !url.includes("duckduckgo")) {
+      seen.add(url);
+      results.push({
+        url,
+        format: detectFormat(url),
+        source: "duckduckgo_images",
+      });
+    }
+  }
+
+  // Pattern 6: Look for srcset attributes (modern DDG responsive images)
+  const srcsetRegex =
+    /<img[^>]+srcset\s*=\s*["']((?:https?:)?\/\/[^"']+)["'][^>]*>/gi;
+  while ((match = srcsetRegex.exec(html)) !== null) {
+    const url = match[1].replace(/^\/\//, "https://").split(" ")[0];
+    if (!seen.has(url) && !url.includes("duckduckgo")) {
+      seen.add(url);
+      results.push({
+        url,
+        format: detectFormat(url),
+        source: "duckduckgo_images",
+      });
+    }
+  }
+
+  // Pattern 7: Direct <a> links to image files
+  const linkRegex =
+    /<a[^>]+href\s*=\s*["']((?:https?:)?\/\/[^"']+\.(?:png|svg|jpg|jpeg|ico|webp)[^"']*)["']/gi;
+  while ((match = linkRegex.exec(html)) !== null) {
+    const url = match[1].replace(/^\/\//, "https://");
+    if (!seen.has(url) && !url.includes("duckduckgo")) {
+      seen.add(url);
+      results.push({
+        url,
+        format: detectFormat(url),
+        source: "duckduckgo_images",
+      });
+    }
+  }
+
+  // Pattern 8: DDG's new VQD-based AJAX image loading - check for thumbnail data
+  const vqdRegex = /"thumbnail"\s*:\s*"(https?:\/\/[^"]+)"/gi;
+  while ((match = vqdRegex.exec(html)) !== null) {
+    const url = match[1].replace(/\\\//g, "/").replace(/\\u0026/g, "&");
+    if (!seen.has(url) && !url.includes("duckduckgo")) {
+      seen.add(url);
+      results.push({
+        url,
+        format: detectFormat(url),
+        source: "duckduckgo_images",
+      });
+    }
+  }
+
+  // Pattern 9: DDG results JSON in `data-results` attribute
+  const dataResultsRegex = /data-results\s*=\s*"([^"]+)"/gi;
+  while ((match = dataResultsRegex.exec(html)) !== null) {
+    try {
+      const decoded = JSON.parse(decodeURIComponent(match[1]));
+      if (decoded?.results) {
+        for (const result of decoded.results) {
+          const url = result?.image || result?.thumbnail;
+          if (url && !seen.has(url) && !url.includes("duckduckgo")) {
+            seen.add(url);
+            results.push({
+              url,
+              format: detectFormat(url),
+              source: "duckduckgo_images",
+            });
+          }
+        }
+      }
+    } catch {
+      // ignore JSON parse errors
+    }
+  }
+
+  // Fallback Pattern: Extract ANY urls from DDG that look like image hosts
+  // This catches DDG's newer result formats with encoded URLs
+  if (results.length === 0) {
+    const anyImgRegex = /<img[^>]+(?:data-src|src)\s*=\s*["']([^"']+)["']/gi;
+    const allImgs: string[] = [];
+    let imgMatch;
+    while ((imgMatch = anyImgRegex.exec(html)) !== null) {
+      allImgs.push(imgMatch[1].substring(0, 100));
+    }
+    if (allImgs.length > 0) {
+      console.log(
+        `[SEARCH_ENGINE] DuckDuckGo DEBUG: Found ${allImgs.length} <img> tags but none matched extraction patterns`,
+      );
+      console.log(
+        `[SEARCH_ENGINE] DuckDuckGo DEBUG: Sample src/data-src: ${allImgs.slice(0, 3).join(", ")}`,
+      );
+    }
+
+    // Last resort: search for any URL-looking strings that point to known image hosts
+    const rawUrlRegex =
+      /https?:\/\/[^"'\s>]+\.(?:png|svg|jpg|jpeg|ico|webp)[^"'\s]*/gi;
+    let rawUrlMatch;
+    while ((rawUrlMatch = rawUrlRegex.exec(html)) !== null) {
+      const url = rawUrlMatch[0].replace(/[),]+$/g, "");
+      if (!seen.has(url) && !url.includes("duckduckgo")) {
+        seen.add(url);
+        results.push({
+          url,
+          format: detectFormat(url),
+          source: "duckduckgo_images",
+        });
+      }
+    }
+    if (results.length > 0) {
+      console.log(
+        `[SEARCH_ENGINE] DuckDuckGo FALLBACK: Extracted ${results.length} raw image URLs`,
+      );
     }
   }
 
@@ -304,14 +462,24 @@ export async function searchDuckDuckGoImages(
   brand: string,
   index: number = 0,
 ): Promise<ImageSearchResult[]> {
+  const ddgUrl = "https://duckduckgo.com";
+
+  // Check if DuckDuckGo itself is rate-limited before attempting
+  const rateLimited = await isDomainRateLimited(ddgUrl);
+  if (rateLimited) {
+    console.log(
+      `[SEARCH_ENGINE] DuckDuckGo is rate-limited, skipping search for "${brand}"`,
+    );
+    return [];
+  }
+
   console.log(
     `[SEARCH_ENGINE] DuckDuckGo search starting for "${brand}" (variation ${index})`,
   );
   const query = encodeURIComponent(
     SEARCH_VARIATIONS[index % SEARCH_VARIATIONS.length](brand),
   );
-  // Use the user-confirmed working URL pattern
-  const url = `https://duckduckgo.com/?q=${query}&iax=images&ia=images`;
+  const url = `${ddgUrl}/?q=${query}&iax=images&ia=images`;
   console.log(`[SEARCH_ENGINE] DuckDuckGo URL: ${url}`);
 
   const response = await fetchWithTimeout(url, { method: "GET" }, 12000);
@@ -339,13 +507,24 @@ export async function searchGoogleImages(
   brand: string,
   index: number = 0,
 ): Promise<ImageSearchResult[]> {
+  const googleUrl = "https://www.google.com";
+
+  // Check if Google is rate-limited before attempting
+  const rateLimited = await isDomainRateLimited(googleUrl);
+  if (rateLimited) {
+    console.log(
+      `[SEARCH_ENGINE] Google is rate-limited, skipping Images search for "${brand}"`,
+    );
+    return [];
+  }
+
   console.log(
     `[SEARCH_ENGINE] Google Images search starting for "${brand}" (variation ${index})`,
   );
   const query = encodeURIComponent(
     SEARCH_VARIATIONS[index % SEARCH_VARIATIONS.length](brand),
   );
-  const url = `https://www.google.com/images?q=${query}&tbm=isch&hl=en`;
+  const url = `${googleUrl}/images?q=${query}&tbm=isch&hl=en`;
   console.log(`[SEARCH_ENGINE] Google Images URL: ${url}`);
 
   const response = await fetchWithTimeout(url, { method: "GET" }, 12000);
@@ -368,39 +547,49 @@ export async function searchGoogleImages(
 
 // Enhanced dork queries with multiple search variations
 const DORK_QUERIES = [
-  // SVG searches (highest priority)
   `{brand} logo filetype:svg`,
   `{brand} icon filetype:svg`,
   `site:simpleicons.org "{brand}"`,
   `site:worldvectorlogo.com "{brand}"`,
   `site:wikimedia.org "{brand} logo"`,
   `intitle:"{brand}" "logo" filetype:svg`,
-  // PNG searches (transparent backgrounds)
   `{brand} logo png transparent`,
   `{brand} icon png transparent`,
   `site:icons8.com "{brand}"`,
   `site:iconfinder.com "{brand}"`,
   `site:flaticon.com "{brand}" logo`,
   `site:thenounproject.com "{brand}"`,
-  // High-res searches
   `{brand} logo high resolution`,
   `{brand} logo hd filetype:png`,
   `{brand} logo 512x512`,
-  // Official brand assets
   `site:{brand}.com "asset" "logo" "download"`,
   `inurl:press "{brand}" logo filetype:png`,
   `inurl:brand "{brand}" logo filetype:svg`,
   `"{brand}" "logo.svg"`,
   `{brand} brand guidelines logo`,
-  // Favicon searches
   `{brand} favicon.ico`,
   `inurl:{brand} "apple-touch-icon"`,
   `inurl:{brand} "favicon"`,
 ];
 
+/**
+ * Run Google dork searches - but only if Google is not rate-limited.
+ * FIXED: Checks rate limit before running dorks, and adds delays between batches.
+ */
 export async function runDorkSearches(
   brand: string,
 ): Promise<ImageSearchResult[]> {
+  const googleUrl = "https://www.google.com";
+
+  // Check if Google is rate-limited - skip all dork searches if so
+  const rateLimited = await isDomainRateLimited(googleUrl);
+  if (rateLimited) {
+    console.log(
+      `[SEARCH_ENGINE] Google is rate-limited, skipping all dork searches for "${brand}"`,
+    );
+    return [];
+  }
+
   console.log(`[SEARCH_ENGINE] Dork searches starting for "${brand}"`);
   const allResults: ImageSearchResult[] = [];
   const seen = new Set<string>();
@@ -408,6 +597,15 @@ export async function runDorkSearches(
   const queries = DORK_QUERIES.map((q) => q.replace(/\{brand\}/g, brand));
 
   for (let i = 0; i < queries.length; i += 2) {
+    // Re-check rate limit before each batch
+    const stillLimited = await isDomainRateLimited(googleUrl);
+    if (stillLimited) {
+      console.log(
+        `[SEARCH_ENGINE] Google became rate-limited during dork searches, stopping early for "${brand}"`,
+      );
+      break;
+    }
+
     const batch = queries.slice(i, i + 2);
     console.log(
       `[SEARCH_ENGINE] Dork batch ${Math.floor(i / 2) + 1}/${Math.ceil(queries.length / 2)}`,
@@ -416,7 +614,7 @@ export async function runDorkSearches(
     const batchResults = await Promise.all(
       batch.map(async (dorkQuery) => {
         const encodedQuery = encodeURIComponent(dorkQuery);
-        const url = `https://www.google.com/search?q=${encodedQuery}&hl=en`;
+        const url = `${googleUrl}/search?q=${encodedQuery}&hl=en`;
         console.log(`[SEARCH_ENGINE] Dork URL: ${url.substring(0, 120)}`);
 
         const response = await fetchWithTimeout(url, { method: "GET" }, 12000);
@@ -476,9 +674,9 @@ export async function runDorkSearches(
       allResults.push(...results);
     }
 
-    // Rate limiting between batches
+    // Longer delay between batches when rate-limited recently
     if (i + 2 < queries.length) {
-      await new Promise((r) => setTimeout(r, 1500));
+      await new Promise((r) => setTimeout(r, 3000));
     }
   }
 
@@ -543,7 +741,15 @@ export async function searchAllSources(
     return top;
   }
 
-  // Run Google dork searches
+  // Check if DuckDuckGo is rate-limited and if so, still try other sources
+  const ddgIsRateLimited = await isDomainRateLimited("https://duckduckgo.com");
+  if (ddgIsRateLimited) {
+    console.log(
+      `[SEARCH_ENGINE] DuckDuckGo is rate-limited, but continuing with Google dork searches`,
+    );
+  }
+
+  // Run Google dork searches - these will be skipped if Google is rate-limited
   console.log(`[SEARCH_ENGINE] Running Google dork searches`);
   const dorkResults = await runDorkSearches(brand);
   console.log(`[SEARCH_ENGINE] Dork total: ${dorkResults.length} results`);
