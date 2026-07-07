@@ -859,3 +859,33 @@ export async function searchAllSources(
   brandResultCache.set(brand, { results: top, ts: Date.now() });
   return top;
 }
+
+export async function searchForLinksToSpider(brand: string): Promise<string[]> {
+  console.log(`[SEARCH_ENGINE] ===== searchForLinksToSpider starting for "${brand}" =====`);
+  const ddgTextUrl = "https://duckduckgo.com";
+  const allLinks: string[] = [];
+  const seenLinks = new Set<string>();
+
+  if (!(await isDomainRateLimited(ddgTextUrl))) {
+    try {
+      const response = await fetch(
+        `${ddgTextUrl}/?q=${encodeURIComponent(brand)}&ia=web`,
+        { headers: { "User-Agent": getRandomUserAgent() } }
+      );
+      if (response.ok) {
+        const html = await response.text();
+        const linkMatches = html.matchAll(/<a[^>]+href\s*=\s*["']([^"']+)["'][^>]*>/gi);
+        for (const match of linkMatches) {
+          let url = match[1];
+          if (url.startsWith("//")) url = "https:" + url;
+          if (url.startsWith("http") && !url.includes("duckduckgo.com") && !url.includes("google.com")) {
+            if (!seenLinks.has(url)) { seenLinks.add(url); allLinks.push(url); }
+          }
+        }
+        console.log(`[SEARCH_ENGINE] Text search found ${allLinks.length} links`);
+      }
+    } catch (e) { console.log(`[SEARCH_ENGINE] DDG text search error: ${e}`); }
+  }
+  console.log(`[SEARCH_ENGINE] ===== searchForLinksToSpider done for "${brand}": ${allLinks.length} links =====`);
+  return allLinks.slice(0, 30);
+}

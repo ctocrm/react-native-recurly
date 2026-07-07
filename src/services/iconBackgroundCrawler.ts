@@ -19,7 +19,9 @@ import {
 } from "@/src/services/iconLoadingRegistry";
 import { findAllIconSources } from "@/src/services/iconScraper";
 import { isDomainRateLimited } from "@/src/services/rateLimitTracker";
-import { searchAllSources } from "@/src/services/searchEngines";
+import {
+  searchForLinksToSpider
+} from "@/src/services/searchEngines";
 
 // In-flight guard
 let isProcessingQueue = false;
@@ -380,37 +382,21 @@ export async function findIconUrls(iconKey: string): Promise<void> {
   }
 
   // TIER 3: Web search + SPIDER - FIND URLs
-  console.log(`[SEARCH] TIER 3: Web search`);
-  const searchResults = await searchAllSources(iconKey);
-  console.log(`[SEARCH] TIER 3: Found ${searchResults.length} results`);
+  console.log(`[SEARCH] TIER 3: Web search for links to spider`);
+  const linkResults = await searchForLinksToSpider(iconKey);
+  console.log(`[SEARCH] TIER 3: Found ${linkResults.length} links to spider`);
   const linkUrls: string[] = [];
 
-  for (const result of searchResults.slice(0, MAX_WEB_SEARCH_RESULTS)) {
-    if (existingUrls.has(result.url)) continue;
-    const isImage =
-      result.url.match(/\.(svg|png|jpg|jpeg|ico|webp|gif)(\?|$)/i) ||
-      result.url.includes("logo") ||
-      result.url.includes("icon");
-    if (isImage) {
-      await saveCrawlResult(
-        iconKey,
-        "",
-        "web_search",
-        detectUrlFormat(result.url),
-        result.url,
-      );
-      urlsToFetch.push({
-        url: result.url,
-        source: "web_search",
-        format: detectUrlFormat(result.url),
-      });
-    } else if (
-      !result.url.includes("google.com") &&
-      !result.url.includes("bing.com") &&
-      !result.url.includes("duckduckgo.com") &&
-      !result.url.includes("yandex.com")
+  // searchForLinksToSpider returns website URLs - all should be spidered
+  for (const linkUrl of linkResults.slice(0, MAX_WEB_SEARCH_RESULTS)) {
+    if (existingUrls.has(linkUrl)) continue;
+    if (
+      !linkUrl.includes("google.com") &&
+      !linkUrl.includes("bing.com") &&
+      !linkUrl.includes("duckduckgo.com") &&
+      !linkUrl.includes("yandex.com")
     ) {
-      linkUrls.push(result.url);
+      linkUrls.push(linkUrl);
     }
   }
 
