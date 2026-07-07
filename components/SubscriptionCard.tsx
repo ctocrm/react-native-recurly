@@ -77,7 +77,13 @@ const SubscriptionCard = ({
 
     // Cached icon from web crawl (take priority)
     if (iconStatus === "cached" && iconUri) {
-      return <Image source={{ uri: iconUri }} className="size-16 rounded-xl" />;
+      return (
+        <Image
+          source={{ uri: iconUri }}
+          className="size-16 rounded-xl"
+          resizeMode="contain"
+        />
+      );
     }
 
     // No cached icon available - use the static icon asset

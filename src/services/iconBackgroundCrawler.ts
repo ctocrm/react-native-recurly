@@ -17,7 +17,9 @@ import {
   notifyCacheUpdate,
   setIconLoading,
 } from "@/src/services/iconLoadingRegistry";
+import { getReportsForIcon } from "@/src/services/iconReportService";
 import { findAllIconSources } from "@/src/services/iconScraper";
+import { isBase64IconValid } from "@/src/services/iconValidation";
 import { isDomainRateLimited } from "@/src/services/rateLimitTracker";
 import { searchForLinksToSpider } from "@/src/services/searchEngines";
 
@@ -111,6 +113,11 @@ export async function getIconCollection(iconKey: string): Promise<{
     console.log(`[COLLECTION] Loading icons for ${iconKey}`);
     const cached = await getCachedIcon(iconKey);
     const results = await getCrawlResults(iconKey);
+    // Build a set of reported (non-rejected) image hashes to hide by default.
+    const reports = await getReportsForIcon(iconKey);
+    const reportedHashes = new Set(
+      reports.filter((r) => !r.rejected).map((r) => r.imageData),
+    );
 
     const iconMap = new Map<
       string,
@@ -123,7 +130,11 @@ export async function getIconCollection(iconKey: string): Promise<{
     >();
 
     // Add cached icon to collection FIRST
-    if (cached?.imageData) {
+    if (
+      cached?.imageData &&
+      isBase64IconValid(cached.imageData, cached.format) &&
+      !reportedHashes.has(cached.imageData)
+    ) {
       console.log(`[COLLECTION] Found cached icon for ${iconKey}`);
       iconMap.set(cached.imageData, {
         imageData: cached.imageData,
@@ -133,9 +144,14 @@ export async function getIconCollection(iconKey: string): Promise<{
       });
     }
 
-    // Add database crawl results to collection (only those with actual image data)
+    // Add database crawl results to collection (only valid, non-reported images)
     for (const r of results) {
-      if (r.imageData && !iconMap.has(r.imageData)) {
+      if (
+        r.imageData &&
+        !iconMap.has(r.imageData) &&
+        isBase64IconValid(r.imageData, r.format) &&
+        !reportedHashes.has(r.imageData)
+      ) {
         iconMap.set(r.imageData, {
           imageData: r.imageData,
           source: r.source,

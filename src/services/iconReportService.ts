@@ -15,6 +15,7 @@ export interface IconReport {
   source: string;
   imageData: string;
   rejected: boolean;
+  comment?: string;
   reportedAt: string;
 }
 
@@ -25,6 +26,7 @@ CREATE TABLE IF NOT EXISTS icon_reports (
   report_type   TEXT NOT NULL,
   source        TEXT,
   image_data    TEXT,
+  comment       TEXT,
   rejected      INTEGER DEFAULT 0,
   reported_at   TEXT DEFAULT (datetime('now'))
 );
@@ -36,7 +38,7 @@ CREATE INDEX IF NOT EXISTS idx_icon_reports_key ON icon_reports(icon_key);
  * Uses a simple but deterministic hash (Fowler-Noll-Vo-1a) that avoids
  * storing full base64 payloads in the database.
  */
-function hashBase64(data: string): string {
+export function hashImageData(data: string): string {
   let hash = 0x811c9dc5; // FNV offset basis
   for (let i = 0; i < data.length; i++) {
     hash ^= data.charCodeAt(i);
@@ -61,6 +63,7 @@ async function ensureTable(): Promise<void> {
 
 /**
  * Report an icon as wrong or broken.
+ * A non-empty comment is REQUIRED — reports without a reason are rejected.
  * Returns true if the report was saved successfully.
  */
 export async function reportIcon(
@@ -68,19 +71,27 @@ export async function reportIcon(
   reportType: ReportType,
   source: string,
   imageData: string,
+  comment: string,
 ): Promise<boolean> {
+  if (!comment || comment.trim().length === 0) {
+    console.log(`[REPORT] Rejected report for ${iconKey}: comment required`);
+    return false;
+  }
   try {
     await ensureTable();
     const db = getDatabase();
     await db.runAsync(
-      `INSERT INTO icon_reports (icon_key, report_type, source, image_data, rejected)
-       VALUES (?, ?, ?, ?, 0)`,
+      `INSERT INTO icon_reports (icon_key, report_type, source, image_data, comment, rejected)
+       VALUES (?, ?, ?, ?, ?, 0)`,
       iconKey,
       reportType,
       source,
       imageData,
+      comment.trim(),
     );
-    console.log(`Icon reported: ${iconKey} (${reportType}) from ${source}`);
+    console.log(
+      `Icon reported: ${iconKey} (${reportType}) from ${source} — ${comment.trim()}`,
+    );
     return true;
   } catch (error) {
     console.error("Failed to report icon:", error);
@@ -126,9 +137,9 @@ export async function isImageReported(
   try {
     await ensureTable();
     const db = getDatabase();
-    const dataHash = hashBase64(imageData);
+    const dataHash = hashImageData(imageData);
     const row = await db.getFirstAsync<{ count: number }>(
-      "SELECT COUNT(*) as count FROM icon_reports WHERE icon_key = ? AND image_data = ?",
+      "SELECT COUNT(*) as count FROM icon_reports WHERE icon_key = ? AND image_data = ? AND rejected = 0",
       iconKey,
       dataHash,
     );
@@ -148,7 +159,7 @@ export async function rejectReportedIcon(
   try {
     await ensureTable();
     const db = getDatabase();
-    const dataHash = hashBase64(imageData);
+    const dataHash = hashImageData(imageData);
     await db.runAsync(
       "UPDATE icon_reports SET rejected = 1 WHERE icon_key = ? AND image_data = ?",
       iconKey,
