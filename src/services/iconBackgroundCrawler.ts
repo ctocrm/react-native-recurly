@@ -563,15 +563,71 @@ export async function processIconQueue(): Promise<void> {
   }
 }
 
-// Search button handler - triggers search THEN immediately starts fetching
-export async function queueIconForScraping(
+// Promote the first already-fetched crawl result to icon_cache so the
+// subscription card auto-assigns the icon without reopening any modal.
+export async function promoteFirstIconToCache(iconKey: string): Promise<void> {
+  try {
+    const cached = await getCachedIcon(iconKey);
+    if (cached?.imageData) return;
+
+    const all = await getCrawlResults(iconKey);
+    const withData = all.filter((r) => r.imageData);
+    if (withData.length === 0) return;
+
+    const best = withData.reduce((prev, curr) =>
+      prev.fallbackTier < curr.fallbackTier ? prev : curr,
+    );
+    await setCachedIcon(
+      iconKey,
+      best.imageData,
+      best.source,
+      best.format,
+      best.originalUrl,
+    );
+    console.log(`[CRAWL] Auto-assigned first icon for ${iconKey}`);
+  } catch (err) {
+    console.error(`[CRAWL] Failed to promote icon for ${iconKey}:`, err);
+  }
+}
+
+// Detached, persistent background crawler.
+// - Writes a durable record to the DB icon_crawl_queue (survives modal unmount).
+// - Flags the icon as "loading" in the global registry for the FULL crawl.
+// - Runs the actual discovery/fetch as a detached promise that is never awaited
+//   by any UI, so closing any modal cannot cancel it.
+export async function startIconCrawl(
   iconKey: string,
   subscriptionId?: string,
 ): Promise<void> {
+  console.log(
+    `[CRAWL] startIconCrawl for ${iconKey} (sub: ${subscriptionId ?? "none"})`,
+  );
+  // Durable DB record — this is what makes the search persistent/observable.
+  await enqueueIconScrape(iconKey, subscriptionId);
+
+  // Reflect the crawl in the global loading registry for its entire duration.
+  setIconLoading(iconKey, true);
+
+  // Fire-and-forget background worker. Not awaited by any caller/modal.
+  void (async () => {
+    try {
+      await findIconUrls(iconKey);
+      await processIconQueue();
+      await promoteFirstIconToCache(iconKey);
+    } catch (err) {
+      console.error(`[CRAWL] Error crawling ${iconKey}:`, err);
+    } finally {
+      // Always clear the loading flag so the UI returns to a stable state.
+      setIconLoading(iconKey, false);
+    }
+  })();
+}
+
+// Backwards-compatible alias kept so existing call sites keep working.
+export async function queueIconForScraping(
+  iconKey: string,
+  subscriptionId: string = "",
+): Promise<void> {
   console.log(`[BUTTON] Search pressed for ${iconKey}`);
-
-  // Run search to find URLs (spinner stops here)
-  await findIconUrls(iconKey);
-
-  console.log(`[BUTTON] Search completed for ${iconKey}`);
+  startIconCrawl(iconKey, subscriptionId || undefined);
 }

@@ -1,9 +1,16 @@
 import { icons } from "@/constants/icons";
 import { searchLogos } from "@/lib/resolveLogo";
+import { getCachedIcon } from "@/services/database";
+import { startIconCrawl } from "@/src/services/iconBackgroundCrawler";
+import {
+  addCacheUpdateListener,
+  isIconLoading,
+} from "@/src/services/iconLoadingRegistry";
+import { nameToSlug } from "@/src/services/iconScraper";
 import clsx from "clsx";
 import dayjs from "dayjs";
 import { usePostHog } from "posthog-react-native";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   FlatList,
   Image,
@@ -65,6 +72,40 @@ const EditSubscriptionModal = ({
   const [autocompleteResults, setAutocompleteResults] = useState<
     { name: string; icon: any; category?: string }[]
   >([]);
+  // Live web-discovered icon (auto-assigned as the user types)
+  const [liveIconUri, setLiveIconUri] = useState<string | null>(null);
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const liveKeyRef = useRef<string | null>(null);
+
+  const mimeForFormat = (format: string): string => {
+    switch (format) {
+      case "svg":
+        return "image/svg+xml";
+      case "ico":
+        return "image/x-icon";
+      default:
+        return "image/png";
+    }
+  };
+
+  useEffect(() => {
+    const refreshLiveIcon = async () => {
+      const key = liveKeyRef.current;
+      if (!key) {
+        setLiveIconUri(null);
+        return;
+      }
+      const cached = await getCachedIcon(key);
+      setLiveIconUri(
+        cached?.imageData
+          ? `data:${mimeForFormat(cached.format)};base64,${cached.imageData}`
+          : null,
+      );
+    };
+    refreshLiveIcon();
+    const unsub = addCacheUpdateListener(refreshLiveIcon);
+    return unsub;
+  }, []);
 
   // Populate form when subscription changes
   useEffect(() => {
@@ -107,9 +148,21 @@ const EditSubscriptionModal = ({
       const results = searchLogos(text);
       setAutocompleteResults(results);
       setShowAutocomplete(results.length > 0);
+
+      // Kick off background icon discovery the moment the user types (debounced).
+      const slug = nameToSlug(text);
+      liveKeyRef.current = slug;
+      if (debounceTimer.current) clearTimeout(debounceTimer.current);
+      debounceTimer.current = setTimeout(() => {
+        if (slug.length >= 2 && !isIconLoading(slug)) {
+          startIconCrawl(slug);
+        }
+      }, 600);
     } else {
       setShowAutocomplete(false);
       setAutocompleteResults([]);
+      liveKeyRef.current = null;
+      setLiveIconUri(null);
     }
   };
 
@@ -153,6 +206,11 @@ const EditSubscriptionModal = ({
       subscription_category: category,
     });
 
+    // Start a detached background crawl for the typed name. Runs independently
+    // of this modal, so the icon keeps being discovered/auto-assigned.
+    const slug = nameToSlug(name);
+    if (slug.length >= 2) startIconCrawl(slug, subscription.id);
+
     onSave(subscription.id, data);
     onClose();
   };
@@ -189,9 +247,16 @@ const EditSubscriptionModal = ({
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
             >
-              {/* Logo preview */}
+              {/* Logo preview — prefer the live web-discovered icon if found */}
               <View className="mb-2 items-center">
-                <Image source={selectedIcon} className="size-16 rounded-lg" />
+                {liveIconUri ? (
+                  <Image
+                    source={{ uri: liveIconUri }}
+                    className="size-16 rounded-lg"
+                  />
+                ) : (
+                  <Image source={selectedIcon} className="size-16 rounded-lg" />
+                )}
               </View>
 
               {/* Name */}

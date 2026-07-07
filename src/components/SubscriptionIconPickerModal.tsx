@@ -2,7 +2,7 @@ import { icons } from "@/constants/icons";
 import { deleteCachedIcon, setCachedIcon } from "@/services/database";
 import {
   getIconCollection,
-  queueIconForScraping,
+  startIconCrawl
 } from "@/src/services/iconBackgroundCrawler";
 import {
   addCacheUpdateListener,
@@ -147,22 +147,18 @@ const SubscriptionIconPickerModal = ({
     return unsubscribeCache;
   }, [iconKey, visible, loadIcons]);
 
-  const handleSearchOnline = async () => {
+  const handleSearchOnline = () => {
     if (!iconKey) return;
     console.log(`[MODAL] Search button pressed for ${iconKey}`);
     posthog.capture("icon_picker_search_online", {
       subscription_name: subscriptionName,
       icon_key: iconKey,
     });
-    setIsSearching(true);
-    try {
-      await queueIconForScraping(iconKey);
-      console.log(`[MODAL] Search triggered for ${iconKey}`);
-    } catch (err) {
-      console.error(`[MODAL] Search failed for ${iconKey}:`, err);
-    } finally {
-      setIsSearching(false);
-    }
+    // Fire-and-forget: startIconCrawl runs as a detached background process
+    // tracked in the global loading registry, so closing this modal does NOT
+    // cancel the crawl. The isIconLoading listener keeps the spinner in sync.
+    startIconCrawl(iconKey);
+    console.log(`[MODAL] Search triggered for ${iconKey}`);
   };
 
   const handleSelectIcon = async (icon: PickerIcon) => {
