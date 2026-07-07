@@ -7,7 +7,6 @@
  * search engines block simple HTTP requests.
  */
 
-import React from "react";
 import { isDomainRateLimited } from "./rateLimitTracker";
 
 // Types for search results
@@ -194,7 +193,7 @@ export function getInjectionScript(requestId: string): string {
                 jsonMatches.forEach(match => {
                   const urlMatch = match.match(/"FirstUrl":\\s*"([^"]+)"/);
                   if (urlMatch) {
-                    const url = decodeURIComponent(urlMatch[1].replace(/\\\\\\\\u0026/g, '&').replace(/\\\\\\\\/g, ''));
+                    const url = decodeURIComponent(urlMatch[1].replace(/\\\\u0026/g, '&').replace(/\\\\\\//g, ''));
                     if (!seen.has(url) && url.startsWith('http') && !url.includes('duckduckgo')) {
                       seen.add(url);
                       results.push({ url, title: '', snippet: '' });
@@ -218,19 +217,3 @@ export function getInjectionScript(requestId: string): string {
     true;
   `;
 }
-
-// Context for search state
-interface SearchState {
-  isSearching: boolean;
-  currentSearchUrl: string | null;
-  currentRequestId: string | null;
-}
-
-// Create React context for WebView search
-export const WebViewSearchContext = React.createContext<{
-  state: SearchState;
-  triggerSearch: (brand: string, requestId: string) => void;
-}>({
-  state: { isSearching: false, currentSearchUrl: null, currentRequestId: null },
-  triggerSearch: () => {},
-});
