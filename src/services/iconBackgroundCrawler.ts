@@ -113,6 +113,11 @@ async function downloadImageAsBase64(
 // relying on the one-shot icon_crawl_queue, which a prior crawl may have
 // already consumed. Directly downloads the pending URLs, then promotes the
 // best fetched icon to the cache so re-searches actually recover.
+// Process pending downloads in small bounded chunks (mirrors the first-5
+// batching used for newly discovered URLs) so retries stay rate-limited and
+// don't open unbounded parallel network/DB work.
+const RETRY_BATCH_SIZE = 5;
+
 async function retryPendingDownloads(
   iconKey: string,
   pending: { originalUrl: string | null; source: string }[],
@@ -123,12 +128,19 @@ async function retryPendingDownloads(
   console.log(
     `[RETRY] Re-fetching ${toFetch.length} pending/failed downloads for ${iconKey}`,
   );
-  await Promise.all(
-    toFetch.map(async (p) => {
-      const ok = await downloadImageAsBase64(p.originalUrl, p.source, iconKey);
-      if (ok) await markUrlAsCrawled(p.originalUrl);
-    }),
-  );
+  for (let i = 0; i < toFetch.length; i += RETRY_BATCH_SIZE) {
+    const batch = toFetch.slice(i, i + RETRY_BATCH_SIZE);
+    await Promise.all(
+      batch.map(async (p) => {
+        const ok = await downloadImageAsBase64(
+          p.originalUrl,
+          p.source,
+          iconKey,
+        );
+        if (ok) await markUrlAsCrawled(p.originalUrl);
+      }),
+    );
+  }
   await promoteFirstIconToCache(iconKey);
 }
 
@@ -562,13 +574,21 @@ export async function findIconUrls(iconKey: string): Promise<void> {
   const pendingResults = Array.from(latestByUrl.values()).filter(
     (r) => !r.imageData,
   );
-  if (pendingResults.length > 0) {
+  // Exclude URLs that were just discovered in this same crawl and are already
+  // being fetched via the urlsToFetch immediate/queued path — only retry rows
+  // that genuinely failed earlier.
+  const justFetched = new Set(urlsToFetch.map((u) => u.url));
+  const retryRows = pendingResults.filter(
+    (r) => !r.originalUrl || !justFetched.has(r.originalUrl),
+  );
+  if (retryRows.length > 0) {
     console.log(
-      `[SEARCH] ${pendingResults.length} pending/failed downloads to retry for ${iconKey}`,
+      `[SEARCH] ${retryRows.length} pending/failed downloads to retry for ${iconKey}`,
     );
     // Re-fetch directly instead of via the one-shot queue (which a prior crawl
-    // may have already consumed), so the retries actually execute.
-    retryPendingDownloads(iconKey, pendingResults).catch(console.error);
+    // may have already consumed), so the retries actually execute. Await it so
+    // the re-search completes only after cache promotion is done.
+    await retryPendingDownloads(iconKey, retryRows);
   }
 
   console.log(`[SEARCH] ===== FINISHED SEARCH for ${iconKey} =====`);
