@@ -518,6 +518,24 @@ export async function findIconUrls(iconKey: string): Promise<void> {
     }
   }
 
+  // Retry gate: on a RE-search, every discovered URL is usually already in
+  // crawl_results (deduped above), so `urlsToFetch` is empty and the queue
+  // never triggers — but some of those stored rows may have FAILED their
+  // earlier download (empty imageData, e.g. a transient HTTP 400). Enqueue
+  // the icon for background processing whenever there are still pending
+  // (empty) crawl results so processIconQueue re-fetches them. Runs
+  // unconditionally (outside the urlsToFetch block) so re-searches recover.
+  const pendingResults = (await getCrawlResults(iconKey)).filter(
+    (r) => !r.imageData,
+  );
+  if (pendingResults.length > 0) {
+    await enqueueIconScrape(iconKey, undefined);
+    console.log(
+      `[SEARCH] Queued ${iconKey} to retry ${pendingResults.length} pending/failed downloads`,
+    );
+    processIconQueue().catch(console.error);
+  }
+
   console.log(`[SEARCH] ===== FINISHED SEARCH for ${iconKey} =====`);
 }
 

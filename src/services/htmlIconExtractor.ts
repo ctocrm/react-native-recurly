@@ -47,13 +47,41 @@ function detectImageFormat(url: string): ExtractedIcon["format"] {
   return "png";
 }
 
+// Decode common HTML entities that appear in attribute values (e.g. og:image
+// URLs often carry & in their query string, which must become & or the
+// fetch returns HTTP 400). Entity strings are built via concatenation so the
+// source formatter doesn't collapse them into their literal characters.
+const AMP = "&" + "amp;";
+const LT = "&" + "lt;";
+const GT = "&" + "gt;";
+const QUOT = "&" + "quot;";
+const APOS = "&" + "apos;";
+
+function decodeHtmlEntities(s: string): string {
+  return s
+    .split(AMP)
+    .join("&")
+    .split(LT)
+    .join("<")
+    .split(GT)
+    .join(">")
+    .split(QUOT)
+    .join('"')
+    .split(APOS)
+    .join("'")
+    .replace(/&#0*39;/gi, "'")
+    .replace(/&#0*34;/gi, '"');
+}
+
 function resolveUrl(href: string, baseUrl: string): string {
-  if (href.startsWith("http://") || href.startsWith("https://")) return href;
+  const decoded = decodeHtmlEntities(href);
+  if (decoded.startsWith("http://") || decoded.startsWith("https://"))
+    return decoded;
   try {
     // Use the full page URL as the base so document-relative paths resolve correctly
-    return new URL(href, baseUrl).href;
+    return new URL(decoded, baseUrl).href;
   } catch {
-    return href;
+    return decoded;
   }
 }
 
