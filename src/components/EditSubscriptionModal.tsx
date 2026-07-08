@@ -104,7 +104,11 @@ const EditSubscriptionModal = ({
     };
     refreshLiveIcon();
     const unsub = addCacheUpdateListener(refreshLiveIcon);
-    return unsub;
+    return () => {
+      unsub();
+      // Clear any pending debounce timer so it can't fire after unmount.
+      if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    };
   }, []);
 
   // Populate form when subscription changes
@@ -126,6 +130,10 @@ const EditSubscriptionModal = ({
           : "",
       );
       setSelectedIcon(subscription.icon || icons.plus);
+      // Reset live web-discovered icon state so the previous subscription's
+      // icon isn't briefly reused for the newly edited subscription.
+      liveKeyRef.current = null;
+      setLiveIconUri(null);
     }
   }, [subscription]);
 

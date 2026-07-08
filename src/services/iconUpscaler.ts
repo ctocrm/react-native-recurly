@@ -23,7 +23,7 @@ const UPSCALE_THRESHOLD_PX = 64;
 // Target size for upscaled icons (power-of-two friendly, crisp at card size).
 const TARGET_SIZE_PX = 256;
 
-function mimeForFormat(format: string): string {
+export function mimeForFormat(format: string): string {
   switch (format) {
     case "svg":
       return "image/svg+xml";
@@ -57,18 +57,28 @@ function saveFormatFor(format: string): SaveFormat {
   }
 }
 
+export interface UpscaleResult {
+  base64: string;
+  format: string;
+}
+
 /**
  * Upscale a small raster icon (base64 + format) to TARGET_SIZE_PX if needed.
- * Returns the (possibly) upscaled base64; on any error or if the icon is not
- * small, returns the original base64 unchanged. SVG is returned as-is.
+ * Returns the (possibly) upscaled base64 AND the actual output format so
+ * callers don't keep treating re-encoded PNG bytes as the original MIME type
+ * (e.g. ico/gif inputs are encoded to PNG). On any error, or if the icon is
+ * not small / is an SVG, returns the inputs unchanged.
  */
 export async function upscaleIconIfSmall(
   base64: string,
   format: string,
-): Promise<string> {
+): Promise<UpscaleResult> {
   // Vector icons scale natively — nothing to do.
-  if (format === "svg") return base64;
+  if (format === "svg") return { base64, format };
 
+  // Temp files are declared outside the try so cleanup always runs.
+  const tmpUri = `${cacheDirectory}icon_upscale_${Date.now()}.${format}`;
+  let resultUri: string | undefined;
   try {
     const mime = mimeForFormat(format);
     const dataUri = `data:${mime};base64,${base64}`;
@@ -87,41 +97,44 @@ export async function upscaleIconIfSmall(
     const maxDim = Math.max(size.width, size.height);
     if (maxDim >= UPSCALE_THRESHOLD_PX) {
       // Already large enough — no upscaling needed.
-      return base64;
+      return { base64, format };
     }
 
-    // Write to a temp file so manipulateAsync can process it.
-    const tmpUri = `${cacheDirectory}icon_upscale_${Date.now()}.${format}`;
     await writeAsStringAsync(tmpUri, base64, {
       encoding: EncodingType.Base64,
     });
 
+    // Resize with a single dimension so non-square icons keep their aspect
+    // ratio; manipulateAsync scales the other side proportionally.
     const result = await manipulateAsync(
       tmpUri,
-      [{ resize: { width: TARGET_SIZE_PX, height: TARGET_SIZE_PX } }],
+      [{ resize: { width: TARGET_SIZE_PX } }],
       { compress: 1, format: saveFormatFor(format) },
     );
+    resultUri = result.uri;
 
     // Read the upscaled bytes back as base64.
     const upscaled = await readAsStringAsync(result.uri, {
       encoding: EncodingType.Base64,
     });
 
-    // Clean up temp files.
-    try {
-      await deleteAsync(tmpUri, { idempotent: true });
-      await deleteAsync(result.uri, { idempotent: true });
-    } catch {
-      // Best-effort cleanup.
-    }
+    // The encoder maps ico/gif (and the default) to PNG — report that so the
+    // stored/displayed format matches the actual bytes.
+    const outFormat = saveFormatFor(format) === SaveFormat.PNG ? "png" : format;
 
     console.log(
-      `[UPSCALE] ${format} icon ${size.width}x${size.height} -> ${TARGET_SIZE_PX}px`,
+      `[UPSCALE] ${format} icon ${size.width}x${size.height} -> ${TARGET_SIZE_PX}px (${outFormat})`,
     );
-    return upscaled;
+    return { base64: upscaled, format: outFormat };
   } catch (err) {
     // Never break the icon pipeline over upscaling; fall back to original.
     console.log(`[UPSCALE] skipped (${format}):`, err);
-    return base64;
+    return { base64, format };
+  } finally {
+    // Always clean up temp files, even on error, to avoid leaking them.
+    await deleteAsync(tmpUri, { idempotent: true }).catch(() => {});
+    if (resultUri) {
+      await deleteAsync(resultUri, { idempotent: true }).catch(() => {});
+    }
   }
 }

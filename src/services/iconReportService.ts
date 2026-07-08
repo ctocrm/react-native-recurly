@@ -54,6 +54,13 @@ async function ensureTable(): Promise<void> {
   try {
     const db = getDatabase();
     await db.execAsync(REPORTS_TABLE_SQL);
+    // Existing installs created before `comment` was added will lack the
+    // column; ALTER so inserts of the comment column don't fail.
+    await db
+      .execAsync("ALTER TABLE icon_reports ADD COLUMN comment TEXT")
+      .catch(() => {
+        // Column already exists (or table just created above) — ignore.
+      });
     tableEnsured = true;
   } catch {
     // Table might already exist
@@ -137,11 +144,10 @@ export async function isImageReported(
   try {
     await ensureTable();
     const db = getDatabase();
-    const dataHash = hashImageData(imageData);
     const row = await db.getFirstAsync<{ count: number }>(
       "SELECT COUNT(*) as count FROM icon_reports WHERE icon_key = ? AND image_data = ? AND rejected = 0",
       iconKey,
-      dataHash,
+      imageData,
     );
     return (row?.count ?? 0) > 0;
   } catch {
@@ -159,11 +165,10 @@ export async function rejectReportedIcon(
   try {
     await ensureTable();
     const db = getDatabase();
-    const dataHash = hashImageData(imageData);
     await db.runAsync(
       "UPDATE icon_reports SET rejected = 1 WHERE icon_key = ? AND image_data = ?",
       iconKey,
-      dataHash,
+      imageData,
     );
   } catch (error) {
     console.error("Failed to reject icon:", error);

@@ -91,9 +91,12 @@ async function downloadImageAsBase64(
 
     // Rudimentary upscale for low-res icons (e.g. favicons) before storing.
     const format = detectUrlFormat(url);
-    const finalB64 = await upscaleIconIfSmall(b64, format);
+    const { base64: finalB64, format: finalFormat } = await upscaleIconIfSmall(
+      b64,
+      format,
+    );
 
-    await saveCrawlResult(iconKey, finalB64, source, format, url);
+    await saveCrawlResult(iconKey, finalB64, source, finalFormat, url);
     notifyCacheUpdate();
     return true;
   } catch (err: any) {
@@ -154,9 +157,9 @@ export async function getIconCollection(iconKey: string): Promise<{
         // id is derived from the ORIGINAL (pre-upscale) bytes so it stays
         // unique even when two source sizes upscale to identical pixels.
         id: hashImageData(cached.imageData),
-        imageData: displayData,
+        imageData: displayData.base64,
         source: cached.source,
-        format: cached.format,
+        format: displayData.format,
         originalUrl: cached.originalUrl,
       });
     }
@@ -172,9 +175,9 @@ export async function getIconCollection(iconKey: string): Promise<{
         const displayData = await upscaleIconIfSmall(r.imageData, r.format);
         iconMap.set(r.imageData, {
           id: hashImageData(r.imageData),
-          imageData: displayData,
+          imageData: displayData.base64,
           source: r.source,
-          format: r.format,
+          format: displayData.format,
           originalUrl: r.originalUrl,
         });
       }
@@ -525,7 +528,15 @@ export async function findIconUrls(iconKey: string): Promise<void> {
   // the icon for background processing whenever there are still pending
   // (empty) crawl results so processIconQueue re-fetches them. Runs
   // unconditionally (outside the urlsToFetch block) so re-searches recover.
-  const pendingResults = (await getCrawlResults(iconKey)).filter(
+  // Dedupe to the latest row per original_url so earlier append-only empty
+  // (failed) rows don't trigger retries once a later successful row exists.
+  const crawlRows = await getCrawlResults(iconKey);
+  const latestByUrl = new Map<string, (typeof crawlRows)[number]>();
+  for (const r of crawlRows) {
+    if (!r.originalUrl) continue;
+    latestByUrl.set(r.originalUrl, r);
+  }
+  const pendingResults = Array.from(latestByUrl.values()).filter(
     (r) => !r.imageData,
   );
   if (pendingResults.length > 0) {
@@ -553,7 +564,6 @@ export async function processIconQueue(): Promise<void> {
 
     for (const item of queued) {
       console.log(`[QUEUE] Fetching icons for ${item.icon_key}`);
-      setIconLoading(item.icon_key, true);
 
       try {
         // Get URLs from crawl results (found during search)
@@ -596,15 +606,15 @@ export async function processIconQueue(): Promise<void> {
               prev.fallbackTier < curr.fallbackTier ? prev : curr,
             );
             // Upscale low-res picks (e.g. favicons) before caching.
-            const bestB64 = await upscaleIconIfSmall(
+            const bestUpscaled = await upscaleIconIfSmall(
               best.imageData,
               best.format,
             );
             await setCachedIcon(
               item.icon_key,
-              bestB64,
+              bestUpscaled.base64,
               best.source,
-              best.format,
+              bestUpscaled.format,
               best.originalUrl,
             );
             console.log(`[QUEUE] Set best icon as cached: ${best.source}`);
@@ -613,7 +623,10 @@ export async function processIconQueue(): Promise<void> {
       } catch (error) {
         console.error(`[QUEUE] Error:`, error);
       } finally {
-        setIconLoading(item.icon_key, false);
+        // NOTE: intentionally do NOT clear the icon-loading flag here. The
+        // crawl-wide loading state is owned by startIconCrawl and cleared only
+        // when the whole crawl finishes, so the UI stays in "loading" until the
+        // crawl that started it is actually done.
         await dequeueIcon(item.icon_key);
       }
     }
@@ -637,12 +650,12 @@ export async function promoteFirstIconToCache(iconKey: string): Promise<void> {
       prev.fallbackTier < curr.fallbackTier ? prev : curr,
     );
     // Upscale low-res picks (e.g. favicons) before caching.
-    const bestB64 = await upscaleIconIfSmall(best.imageData, best.format);
+    const bestUpscaled = await upscaleIconIfSmall(best.imageData, best.format);
     await setCachedIcon(
       iconKey,
-      bestB64,
+      bestUpscaled.base64,
       best.source,
-      best.format,
+      bestUpscaled.format,
       best.originalUrl,
     );
     console.log(`[CRAWL] Auto-assigned first icon for ${iconKey}`);
@@ -664,21 +677,29 @@ export async function startIconCrawl(
     `[CRAWL] startIconCrawl for ${iconKey} (sub: ${subscriptionId ?? "none"})`,
   );
   // Durable DB record — this is what makes the search persistent/observable.
+  // enqueueIconScrape also kicks off the fetch worker, so the crawl is
+  // self-sustaining in the background without startIconCrawl awaiting the
+  // queue directly.
   await enqueueIconScrape(iconKey, subscriptionId);
 
-  // Reflect the crawl in the global loading registry for its entire duration.
+  // Flag the icon as "loading" for the FULL crawl duration. This is the
+  // crawl-wide loading state — only startIconCrawl clears it, never the
+  // per-item completion inside processIconQueue.
   setIconLoading(iconKey, true);
 
   // Fire-and-forget background worker. Not awaited by any caller/modal.
   void (async () => {
     try {
+      // findIconUrls triggers background queue processing as it discovers URLs,
+      // so we only enqueue work here and let it run; promoteFirstIconToCache
+      // still runs to auto-assign the first fetched icon to the subscription.
       await findIconUrls(iconKey);
-      await processIconQueue();
       await promoteFirstIconToCache(iconKey);
     } catch (err) {
       console.error(`[CRAWL] Error crawling ${iconKey}:`, err);
     } finally {
-      // Always clear the loading flag so the UI returns to a stable state.
+      // Only clear the crawl-wide loading flag from here, never from the
+      // per-item completion in processIconQueue.
       setIconLoading(iconKey, false);
     }
   })();

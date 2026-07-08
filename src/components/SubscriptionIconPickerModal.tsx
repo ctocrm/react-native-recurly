@@ -12,7 +12,7 @@ import {
 import {
   getReportsForIcon,
   rejectReportedIcon,
-  reportIcon
+  reportIcon,
 } from "@/src/services/iconReportService";
 import {
   addRateLimitListener,
@@ -489,7 +489,7 @@ const SubscriptionIconPickerModal = ({
               <TextInput
                 className="rounded-xl border border-border bg-background px-3 py-2 text-sm text-primary"
                 placeholder="Explain why (required)…"
-                placeholderTextColor="rgba(0,0,0,0.4)"
+                placeholderTextColor="rgba(0, 0, 0, 0.6)"
                 value={reportState.comment}
                 onChangeText={(t) =>
                   setReportState((s) => ({ ...s, comment: t }))

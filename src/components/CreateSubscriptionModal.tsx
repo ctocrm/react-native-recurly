@@ -103,7 +103,11 @@ const CreateSubscriptionModal = ({
     };
     refreshLiveIcon();
     const unsub = addCacheUpdateListener(refreshLiveIcon);
-    return unsub;
+    return () => {
+      unsub();
+      // Clear any pending debounce timer so it can't fire after unmount.
+      if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    };
   }, []);
 
   const isNameValid = name.trim().length > 0;
@@ -119,6 +123,9 @@ const CreateSubscriptionModal = ({
     setSelectedIcon(icons.plus);
     setShowAutocomplete(false);
     setAutocompleteResults([]);
+    // Clear live web-discovered icon state so reopening starts clean.
+    setLiveIconUri(null);
+    liveKeyRef.current = null;
   }, []);
 
   // Track modal open and reset form whenever the modal visibility changes
@@ -168,6 +175,9 @@ const CreateSubscriptionModal = ({
     }
     setShowAutocomplete(false);
     setAutocompleteResults([]);
+    // Clear any stale live web icon so the explicit brand selection wins.
+    setLiveIconUri(null);
+    liveKeyRef.current = null;
   };
 
   const handleDismiss = useCallback(() => {

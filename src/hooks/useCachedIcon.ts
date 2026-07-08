@@ -9,28 +9,7 @@ import {
   addLoadingListener,
   isIconLoading,
 } from "../services/iconLoadingRegistry";
-import { upscaleIconIfSmall } from "../services/iconUpscaler";
-
-// MIME type mapping from format string to data URI prefix
-function mimeForFormat(format: string): string {
-  switch (format) {
-    case "svg":
-      return "image/svg+xml";
-    case "png":
-      return "image/png";
-    case "ico":
-      return "image/x-icon";
-    case "jpg":
-    case "jpeg":
-      return "image/jpeg";
-    case "gif":
-      return "image/gif";
-    case "webp":
-      return "image/webp";
-    default:
-      return "image/png";
-  }
-}
+import { mimeForFormat, upscaleIconIfSmall } from "../services/iconUpscaler";
 
 export type IconStatus =
   "placeholder" | "loading" | "cached" | "error" | "no_icon";
@@ -70,26 +49,7 @@ export function useCachedIcon(iconKey: string | undefined): IconState {
           setIconUri(null);
           setFormat(null);
         } else {
-          const mime = mimeForFormat(cached.format);
-          // Upscale small raster icons (e.g. previously downloaded favicons)
-          // once, and persist the upscaled bytes back so existing icons
-          // stored before this feature also get crisp on the card.
-          const displayData = await upscaleIconIfSmall(
-            cached.imageData,
-            cached.format,
-          );
-          if (displayData !== cached.imageData && active) {
-            await setCachedIcon(
-              iconKey,
-              displayData,
-              cached.source,
-              cached.format,
-              cached.originalUrl,
-            );
-          }
-          setIconUri(`data:${mime};base64,${displayData}`);
-          setFormat(cached.format);
-          setLoading(false);
+          await applyCachedImage(cached, active);
           return;
         }
       }
@@ -146,24 +106,7 @@ export function useCachedIcon(iconKey: string | undefined): IconState {
           setIconUri(null);
           setFormat(null);
         } else {
-          const mime = mimeForFormat(cached.format);
-          // Same upscale + persist step as the mount path, for force updates.
-          const displayData = await upscaleIconIfSmall(
-            cached.imageData,
-            cached.format,
-          );
-          if (displayData !== cached.imageData && active) {
-            await setCachedIcon(
-              iconKey,
-              displayData,
-              cached.source,
-              cached.format,
-              cached.originalUrl,
-            );
-          }
-          setIconUri(`data:${mime};base64,${displayData}`);
-          setFormat(cached.format);
-          setLoading(false);
+          await applyCachedImage(cached, active);
         }
       } else {
         // No cached data - clear loading if icon is no longer queued
@@ -182,6 +125,37 @@ export function useCachedIcon(iconKey: string | undefined): IconState {
       active = false;
     };
   }, [iconKey, _]); // _ is the force update counter
+
+  // Apply a cached icon row to the hook state, upscaling + persisting any
+  // small raster icon once and reflecting the upscaled bytes/format.
+  const applyCachedImage = async (
+    cached: {
+      imageData: string;
+      format: string;
+      source?: string | null;
+      originalUrl?: string | null;
+    },
+    active: boolean,
+  ): Promise<void> => {
+    const { base64: upscaled, format: outFormat } = await upscaleIconIfSmall(
+      cached.imageData,
+      cached.format,
+    );
+    if (upscaled !== cached.imageData && active) {
+      await setCachedIcon(
+        iconKey!,
+        upscaled,
+        cached.source ?? "local",
+        outFormat,
+        cached.originalUrl ?? undefined,
+      );
+    }
+    if (!active) return;
+    const mime = mimeForFormat(outFormat);
+    setIconUri(`data:${mime};base64,${upscaled}`);
+    setFormat(outFormat);
+    setLoading(false);
+  };
 
   // Determine status
   if (!iconKey) {
