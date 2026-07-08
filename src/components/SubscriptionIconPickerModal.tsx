@@ -56,6 +56,11 @@ interface PickerIcon {
   reportedType?: "wrong" | "broken" | null;
 }
 
+interface IconDetection {
+  hasWhite: boolean;
+  isLowRes: boolean;
+}
+
 const SubscriptionIconPickerModal = ({
   visible,
   iconKey,
@@ -78,20 +83,20 @@ const SubscriptionIconPickerModal = ({
     type: "wrong" | "broken" | null;
     comment: string;
   }>({ icon: null, type: null, comment: "" });
+  // Per-icon white-bg / low-res detection results, keyed by icon id.
+  const [detections, setDetections] = useState<Record<string, IconDetection>>(
+    {},
+  );
+  // Which icon + action is currently processing (for the spinner).
+  const [processing, setProcessing] = useState<{
+    id: string;
+    kind: "white" | "upscale";
+  } | null>(null);
   const isMounted = useRef(true);
   const latestKeyRef = useRef(iconKey);
 
   // Canvas processor for white-background detection/removal.
   const processRef = useRef<ImageProcessHandle>(null);
-
-  // The currently selected/cached icon (the one shown on the card) — used by
-  // the top toolbar "Clear White Background" and "Upscale" actions.
-  const [activeIcon, setActiveIcon] = useState<PickerIcon | null>(null);
-  const [activeHasWhiteBg, setActiveHasWhiteBg] = useState(false);
-  const [activeIsLowRes, setActiveIsLowRes] = useState(false);
-  const [processing, setProcessing] = useState<"white" | "upscale" | null>(
-    null,
-  );
 
   useEffect(() => {
     latestKeyRef.current = iconKey;
@@ -127,32 +132,44 @@ const SubscriptionIconPickerModal = ({
     return unsubscribeRateLimit;
   }, [refreshRateLimitedDomains]);
 
-  // Detect white background + low resolution on the active icon so the toolbar
-  // buttons only appear when there is something to act on.
-  const detectActiveIcon = useCallback(async (icon: PickerIcon | null) => {
-    if (
-      !icon ||
-      !processRef.current ||
-      icon.imageData.startsWith("local_asset:")
-    ) {
-      setActiveHasWhiteBg(false);
-      setActiveIsLowRes(false);
-      return;
-    }
-    try {
-      const mime = icon.format === "svg" ? "svg+xml" : icon.format;
-      const uri = `data:image/${mime};base64,${icon.imageData}`;
-      const [hasWhite, lowRes] = await Promise.all([
-        processRef.current.process(uri, "detectWhiteBg", 30).catch(() => false),
-        isLowResIcon(icon.imageData, icon.format),
-      ]);
-      setActiveHasWhiteBg(Boolean(hasWhite));
-      setActiveIsLowRes(Boolean(lowRes));
-    } catch {
-      setActiveHasWhiteBg(false);
-      setActiveIsLowRes(false);
-    }
-  }, []);
+  // Detect white-bg + low-res for every (non-local) icon so the corrective
+  // chips can be shown directly under each tile, like the report chips.
+  const detectIcons = useCallback(
+    async (icons: PickerIcon[], requestKey: string) => {
+      const next: Record<string, IconDetection> = {};
+      for (const icon of icons) {
+        if (!isMounted.current || latestKeyRef.current !== requestKey) return;
+        if (
+          !processRef.current ||
+          icon.imageData.startsWith("local_asset:") ||
+          icon.format === "svg"
+        ) {
+          next[icon.id] = { hasWhite: false, isLowRes: false };
+          continue;
+        }
+        try {
+          const mime = icon.format === "svg" ? "svg+xml" : icon.format;
+          const uri = `data:image/${mime};base64,${icon.imageData}`;
+          const [hasWhite, isLowRes] = await Promise.all([
+            processRef.current
+              .process(uri, "detectWhiteBg", 30)
+              .catch(() => false),
+            isLowResIcon(icon.imageData, icon.format).catch(() => false),
+          ]);
+          next[icon.id] = {
+            hasWhite: Boolean(hasWhite),
+            isLowRes: Boolean(isLowRes),
+          };
+        } catch {
+          next[icon.id] = { hasWhite: false, isLowRes: false };
+        }
+      }
+      if (isMounted.current && latestKeyRef.current === requestKey) {
+        setDetections(next);
+      }
+    },
+    [],
+  );
 
   const loadIcons = useCallback(async () => {
     if (!iconKey) return;
@@ -199,20 +216,13 @@ const SubscriptionIconPickerModal = ({
           `[PICKER] Loaded ${visible.length} icons for ${iconKey} (${mapped.length} total, reports hidden by default)`,
         );
 
-        // The "active" icon is the chosen cached icon (first in the
-        // collection), falling back to the subscription's local asset.
-        const active = collection.cachedIconUri
-          ? (mapped.find(
-              (i) => i.imageData && !i.imageData.startsWith("local_asset:"),
-            ) ?? null)
-          : null;
-        setActiveIcon(active);
-        detectActiveIcon(active);
+        // Run per-icon white-bg / low-res detection for the corrective chips.
+        detectIcons(mapped, requestKey);
       }
     } catch (error) {
       console.error("[PICKER] Failed to load icons:", error);
     }
-  }, [iconKey, subscriptionIcon, showIncorrect, showBroken, detectActiveIcon]);
+  }, [iconKey, subscriptionIcon, showIncorrect, showBroken, detectIcons]);
 
   useEffect(() => {
     isMounted.current = true;
@@ -287,35 +297,38 @@ const SubscriptionIconPickerModal = ({
     onClose();
   };
 
+  // Persist a processed icon (white-bg removed or AI-upscaled) as the cached
+  // icon so the card reflects it immediately.
   const persistProcessedIcon = async (
+    icon: PickerIcon,
     processedBase64: string,
     newFormat: string,
     event: string,
   ) => {
-    if (!iconKey || !activeIcon) return;
+    if (!iconKey) return;
     await setCachedIcon(
       iconKey,
       processedBase64,
-      activeIcon.source,
+      icon.source,
       newFormat,
-      activeIcon.originalUrl,
+      icon.originalUrl,
     );
     posthog.capture(event, {
       subscription_name: subscriptionName,
       icon_key: iconKey,
-      source: activeIcon.source,
+      source: icon.source,
     });
     onIconChange();
     await loadIcons();
     Alert.alert("Updated", "The icon has been updated.");
   };
 
-  const handleClearWhiteBackground = async () => {
-    if (!activeIcon || !processRef.current) return;
-    setProcessing("white");
+  const handleClearWhiteBackground = async (icon: PickerIcon) => {
+    if (!processRef.current) return;
+    setProcessing({ id: icon.id, kind: "white" });
     try {
-      const mime = activeIcon.format === "svg" ? "svg+xml" : activeIcon.format;
-      const uri = `data:image/${mime};base64,${activeIcon.imageData}`;
+      const mime = icon.format === "svg" ? "svg+xml" : icon.format;
+      const uri = `data:image/${mime};base64,${icon.imageData}`;
       const pngDataUri: string | null = await processRef.current.process(
         uri,
         "removeWhiteBg",
@@ -326,8 +339,16 @@ const SubscriptionIconPickerModal = ({
         return;
       }
       const base64 = pngDataUri.split(",")[1];
-      await persistProcessedIcon(base64, "png", "icon_picker_remove_white_bg");
-      setActiveHasWhiteBg(false);
+      await persistProcessedIcon(
+        icon,
+        base64,
+        "png",
+        "icon_picker_remove_white_bg",
+      );
+      setDetections((prev) => ({
+        ...prev,
+        [icon.id]: { ...prev[icon.id], hasWhite: false } as IconDetection,
+      }));
     } catch (err) {
       console.error("[PICKER] white-bg removal failed:", err);
       Alert.alert("Error", "Failed to clear white background.");
@@ -336,16 +357,23 @@ const SubscriptionIconPickerModal = ({
     }
   };
 
-  const handleUpscale = async () => {
-    if (!activeIcon) return;
-    setProcessing("upscale");
+  const handleUpscale = async (icon: PickerIcon) => {
+    setProcessing({ id: icon.id, kind: "upscale" });
     try {
       const { base64, format } = await upscaleIconAi(
-        activeIcon.imageData,
-        activeIcon.format,
+        icon.imageData,
+        icon.format,
       );
-      await persistProcessedIcon(base64, format, "icon_picker_upscale_ai");
-      setActiveIsLowRes(false);
+      await persistProcessedIcon(
+        icon,
+        base64,
+        format,
+        "icon_picker_upscale_ai",
+      );
+      setDetections((prev) => ({
+        ...prev,
+        [icon.id]: { ...prev[icon.id], isLowRes: false } as IconDetection,
+      }));
     } catch (err) {
       console.error("[PICKER] upscale failed:", err);
       Alert.alert("Error", "Failed to upscale icon.");
@@ -444,6 +472,11 @@ const SubscriptionIconPickerModal = ({
       : { uri: dataUri };
 
     const isReported = !!item.reportedType;
+    const detection = detections[item.id];
+    const isProcessingWhite =
+      processing?.id === item.id && processing.kind === "white";
+    const isProcessingUpscale =
+      processing?.id === item.id && processing.kind === "upscale";
 
     return (
       <View className="items-center gap-2 px-2 py-3">
@@ -457,6 +490,46 @@ const SubscriptionIconPickerModal = ({
             resizeMode="contain"
           />
         </Pressable>
+
+        {/* Corrective chips (white-bg / upscale) — only when detected */}
+        {(detection?.hasWhite || detection?.isLowRes) && (
+          <View className="flex-row items-center gap-1">
+            {detection.hasWhite && (
+              <Pressable
+                onPress={() => handleClearWhiteBackground(item)}
+                disabled={!!processing}
+                className="items-center rounded-full bg-blue-100 px-2 py-1"
+                hitSlop={8}
+              >
+                {isProcessingWhite ? (
+                  <ActivityIndicator size="small" color="#1d4ed8" />
+                ) : (
+                  <Text className="text-[10px] font-sans-semibold text-blue-700">
+                    Clear BG
+                  </Text>
+                )}
+              </Pressable>
+            )}
+            {detection.isLowRes && (
+              <Pressable
+                onPress={() => handleUpscale(item)}
+                disabled={!!processing}
+                className="items-center rounded-full bg-purple-100 px-2 py-1"
+                hitSlop={8}
+              >
+                {isProcessingUpscale ? (
+                  <ActivityIndicator size="small" color="#7c3aed" />
+                ) : (
+                  <Text className="text-[10px] font-sans-semibold text-purple-700">
+                    Upscale
+                  </Text>
+                )}
+              </Pressable>
+            )}
+          </View>
+        )}
+
+        {/* Report chips */}
         <View className="flex-row items-center gap-1">
           {isReported ? (
             <Pressable
@@ -514,42 +587,6 @@ const SubscriptionIconPickerModal = ({
               <Text className="text-lg text-muted-foreground">X</Text>
             </Pressable>
           </View>
-
-          {/* Top toolbar: conditional clear-white-bg / upscale for the active icon */}
-          {(activeHasWhiteBg || activeIsLowRes) && (
-            <View className="mb-3 flex-row gap-2">
-              {activeHasWhiteBg && (
-                <Pressable
-                  className="flex-1 flex-row items-center justify-center gap-2 rounded-xl bg-card px-3 py-2.5"
-                  onPress={handleClearWhiteBackground}
-                  disabled={processing !== null}
-                >
-                  {processing === "white" ? (
-                    <ActivityIndicator size="small" color="#8b5cf6" />
-                  ) : (
-                    <Text className="text-sm font-sans-semibold text-primary">
-                      Clear White BG
-                    </Text>
-                  )}
-                </Pressable>
-              )}
-              {activeIsLowRes && (
-                <Pressable
-                  className="flex-1 flex-row items-center justify-center gap-2 rounded-xl bg-card px-3 py-2.5"
-                  onPress={handleUpscale}
-                  disabled={processing !== null}
-                >
-                  {processing === "upscale" ? (
-                    <ActivityIndicator size="small" color="#8b5cf6" />
-                  ) : (
-                    <Text className="text-sm font-sans-semibold text-primary">
-                      Upscale (AI)
-                    </Text>
-                  )}
-                </Pressable>
-              )}
-            </View>
-          )}
 
           {/* Report toggles */}
           <View className="mb-3 flex-row justify-between">
