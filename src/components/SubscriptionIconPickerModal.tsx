@@ -11,9 +11,8 @@ import {
 } from "@/src/services/iconLoadingRegistry";
 import {
   getReportsForIcon,
-  hashImageData,
   rejectReportedIcon,
-  reportIcon,
+  reportIcon
 } from "@/src/services/iconReportService";
 import {
   addRateLimitListener,
@@ -131,8 +130,11 @@ const SubscriptionIconPickerModal = ({
       if (isMounted.current) {
         const mapped: PickerIcon[] = collection.icons.map((icon) => {
           const reportedType = reportedByHash.get(icon.imageData) ?? null;
+          // `id` comes straight from getIconCollection (hashed from the
+          // ORIGINAL bytes), so it stays unique even when two source sizes
+          // upscale to identical pixels — prevents duplicate FlatList keys.
           return {
-            id: hashImageData(icon.imageData),
+            id: icon.id,
             imageData: icon.imageData,
             source: icon.source,
             format: icon.format,
@@ -203,19 +205,30 @@ const SubscriptionIconPickerModal = ({
   const handleSelectIcon = async (icon: PickerIcon) => {
     if (!iconKey) return;
 
-    await setCachedIcon(
-      iconKey,
-      icon.imageData,
-      icon.source,
-      icon.format,
-      icon.originalUrl,
-    );
-
-    posthog.capture("icon_picker_icon_selected", {
-      subscription_name: subscriptionName,
-      icon_key: iconKey,
-      source: icon.source,
-    });
+    // Selecting the subscription's own bundled asset shouldn't write the
+    // "local_asset:" sentinel into icon_cache — that produces an invalid
+    // data URI and a blank icon on the card. Instead, clear any cache
+    // override so the card falls back to the static brand asset.
+    if (icon.imageData.startsWith("local_asset:")) {
+      await deleteCachedIcon(iconKey);
+      posthog.capture("icon_picker_icon_selected_default", {
+        subscription_name: subscriptionName,
+        icon_key: iconKey,
+      });
+    } else {
+      await setCachedIcon(
+        iconKey,
+        icon.imageData,
+        icon.source,
+        icon.format,
+        icon.originalUrl,
+      );
+      posthog.capture("icon_picker_icon_selected", {
+        subscription_name: subscriptionName,
+        icon_key: iconKey,
+        source: icon.source,
+      });
+    }
 
     onIconChange();
     onClose();

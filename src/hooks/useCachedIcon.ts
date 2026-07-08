@@ -1,10 +1,15 @@
 import { useEffect, useState } from "react";
-import { getCachedIcon, getQueuedIcons } from "../../services/database";
+import {
+  getCachedIcon,
+  getQueuedIcons,
+  setCachedIcon,
+} from "../../services/database";
 import {
   addCacheUpdateListener,
   addLoadingListener,
   isIconLoading,
 } from "../services/iconLoadingRegistry";
+import { upscaleIconIfSmall } from "../services/iconUpscaler";
 
 // MIME type mapping from format string to data URI prefix
 function mimeForFormat(format: string): string {
@@ -58,11 +63,35 @@ export function useCachedIcon(iconKey: string | undefined): IconState {
       if (!active) return;
 
       if (cached?.imageData) {
-        const mime = mimeForFormat(cached.format);
-        setIconUri(`data:${mime};base64,${cached.imageData}`);
-        setFormat(cached.format);
-        setLoading(false);
-        return;
+        // A "local_asset:" sentinel in the cache is not a real image — it
+        // means "use the static brand asset". Treat it as no override so the
+        // card falls back to the bundled icon instead of a blank/broken URI.
+        if (cached.imageData.startsWith("local_asset:")) {
+          setIconUri(null);
+          setFormat(null);
+        } else {
+          const mime = mimeForFormat(cached.format);
+          // Upscale small raster icons (e.g. previously downloaded favicons)
+          // once, and persist the upscaled bytes back so existing icons
+          // stored before this feature also get crisp on the card.
+          const displayData = await upscaleIconIfSmall(
+            cached.imageData,
+            cached.format,
+          );
+          if (displayData !== cached.imageData && active) {
+            await setCachedIcon(
+              iconKey,
+              displayData,
+              cached.source,
+              cached.format,
+              cached.originalUrl,
+            );
+          }
+          setIconUri(`data:${mime};base64,${displayData}`);
+          setFormat(cached.format);
+          setLoading(false);
+          return;
+        }
       }
 
       // Check if icon is in the queue (needs loading state)
@@ -112,10 +141,30 @@ export function useCachedIcon(iconKey: string | undefined): IconState {
       if (!active) return;
 
       if (cached?.imageData) {
-        const mime = mimeForFormat(cached.format);
-        setIconUri(`data:${mime};base64,${cached.imageData}`);
-        setFormat(cached.format);
-        setLoading(false);
+        // "local_asset:" sentinel → no real override; render static asset.
+        if (cached.imageData.startsWith("local_asset:")) {
+          setIconUri(null);
+          setFormat(null);
+        } else {
+          const mime = mimeForFormat(cached.format);
+          // Same upscale + persist step as the mount path, for force updates.
+          const displayData = await upscaleIconIfSmall(
+            cached.imageData,
+            cached.format,
+          );
+          if (displayData !== cached.imageData && active) {
+            await setCachedIcon(
+              iconKey,
+              displayData,
+              cached.source,
+              cached.format,
+              cached.originalUrl,
+            );
+          }
+          setIconUri(`data:${mime};base64,${displayData}`);
+          setFormat(cached.format);
+          setLoading(false);
+        }
       } else {
         // No cached data - clear loading if icon is no longer queued
         const queued = await getQueuedIcons();

@@ -17,8 +17,12 @@ import {
   notifyCacheUpdate,
   setIconLoading,
 } from "@/src/services/iconLoadingRegistry";
-import { getReportsForIcon } from "@/src/services/iconReportService";
+import {
+  getReportsForIcon,
+  hashImageData,
+} from "@/src/services/iconReportService";
 import { findAllIconSources } from "@/src/services/iconScraper";
+import { upscaleIconIfSmall } from "@/src/services/iconUpscaler";
 import { isBase64IconValid } from "@/src/services/iconValidation";
 import { isDomainRateLimited } from "@/src/services/rateLimitTracker";
 import { searchForLinksToSpider } from "@/src/services/searchEngines";
@@ -85,7 +89,11 @@ async function downloadImageAsBase64(
     const b64 = btoa(binary);
     console.log(`[FETCH] SUCCESS: ${url} (${b64.length} bytes)`);
 
-    await saveCrawlResult(iconKey, b64, source, detectUrlFormat(url), url);
+    // Rudimentary upscale for low-res icons (e.g. favicons) before storing.
+    const format = detectUrlFormat(url);
+    const finalB64 = await upscaleIconIfSmall(b64, format);
+
+    await saveCrawlResult(iconKey, finalB64, source, format, url);
     notifyCacheUpdate();
     return true;
   } catch (err: any) {
@@ -103,6 +111,7 @@ export async function getIconCollection(iconKey: string): Promise<{
   cachedIconUri: string | null;
   cachedFormat: string | null;
   icons: {
+    id: string;
     imageData: string;
     source: string;
     format: string;
@@ -122,6 +131,7 @@ export async function getIconCollection(iconKey: string): Promise<{
     const iconMap = new Map<
       string,
       {
+        id: string;
         imageData: string;
         source: string;
         format: string;
@@ -129,15 +139,22 @@ export async function getIconCollection(iconKey: string): Promise<{
       }
     >();
 
-    // Add cached icon to collection FIRST
+    // Add cached icon to collection FIRST (upscale small raster icons on view)
     if (
       cached?.imageData &&
       isBase64IconValid(cached.imageData, cached.format) &&
       !reportedHashes.has(cached.imageData)
     ) {
       console.log(`[COLLECTION] Found cached icon for ${iconKey}`);
+      const displayData = await upscaleIconIfSmall(
+        cached.imageData,
+        cached.format,
+      );
       iconMap.set(cached.imageData, {
-        imageData: cached.imageData,
+        // id is derived from the ORIGINAL (pre-upscale) bytes so it stays
+        // unique even when two source sizes upscale to identical pixels.
+        id: hashImageData(cached.imageData),
+        imageData: displayData,
         source: cached.source,
         format: cached.format,
         originalUrl: cached.originalUrl,
@@ -152,8 +169,10 @@ export async function getIconCollection(iconKey: string): Promise<{
         isBase64IconValid(r.imageData, r.format) &&
         !reportedHashes.has(r.imageData)
       ) {
+        const displayData = await upscaleIconIfSmall(r.imageData, r.format);
         iconMap.set(r.imageData, {
-          imageData: r.imageData,
+          id: hashImageData(r.imageData),
+          imageData: displayData,
           source: r.source,
           format: r.format,
           originalUrl: r.originalUrl,
@@ -165,6 +184,7 @@ export async function getIconCollection(iconKey: string): Promise<{
     const localBase64 = await loadLocalIconAsBase64(iconKey);
     if (localBase64 && !iconMap.has(localBase64)) {
       iconMap.set(localBase64, {
+        id: hashImageData(localBase64),
         imageData: localBase64,
         source: "subscription",
         format: "png",
@@ -557,9 +577,14 @@ export async function processIconQueue(): Promise<void> {
             const best = withData.reduce((prev, curr) =>
               prev.fallbackTier < curr.fallbackTier ? prev : curr,
             );
+            // Upscale low-res picks (e.g. favicons) before caching.
+            const bestB64 = await upscaleIconIfSmall(
+              best.imageData,
+              best.format,
+            );
             await setCachedIcon(
               item.icon_key,
-              best.imageData,
+              bestB64,
               best.source,
               best.format,
               best.originalUrl,
@@ -593,9 +618,11 @@ export async function promoteFirstIconToCache(iconKey: string): Promise<void> {
     const best = withData.reduce((prev, curr) =>
       prev.fallbackTier < curr.fallbackTier ? prev : curr,
     );
+    // Upscale low-res picks (e.g. favicons) before caching.
+    const bestB64 = await upscaleIconIfSmall(best.imageData, best.format);
     await setCachedIcon(
       iconKey,
-      best.imageData,
+      bestB64,
       best.source,
       best.format,
       best.originalUrl,
