@@ -1059,3 +1059,82 @@ export async function needsSync(): Promise<boolean> {
   if (localHash === metadata.remoteFileHash) return false;
   return true;
 }
+
+// ---------------------------------------------------------------------------
+// Cache & Crawl Data management (Settings → Clear data for repeatable re-crawl)
+// ---------------------------------------------------------------------------
+
+export interface IconCacheStats {
+  iconCache: number;
+  crawlResults: number;
+  crawlQueue: number;
+  crawledUrls: number;
+}
+
+export async function getIconCacheStats(): Promise<IconCacheStats> {
+  const db = getDatabase();
+  const cacheRow = await db.getFirstAsync<{ cnt: number }>(
+    "SELECT COUNT(*) as cnt FROM icon_cache",
+  );
+  const resultsRow = await db.getFirstAsync<{ cnt: number }>(
+    "SELECT COUNT(*) as cnt FROM icon_crawl_results",
+  );
+  const queueRow = await db.getFirstAsync<{ cnt: number }>(
+    "SELECT COUNT(*) as cnt FROM icon_crawl_queue",
+  );
+  const urlsRow = await db.getFirstAsync<{ cnt: number }>(
+    "SELECT COUNT(*) as cnt FROM crawled_urls",
+  );
+  return {
+    iconCache: cacheRow?.cnt ?? 0,
+    crawlResults: resultsRow?.cnt ?? 0,
+    crawlQueue: queueRow?.cnt ?? 0,
+    crawledUrls: urlsRow?.cnt ?? 0,
+  };
+}
+
+/**
+ * Clears stored icon image data: the chosen icon cache, all crawl candidate
+ * results, and the pending background fetch queue. After this a re-search will
+ * re-download everything from scratch.
+ */
+export async function clearIconCache(): Promise<void> {
+  const db = getDatabase();
+  await db.withTransactionAsync(async () => {
+    await db.execAsync("DELETE FROM icon_cache");
+    await db.execAsync("DELETE FROM icon_crawl_results");
+    await db.execAsync("DELETE FROM icon_crawl_queue");
+  });
+  // Notify listeners so in-memory cache state is invalidated.
+  setTimeout(async () => {
+    const { notifyCacheUpdate } =
+      await import("../src/services/iconLoadingRegistry");
+    notifyCacheUpdate();
+  }, 0);
+}
+
+/**
+ * Clears spider/crawl history so deduplication and rate-limit cooldowns no
+ * longer block re-spidering: the universal crawled_urls dedup table, the
+ * persisted rate-limit cooldowns, and reported/rejected icon records.
+ */
+export async function clearCrawlHistory(): Promise<void> {
+  const db = getDatabase();
+  await db.withTransactionAsync(async () => {
+    await db.execAsync("DELETE FROM crawled_urls");
+    // icon_reports is created lazily; swallow errors if it doesn't exist yet.
+    try {
+      await db.execAsync("DELETE FROM icon_reports");
+    } catch {
+      /* table not yet created */
+    }
+  });
+  // Reset persisted rate-limit cooldowns (SecureStore + in-memory).
+  try {
+    const { clearAllRateLimits } =
+      await import("../src/services/rateLimitTracker");
+    await clearAllRateLimits();
+  } catch {
+    /* rate-limit module unavailable */
+  }
+}

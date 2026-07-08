@@ -181,6 +181,19 @@ export async function recordSuccess(url: string): Promise<void> {
   await saveState();
 }
 
+/**
+ * Clears all rate-limit cooldowns (both in-memory and persisted in
+ * SecureStore). Used by the Settings "Clear Crawl History" action so a
+ * re-spider is not blocked by stale cooldowns.
+ */
+export async function clearAllRateLimits(): Promise<void> {
+  await ensureLoaded();
+  stateMap.clear();
+  await saveState();
+  notifyListeners();
+  console.log("[RATE_LIMIT] Cleared all rate-limit cooldowns");
+}
+
 export async function isDomainRateLimited(url: string): Promise<boolean> {
   await ensureLoaded();
   const domain = getDomainFromUrl(url);
