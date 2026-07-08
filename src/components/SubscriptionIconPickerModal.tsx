@@ -2,14 +2,18 @@ import { icons } from "@/constants/icons";
 import { deleteCachedIcon, setCachedIcon } from "@/services/database";
 import {
   getIconCollection,
-  queueIconForScraping,
+  startIconCrawl,
 } from "@/src/services/iconBackgroundCrawler";
 import {
   addCacheUpdateListener,
   addLoadingListener,
   isIconLoading,
 } from "@/src/services/iconLoadingRegistry";
-import { reportIcon } from "@/src/services/iconReportService";
+import {
+  getReportsForIcon,
+  rejectReportedIcon,
+  reportIcon,
+} from "@/src/services/iconReportService";
 import {
   addRateLimitListener,
   getRateLimitedDomains,
@@ -24,7 +28,9 @@ import {
   ImageSourcePropType,
   Modal,
   Pressable,
+  Switch,
   Text,
+  TextInput,
   View,
 } from "react-native";
 
@@ -38,11 +44,12 @@ interface IconPickerProps {
 }
 
 interface PickerIcon {
-  id: number;
+  id: string;
   imageData: string;
   source: string;
   format: string;
   originalUrl: string | null;
+  reportedType?: "wrong" | "broken" | null;
 }
 
 const SubscriptionIconPickerModal = ({
@@ -57,6 +64,16 @@ const SubscriptionIconPickerModal = ({
   const [availableIcons, setAvailableIcons] = useState<PickerIcon[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [rateLimitedDomains, setRateLimitedDomains] = useState<string[]>([]);
+  // Toggle to reveal reported ("incorrect") icons.
+  const [showIncorrect, setShowIncorrect] = useState(false);
+  // Toggle to reveal reported ("broken") icons.
+  const [showBroken, setShowBroken] = useState(false);
+  // Inline comment state for the mandatory report flow.
+  const [reportState, setReportState] = useState<{
+    icon: PickerIcon | null;
+    type: "wrong" | "broken" | null;
+    comment: string;
+  }>({ icon: null, type: null, comment: "" });
   const isMounted = useRef(true);
   const latestKeyRef = useRef(iconKey);
 
@@ -101,24 +118,48 @@ const SubscriptionIconPickerModal = ({
       const collection = await getIconCollection(iconKey);
       if (requestKey !== latestKeyRef.current) return;
 
+      // Map reported icons so we can (a) hide them by default and
+      // (b) surface them with a "Mark as good" action when toggles are on.
+      const reports = await getReportsForIcon(iconKey);
+      const reportedByHash = new Map<string, "wrong" | "broken">();
+      for (const r of reports) {
+        if (r.rejected) continue; // user later marked good
+        reportedByHash.set(r.imageData, r.reportType);
+      }
+
       if (isMounted.current) {
-        setAvailableIcons(
-          collection.icons.map((icon, idx) => ({
-            id: idx,
+        const mapped: PickerIcon[] = collection.icons.map((icon) => {
+          const reportedType = reportedByHash.get(icon.imageData) ?? null;
+          // `id` comes straight from getIconCollection (hashed from the
+          // ORIGINAL bytes), so it stays unique even when two source sizes
+          // upscale to identical pixels — prevents duplicate FlatList keys.
+          return {
+            id: icon.id,
             imageData: icon.imageData,
             source: icon.source,
             format: icon.format,
             originalUrl: icon.originalUrl,
-          })),
-        );
+            reportedType,
+          };
+        });
+
+        // Default: hide reported icons. Toggles reveal them.
+        const visible = mapped.filter((i) => {
+          if (!i.reportedType) return true;
+          if (i.reportedType === "wrong") return showIncorrect;
+          if (i.reportedType === "broken") return showBroken;
+          return true;
+        });
+
+        setAvailableIcons(visible);
         console.log(
-          `[PICKER] Loaded ${collection.icons.length} icons for ${iconKey}`,
+          `[PICKER] Loaded ${visible.length} icons for ${iconKey} (${mapped.length} total, reports hidden by default)`,
         );
       }
     } catch (error) {
       console.error("[PICKER] Failed to load icons:", error);
     }
-  }, [iconKey, subscriptionIcon]);
+  }, [iconKey, subscriptionIcon, showIncorrect, showBroken]);
 
   useEffect(() => {
     isMounted.current = true;
@@ -147,40 +188,47 @@ const SubscriptionIconPickerModal = ({
     return unsubscribeCache;
   }, [iconKey, visible, loadIcons]);
 
-  const handleSearchOnline = async () => {
+  const handleSearchOnline = () => {
     if (!iconKey) return;
     console.log(`[MODAL] Search button pressed for ${iconKey}`);
     posthog.capture("icon_picker_search_online", {
       subscription_name: subscriptionName,
       icon_key: iconKey,
     });
-    setIsSearching(true);
-    try {
-      await queueIconForScraping(iconKey);
-      console.log(`[MODAL] Search triggered for ${iconKey}`);
-    } catch (err) {
-      console.error(`[MODAL] Search failed for ${iconKey}:`, err);
-    } finally {
-      setIsSearching(false);
-    }
+    // Fire-and-forget: startIconCrawl runs as a detached background process
+    // tracked in the global loading registry, so closing this modal does NOT
+    // cancel the crawl. The isIconLoading listener keeps the spinner in sync.
+    startIconCrawl(iconKey);
+    console.log(`[MODAL] Search triggered for ${iconKey}`);
   };
 
   const handleSelectIcon = async (icon: PickerIcon) => {
     if (!iconKey) return;
 
-    await setCachedIcon(
-      iconKey,
-      icon.imageData,
-      icon.source,
-      icon.format,
-      icon.originalUrl,
-    );
-
-    posthog.capture("icon_picker_icon_selected", {
-      subscription_name: subscriptionName,
-      icon_key: iconKey,
-      source: icon.source,
-    });
+    // Selecting the subscription's own bundled asset shouldn't write the
+    // "local_asset:" sentinel into icon_cache — that produces an invalid
+    // data URI and a blank icon on the card. Instead, clear any cache
+    // override so the card falls back to the static brand asset.
+    if (icon.imageData.startsWith("local_asset:")) {
+      await deleteCachedIcon(iconKey);
+      posthog.capture("icon_picker_icon_selected_default", {
+        subscription_name: subscriptionName,
+        icon_key: iconKey,
+      });
+    } else {
+      await setCachedIcon(
+        iconKey,
+        icon.imageData,
+        icon.source,
+        icon.format,
+        icon.originalUrl,
+      );
+      posthog.capture("icon_picker_icon_selected", {
+        subscription_name: subscriptionName,
+        icon_key: iconKey,
+        source: icon.source,
+      });
+    }
 
     onIconChange();
     onClose();
@@ -202,15 +250,25 @@ const SubscriptionIconPickerModal = ({
     onClose();
   };
 
-  const reportIconAndNotify = async (
-    icon: PickerIcon,
-    reportType: "wrong" | "broken",
-    successMessage: string,
-  ) => {
-    if (!iconKey) return;
+  // Open the mandatory-comment report sheet for a given icon + type.
+  const openReport = (icon: PickerIcon, type: "wrong" | "broken") => {
+    setReportState({ icon, type, comment: "" });
+  };
+
+  const submitReport = async () => {
+    const { icon, type, comment } = reportState;
+    if (!iconKey || !icon || !type) return;
+
+    if (!comment.trim()) {
+      Alert.alert(
+        "Comment required",
+        "Please explain why you are reporting this icon.",
+      );
+      return;
+    }
 
     const captureEvent =
-      reportType === "wrong"
+      type === "wrong"
         ? "icon_picker_report_wrong"
         : "icon_picker_report_broken";
 
@@ -222,49 +280,41 @@ const SubscriptionIconPickerModal = ({
 
     const saved = await reportIcon(
       iconKey,
-      reportType,
+      type,
       icon.source,
       icon.imageData,
+      comment.trim(),
     );
+
+    setReportState({ icon: null, type: null, comment: "" });
+
     if (saved) {
-      Alert.alert("Icon Reported", successMessage, [
-        {
-          text: "OK",
-          onPress: () => {
-            setAvailableIcons((prev) =>
-              prev.filter((i) => i.imageData !== icon.imageData),
-            );
-          },
-        },
-      ]);
+      // Drop it from the visible list immediately (it will stay hidden on reopen).
+      setAvailableIcons((prev) =>
+        prev.filter((i) => i.imageData !== icon.imageData),
+      );
+      Alert.alert(
+        "Icon Reported",
+        type === "wrong"
+          ? `This icon has been reported as incorrect for "${subscriptionName}".`
+          : `This icon has been reported as broken for "${subscriptionName}".`,
+      );
     } else {
       Alert.alert("Error", "Failed to report icon. Please try again.");
     }
   };
 
-  const handleReportWrong = async (icon: PickerIcon) => {
-    await reportIconAndNotify(
-      icon,
-      "wrong",
-      `This icon has been reported as incorrect. It will be hidden from future searches for "${subscriptionName}".`,
+  // "Mark as good" — undo a mistaken report (persisted as rejected).
+  const handleMarkAsGood = async (icon: PickerIcon) => {
+    if (!iconKey) return;
+    await rejectReportedIcon(iconKey, icon.imageData);
+    setAvailableIcons((prev) =>
+      prev.filter((i) => i.imageData !== icon.imageData),
     );
+    Alert.alert("Restored", "This icon will no longer be hidden.");
   };
 
-  const handleReportBroken = async (icon: PickerIcon) => {
-    await reportIconAndNotify(
-      icon,
-      "broken",
-      `This icon has been reported as broken. It will be hidden from future searches for "${subscriptionName}".`,
-    );
-  };
-
-  const renderIconItem = ({
-    item,
-    index,
-  }: {
-    item: PickerIcon;
-    index: number;
-  }) => {
+  const renderIconItem = ({ item }: { item: PickerIcon }) => {
     // Handle local_asset prefix - use the subscription icon directly
     const isLocalAsset = item.imageData.startsWith("local_asset:");
     // Build a safe data URI for non-local assets
@@ -273,27 +323,44 @@ const SubscriptionIconPickerModal = ({
       ? (subscriptionIcon ?? icons.plus)
       : { uri: dataUri };
 
+    const isReported = !!item.reportedType;
+
     return (
       <View className="items-center gap-2 px-2 py-3">
         <Pressable
           className="size-16 items-center justify-center rounded-xl border-2 border-border bg-card"
           onPress={() => handleSelectIcon(item)}
         >
-          <Image source={imageSource} className="size-12" />
+          <Image
+            source={imageSource}
+            className="size-12"
+            resizeMode="contain"
+          />
         </Pressable>
         <View className="flex-row gap-1">
-          <Pressable
-            onPress={() => handleReportWrong(item)}
-            className="px-1.5 py-0.5"
-          >
-            <Text className="text-xs text-muted-foreground">X</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => handleReportBroken(item)}
-            className="px-1.5 py-0.5"
-          >
-            <Text className="text-xs text-muted-foreground">!</Text>
-          </Pressable>
+          {isReported ? (
+            <Pressable
+              onPress={() => handleMarkAsGood(item)}
+              className="px-1.5 py-0.5"
+            >
+              <Text className="text-xs text-green-500">✓ good</Text>
+            </Pressable>
+          ) : (
+            <>
+              <Pressable
+                onPress={() => openReport(item, "wrong")}
+                className="px-1.5 py-0.5"
+              >
+                <Text className="text-xs text-muted-foreground">X</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => openReport(item, "broken")}
+                className="px-1.5 py-0.5"
+              >
+                <Text className="text-xs text-muted-foreground">!</Text>
+              </Pressable>
+            </>
+          )}
         </View>
       </View>
     );
@@ -320,6 +387,32 @@ const SubscriptionIconPickerModal = ({
             </Pressable>
           </View>
 
+          {/* Report toggles */}
+          <View className="mb-3 flex-row justify-between">
+            <View className="flex-row items-center gap-2">
+              <Switch
+                value={showIncorrect}
+                onValueChange={(v) => {
+                  setShowIncorrect(v);
+                  loadIcons();
+                }}
+              />
+              <Text className="text-xs text-muted-foreground">
+                Show incorrect
+              </Text>
+            </View>
+            <View className="flex-row items-center gap-2">
+              <Switch
+                value={showBroken}
+                onValueChange={(v) => {
+                  setShowBroken(v);
+                  loadIcons();
+                }}
+              />
+              <Text className="text-xs text-muted-foreground">Show broken</Text>
+            </View>
+          </View>
+
           {availableIcons.length > 0 && (
             <>
               <Text className="mb-2 text-xs text-muted-foreground">
@@ -328,7 +421,7 @@ const SubscriptionIconPickerModal = ({
               </Text>
               <FlatList
                 data={availableIcons}
-                keyExtractor={(item) => item.id.toString()}
+                keyExtractor={(item) => item.id}
                 renderItem={renderIconItem}
                 horizontal
                 showsHorizontalScrollIndicator={false}
@@ -384,6 +477,47 @@ const SubscriptionIconPickerModal = ({
               </Text>
             </View>
           </Pressable>
+
+          {/* Mandatory-comment report sheet */}
+          {reportState.icon && (
+            <View className="mt-4 rounded-2xl border border-border bg-card p-4">
+              <Text className="mb-2 font-sans-medium text-primary">
+                {reportState.type === "wrong"
+                  ? "Report incorrect icon"
+                  : "Report broken icon"}
+              </Text>
+              <TextInput
+                className="rounded-xl border border-border bg-background px-3 py-2 text-sm text-primary"
+                placeholder="Explain why (required)…"
+                placeholderTextColor="rgba(0, 0, 0, 0.6)"
+                value={reportState.comment}
+                onChangeText={(t) =>
+                  setReportState((s) => ({ ...s, comment: t }))
+                }
+                multiline
+                numberOfLines={3}
+                autoFocus
+              />
+              <View className="mt-3 flex-row justify-end gap-3">
+                <Pressable
+                  className="rounded-xl px-4 py-2"
+                  onPress={() =>
+                    setReportState({ icon: null, type: null, comment: "" })
+                  }
+                >
+                  <Text className="text-sm text-muted-foreground">Cancel</Text>
+                </Pressable>
+                <Pressable
+                  className="rounded-xl bg-accent px-4 py-2"
+                  onPress={submitReport}
+                >
+                  <Text className="text-sm font-sans-medium text-white">
+                    Submit
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+          )}
         </View>
       </View>
     </Modal>

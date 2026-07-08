@@ -1,13 +1,19 @@
 import { icons } from "@/constants/icons";
 import { searchLogos } from "@/lib/resolveLogo";
+import { getCachedIcon } from "@/services/database";
 import {
-  queueIconForScraping
+  queueIconForScraping,
+  startIconCrawl,
 } from "@/src/services/iconBackgroundCrawler";
+import {
+  addCacheUpdateListener,
+  isIconLoading,
+} from "@/src/services/iconLoadingRegistry";
 import { nameToSlug } from "@/src/services/iconScraper";
 import clsx from "clsx";
 import dayjs from "dayjs";
 import { usePostHog } from "posthog-react-native";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Image,
   KeyboardAvoidingView,
@@ -63,6 +69,46 @@ const CreateSubscriptionModal = ({
   const [autocompleteResults, setAutocompleteResults] = useState<
     { name: string; icon: any; category?: string }[]
   >([]);
+  // Live web-discovered icon (auto-assigned as the user types)
+  const [liveIconUri, setLiveIconUri] = useState<string | null>(null);
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const liveKeyRef = useRef<string | null>(null);
+
+  // Helpers to map a cached icon format to a data URI
+  const mimeForFormat = (format: string): string => {
+    switch (format) {
+      case "svg":
+        return "image/svg+xml";
+      case "ico":
+        return "image/x-icon";
+      default:
+        return "image/png";
+    }
+  };
+
+  // Reflect a freshly crawled icon into the live preview as soon as it lands.
+  useEffect(() => {
+    const refreshLiveIcon = async () => {
+      const key = liveKeyRef.current;
+      if (!key) {
+        setLiveIconUri(null);
+        return;
+      }
+      const cached = await getCachedIcon(key);
+      setLiveIconUri(
+        cached?.imageData
+          ? `data:${mimeForFormat(cached.format)};base64,${cached.imageData}`
+          : null,
+      );
+    };
+    refreshLiveIcon();
+    const unsub = addCacheUpdateListener(refreshLiveIcon);
+    return () => {
+      unsub();
+      // Clear any pending debounce timer so it can't fire after unmount.
+      if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    };
+  }, []);
 
   const isNameValid = name.trim().length > 0;
   const parsedPrice = parseFloat(price);
@@ -77,6 +123,9 @@ const CreateSubscriptionModal = ({
     setSelectedIcon(icons.plus);
     setShowAutocomplete(false);
     setAutocompleteResults([]);
+    // Clear live web-discovered icon state so reopening starts clean.
+    setLiveIconUri(null);
+    liveKeyRef.current = null;
   }, []);
 
   // Track modal open and reset form whenever the modal visibility changes
@@ -94,10 +143,23 @@ const CreateSubscriptionModal = ({
       setAutocompleteResults(results);
       // Show autocomplete when typing
       setShowAutocomplete(true);
+
+      // Kick off background icon discovery the moment the user types.
+      // Debounced so we don't spam the crawler on every keystroke.
+      const slug = nameToSlug(text);
+      liveKeyRef.current = slug;
+      if (debounceTimer.current) clearTimeout(debounceTimer.current);
+      debounceTimer.current = setTimeout(() => {
+        if (slug.length >= 2 && !isIconLoading(slug)) {
+          startIconCrawl(slug);
+        }
+      }, 600);
     } else {
       setShowAutocomplete(false);
       setAutocompleteResults([]);
       setSelectedIcon(icons.plus);
+      liveKeyRef.current = null;
+      setLiveIconUri(null);
     }
   };
 
@@ -113,6 +175,9 @@ const CreateSubscriptionModal = ({
     }
     setShowAutocomplete(false);
     setAutocompleteResults([]);
+    // Clear any stale live web icon so the explicit brand selection wins.
+    setLiveIconUri(null);
+    liveKeyRef.current = null;
   };
 
   const handleDismiss = useCallback(() => {
@@ -157,9 +222,11 @@ const CreateSubscriptionModal = ({
       subscription_frequency: frequency,
     });
 
-    // Persist subscription first, then queue icon scraping
+    // Persist subscription first, then start a detached (fire-and-forget)
+    // background crawl. The search continues even after the modal closes and
+    // the first found icon is auto-assigned to the saved subscription.
     await onCreate(subscription);
-    queueIconForScraping(iconKey, subscriptionId);
+    startIconCrawl(iconKey, subscriptionId);
 
     onClose();
   };
@@ -194,9 +261,16 @@ const CreateSubscriptionModal = ({
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
             >
-              {/* Logo preview */}
+              {/* Logo preview — prefer the live web-discovered icon if found */}
               <View className="mb-2 items-center">
-                <Image source={selectedIcon} className="size-16 rounded-lg" />
+                {liveIconUri ? (
+                  <Image
+                    source={{ uri: liveIconUri }}
+                    className="size-16 rounded-lg"
+                  />
+                ) : (
+                  <Image source={selectedIcon} className="size-16 rounded-lg" />
+                )}
               </View>
 
               {/* Name */}
