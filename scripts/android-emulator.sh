@@ -2,6 +2,9 @@
 # Android emulator management script
 # Usage: ./scripts/android-emulator.sh <command>
 # Commands: start, stop, install, launch, logcat, status
+#
+# start: Checks if emulator is already running, if yes uses it; if not, starts it
+#        in background (output buffered) and prompts user to press Enter when ready.
 
 set -e
 
@@ -9,39 +12,55 @@ ANDROID_SDK="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/home/d/Android/Sdk}}"
 AVD_NAME="Pixel_6a"
 APP_PACKAGE="com.ctocrm.jsmastery"
 APP_ACTIVITY="com.ctocrm.jsmastery.MainActivity"
+EMULATOR_LOG="/tmp/emu-boot-$$.log"
 
-# Timeout in seconds (extended for slow VM)
+# Timeout in seconds
 TIMEOUT_SECONDS=300
 
-run_cmd() {
-    echo "[EMULATOR] $1"
-    eval "$1"
+# Get emulator serial dynamically
+get_emulator_serial() {
+    adb devices 2>/dev/null | grep 'emulator-' | head -1 | awk '{print $1}'
 }
 
-wait_for_device() {
-    echo "[EMULATOR] Waiting for device to be ready..."
-    timeout $TIMEOUT_SECONDS bash -c "until adb shell getprop sys.boot_completed | grep -q 1; do sleep 2; done"
-    echo "[EMULATOR] Device booted, waiting for system UI..."
-    timeout $TIMEOUT_SECONDS bash -c "until adb shell getprop sys.uiopened 2>/dev/null | grep -q 1; do sleep 2; done || true"
-    echo "[EMULATOR] Device ready"
+is_emulator_running() {
+    adb shell getprop sys.boot_completed 2>/dev/null | grep -q 1
 }
 
 case "$1" in
     start)
-        if adb shell getprop sys.boot_completed 2>/dev/null | grep -q 1; then
-            echo "[EMULATOR] Device already running"
+        # Export display for emulator GUI
+        export DISPLAY=${DISPLAY:-:0}
+        if is_emulator_running; then
+            echo "[EMULATOR] Emulator already running (detected boot completed)"
+            SERIAL=$(get_emulator_serial)
+            echo "[EMULATOR] Using emulator: ${SERIAL:-default}"
         else
+            echo "[EMULATOR] No running emulator detected"
             echo "[EMULATOR] Starting $AVD_NAME..."
-            "$ANDROID_SDK/emulator/emulator" -avd "$AVD_NAME" -no-snapshot -no-audio -no-boot-anim -accel off &
-            sleep 5
-            wait_for_device
+            # Start emulator in background, buffer output to log file
+            # Using -no-snapshot-load to avoid potential snapshot corruption
+            # Try with hardware acceleration and proper GPU
+            "$ANDROID_SDK/emulator/emulator" -avd "$AVD_NAME" -no-snapshot-load -no-audio -skin pixel_6a -gpu host -accel on > "$EMULATOR_LOG" 2>&1 &
+            sleep 2
+            echo "[EMULATOR] Emulator process started in background"
+            echo ""
+            echo "=========================================="
+            echo "[EMULATOR] Emulator is starting in background."
+            echo "[EMULATOR] Please wait for the emulator to show the home screen."
+            echo "[EMULATOR] Press Enter when the emulator is ready."
+            echo "=========================================="
+            echo ""
+            read -p "[EMULATOR] Press Enter when the emulator is ready..." || true
+            # Wait for device to be ready
+            timeout 120 bash -c "until adb shell getprop sys.boot_completed 2>/dev/null | grep -q 1; do sleep 2; done" || true
+            # Clean up log file
+            rm -f "$EMULATOR_LOG"
         fi
         ;;
     
     stop)
         echo "[EMULATOR] Stopping $AVD_NAME..."
-        # Get the first emulator serial dynamically
-        EMULATOR_SERIAL=$(adb devices | grep 'emulator-' | head -1 | awk '{print $1}')
+        EMULATOR_SERIAL=$(get_emulator_serial)
         if [ -n "$EMULATOR_SERIAL" ]; then
             adb -s "$EMULATOR_SERIAL" emu kill 2>/dev/null || true
         else
@@ -75,8 +94,9 @@ case "$1" in
         ;;
     
     status)
-        if adb shell getprop sys.boot_completed 2>/dev/null | grep -q 1; then
-            echo "[EMULATOR] Status: Running"
+        if is_emulator_running; then
+            SERIAL=$(get_emulator_serial)
+            echo "[EMULATOR] Status: Running (${SERIAL:-default})"
         else
             echo "[EMULATOR] Status: Not running"
         fi
@@ -87,7 +107,7 @@ case "$1" in
         echo "Usage: $0 {start|stop|install|launch|logcat|status}"
         echo ""
         echo "Commands:"
-        echo "  start   - Start the emulator AVD (waits for boot)"
+        echo "  start   - Start the emulator AVD (uses existing if running, prompts if needs boot)"
         echo "  stop    - Stop the emulator"
         echo "  install - Install APK to emulator (requires path)"
         echo "  launch  - Launch the app on emulator"
