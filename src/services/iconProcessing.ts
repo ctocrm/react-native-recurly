@@ -6,8 +6,8 @@
  *   If the native module or model is unavailable, it transparently falls back to
  *   the existing bilinear `upscaleIconIfSmall` so the button always works.
  * - `isLowResIcon` detects icons small enough to benefit from upscaling.
- * - White-background removal is handled in the WebView canvas processor
- *   (ImageProcessWebView) which is cheaper and needs no ML model.
+ * - White-background removal is handled by whiteBgRemoval.ts using
+ *   expo-image-manipulator + upng-js (no WebView needed).
  */
 
 import { Image } from "react-native";
@@ -16,13 +16,28 @@ import { mimeForFormat, upscaleIconIfSmall } from "./iconUpscaler";
 // Below this max dimension an icon is "low-res" and worth upscaling.
 const LOW_RES_THRESHOLD_PX = 64;
 
-// Heuristic upper bound for the input size we feed the model (keeps latency low).
-const MAX_MODEL_INPUT_PX = 128;
+// Input size we feed the ESPCN model (matches training resolution for fast model).
+const MODEL_INPUT_PX = 32;
+// Output is 2x the input.
+const MODEL_SCALE = 2;
 
-export function isLowResIcon(base64: string, format: string): Promise<boolean> {
+export function isLowResIcon(
+  base64: string,
+  format: string,
+  originalWidth?: number,
+  originalHeight?: number,
+): Promise<boolean> {
   return new Promise((resolve) => {
     if (format === "svg") {
       resolve(false);
+      return;
+    }
+    // If we have original dimensions stored (from before upscaling), use those
+    // directly -- no need to decode the image again. This is the key fix for the
+    // "Upscale" button not appearing: icons are upscaled to 256px before storage,
+    // so the current imageData always looks "large enough".
+    if (originalWidth !== undefined && originalHeight !== undefined) {
+      resolve(Math.max(originalWidth, originalHeight) < LOW_RES_THRESHOLD_PX);
       return;
     }
     const mime = mimeForFormat(format);
@@ -40,18 +55,35 @@ export function isLowResIcon(base64: string, format: string): Promise<boolean> {
 let modelPromise: Promise<any> | null = null;
 let modelFailed = false;
 
-// Expect a model file at assets/models/espcn_2x.tflite. The user provides the
-// actual .tflite; we resolve it from the app bundle via require(). The native
-// module is imported dynamically so the app still builds/runs (Expo Go) where
-// it isn't linked — the import is deliberately `any`-typed because the package
-// is added via a dev build, not present in this type environment.
+/**
+ * Check if the Tflite native module is available by probing NativeModules
+ * before attempting any import/require. The package's top-level code calls
+ * TurboModuleRegistry.getEnforcing(...) which crashes if the native module
+ * isn't linked (e.g. Expo Go), so we must avoid loading the JS module at all.
+ */
+function tfliteModuleExists(): boolean {
+  try {
+    const { NativeModules } = require("react-native");
+    return !!(NativeModules && NativeModules.RNTflite);
+  } catch {
+    return false;
+  }
+}
+
 function loadModel(): Promise<any | null> {
   if (modelFailed) return Promise.resolve(null);
   if (modelPromise) return modelPromise;
 
   modelPromise = (async () => {
     try {
-      const TfliteModule: any = await import("react-native-fast-tflite");
+      if (!tfliteModuleExists()) {
+        modelFailed = true;
+        console.warn("[ICON_AI] RNTflite native module not available");
+        return null;
+      }
+
+      // Safe to require now since native module exists.
+      const TfliteModule: any = require("react-native-fast-tflite");
       const loadTfliteModel = TfliteModule.loadTfliteModel;
       if (!loadTfliteModel) return null;
 
@@ -76,16 +108,21 @@ function loadModel(): Promise<any | null> {
 /**
  * Upscale a small raster icon using the edge-AI model when available, else the
  * bilinear fallback. Always returns a base64 plus the output format.
+ *
+ * `force` skips the "already large enough" short-circuit so an explicit user
+ * tap always produces a crisper, larger icon (the stored bytes may already be
+ * a 256px bilinear upscale from crawl time, which is still low quality).
  */
 export async function upscaleIconAi(
   base64: string,
   format: string,
+  force = false,
 ): Promise<{ base64: string; format: string }> {
   if (format === "svg") return { base64, format };
 
   const model = await loadModel();
   if (!model) {
-    return upscaleIconIfSmall(base64, format);
+    return upscaleIconIfSmall(base64, format, force);
   }
 
   try {
@@ -94,31 +131,66 @@ export async function upscaleIconAi(
     const { readAsStringAsync, EncodingType } =
       await import("expo-file-system/legacy");
     const { deleteAsync } = await import("expo-file-system/legacy");
+    const UPNG = (await import("upng-js")).default;
 
     const mime = mimeForFormat(format);
     const srcUri = `data:${mime};base64,${base64}`;
 
-    // Bound input size for the model.
+    // Resize to the model's expected input size (32px on the long side).
     const bounded = await manipulateAsync(
       srcUri,
-      [{ resize: { width: MAX_MODEL_INPUT_PX } }],
+      [{ resize: { width: MODEL_INPUT_PX } }],
       { compress: 1, format: SaveFormat.PNG },
     );
 
-    // Read the normalized PNG back as base64 to feed the model tensor.
+    // Read the resized PNG and decode to get RGB pixels for the model.
     const inputB64 = await readAsStringAsync(bounded.uri, {
       encoding: EncodingType.Base64,
     });
 
-    const binary = atob(inputB64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    // Decode PNG to get raw RGBA pixels.
+    const decoded = UPNG.decode(
+      Uint8Array.from(atob(inputB64), (c) => c.charCodeAt(0)).buffer,
+    ) as any;
+    const rgbaIn = new Uint8ClampedArray(
+      decoded.data as unknown as ArrayBuffer,
+    );
 
-    const out: Uint8Array[] = await model.runSync([bytes]);
-    const outBytes = out[0] as Uint8Array;
+    // Extract RGB planes (model expects 3 channels, no alpha).
+    const rgbIn = new Float32Array(MODEL_INPUT_PX * MODEL_INPUT_PX * 3);
+    let srcP = 0;
+    for (let i = 0; i < MODEL_INPUT_PX * MODEL_INPUT_PX; i++) {
+      rgbIn[i * 3] = rgbaIn[srcP++] / 255;
+      rgbIn[i * 3 + 1] = rgbaIn[srcP++] / 255;
+      rgbIn[i * 3 + 2] = rgbaIn[srcP++] / 255;
+      srcP++; // skip alpha
+    }
+
+    // Run ESPCN: output is the 2x RGB image (shape: 1x64x64x3).
+    const out: Float32Array[] = await model.runSync([rgbIn]);
+    const outBytes = out[0];
+    const outW = MODEL_INPUT_PX * MODEL_SCALE;
+    const outH = MODEL_INPUT_PX * MODEL_SCALE;
+
+    // Allocate RGBA buffer for upng-js (expects 4 channels).
+    // Model outputs float32 0-1, convert to uint8 0-255.
+    const rgba = new Uint8Array(outW * outH * 4);
+    let p = 0;
+    for (let i = 0; i < outW * outH; i++) {
+      rgba[i * 4] = Math.round(outBytes[p++] * 255);
+      rgba[i * 4 + 1] = Math.round(outBytes[p++] * 255);
+      rgba[i * 4 + 2] = Math.round(outBytes[p++] * 255);
+      rgba[i * 4 + 3] = 255;
+    }
+
+    // Encode the upscaled RGBA back to a PNG.
+    const pngData = UPNG.encode([rgba.buffer as ArrayBuffer], outW, outH, 256);
+    const uint8 = new Uint8Array(pngData);
     let outB64 = "";
-    for (let i = 0; i < outBytes.length; i++) {
-      outB64 += String.fromCharCode(outBytes[i]);
+    const chunkSize = 8192;
+    for (let i = 0; i < uint8.length; i += chunkSize) {
+      const end = Math.min(i + chunkSize, uint8.length);
+      outB64 += String.fromCharCode(...uint8.subarray(i, end));
     }
     const result = btoa(outB64);
 
@@ -126,6 +198,8 @@ export async function upscaleIconAi(
     return { base64: result, format: "png" };
   } catch (err) {
     console.warn("[ICON_AI] model run failed, bilinear fallback:", err);
-    return upscaleIconIfSmall(base64, format);
+    // Must pass force=true so the fallback actually upscales instead of
+    // short-circuiting on the already-stored (≥64px) bytes.
+    return upscaleIconIfSmall(base64, format, true);
   }
 }

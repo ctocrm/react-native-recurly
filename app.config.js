@@ -9,4 +9,5 @@ module.exports = {
       posthogHost: process.env.POSTHOG_HOST || "https://us.i.posthog.com",
     },
   },
+  plugins: ["react-native-fast-tflite"],
 };

@@ -1,8 +1,5 @@
 import { icons } from "@/constants/icons";
 import { deleteCachedIcon, setCachedIcon } from "@/services/database";
-import ImageProcessWebView, {
-  type ImageProcessHandle,
-} from "@/src/components/ImageProcessWebView";
 import {
   getIconCollection,
   startIconCrawl,
@@ -22,6 +19,7 @@ import {
   addRateLimitListener,
   getRateLimitedDomains,
 } from "@/src/services/rateLimitTracker";
+import { detectWhiteBg, removeWhiteBg } from "@/src/services/whiteBgRemoval";
 import { usePostHog } from "posthog-react-native";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -54,6 +52,8 @@ interface PickerIcon {
   format: string;
   originalUrl: string | null;
   reportedType?: "wrong" | "broken" | null;
+  originalWidth?: number;
+  originalHeight?: number;
 }
 
 interface IconDetection {
@@ -95,9 +95,6 @@ const SubscriptionIconPickerModal = ({
   const isMounted = useRef(true);
   const latestKeyRef = useRef(iconKey);
 
-  // Canvas processor for white-background detection/removal.
-  const processRef = useRef<ImageProcessHandle>(null);
-
   useEffect(() => {
     latestKeyRef.current = iconKey;
   }, [iconKey]);
@@ -133,14 +130,13 @@ const SubscriptionIconPickerModal = ({
   }, [refreshRateLimitedDomains]);
 
   // Detect white-bg + low-res for every (non-local) icon so the corrective
-  // chips can be shown directly under each tile, like the report chips.
+  // chips show directly under each tile, like report chips.
   const detectIcons = useCallback(
     async (icons: PickerIcon[], requestKey: string) => {
       const next: Record<string, IconDetection> = {};
       for (const icon of icons) {
         if (!isMounted.current || latestKeyRef.current !== requestKey) return;
         if (
-          !processRef.current ||
           icon.imageData.startsWith("local_asset:") ||
           icon.format === "svg"
         ) {
@@ -148,13 +144,20 @@ const SubscriptionIconPickerModal = ({
           continue;
         }
         try {
-          const mime = icon.format === "svg" ? "svg+xml" : icon.format;
-          const uri = `data:image/${mime};base64,${icon.imageData}`;
+          const lowResTask = isLowResIcon(
+            icon.imageData,
+            icon.format,
+            icon.originalWidth,
+            icon.originalHeight,
+          ).catch(() => false);
+          const whiteTask = detectWhiteBg(
+            icon.imageData,
+            icon.format,
+            60,
+          ).catch(() => false);
           const [hasWhite, isLowRes] = await Promise.all([
-            processRef.current
-              .process(uri, "detectWhiteBg", 30)
-              .catch(() => false),
-            isLowResIcon(icon.imageData, icon.format).catch(() => false),
+            whiteTask,
+            lowResTask,
           ]);
           next[icon.id] = {
             hasWhite: Boolean(hasWhite),
@@ -165,7 +168,7 @@ const SubscriptionIconPickerModal = ({
         }
       }
       if (isMounted.current && latestKeyRef.current === requestKey) {
-        setDetections(next);
+        setDetections((prev) => ({ ...prev, ...next }));
       }
     },
     [],
@@ -200,6 +203,8 @@ const SubscriptionIconPickerModal = ({
             format: icon.format,
             originalUrl: icon.originalUrl,
             reportedType,
+            originalWidth: icon.originalWidth,
+            originalHeight: icon.originalHeight,
           };
         });
 
@@ -318,27 +323,34 @@ const SubscriptionIconPickerModal = ({
       icon_key: iconKey,
       source: icon.source,
     });
+    // Update the visible tile in-place so the user sees the processed icon
+    // right away (the tapped tile's id is derived from the ORIGINAL bytes, so
+    // reloading from the crawl-result rows alone would still show the old art).
+    setAvailableIcons((prev) =>
+      prev.map((i) =>
+        i.id === icon.id
+          ? {
+              ...i,
+              imageData: processedBase64,
+              format: newFormat,
+              source: icon.source,
+              originalUrl: icon.originalUrl,
+            }
+          : i,
+      ),
+    );
     onIconChange();
-    await loadIcons();
     Alert.alert("Updated", "The icon has been updated.");
   };
 
   const handleClearWhiteBackground = async (icon: PickerIcon) => {
-    if (!processRef.current) return;
     setProcessing({ id: icon.id, kind: "white" });
     try {
-      const mime = icon.format === "svg" ? "svg+xml" : icon.format;
-      const uri = `data:image/${mime};base64,${icon.imageData}`;
-      const pngDataUri: string | null = await processRef.current.process(
-        uri,
-        "removeWhiteBg",
-        30,
-      );
-      if (!pngDataUri) {
+      const base64 = await removeWhiteBg(icon.imageData, icon.format, 60);
+      if (!base64) {
         Alert.alert("Error", "Could not process this icon.");
         return;
       }
-      const base64 = pngDataUri.split(",")[1];
       await persistProcessedIcon(
         icon,
         base64,
@@ -360,9 +372,12 @@ const SubscriptionIconPickerModal = ({
   const handleUpscale = async (icon: PickerIcon) => {
     setProcessing({ id: icon.id, kind: "upscale" });
     try {
+      // force=true so we always re-upscale even if the stored bytes were
+      // already a 256px bilinear upscale from crawl time (still low quality).
       const { base64, format } = await upscaleIconAi(
         icon.imageData,
         icon.format,
+        true,
       );
       await persistProcessedIcon(
         icon,
@@ -491,43 +506,37 @@ const SubscriptionIconPickerModal = ({
           />
         </Pressable>
 
-        {/* Corrective chips (white-bg / upscale) — only when detected */}
-        {(detection?.hasWhite || detection?.isLowRes) && (
-          <View className="flex-row items-center gap-1">
-            {detection.hasWhite && (
-              <Pressable
-                onPress={() => handleClearWhiteBackground(item)}
-                disabled={!!processing}
-                className="items-center rounded-full bg-blue-100 px-2 py-1"
-                hitSlop={8}
-              >
-                {isProcessingWhite ? (
-                  <ActivityIndicator size="small" color="#1d4ed8" />
-                ) : (
-                  <Text className="text-[10px] font-sans-semibold text-blue-700">
-                    Clear BG
-                  </Text>
-                )}
-              </Pressable>
+        {/* Corrective chips (white-bg / upscale) — always shown */}
+        <View className="flex-row items-center gap-1">
+          <Pressable
+            onPress={() => handleClearWhiteBackground(item)}
+            disabled={!!processing}
+            className="items-center rounded-full bg-blue-100 px-2 py-1"
+            hitSlop={8}
+          >
+            {isProcessingWhite ? (
+              <ActivityIndicator size="small" color="#1d4ed8" />
+            ) : (
+              <Text className="text-[10px] font-sans-semibold text-blue-700">
+                Clear White BG
+              </Text>
             )}
-            {detection.isLowRes && (
-              <Pressable
-                onPress={() => handleUpscale(item)}
-                disabled={!!processing}
-                className="items-center rounded-full bg-purple-100 px-2 py-1"
-                hitSlop={8}
-              >
-                {isProcessingUpscale ? (
-                  <ActivityIndicator size="small" color="#7c3aed" />
-                ) : (
-                  <Text className="text-[10px] font-sans-semibold text-purple-700">
-                    Upscale
-                  </Text>
-                )}
-              </Pressable>
+          </Pressable>
+          <Pressable
+            onPress={() => handleUpscale(item)}
+            disabled={!!processing}
+            className="items-center rounded-full bg-purple-100 px-2 py-1"
+            hitSlop={8}
+          >
+            {isProcessingUpscale ? (
+              <ActivityIndicator size="small" color="#7c3aed" />
+            ) : (
+              <Text className="text-[10px] font-sans-semibold text-purple-700">
+                Upscale (AI)
+              </Text>
             )}
-          </View>
-        )}
+          </Pressable>
+        </View>
 
         {/* Report chips */}
         <View className="flex-row items-center gap-1">
@@ -720,8 +729,6 @@ const SubscriptionIconPickerModal = ({
             </View>
           )}
         </View>
-        {/* Off-screen canvas processor for white-bg detection/removal */}
-        <ImageProcessWebView ref={processRef} />
       </View>
     </Modal>
   );

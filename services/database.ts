@@ -175,6 +175,40 @@ const MIGRATIONS = [
       );
     }
   },
+  // Migration 6: Add original_width, original_height to icon_crawl_results
+  async (db: SQLiteDatabase) => {
+    const columns = await db.getAllAsync<{ name: string }>(
+      "PRAGMA table_info(icon_crawl_results)",
+    );
+    const names = columns.map((c: any) => c.name);
+    if (!names.includes("original_width")) {
+      await db.execAsync(
+        "ALTER TABLE icon_crawl_results ADD COLUMN original_width INTEGER",
+      );
+    }
+    if (!names.includes("original_height")) {
+      await db.execAsync(
+        "ALTER TABLE icon_crawl_results ADD COLUMN original_height INTEGER",
+      );
+    }
+  },
+  // Migration 7: Add original_width, original_height to icon_cache
+  async (db: SQLiteDatabase) => {
+    const columns = await db.getAllAsync<{ name: string }>(
+      "PRAGMA table_info(icon_cache)",
+    );
+    const names = columns.map((c: any) => c.name);
+    if (!names.includes("original_width")) {
+      await db.execAsync(
+        "ALTER TABLE icon_cache ADD COLUMN original_width INTEGER",
+      );
+    }
+    if (!names.includes("original_height")) {
+      await db.execAsync(
+        "ALTER TABLE icon_cache ADD COLUMN original_height INTEGER",
+      );
+    }
+  },
 ];
 
 export async function openDatabase(userId: string): Promise<SQLiteDatabase> {
@@ -407,6 +441,8 @@ export interface CachedIconData {
   format: string;
   originalUrl: string | null;
   fallbackTier: number;
+  originalWidth?: number;
+  originalHeight?: number;
 }
 
 function detectFormatFromBase64(base64: string, source: string): string {
@@ -440,8 +476,10 @@ export async function getCachedIcon(
       format: string;
       original_url: string | null;
       fallback_tier: number;
+      original_width: number | null;
+      original_height: number | null;
     }>(
-      "SELECT image_data, source, format, original_url, fallback_tier FROM icon_cache WHERE icon_key = ?",
+      "SELECT image_data, source, format, original_url, fallback_tier, original_width, original_height FROM icon_cache WHERE icon_key = ?",
       iconKey,
     );
     if (row)
@@ -451,6 +489,8 @@ export async function getCachedIcon(
         format: row.format,
         originalUrl: row.original_url ?? null,
         fallbackTier: row.fallback_tier,
+        originalWidth: row.original_width ?? undefined,
+        originalHeight: row.original_height ?? undefined,
       };
     return null;
   } catch {
@@ -489,16 +529,20 @@ export async function setCachedIcon(
   format: string = "png",
   originalUrl: string | null = null,
   fallbackTier: number = 0,
+  originalWidth?: number,
+  originalHeight?: number,
 ): Promise<void> {
   const db = getDatabase();
   await db.runAsync(
-    "INSERT OR REPLACE INTO icon_cache (icon_key, image_data, source, format, original_url, fallback_tier, updated_at) VALUES (?, ?, ?, ?, ?, ?, datetime('now'))",
+    "INSERT OR REPLACE INTO icon_cache (icon_key, image_data, source, format, original_url, fallback_tier, original_width, original_height, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))",
     iconKey,
     imageData,
     source,
     format,
     originalUrl,
     fallbackTier,
+    originalWidth ?? null,
+    originalHeight ?? null,
   );
   // Notify listeners that cache has been updated (dynamic import to avoid circular deps)
   setTimeout(async () => {
@@ -520,6 +564,8 @@ export interface CrawlResultData {
   format: string;
   originalUrl: string | null;
   fallbackTier: number;
+  originalWidth?: number;
+  originalHeight?: number;
 }
 
 export async function saveCrawlResult(
@@ -529,16 +575,20 @@ export async function saveCrawlResult(
   format: string,
   originalUrl: string | null = null,
   fallbackTier: number = 0,
+  originalWidth?: number,
+  originalHeight?: number,
 ): Promise<void> {
   const db = getDatabase();
   await db.runAsync(
-    "INSERT INTO icon_crawl_results (icon_key, image_data, source, format, original_url, fallback_tier) VALUES (?, ?, ?, ?, ?, ?)",
+    "INSERT INTO icon_crawl_results (icon_key, image_data, source, format, original_url, fallback_tier, original_width, original_height) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
     iconKey,
     imageData,
     source,
     format,
     originalUrl,
     fallbackTier,
+    originalWidth ?? null,
+    originalHeight ?? null,
   );
 }
 
@@ -562,8 +612,10 @@ export async function getCrawlResults(
     format: string;
     original_url: string | null;
     fallback_tier: number;
+    original_width: number | null;
+    original_height: number | null;
   }>(
-    "SELECT id, icon_key, image_data, source, format, original_url, fallback_tier FROM icon_crawl_results WHERE icon_key = ? ORDER BY created_at DESC",
+    "SELECT id, icon_key, image_data, source, format, original_url, fallback_tier, original_width, original_height FROM icon_crawl_results WHERE icon_key = ? ORDER BY created_at DESC",
     iconKey,
   );
   return rows.map((r) => ({
@@ -574,6 +626,8 @@ export async function getCrawlResults(
     format: r.format,
     originalUrl: r.original_url ?? null,
     fallbackTier: r.fallback_tier,
+    originalWidth: r.original_width ?? undefined,
+    originalHeight: r.original_height ?? undefined,
   }));
 }
 
