@@ -10,9 +10,6 @@ module.exports = {
     },
     extra: {
       ...(appJson.expo.extra || {}),
-      eas: {
-        projectId: "a5994d10-17c0-4d53-82bc-9fac030b1ead",
-      },
       posthogProjectToken: process.env.POSTHOG_PROJECT_TOKEN,
       posthogHost: process.env.POSTHOG_HOST || "https://us.i.posthog.com",
     },

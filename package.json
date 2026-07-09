@@ -8,7 +8,13 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "generate-model": "node scripts/generate-model.js",
+    "generate-model:force": "node scripts/generate-model.js --force",
+    "prebuild:android": "expo prebuild --clean --platform android",
+    "prebuild:ios": "expo prebuild --clean --platform ios",
+    "build:android": "./scripts/build-android.sh",
+    "build:android:force": "./scripts/build-android.sh --force-model"
   },
   "dependencies": {
     "@clerk/expo": "3.1.12",

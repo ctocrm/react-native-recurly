@@ -53,7 +53,7 @@ Created a minimal ESPCN (Enhanced Super-Resolution Generative Adversarial Networ
 To retrain the model:
 
 ```bash
-/tmp/tfenv/bin/python scripts/train_espcn_fast.py
+npm run generate-model:force
 ```
 
 ### 3. Metro Bundler Configuration (`metro.config.js`)
@@ -73,30 +73,15 @@ module.exports = {
       package: "com.ctocrm.jsmastery",
     },
     extra: {
-      eas: {
-        projectId: "a5994d10-17c0-4d53-82bc-9fac030b1ead",
-      },
+      posthogProjectToken: process.env.POSTHOG_PROJECT_TOKEN,
+      posthogHost: process.env.POSTHOG_HOST || "https://us.i.posthog.com",
     },
   },
   plugins: ["react-native-fast-tflite"],
 };
 ```
 
-### 5. EAS Build Profile (`eas.json`)
-
-```json
-{
-  "cli": { "version": ">= 3.0.0" },
-  "build": {
-    "preview": {
-      "distribution": "internal",
-      "android": { "gradleCommand": ":app:assembleDebug" }
-    }
-  }
-}
-```
-
-### 6. Inference Code Fix (`src/services/iconProcessing.ts`)
+### 5. Inference Code Fix (`src/services/iconProcessing.ts`)
 
 - Fixed API call from `loadTfliteModel` to `loadTensorflowModel`
 - Proper input processing:
@@ -109,33 +94,53 @@ module.exports = {
   - Convert to uint8 [0,255] for PNG encoding
   - Re-chunk btoa to prevent stack overflow
 
-## Build Process
+## Native Build Process (EAS-free)
+
+This project uses native Android/iOS builds instead of EAS. See `BUILD.md` for complete instructions.
 
 ### Prerequisites
 
-- `react-native-fast-tflite` already in `package.json`
-- Android SDK/NDK installed
-- EAS CLI installed (`npm install -g eas-cli`)
+- `react-native-fast-tflite` in `package.json`
+- Android SDK installed and `$ANDROID_HOME` set
+- Java JDK 17+ installed
+- For iOS builds: macOS with Xcode
 
 ### Steps to Build
 
 ```bash
-# 1. Initialize EAS (if not already done)
-npx eas init --force
+# Generate model (only if needed)
+npm run generate-model
 
-# 2. Run local build
-npx eas build --profile preview --platform android --local
+# Full native Android build (model generation included)
+npm run build:android
 
-# Or use Expo CLI prebuild + Gradle directly
-npx expo prebuild --clean
-cd android && ./gradlew assembleDebug
+# Or run the verification script (builds, installs, launches on emulator)
+./scripts/verify-android.sh
+
+# Force model regeneration
+npm run build:android:force
+./scripts/verify-android.sh --force-model
 ```
+
+### Build Scripts
+
+| Command                                       | Description                               |
+| --------------------------------------------- | ----------------------------------------- |
+| `npm run generate-model`                      | Generate TFLite model if needed           |
+| `npm run generate-model:force`                | Force model regeneration                  |
+| `npm run prebuild:android`                    | Generate native Android project           |
+| `npm run build:android`                       | Build debug APK with model                |
+| `./scripts/verify-android.sh`                 | Full build + install + launch on emulator |
+| `./scripts/android-emulator.sh start`         | Start the emulator                        |
+| `./scripts/android-emulator.sh install <apk>` | Install APK to emulator                   |
+| `./scripts/android-emulator.sh launch`        | Launch the app                            |
+| `./scripts/android-emulator.sh logcat`        | Monitor logs                              |
 
 ### Testing
 
 - The app will show `[ICON_AI] RNTflite native module not available` in Expo Go
 - This is expected - Expo Go doesn't support custom native modules
-- Install the development build to test AI upscaling
+- Use native builds to test AI upscaling: `./scripts/verify-android.sh`
 
 ## Model Architecture Details
 
@@ -152,8 +157,16 @@ Output: (None, None, None, 3)  - 2x upscaled image
 ## Files Modified
 
 - `assets/models/espcn_2x.tflite` - Generated TFLite model (11KB)
-- `eas.json` - Added preview build profile
 - `metro.config.js` - Added tflite asset extension
-- `app.config.js` - Added owner, android package, projectId, plugin
+- `app.config.js` - Added owner, android package, plugin (removed EAS config)
 - `src/services/iconProcessing.ts` - Fixed inference pipeline
 - `src/services/whiteBgRemoval.ts` - Fixed chunked btoa conversion
+
+## New Files Added
+
+- `scripts/generate-model.ts` - Model generation wrapper with --force option
+- `scripts/android-emulator.sh` - Emulator management script
+- `scripts/build-android.sh` - Native Android build script
+- `scripts/verify-android.sh` - Build verification script
+- `scripts/prebuild-ios.sh` - iOS prebuild script (macOS)
+- `BUILD.md` - Detailed build instructions
