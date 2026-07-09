@@ -20,6 +20,11 @@ echo "=========================================="
 echo "Native Android Build Script"
 echo "=========================================="
 
+# Set Java 17 for react-native-fast-tflite compatibility
+export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+export PATH="$JAVA_HOME/bin:$PATH"
+echo "[BUILD] Using Java: $JAVA_HOME"
+
 # Step 1: Generate model (if needed or forced)
 echo ""
 echo "[BUILD] Step 1: Model Generation"
@@ -41,6 +46,10 @@ npx expo prebuild --clean --platform android
 echo ""
 echo "[BUILD] Step 3: Building Debug APK"
 cd "$PROJECT_ROOT/android"
+
+# Disable new architecture for react-native-fast-tflite compatibility
+# The library has toolchain issues with new architecture
+sed -i 's/newArchEnabled=true/newArchEnabled=false/' gradle.properties
 
 # Use gradlew wrapper (it will download Gradle if needed)
 ./gradlew assembleDebug --no-daemon

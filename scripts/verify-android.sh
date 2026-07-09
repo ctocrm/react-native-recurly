@@ -29,6 +29,10 @@ echo ""
 # Extended timeout for slow VM (10 minutes)
 VM_TIMEOUT=600
 
+# Set Java 17 for react-native-fast-tflite compatibility
+export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+export PATH="$JAVA_HOME/bin:$PATH"
+
 # Step 1: Check emulator status
 echo "[VERIFY] Checking emulator status..."
 "$SCRIPT_DIR/android-emulator.sh" status || true
