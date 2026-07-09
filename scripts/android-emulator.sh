@@ -77,7 +77,12 @@ case "$1" in
             exit 1
         fi
         echo "[EMULATOR] Installing $APK_PATH..."
-        adb install -r "$APK_PATH"
+        # Try install, if insufficient storage, uninstall first and retry
+        if ! adb install -r "$APK_PATH" 2>&1; then
+            echo "[EMULATOR] Install failed, trying uninstall and retry..."
+            adb uninstall "$APP_PACKAGE" 2>/dev/null || true
+            adb install -r "$APK_PATH"
+        fi
         echo "[EMULATOR] Install complete"
         ;;
     
