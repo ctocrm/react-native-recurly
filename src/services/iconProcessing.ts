@@ -83,13 +83,13 @@ function loadModel(): Promise<any | null> {
       }
 
       // Safe to require now since native module exists.
-      const TfliteModule: any = require("react-native-fast-tflite");
-      const loadTfliteModel = TfliteModule.loadTfliteModel;
-      if (!loadTfliteModel) return null;
+      const { loadTensorflowModel } = require("react-native-fast-tflite");
+      if (!loadTensorflowModel) return null;
 
       // Bundled model resolved at build time.
-      const modelPath: any = require("../../assets/models/espcn_2x.tflite");
-      const model = await loadTfliteModel(modelPath);
+      const model = await loadTensorflowModel(
+        require("../../assets/models/espcn_2x.tflite"),
+      );
       console.log("[ICON_AI] super-resolution model loaded");
       return model;
     } catch (err) {
