@@ -14,7 +14,17 @@
     "prebuild:android": "expo prebuild --clean --platform android",
     "prebuild:ios": "expo prebuild --clean --platform ios",
     "build:android": "./scripts/build-android.sh",
-    "build:android:force": "./scripts/build-android.sh --force-model"
+    "build:android:force": "./scripts/build-android.sh --force-model",
+    "build:android:dev": "./scripts/build-android.sh --dev",
+    "build:android:watch": "./scripts/build-android.sh --watch",
+    "build:android:dev:watch": "./scripts/build-android.sh --dev --watch",
+    "build:android:dev:watch:full": "./scripts/build-android.sh --arch x86_64 --dev --force-model --watch",
+    "verify:android": "./scripts/verify-android.sh",
+    "verify:android:dev": "./scripts/verify-android.sh --dev",
+    "verify:android:watch": "./scripts/verify-android.sh --watch",
+    "emulator:start": "./scripts/android-emulator.sh start",
+    "emulator:stop": "./scripts/android-emulator.sh stop",
+    "emulator:status": "./scripts/android-emulator.sh status"
   },
   "dependencies": {
     "@clerk/expo": "3.1.12",
