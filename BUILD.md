@@ -139,6 +139,58 @@ bundle exec pod install --repo-update
 
 ---
 
+## Build Configuration Fixes Applied
+
+### Java Toolchain Requirements
+
+The `react-native-fast-tflite` library requires Java 17 for compilation:
+
+```bash
+# All build scripts explicitly set JAVA_HOME:
+export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+```
+
+The Gradle wrapper uses Java 17 automatically via `org.gradle.java.home` in gradle.properties.
+
+### New Architecture Enablement
+
+React Native New Architecture is **required** for `react-native-worklets` and `react-native-reanimated`:
+
+```properties
+# android/gradle.properties
+newArchEnabled=true
+```
+
+The build will fail with error:
+
+```
+[Worklets] Worklets require new architecture to be enabled.
+```
+
+### EAS Build Removal
+
+EAS build configuration was removed:
+
+- Deleted `eas.json`
+- Removed build profiles from `app.config.js`
+- Kept only the `react-native-fast-tflite` plugin:
+
+```javascript
+plugins: ["react-native-fast-tflite"];
+```
+
+### Native Build Scripts Created
+
+| Script                        | Purpose                                                 |
+| ----------------------------- | ------------------------------------------------------- |
+| `scripts/generate-model.js`   | Model generation with `--force` optional switch         |
+| `scripts/build-android.sh`    | Native Android build with integrated model generation   |
+| `scripts/prebuild-ios.sh`     | iOS prebuild for macOS environments                     |
+| `scripts/verify-android.sh`   | Full verification: build + install + launch on emulator |
+| `scripts/android-emulator.sh` | Emulator management (start/stop/install/launch/logcat)  |
+
+---
+
 ## Model Architecture
 
 The ESPCN 2x model architecture:
@@ -187,3 +239,4 @@ The model training script requires TensorFlow:
 - Uses `/tmp/tfenv/bin/python` if available
 - Falls back to `python3` with `tensorflow` package
 - Create a virtual environment: `python3 -m venv .venv && pip install tensorflow numpy`
+

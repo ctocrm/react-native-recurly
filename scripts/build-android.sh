@@ -47,10 +47,6 @@ echo ""
 echo "[BUILD] Step 3: Building Debug APK"
 cd "$PROJECT_ROOT/android"
 
-# Disable new architecture for react-native-fast-tflite compatibility
-# The library has toolchain issues with new architecture
-sed -i 's/newArchEnabled=true/newArchEnabled=false/' gradle.properties
-
 # Use gradlew wrapper (it will download Gradle if needed)
 ./gradlew assembleDebug --no-daemon
 

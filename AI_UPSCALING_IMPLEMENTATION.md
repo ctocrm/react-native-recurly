@@ -7,6 +7,8 @@ Two issues were reported:
 1. "The clear white BG **spin forever**" - White background removal process was hanging/crashing
 2. "The Upscale(AI) finish but the icon looks unchanged" - AI upscaling completed but produced no visual change
 
+---
+
 ## Root Causes Identified
 
 ### Issue 1: White Background Removal Stack Overflow
@@ -20,6 +22,8 @@ Two issues were reported:
 - **Location**: `assets/models/espcn_2x.tflite`
 - **Cause**: Model file was 14 bytes (placeholder text) instead of a real TensorFlow Lite model
 - **Symptom**: Model couldn't actually process images, output was unchanged
+
+---
 
 ## Fixes Applied
 
@@ -94,6 +98,60 @@ module.exports = {
   - Convert to uint8 [0,255] for PNG encoding
   - Re-chunk btoa to prevent stack overflow
 
+---
+
+## Build Configuration Fixes Applied
+
+### Java Toolchain Requirements
+
+The `react-native-fast-tflite` library requires Java 17 for compilation:
+
+```bash
+# All build scripts explicitly set JAVA_HOME:
+export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+```
+
+The Gradle wrapper uses Java 17 automatically via `org.gradle.java.home` in gradle.properties.
+
+### New Architecture Enablement
+
+React Native New Architecture is **required** for `react-native-worklets` and `react-native-reanimated`:
+
+```properties
+# android/gradle.properties
+newArchEnabled=true
+```
+
+The build will fail with error:
+
+```
+[Worklets] Worklets require new architecture to be enabled.
+```
+
+### EAS Build Removal
+
+EAS build configuration was removed:
+
+- Deleted `eas.json`
+- Removed build profiles from `app.config.js`
+- Kept only the `react-native-fast-tflite` plugin:
+
+```javascript
+plugins: ["react-native-fast-tflite"];
+```
+
+### Native Build Scripts Created
+
+| Script                        | Purpose                                                 |
+| ----------------------------- | ------------------------------------------------------- |
+| `scripts/generate-model.js`   | Model generation with `--force` optional switch         |
+| `scripts/build-android.sh`    | Native Android build with integrated model generation   |
+| `scripts/prebuild-ios.sh`     | iOS prebuild for macOS environments                     |
+| `scripts/verify-android.sh`   | Full verification: build + install + launch on emulator |
+| `scripts/android-emulator.sh` | Emulator management (start/stop/install/launch/logcat)  |
+
+---
+
 ## Native Build Process (EAS-free)
 
 This project uses native Android/iOS builds instead of EAS. See `BUILD.md` for complete instructions.
@@ -122,7 +180,7 @@ npm run build:android:force
 ./scripts/verify-android.sh --force-model
 ```
 
-### Build Scripts
+### Build Commands Reference
 
 | Command                                       | Description                               |
 | --------------------------------------------- | ----------------------------------------- |
@@ -142,6 +200,8 @@ npm run build:android:force
 - This is expected - Expo Go doesn't support custom native modules
 - Use native builds to test AI upscaling: `./scripts/verify-android.sh`
 
+---
+
 ## Model Architecture Details
 
 ```
@@ -154,6 +214,8 @@ Input:  (None, None, None, 3)  - Flexible input size, 3 channels
 Output: (None, None, None, 3)  - 2x upscaled image
 ```
 
+---
+
 ## Files Modified
 
 - `assets/models/espcn_2x.tflite` - Generated TFLite model (11KB)
@@ -162,11 +224,14 @@ Output: (None, None, None, 3)  - 2x upscaled image
 - `src/services/iconProcessing.ts` - Fixed inference pipeline
 - `src/services/whiteBgRemoval.ts` - Fixed chunked btoa conversion
 
+---
+
 ## New Files Added
 
-- `scripts/generate-model.ts` - Model generation wrapper with --force option
+- `scripts/generate-model.js` - Model generation wrapper with --force option
 - `scripts/android-emulator.sh` - Emulator management script
 - `scripts/build-android.sh` - Native Android build script
 - `scripts/verify-android.sh` - Build verification script
 - `scripts/prebuild-ios.sh` - iOS prebuild script (macOS)
 - `BUILD.md` - Detailed build instructions
+
