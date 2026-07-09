@@ -1,34 +1,88 @@
 #!/bin/bash
-# Native Android build script with model generation
-# Usage: ./scripts/build-android.sh [--force-model]
+# Interactive Android Build Script
+# Builds one arch at a time (sequential) with live monitoring
+#
+# Usage:
+#   ./scripts/build-android.sh                    # Build all archs (default)
+#   ./scripts/build-android.sh --arch x86_64      # Build a specific arch
+#   ./scripts/build-android.sh --dev              # Quick dev: x86_64 + install + launch
+#   ./scripts/build-android.sh --parallel N       # Build all with N workers
 #
 # Options:
-#   --force-model    Force model regeneration even if model exists and is fresh
+#   --arch all|x86_64|arm64-v8a|armeabi-v7a|x86   Architecture to build (default: all)
+#   --dev                                         Quick dev mode (x86_64 + install + launch)
+#   --parallel N                                  Workers per arch (default: 1)
+#   --force-model                                 Force model regeneration
+#   --watch                                       Enable live monitoring
+#   --clean                                       Clean prebuild (expo prebuild --clean)
 
-set -e
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-ANDROID_SDK="${ANDROID_HOME:-/home/d/Android/Sdk}"
+ANDROID_SDK="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/home/d/Android/Sdk}}"
 
-FORCE_MODEL="false"
-if [ "$1" = "--force-model" ]; then
-    FORCE_MODEL="true"
-fi
+# Defaults
+ARCH_LIST=("arm64-v8a" "armeabi-v7a" "x86" "x86_64")
+ARCH_TARGET="all"
+PARALLEL=1
+FORCE_MODEL=false
+WATCH=false
+CLEAN=false
+DEV_MODE=false
 
-echo "=========================================="
-echo "Native Android Build Script"
-echo "=========================================="
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --arch)
+            ARCH_TARGET="$2"
+            shift 2
+            ;;
+        --dev)
+            DEV_MODE=true
+            ARCH_TARGET="x86_64"
+            shift
+            ;;
+        --parallel)
+            PARALLEL="$2"
+            shift 2
+            ;;
+        --force-model)
+            FORCE_MODEL=true
+            shift
+            ;;
+        --watch)
+            WATCH=true
+            shift
+            ;;
+        --clean)
+            CLEAN=true
+            shift
+            ;;
+        *)
+            echo "[BUILD] Unknown option: $1"
+            exit 1
+            ;;
+    esac
+done
 
-# Set Java 17 for react-native-fast-tflite compatibility
 export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
 export PATH="$JAVA_HOME/bin:$PATH"
-echo "[BUILD] Using Java: $JAVA_HOME"
 
-# Step 1: Generate model (if needed or forced)
+# Determine which archs to build
+if [ "$ARCH_TARGET" = "all" ]; then
+    BUILD_ARCHS=("${ARCH_LIST[@]}")
+elif [ "$ARCH_TARGET" = "x86_64" ] || [ "$ARCH_TARGET" = "x86" ] || [ "$ARCH_TARGET" = "arm64-v8a" ] || [ "$ARCH_TARGET" = "armeabi-v7a" ]; then
+    BUILD_ARCHS=("$ARCH_TARGET")
+else
+    echo "[BUILD] Unknown architecture: $ARCH_TARGET"
+    echo "[BUILD] Valid options: all, x86_64, x86, arm64-v8a, armeabi-v7a"
+    exit 1
+fi
+
+# Step 1: Model generation
 echo ""
 echo "[BUILD] Step 1: Model Generation"
-cd "$PROJECT_ROOT"
 if [ "$FORCE_MODEL" = "true" ]; then
     echo "[BUILD] Forcing model regeneration..."
     node "$SCRIPT_DIR/generate-model.js" --force
@@ -40,29 +94,96 @@ fi
 # Step 2: Prebuild Android project
 echo ""
 echo "[BUILD] Step 2: Expo Prebuild (Android)"
-npx expo prebuild --clean --platform android
-
-# Step 3: Build Debug APK
-echo ""
-echo "[BUILD] Step 3: Building Debug APK"
-cd "$PROJECT_ROOT/android"
-
-# Use gradlew wrapper (it will download Gradle if needed)
-./gradlew assembleDebug --no-daemon
-
-APK_PATH="$PROJECT_ROOT/android/app/build/outputs/apk/debug/app-debug.apk"
-
-if [ -f "$APK_PATH" ]; then
-    echo "[BUILD] APK built successfully: $APK_PATH"
-    ls -la "$APK_PATH"
+if [ "$CLEAN" = "true" ]; then
+    npx expo prebuild --clean --platform android
 else
-    echo "[BUILD] Error: APK not found at $APK_PATH"
-    exit 1
+    npx expo prebuild --platform android
+fi
+
+# Step 3: Build each architecture one at a time (sequential) to avoid CPU hammering
+echo ""
+echo "[BUILD] Step 3: Building ${#BUILD_ARCHS[@]} arch(s) one at a time"
+
+BUILD_DIR="$PROJECT_ROOT/android"
+JVM_ARGS="-Xmx4096m -XX:MaxMetaspaceSize=512m"
+if [ "$PARALLEL" -le 1 ]; then
+    JVM_ARGS="$JVM_ARGS -Dorg.gradle.workers.max=1"
+else
+    JVM_ARGS="$JVM_ARGS -Dorg.gradle.workers.max=$PARALLEL"
+fi
+
+ALL_PASSED=true
+for ARCH in "${BUILD_ARCHS[@]}"; do
+    LOG_FILE="$PROJECT_ROOT/build-${ARCH}.log"
+    APK_FILE="$BUILD_DIR/app/build/outputs/apk/debug/app-debug.apk"
+    
+    echo ""
+    echo "[BUILD] === Building $ARCH ==="
+    echo "[BUILD] Log: $LOG_FILE | Filter: -PreactNativeArchitectures=$ARCH"
+    
+    cd "$BUILD_DIR"
+    
+    # Build single arch using assembleDebug with arch filter
+    ./gradlew assembleDebug --no-daemon \
+        -PreactNativeArchitectures="$ARCH" \
+        -Dorg.gradle.jvmargs="$JVM_ARGS" \
+        2>&1 | stdbuf -oL tee "$LOG_FILE" &
+    BUILD_PID=$!
+    
+    # Start monitor if --watch
+    if [ "$WATCH" = "true" ]; then
+        "$SCRIPT_DIR/build-monitor.sh" "$LOG_FILE" "$ARCH" "$BUILD_PID" &
+        MONITOR_PID=$!
+        echo "[BUILD] Monitor PID: $MONITOR_PID"
+    fi
+    
+    # Wait for build to finish
+    wait $BUILD_PID
+    BUILD_EXIT=$?
+    
+    # Stop monitor
+    if [ "$WATCH" = "true" ] && [ -n "${MONITOR_PID:-}" ]; then
+        kill $MONITOR_PID 2>/dev/null || true
+        echo ""
+    fi
+    
+    # Show result
+    if [ $BUILD_EXIT -eq 0 ]; then
+        echo "[BUILD] SUCCESS: $ARCH -> $APK_FILE"
+    else
+        echo "[BUILD] FAILED: $ARCH (exit code $BUILD_EXIT)"
+        echo "[BUILD] See $LOG_FILE for details"
+        tail -20 "$LOG_FILE" || true
+        ALL_PASSED=false
+        if [ "$DEV_MODE" = "true" ]; then
+            exit $BUILD_EXIT
+        fi
+    fi
+done
+
+echo ""
+
+if [ "$ALL_PASSED" = "true" ]; then
+    echo "[BUILD] All builds complete!"
+else
+    echo "[BUILD] Some builds failed (check logs above)"
+fi
+
+# Dev mode: install and launch on emulator
+if [ "$DEV_MODE" = "true" ] && [ "$ALL_PASSED" = "true" ]; then
+    echo ""
+    echo "[BUILD] Dev mode: Installing and launching on emulator..."
+    APK_FILE="$BUILD_DIR/app/build/outputs/apk/debug/app-debug.apk"
+    if [ -f "$APK_FILE" ]; then
+        "$SCRIPT_DIR/android-emulator.sh" install "$APK_FILE"
+        "$SCRIPT_DIR/android-emulator.sh" launch
+        echo ""
+        echo "[BUILD] App installed and launched. Use 'adb logcat' to monitor."
+    else
+        echo "[BUILD] Error: APK not found at $APK_FILE"
+        exit 1
+    fi
 fi
 
 echo ""
-echo "[BUILD] Build complete!"
-echo ""
-echo "To install and run on emulator, use:"
-echo "  $SCRIPT_DIR/android-emulator.sh install $APK_PATH"
-echo "  $SCRIPT_DIR/android-emulator.sh launch"
+echo "[BUILD] Done."

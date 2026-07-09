@@ -5,7 +5,7 @@
 
 set -e
 
-ANDROID_SDK="${ANDROID_HOME:-/home/d/Android/Sdk}"
+ANDROID_SDK="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/home/d/Android/Sdk}}"
 AVD_NAME="Pixel_6a"
 APP_PACKAGE="com.ctocrm.jsmastery"
 APP_ACTIVITY="com.ctocrm.jsmastery.MainActivity"
@@ -40,7 +40,13 @@ case "$1" in
     
     stop)
         echo "[EMULATOR] Stopping $AVD_NAME..."
-        adb -s emulator-5554 emu kill 2>/dev/null || true
+        # Get the first emulator serial dynamically
+        EMULATOR_SERIAL=$(adb devices | grep 'emulator-' | head -1 | awk '{print $1}')
+        if [ -n "$EMULATOR_SERIAL" ]; then
+            adb -s "$EMULATOR_SERIAL" emu kill 2>/dev/null || true
+        else
+            adb emu kill 2>/dev/null || true
+        fi
         echo "[EMULATOR] Emulator stopped"
         ;;
     

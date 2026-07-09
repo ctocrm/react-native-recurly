@@ -32,7 +32,7 @@ fi
 # Step 1: Generate model (iOS uses the same model as Android)
 echo "[IOS] Step 1: Model Generation"
 cd "$PROJECT_ROOT"
-node "$SCRIPT_DIR/generate-model.ts"
+node "$SCRIPT_DIR/generate-model.js"
 
 # Step 2: Prebuild iOS project
 echo ""
@@ -42,8 +42,8 @@ npx expo prebuild --clean --platform ios
 echo ""
 echo "[IOS] Prebuild complete!"
 echo ""
-echo "On macOS, continue with:"
+echo "Note: iOS builds require macOS with Xcode."
+echo "To continue on macOS:"
 echo "  cd ios"
-echo "  # Install CocoaPods if needed:"
-echo "  # bundle install && bundle exec pod install --repo-update"
-echo "  # Then build with Xcode or xcodebuild"
+echo "  bundle install && bundle exec pod install --repo-update"
+echo "  xcodebuild -workspace Jsmastery.xcworkspace -scheme Jsmastery -configuration Debug -destination 'platform=iOS Simulator,name=iPhone 15' -derivedDataPath build"

@@ -8,6 +8,62 @@ This project uses `react-native-fast-tflite` for on-device AI icon upscaling. Si
 
 ---
 
+## Quick Start
+
+```bash
+# Quick dev mode: build x86_64 only, install on emulator, launch app
+./scripts/build-android.sh --dev --watch
+
+# Or full verification (same as above but with log monitoring)
+./scripts/verify-android.sh --watch
+```
+
+---
+
+## Interactive Build Script
+
+The build script supports multiple modes for different workflows:
+
+### Usage
+```
+./scripts/build-android.sh [options]
+
+Options:
+  --arch all|x86_64|arm64-v8a|armeabi-v7a|x86   Architecture to build (default: all)
+  --dev                                         Quick dev mode (x86_64 + install + launch)
+  --parallel N                                  Workers per arch (default: 1)
+  --force-model                                 Force model regeneration
+  --watch                                       Enable live monitoring
+  --clean                                       Clean prebuild
+```
+
+### Modes
+
+| Mode | Command | Description |
+|------|---------|-------------|
+| **Default** | `./scripts/build-android.sh` | Builds all 4 architectures sequentially |
+| **Dev** | `./scripts/build-android.sh --dev` | x86_64 only + install + launch on emulator |
+| **Single arch** | `./scripts/build-android.sh --arch arm64-v8a` | Build a specific architecture |
+| **With monitor** | `./scripts/build-android.sh --dev --watch` | Live status display during build |
+
+### Live Monitor
+
+When `--watch` is enabled, the build-monitor shows a live status line:
+
+```
+[MONITOR] Arch: x86_64     | Task: app:buildCMakeDebug[x86_64] | CPU: 87% | Procs: 14 | Elapsed: 4m12s
+```
+
+Features:
+- **Live task tracking**: Shows current Gradle task
+- **CPU usage**: Total CPU % of all build processes
+- **Process count**: Number of active build processes
+- **Stall detection**: Warns if no new task for >60s
+- **Error detection**: Catches FAILED/error immediately
+- **Clang activity check**: Distinguishes between stall and long compilation
+
+---
+
 ## Android Build Process
 
 ### Prerequisites
@@ -23,16 +79,6 @@ This project uses `react-native-fast-tflite` for on-device AI icon upscaling. Si
 3. **AVD (Android Virtual Device)** - Configured emulator:
    - Default AVD name: `Pixel_6a`
    - Can be created via Android Studio AVD Manager
-
-### Quick Start
-
-```bash
-# Run full build and verification (builds, installs, launches)
-./scripts/verify-android.sh
-
-# Force model regeneration and run
-./scripts/verify-android.sh --force-model
-```
 
 ### Step-by-Step Build
 
@@ -55,7 +101,6 @@ npm run prebuild:android
 ```
 
 This generates/updates the native Android project with:
-
 - All Expo plugins (including `react-native-fast-tflite`)
 - Native module linking
 - Asset bundling configuration
@@ -63,15 +108,21 @@ This generates/updates the native Android project with:
 #### Step 3: Build the APK
 
 ```bash
-# Using npm script
-npm run build:android
+# Build all architectures (sequential)
+./scripts/build-android.sh
 
-# Or manually
-cd android
-./gradlew assembleDebug --no-daemon
+# Build only for emulator (x86_64)
+./scripts/build-android.sh --arch x86_64
+
+# Build with live monitor
+./scripts/build-android.sh --arch x86_64 --watch
 ```
 
-Output: `android/app/build/outputs/apk/debug/app-debug.apk`
+Output per architecture:
+- `android/app/build/outputs/apk/debug/app-x86_64-debug.apk`
+- `android/app/build/outputs/apk/debug/app-arm64-v8a-debug.apk`
+- `android/app/build/outputs/apk/debug/app-armeabi-v7a-debug.apk`
+- `android/app/build/outputs/apk/debug/app-x86-debug.apk`
 
 #### Step 4: Start Emulator and Install
 
@@ -80,7 +131,7 @@ Output: `android/app/build/outputs/apk/debug/app-debug.apk`
 ./scripts/android-emulator.sh start
 
 # Install the APK
-./scripts/android-emulator.sh install /path/to/app-debug.apk
+./scripts/android-emulator.sh install android/app/build/outputs/apk/debug/app-x86_64-debug.apk
 
 # Launch the app
 ./scripts/android-emulator.sh launch
@@ -98,18 +149,20 @@ Output: `android/app/build/outputs/apk/debug/app-debug.apk`
 
 ### Build Commands Reference
 
-| Command                                       | Description                     |
-| --------------------------------------------- | ------------------------------- |
-| `npm run generate-model`                      | Generate TFLite model if needed |
-| `npm run generate-model:force`                | Force model regeneration        |
-| `npm run prebuild:android`                    | Generate native Android project |
-| `npm run build:android`                       | Build debug APK with model      |
-| `./scripts/verify-android.sh`                 | Full build + install + launch   |
-| `./scripts/android-emulator.sh start`         | Start the emulator              |
-| `./scripts/android-emulator.sh install <apk>` | Install APK to emulator         |
-| `./scripts/android-emulator.sh launch`        | Launch the app                  |
-| `./scripts/android-emulator.sh logcat`        | Monitor app logs                |
-| `./scripts/android-emulator.sh status`        | Check emulator status           |
+| Command                                       | Description                               |
+| --------------------------------------------- | ----------------------------------------- |
+| `npm run generate-model`                      | Generate TFLite model if needed           |
+| `npm run generate-model:force`                | Force model regeneration                  |
+| `npm run prebuild:android`                    | Generate native Android project           |
+| `./scripts/build-android.sh`                  | Build all archs (sequential)              |
+| `./scripts/build-android.sh --dev --watch`    | Quick dev build + install + launch        |
+| `./scripts/build-android.sh --arch x86_64`    | Build specific arch                       |
+| `./scripts/verify-android.sh --watch`         | Full verification with log monitoring     |
+| `./scripts/android-emulator.sh start`         | Start the emulator                        |
+| `./scripts/android-emulator.sh install <apk>` | Install APK to emulator                   |
+| `./scripts/android-emulator.sh launch`        | Launch the app                            |
+| `./scripts/android-emulator.sh logcat`        | Monitor app logs                          |
+| `./scripts/android-emulator.sh status`        | Check emulator status                     |
 
 ---
 
@@ -170,23 +223,19 @@ The build will fail with error:
 ### EAS Build Removal
 
 EAS build configuration was removed:
-
 - Deleted `eas.json`
 - Removed build profiles from `app.config.js`
-- Kept only the `react-native-fast-tflite` plugin:
-
-```javascript
-plugins: ["react-native-fast-tflite"];
-```
+- Kept only the `react-native-fast-tflite` plugin
 
 ### Native Build Scripts Created
 
 | Script                        | Purpose                                                 |
 | ----------------------------- | ------------------------------------------------------- |
 | `scripts/generate-model.js`   | Model generation with `--force` optional switch         |
-| `scripts/build-android.sh`    | Native Android build with integrated model generation   |
+| `scripts/build-android.sh`    | Interactive Android build with arch selection + monitor |
+| `scripts/build-monitor.sh`    | Live build monitor with stall/error detection           |
 | `scripts/prebuild-ios.sh`     | iOS prebuild for macOS environments                     |
-| `scripts/verify-android.sh`   | Full verification: build + install + launch on emulator |
+| `scripts/verify-android.sh`   | Full verification: build + install + launch + log watch |
 | `scripts/android-emulator.sh` | Emulator management (start/stop/install/launch/logcat)  |
 
 ---
@@ -221,22 +270,20 @@ Output: 64x64 RGB image
 ### TFLite Module Not Loading
 
 If you see `[ICON_AI] RNTflite native module not available`:
-
 - Ensure you're running a native build, not Expo Go
 - Check the APK was installed correctly
 - Verify `react-native-fast-tflite` is in `app.config.js` plugins
 
 ### Slow Build Performance
 
-- Building in a VM is inherently slow - extend timeouts
-- Use `--no-daemon` flag to avoid Gradle daemon issues in CI
-- Model generation requires Python with TensorFlow installed
+- Building in a VM is inherently slow - use `--watch` to see live progress
+- Use `--arch x86_64` to build only for emulator (faster)
+- The monitor shows CPU usage and current task so you know it's working
+- Stall detection warns if no progress for >60s
 
 ### Python Environment Issues
 
 The model training script requires TensorFlow:
-
 - Uses `/tmp/tfenv/bin/python` if available
 - Falls back to `python3` with `tensorflow` package
 - Create a virtual environment: `python3 -m venv .venv && pip install tensorflow numpy`
-
