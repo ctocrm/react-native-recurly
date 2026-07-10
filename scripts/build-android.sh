@@ -12,7 +12,7 @@
 #
 # Modes:
 #   (default)  Self-contained release-style APK: the JS bundle is embedded via
-#              NODE_ENV=production so the app runs with NO Metro/dev server.
+#              gradle assembleRelease (NO Metro/dev server needed).
 #   --dev      Development client: builds debug APK and launches `npx expo start`
 #              (Metro) so the app connects to the dev server for live reload.
 #
@@ -99,12 +99,11 @@ fi
 #   production  -> bundle is embedded (self-contained, no Metro needed)
 #   (unset)     -> dev client connects to `npx expo start` (Metro)
 # ---------------------------------------------------------------------------
-EXPORT_DIR="$PROJECT_ROOT/.expo-export-tmp"
 if [ "$DEV_MODE" = "true" ]; then
     echo "[BUILD] Dev client mode: bundle will connect to Metro (npx expo start)"
     unset NODE_ENV
 else
-    echo "[BUILD] Self-contained mode: embedding JS bundle (NODE_ENV=production)"
+    echo "[BUILD] Self-contained mode: embedding JS bundle via gradle assembleRelease"
     export NODE_ENV=production
 fi
 
@@ -128,39 +127,8 @@ else
     npx expo prebuild --platform android
 fi
 
-# Define BUILD_DIR early so Step 2b can use it
+# Define BUILD_DIR early
 BUILD_DIR="$PROJECT_ROOT/android"
-
-# Step 2b: For self-contained builds, explicitly export the JS bundle and copy
-# it (plus assets) into the Android assets folder so the APK is fully standalone
-# and does NOT need a Metro/dev server. The React Gradle Plugin's export:embed
-# step is unreliable for assembleDebug, so we do it explicitly here.
-if [ "$DEV_MODE" = "false" ]; then
-    echo ""
-    echo "[BUILD] Step 2b: Exporting JS bundle (self-contained)..."
-    rm -rf "$EXPORT_DIR"
-    NODE_ENV=production npx expo export --platform android --output-dir "$EXPORT_DIR" 2>&1 | tail -8
-
-    # Locate the exported Hermes bytecode bundle
-    BUNDLE_SRC=$(find "$EXPORT_DIR/_expo/static/js/android" -name '*.hbc' 2>/dev/null | head -1)
-    if [ -z "$BUNDLE_SRC" ]; then
-        BUNDLE_SRC=$(find "$EXPORT_DIR" -name 'index.android.bundle' 2>/dev/null | head -1)
-    fi
-
-    if [ -z "$BUNDLE_SRC" ]; then
-        echo "[BUILD] ERROR: expo export did not produce a JS bundle"
-        exit 1
-    fi
-
-    ASSETS_DEST="$BUILD_DIR/app/src/main/assets"
-    mkdir -p "$ASSETS_DEST"
-    cp "$BUNDLE_SRC" "$ASSETS_DEST/index.android.bundle"
-    # Copy exported static assets (fonts, images) if present
-    if [ -d "$EXPORT_DIR/assets" ]; then
-        cp -r "$EXPORT_DIR/assets/." "$ASSETS_DEST/" 2>/dev/null || true
-    fi
-    echo "[BUILD] Bundle copied to $ASSETS_DEST/index.android.bundle ($(du -h "$ASSETS_DEST/index.android.bundle" | cut -f1))"
-fi
 
 # Step 3: Build each architecture one at a time (sequential) to avoid CPU hammering
 echo ""
@@ -176,7 +144,13 @@ fi
 ALL_PASSED=true
 for ARCH in "${BUILD_ARCHS[@]}"; do
     LOG_FILE="$PROJECT_ROOT/build-${ARCH}.log"
-    APK_FILE="$BUILD_DIR/app/build/outputs/apk/debug/app-debug.apk"
+    if [ "$DEV_MODE" = "true" ]; then
+        APK_FILE="$BUILD_DIR/app/build/outputs/apk/debug/app-debug.apk"
+        GRADLE_TASK="assembleDebug"
+    else
+        APK_FILE="$BUILD_DIR/app/build/outputs/apk/release/app-release.apk"
+        GRADLE_TASK="assembleRelease"
+    fi
 
     echo ""
     echo "[BUILD] === Building $ARCH ==="
@@ -184,8 +158,8 @@ for ARCH in "${BUILD_ARCHS[@]}"; do
 
     cd "$BUILD_DIR"
 
-    # Build single arch using assembleDebug with arch filter
-    ./gradlew assembleDebug --no-daemon \
+    # Build single arch using assembleRelease (self-contained) or assembleDebug (dev mode)
+    ./gradlew "$GRADLE_TASK" --no-daemon \
         -PreactNativeArchitectures="$ARCH" \
         -Dorg.gradle.jvmargs="$JVM_ARGS" \
         2>&1 | stdbuf -oL tee "$LOG_FILE" &
@@ -258,7 +232,7 @@ if [ "$DEV_MODE" = "true" ] && [ "$ALL_PASSED" = "true" ]; then
 elif [ "$ALL_PASSED" = "true" ] && [ "$ARCH_TARGET" != "all" ] && [ "$DO_INSTALL" = "true" ]; then
     echo ""
     echo "[BUILD] Self-contained mode: Installing and launching on emulator..."
-    APK_FILE="$BUILD_DIR/app/build/outputs/apk/debug/app-debug.apk"
+    APK_FILE="$BUILD_DIR/app/build/outputs/apk/release/app-release.apk"
     if [ -f "$APK_FILE" ]; then
         "$SCRIPT_DIR/android-emulator.sh" start
         "$SCRIPT_DIR/android-emulator.sh" install "$APK_FILE"
@@ -270,8 +244,9 @@ elif [ "$ALL_PASSED" = "true" ] && [ "$ARCH_TARGET" != "all" ] && [ "$DO_INSTALL
         exit 1
     fi
 elif [ "$ALL_PASSED" = "true" ] && [ "$ARCH_TARGET" != "all" ]; then
+    APK_FILE="$BUILD_DIR/app/build/outputs/apk/release/app-release.apk"
     echo ""
-    echo "[BUILD] APK built at: $BUILD_DIR/app/build/outputs/apk/debug/app-debug.apk"
+    echo "[BUILD] APK built at: $APK_FILE"
     echo "[BUILD] Run with --install to install on emulator."
 fi
 
