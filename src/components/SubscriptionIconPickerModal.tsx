@@ -9,6 +9,7 @@ import {
   addLoadingListener,
   isIconLoading,
 } from "@/src/services/iconLoadingRegistry";
+import { isLowResIcon, upscaleIconAi } from "@/src/services/iconProcessing";
 import {
   getReportsForIcon,
   rejectReportedIcon,
@@ -18,6 +19,7 @@ import {
   addRateLimitListener,
   getRateLimitedDomains,
 } from "@/src/services/rateLimitTracker";
+import { detectWhiteBg, removeWhiteBg } from "@/src/services/whiteBgRemoval";
 import { usePostHog } from "posthog-react-native";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -50,6 +52,13 @@ interface PickerIcon {
   format: string;
   originalUrl: string | null;
   reportedType?: "wrong" | "broken" | null;
+  originalWidth?: number;
+  originalHeight?: number;
+}
+
+interface IconDetection {
+  hasWhite: boolean;
+  isLowRes: boolean;
 }
 
 const SubscriptionIconPickerModal = ({
@@ -74,6 +83,15 @@ const SubscriptionIconPickerModal = ({
     type: "wrong" | "broken" | null;
     comment: string;
   }>({ icon: null, type: null, comment: "" });
+  // Per-icon white-bg / low-res detection results, keyed by icon id.
+  const [detections, setDetections] = useState<Record<string, IconDetection>>(
+    {},
+  );
+  // Which icon + action is currently processing (for the spinner).
+  const [processing, setProcessing] = useState<{
+    id: string;
+    kind: "white" | "upscale";
+  } | null>(null);
   const isMounted = useRef(true);
   const latestKeyRef = useRef(iconKey);
 
@@ -111,6 +129,85 @@ const SubscriptionIconPickerModal = ({
     return unsubscribeRateLimit;
   }, [refreshRateLimitedDomains]);
 
+  // Detect white-bg + low-res for every (non-local) icon so the corrective
+  // chips show directly under each tile, like report chips. Icons are processed
+  // with bounded concurrency so detection stays responsive for large sets.
+  const detectIcons = useCallback(
+    async (icons: PickerIcon[], requestKey: string) => {
+      // Local assets and SVGs are handled immediately (no detection needed).
+      for (const icon of icons) {
+        if (!isMounted.current || latestKeyRef.current !== requestKey) return;
+        if (
+          icon.imageData.startsWith("local_asset:") ||
+          icon.format === "svg"
+        ) {
+          setDetections((prev) => ({
+            ...prev,
+            [icon.id]: { hasWhite: false, isLowRes: false },
+          }));
+        }
+      }
+
+      const toDetect = icons.filter(
+        (icon) =>
+          !icon.imageData.startsWith("local_asset:") && icon.format !== "svg",
+      );
+
+      // Process with bounded concurrency (e.g. 4 at a time).
+      const CONCURRENCY = 4;
+      let cursor = 0;
+
+      const worker = async () => {
+        while (cursor < toDetect.length) {
+          const index = cursor++;
+          const icon = toDetect[index];
+          if (!isMounted.current || latestKeyRef.current !== requestKey) return;
+          try {
+            const lowResTask = isLowResIcon(
+              icon.imageData,
+              icon.format,
+              icon.originalWidth,
+              icon.originalHeight,
+            ).catch(() => false);
+            const whiteTask = detectWhiteBg(
+              icon.imageData,
+              icon.format,
+              60,
+            ).catch(() => false);
+            const [hasWhite, isLowRes] = await Promise.all([
+              whiteTask,
+              lowResTask,
+            ]);
+            // Ignore results from a superseded request.
+            if (!isMounted.current || latestKeyRef.current !== requestKey)
+              return;
+            setDetections((prev) => ({
+              ...prev,
+              [icon.id]: {
+                hasWhite: Boolean(hasWhite),
+                isLowRes: Boolean(isLowRes),
+              },
+            }));
+          } catch {
+            if (!isMounted.current || latestKeyRef.current !== requestKey)
+              return;
+            setDetections((prev) => ({
+              ...prev,
+              [icon.id]: { hasWhite: false, isLowRes: false },
+            }));
+          }
+        }
+      };
+
+      const workers = Array.from(
+        { length: Math.min(CONCURRENCY, toDetect.length) },
+        () => worker(),
+      );
+      await Promise.all(workers);
+    },
+    [],
+  );
+
   const loadIcons = useCallback(async () => {
     if (!iconKey) return;
     const requestKey = iconKey;
@@ -140,6 +237,8 @@ const SubscriptionIconPickerModal = ({
             format: icon.format,
             originalUrl: icon.originalUrl,
             reportedType,
+            originalWidth: icon.originalWidth,
+            originalHeight: icon.originalHeight,
           };
         });
 
@@ -155,11 +254,14 @@ const SubscriptionIconPickerModal = ({
         console.log(
           `[PICKER] Loaded ${visible.length} icons for ${iconKey} (${mapped.length} total, reports hidden by default)`,
         );
+
+        // Run per-icon white-bg / low-res detection for the corrective chips.
+        detectIcons(mapped, requestKey);
       }
     } catch (error) {
       console.error("[PICKER] Failed to load icons:", error);
     }
-  }, [iconKey, subscriptionIcon, showIncorrect, showBroken]);
+  }, [iconKey, subscriptionIcon, showIncorrect, showBroken, detectIcons]);
 
   useEffect(() => {
     isMounted.current = true;
@@ -232,6 +334,101 @@ const SubscriptionIconPickerModal = ({
 
     onIconChange();
     onClose();
+  };
+
+  // Persist a processed icon (white-bg removed or AI-upscaled) as the cached
+  // icon so the card reflects it immediately.
+  const persistProcessedIcon = async (
+    icon: PickerIcon,
+    processedBase64: string,
+    newFormat: string,
+    event: string,
+  ) => {
+    if (!iconKey) return;
+    await setCachedIcon(
+      iconKey,
+      processedBase64,
+      icon.source,
+      newFormat,
+      icon.originalUrl,
+    );
+    posthog.capture(event, {
+      subscription_name: subscriptionName,
+      icon_key: iconKey,
+      source: icon.source,
+    });
+    // Update the visible tile in-place so the user sees the processed icon
+    // right away (the tapped tile's id is derived from the ORIGINAL bytes, so
+    // reloading from the crawl-result rows alone would still show the old art).
+    setAvailableIcons((prev) =>
+      prev.map((i) =>
+        i.id === icon.id
+          ? {
+              ...i,
+              imageData: processedBase64,
+              format: newFormat,
+              source: icon.source,
+              originalUrl: icon.originalUrl,
+            }
+          : i,
+      ),
+    );
+    onIconChange();
+    Alert.alert("Updated", "The icon has been updated.");
+  };
+
+  const handleClearWhiteBackground = async (icon: PickerIcon) => {
+    setProcessing({ id: icon.id, kind: "white" });
+    try {
+      const base64 = await removeWhiteBg(icon.imageData, icon.format, 60);
+      if (!base64) {
+        Alert.alert("Error", "Could not process this icon.");
+        return;
+      }
+      await persistProcessedIcon(
+        icon,
+        base64,
+        "png",
+        "icon_picker_remove_white_bg",
+      );
+      setDetections((prev) => ({
+        ...prev,
+        [icon.id]: { ...prev[icon.id], hasWhite: false } as IconDetection,
+      }));
+    } catch (err) {
+      console.error("[PICKER] white-bg removal failed:", err);
+      Alert.alert("Error", "Failed to clear white background.");
+    } finally {
+      setProcessing(null);
+    }
+  };
+
+  const handleUpscale = async (icon: PickerIcon) => {
+    setProcessing({ id: icon.id, kind: "upscale" });
+    try {
+      // force=true so we always re-upscale even if the stored bytes were
+      // already a 256px bilinear upscale from crawl time (still low quality).
+      const { base64, format } = await upscaleIconAi(
+        icon.imageData,
+        icon.format,
+        true,
+      );
+      await persistProcessedIcon(
+        icon,
+        base64,
+        format,
+        "icon_picker_upscale_ai",
+      );
+      setDetections((prev) => ({
+        ...prev,
+        [icon.id]: { ...prev[icon.id], isLowRes: false } as IconDetection,
+      }));
+    } catch (err) {
+      console.error("[PICKER] upscale failed:", err);
+      Alert.alert("Error", "Failed to upscale icon.");
+    } finally {
+      setProcessing(null);
+    }
   };
 
   const handleUseDefault = async () => {
@@ -324,6 +521,11 @@ const SubscriptionIconPickerModal = ({
       : { uri: dataUri };
 
     const isReported = !!item.reportedType;
+    const detection = detections[item.id];
+    const isProcessingWhite =
+      processing?.id === item.id && processing.kind === "white";
+    const isProcessingUpscale =
+      processing?.id === item.id && processing.kind === "upscale";
 
     return (
       <View className="items-center gap-2 px-2 py-3">
@@ -337,27 +539,73 @@ const SubscriptionIconPickerModal = ({
             resizeMode="contain"
           />
         </Pressable>
-        <View className="flex-row gap-1">
+
+        {/* Corrective chips (white-bg / upscale) — shown based on detection */}
+        <View className="flex-row items-center gap-1">
+          {detections[item.id]?.hasWhite && (
+            <Pressable
+              onPress={() => handleClearWhiteBackground(item)}
+              disabled={!!processing}
+              className="items-center rounded-full bg-blue-100 px-2 py-1"
+              hitSlop={8}
+            >
+              {isProcessingWhite ? (
+                <ActivityIndicator size="small" color="#1d4ed8" />
+              ) : (
+                <Text className="text-[10px] font-sans-semibold text-blue-700">
+                  Clear White BG
+                </Text>
+              )}
+            </Pressable>
+          )}
+          {detections[item.id]?.isLowRes && (
+            <Pressable
+              onPress={() => handleUpscale(item)}
+              disabled={!!processing}
+              className="items-center rounded-full bg-purple-100 px-2 py-1"
+              hitSlop={8}
+            >
+              {isProcessingUpscale ? (
+                <ActivityIndicator size="small" color="#7c3aed" />
+              ) : (
+                <Text className="text-[10px] font-sans-semibold text-purple-700">
+                  Upscale (AI)
+                </Text>
+              )}
+            </Pressable>
+          )}
+        </View>
+
+        {/* Report chips */}
+        <View className="flex-row items-center gap-1">
           {isReported ? (
             <Pressable
               onPress={() => handleMarkAsGood(item)}
-              className="px-1.5 py-0.5"
+              className="rounded-full bg-green-100 px-2.5 py-1"
             >
-              <Text className="text-xs text-green-500">✓ good</Text>
+              <Text className="text-xs font-sans-semibold text-green-700">
+                ✓ Good
+              </Text>
             </Pressable>
           ) : (
             <>
               <Pressable
                 onPress={() => openReport(item, "wrong")}
-                className="px-1.5 py-0.5"
+                className="items-center rounded-full bg-destructive/10 px-2.5 py-1"
+                hitSlop={8}
               >
-                <Text className="text-xs text-muted-foreground">X</Text>
+                <Text className="text-xs font-sans-semibold text-destructive">
+                  Wrong
+                </Text>
               </Pressable>
               <Pressable
                 onPress={() => openReport(item, "broken")}
-                className="px-1.5 py-0.5"
+                className="items-center rounded-full bg-amber-100 px-2.5 py-1"
+                hitSlop={8}
               >
-                <Text className="text-xs text-muted-foreground">!</Text>
+                <Text className="text-xs font-sans-semibold text-amber-700">
+                  Broken
+                </Text>
               </Pressable>
             </>
           )}

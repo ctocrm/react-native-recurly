@@ -1,8 +1,10 @@
 import images from "@/constants/images";
+import ConfirmModal from "@/src/components/ConfirmModal";
 import ConflictResolutionModal from "@/src/components/ConflictResolutionModal";
 import UserSettingsModal from "@/src/components/UserSettingsModal";
 import { useCloudSync } from "@/src/context/CloudSyncContext";
 import { useDatabase } from "@/src/context/DatabaseProvider";
+import { useIconCache } from "@/src/context/IconCacheContext";
 import { useSubscriptions } from "@/src/context/SubscriptionContext";
 import { useClerk, useUser } from "@clerk/expo";
 import FontAwesome6 from "@expo/vector-icons/FontAwesome6";
@@ -10,7 +12,7 @@ import * as DocumentPicker from "expo-document-picker";
 import * as Sharing from "expo-sharing";
 import { styled } from "nativewind";
 import { usePostHog } from "posthog-react-native";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -24,10 +26,14 @@ import {
 } from "react-native";
 import { SafeAreaView as RNSafeAreaView } from "react-native-safe-area-context";
 import {
+  clearCrawlHistory,
+  clearIconCache,
   executeImportActions,
   executeNonConflictingImport,
   exportBackup,
+  getIconCacheStats,
   importBackup,
+  type IconCacheStats,
   type ImportScanResult,
 } from "../../services/database";
 
@@ -66,6 +72,8 @@ const getOrderedProviders = () => {
   ];
 };
 
+type ClearTarget = "iconCache" | "crawlHistory" | null;
+
 const Settings = () => {
   const { signOut } = useClerk();
   const { user } = useUser();
@@ -75,6 +83,7 @@ const Settings = () => {
   const posthog = usePostHog();
   const { isReady } = useDatabase();
   const { refreshSubscriptions } = useSubscriptions();
+  const { clearCache } = useIconCache();
   const {
     syncMetadata,
     isInitialized,
@@ -124,8 +133,33 @@ const Settings = () => {
     }[]
   >([]);
 
+  // Cache & crawl data management
+  const [cacheStats, setCacheStats] = useState<IconCacheStats>({
+    iconCache: 0,
+    crawlResults: 0,
+    crawlQueue: 0,
+    crawledUrls: 0,
+  });
+  const [confirmTarget, setConfirmTarget] = useState<ClearTarget>(null);
+  const [clearing, setClearing] = useState(false);
+
   // Compute ordered providers once using useMemo
   const orderedProviders = useMemo(() => getOrderedProviders(), []);
+
+  // Load cache / crawl statistics so the UI can show live counts.
+  const loadStats = useCallback(async () => {
+    if (!isReady) return;
+    try {
+      const stats = await getIconCacheStats();
+      setCacheStats(stats);
+    } catch (error) {
+      console.error("Failed to load cache stats:", error);
+    }
+  }, [isReady]);
+
+  useEffect(() => {
+    loadStats();
+  }, [loadStats]);
 
   // ---------------------------------------------------------------------------
   // Sign Out
@@ -322,6 +356,50 @@ const Settings = () => {
   };
 
   // ---------------------------------------------------------------------------
+  // Cache & Crawl Data
+  // ---------------------------------------------------------------------------
+
+  const confirmConfig: Record<
+    Exclude<ClearTarget, null>,
+    { title: string; message: string; event: string }
+  > = {
+    iconCache: {
+      title: "Clear Icon Cache",
+      message: `This removes all ${cacheStats.iconCache} cached icon(s), ${cacheStats.crawlResults} crawl candidate(s) and ${cacheStats.crawlQueue} queued fetch(es). Crawled URLs are preserved, so previously crawled icons may not be re-downloaded.`,
+      event: "settings_clear_icon_cache",
+    },
+    crawlHistory: {
+      title: "Clear Spider / Crawl History",
+      message: `This clears the ${cacheStats.crawledUrls} crawled URL(s) used for deduplication and resets all rate-limit cooldowns, so re-spidering starts fresh with repeatable behaviour.`,
+      event: "settings_clear_crawl_history",
+    },
+  };
+
+  const handleConfirmClear = async () => {
+    const target = confirmTarget;
+    setConfirmTarget(null);
+    if (!target || !isReady) return;
+
+    setClearing(true);
+    try {
+      if (target === "iconCache") {
+        await clearIconCache();
+        clearCache(); // empty the in-memory cache map too
+        posthog.capture("settings_clear_icon_cache");
+      } else {
+        await clearCrawlHistory();
+        posthog.capture("settings_clear_crawl_history");
+      }
+      await loadStats();
+    } catch (error) {
+      console.error("Failed to clear data:", error);
+      Alert.alert("Error", "Failed to clear data");
+    } finally {
+      setClearing(false);
+    }
+  };
+
+  // ---------------------------------------------------------------------------
   // Cloud Sync
   // ---------------------------------------------------------------------------
 
@@ -506,6 +584,39 @@ const Settings = () => {
               </Text>
             </View>
           </View>
+        </View>
+
+        {/* Cache & Crawl Data Section */}
+        <View className="auth-card mb-5">
+          <Text className="text-base font-sans-semibold text-primary mb-3">
+            Cache & Crawl Data
+          </Text>
+          <Text className="text-xs font-sans-medium text-muted-foreground mb-3">
+            Clear cached icon data or spider/crawl history to reset crawlers and
+            make re-searching repeatable.
+          </Text>
+
+          <Pressable
+            className={`auth-button bg-destructive mb-3 ${clearing || !isReady ? "opacity-50" : ""}`}
+            onPress={() => setConfirmTarget("iconCache")}
+            disabled={clearing || !isReady}
+          >
+            <Text className="auth-button-text text-white">
+              Clear Icon Cache
+              {cacheStats.iconCache > 0 ? ` (${cacheStats.iconCache})` : ""}
+            </Text>
+          </Pressable>
+
+          <Pressable
+            className={`auth-button bg-destructive ${clearing || !isReady ? "opacity-50" : ""}`}
+            onPress={() => setConfirmTarget("crawlHistory")}
+            disabled={clearing || !isReady}
+          >
+            <Text className="auth-button-text text-white">
+              Clear Spider / Crawl History
+              {cacheStats.crawledUrls > 0 ? ` (${cacheStats.crawledUrls})` : ""}
+            </Text>
+          </Pressable>
         </View>
 
         {/* Cloud Sync Section */}
@@ -752,6 +863,17 @@ const Settings = () => {
         conflicts={conflictRows}
         onResolve={handleConflictResolve}
         onCancel={handleConflictCancel}
+      />
+
+      {/* Clear data confirmation modal */}
+      <ConfirmModal
+        visible={confirmTarget !== null}
+        title={confirmTarget ? confirmConfig[confirmTarget].title : ""}
+        message={confirmTarget ? confirmConfig[confirmTarget].message : ""}
+        confirmLabel={clearing ? "Clearing..." : "Clear"}
+        destructive
+        onConfirm={handleConfirmClear}
+        onCancel={() => setConfirmTarget(null)}
       />
     </SafeAreaView>
   );

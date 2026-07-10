@@ -11,6 +11,7 @@ interface IconCacheContextType {
   getCachedIconData: (iconKey: string) => Promise<string | null>;
   cachedIcons: Map<string, string>;
   isIconCached: (iconKey: string) => boolean;
+  clearCache: () => void;
 }
 
 const IconCacheContext = createContext<IconCacheContextType | undefined>(
@@ -59,6 +60,13 @@ export const IconCacheProvider = ({ children }: { children: ReactNode }) => {
     [cachedIcons],
   );
 
+  // Empty both the module-level in-memory map and the exposed state. The
+  // database table is cleared separately by clearIconCache().
+  const clearCache = useCallback(() => {
+    iconCacheMap.clear();
+    setCachedIcons(new Map());
+  }, []);
+
   // No AppState listener here: DatabaseProvider is a child of this provider,
   // so the database may not be ready yet. Foreground queue processing is
   // handled by SubscriptionProvider which is inside DatabaseProvider.
@@ -69,6 +77,7 @@ export const IconCacheProvider = ({ children }: { children: ReactNode }) => {
         getCachedIconData,
         cachedIcons,
         isIconCached,
+        clearCache,
       }}
     >
       {children}

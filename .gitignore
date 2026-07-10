@@ -5,6 +5,7 @@ node_modules/
 
 # Expo
 .expo/
+.expo-export-tmp/
 dist/
 web-build/
 expo-env.d.ts
@@ -32,6 +33,9 @@ yarn-error.*
 
 # local env files
 .env*.local
+
+# Python virtual environment
+.venv/
 
 # typescript
 *.tsbuildinfo

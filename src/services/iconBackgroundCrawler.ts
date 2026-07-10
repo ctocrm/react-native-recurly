@@ -22,10 +22,11 @@ import {
   hashImageData,
 } from "@/src/services/iconReportService";
 import { findAllIconSources } from "@/src/services/iconScraper";
-import { upscaleIconIfSmall } from "@/src/services/iconUpscaler";
+import { mimeForFormat, upscaleIconIfSmall } from "@/src/services/iconUpscaler";
 import { isBase64IconValid } from "@/src/services/iconValidation";
 import { isDomainRateLimited } from "@/src/services/rateLimitTracker";
 import { searchForLinksToSpider } from "@/src/services/searchEngines";
+import { Image } from "react-native";
 
 // In-flight guard
 let isProcessingQueue = false;
@@ -89,14 +90,37 @@ async function downloadImageAsBase64(
     const b64 = btoa(binary);
     console.log(`[FETCH] SUCCESS: ${url} (${b64.length} bytes)`);
 
-    // Rudimentary upscale for low-res icons (e.g. favicons) before storing.
+    // Measure original dimensions BEFORE upscaling so we can determine if the
+    // icon is truly low-res and show the "Upscale (AI)" button in the picker.
     const format = detectUrlFormat(url);
+    const mime = mimeForFormat(format);
+    const dataUri = `data:${mime};base64,${b64}`;
+    const origSize = await new Promise<{ width: number; height: number }>(
+      (resolve, reject) => {
+        Image.getSize(
+          dataUri,
+          (width, height) => resolve({ width, height }),
+          (err) => reject(err),
+        );
+      },
+    ).catch(() => null);
+
+    // Rudimentary upscale for low-res icons (e.g. favicons) before storing.
     const { base64: finalB64, format: finalFormat } = await upscaleIconIfSmall(
       b64,
       format,
     );
 
-    await saveCrawlResult(iconKey, finalB64, source, finalFormat, url);
+    await saveCrawlResult(
+      iconKey,
+      finalB64,
+      source,
+      finalFormat,
+      url,
+      0,
+      origSize?.width,
+      origSize?.height,
+    );
     notifyCacheUpdate();
     return true;
   } catch (err: any) {
@@ -154,6 +178,8 @@ export async function getIconCollection(iconKey: string): Promise<{
     source: string;
     format: string;
     originalUrl: string | null;
+    originalWidth?: number;
+    originalHeight?: number;
   }[];
 }> {
   try {
@@ -174,6 +200,8 @@ export async function getIconCollection(iconKey: string): Promise<{
         source: string;
         format: string;
         originalUrl: string | null;
+        originalWidth?: number;
+        originalHeight?: number;
       }
     >();
 
@@ -196,6 +224,8 @@ export async function getIconCollection(iconKey: string): Promise<{
         source: cached.source,
         format: displayData.format,
         originalUrl: cached.originalUrl,
+        originalWidth: cached.originalWidth,
+        originalHeight: cached.originalHeight,
       });
     }
 
@@ -214,6 +244,8 @@ export async function getIconCollection(iconKey: string): Promise<{
           source: r.source,
           format: displayData.format,
           originalUrl: r.originalUrl,
+          originalWidth: r.originalWidth,
+          originalHeight: r.originalHeight,
         });
       }
     }
@@ -660,6 +692,9 @@ export async function processIconQueue(): Promise<void> {
               best.source,
               bestUpscaled.format,
               best.originalUrl,
+              0,
+              best.originalWidth,
+              best.originalHeight,
             );
             console.log(`[QUEUE] Set best icon as cached: ${best.source}`);
           }
@@ -701,6 +736,9 @@ export async function promoteFirstIconToCache(iconKey: string): Promise<void> {
       best.source,
       bestUpscaled.format,
       best.originalUrl,
+      0,
+      best.originalWidth,
+      best.originalHeight,
     );
     console.log(`[CRAWL] Auto-assigned first icon for ${iconKey}`);
   } catch (err) {

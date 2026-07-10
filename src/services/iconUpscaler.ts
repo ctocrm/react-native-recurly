@@ -72,6 +72,7 @@ export interface UpscaleResult {
 export async function upscaleIconIfSmall(
   base64: string,
   format: string,
+  force = false,
 ): Promise<UpscaleResult> {
   // Vector icons scale natively — nothing to do.
   if (format === "svg") return { base64, format };
@@ -95,10 +96,15 @@ export async function upscaleIconIfSmall(
     );
 
     const maxDim = Math.max(size.width, size.height);
-    if (maxDim >= UPSCALE_THRESHOLD_PX) {
-      // Already large enough — no upscaling needed.
+    if (maxDim >= UPSCALE_THRESHOLD_PX && !force) {
+      // Already large enough — no upscaling needed (unless forced by an
+      // explicit user tap on the "Upscale (AI)" button).
       return { base64, format };
     }
+
+    // When forced, ensure we still grow the icon to at least TARGET_SIZE_PX
+    // (or double its current size if it's already larger than the target).
+    const targetWidth = Math.max(TARGET_SIZE_PX, maxDim * 2);
 
     await writeAsStringAsync(tmpUri, base64, {
       encoding: EncodingType.Base64,
@@ -108,7 +114,7 @@ export async function upscaleIconIfSmall(
     // ratio; manipulateAsync scales the other side proportionally.
     const result = await manipulateAsync(
       tmpUri,
-      [{ resize: { width: TARGET_SIZE_PX } }],
+      [{ resize: { width: targetWidth } }],
       { compress: 1, format: saveFormatFor(format) },
     );
     resultUri = result.uri;
