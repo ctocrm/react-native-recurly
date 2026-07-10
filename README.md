@@ -33,7 +33,7 @@ This project uses native Android/iOS builds instead of EAS. The AI upscaling fea
 
 ### Prerequisites
 
-- **Android SDK** installed and `$ANDROID_HOME` set (default: `/home/d/Android/Sdk`)
+- **Android SDK** installed and `$ANDROID_HOME` set (point this to your local SDK installation, e.g. `~/Android/Sdk`)
 - **Java JDK** 17+ installed (required for react-native-fast-tflite)
 - **Android SDK Platform** 34+ installed
 - **Android Emulator** with an AVD configured (e.g., Pixel_6a)
@@ -118,4 +118,3 @@ Join our community of developers creating universal apps.
 
 - [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
 - [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
-

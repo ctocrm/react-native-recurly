@@ -63,8 +63,14 @@ let modelFailed = false;
  */
 function tfliteModuleExists(): boolean {
   try {
-    const { NativeModules } = require("react-native");
-    return !!(NativeModules && NativeModules.RNTflite);
+    const TurboModuleRegistry = require("react-native").TurboModuleRegistry;
+    // react-native-fast-tflite exposes its TurboModule under the name "Tflite".
+    const mod =
+      TurboModuleRegistry &&
+      (TurboModuleRegistry.get
+        ? TurboModuleRegistry.get("Tflite")
+        : TurboModuleRegistry.getEnforcing("Tflite"));
+    return !!mod;
   } catch {
     return false;
   }
@@ -136,10 +142,10 @@ export async function upscaleIconAi(
     const mime = mimeForFormat(format);
     const srcUri = `data:${mime};base64,${base64}`;
 
-    // Resize to the model's expected input size (32px on the long side).
+    // Resize to the model's expected square input size (32x32).
     const bounded = await manipulateAsync(
       srcUri,
-      [{ resize: { width: MODEL_INPUT_PX } }],
+      [{ resize: { width: MODEL_INPUT_PX, height: MODEL_INPUT_PX } }],
       { compress: 1, format: SaveFormat.PNG },
     );
 
@@ -183,8 +189,8 @@ export async function upscaleIconAi(
       rgba[i * 4 + 3] = 255;
     }
 
-    // Encode the upscaled RGBA back to a PNG.
-    const pngData = UPNG.encode([rgba.buffer as ArrayBuffer], outW, outH, 256);
+    // Encode the upscaled RGBA back to a PNG (cnum=0 → full 32-bit RGBA, no palette quantization).
+    const pngData = UPNG.encode([rgba.buffer as ArrayBuffer], outW, outH, 0);
     const uint8 = new Uint8Array(pngData);
     let outB64 = "";
     const chunkSize = 8192;

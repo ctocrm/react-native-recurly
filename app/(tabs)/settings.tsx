@@ -365,7 +365,7 @@ const Settings = () => {
   > = {
     iconCache: {
       title: "Clear Icon Cache",
-      message: `This removes all ${cacheStats.iconCache} cached icon(s), ${cacheStats.crawlResults} crawl candidate(s) and ${cacheStats.crawlQueue} queued fetch(es). Re-searching an icon will re-download everything from scratch.`,
+      message: `This removes all ${cacheStats.iconCache} cached icon(s), ${cacheStats.crawlResults} crawl candidate(s) and ${cacheStats.crawlQueue} queued fetch(es). Crawled URLs are preserved, so previously crawled icons may not be re-downloaded.`,
       event: "settings_clear_icon_cache",
     },
     crawlHistory: {

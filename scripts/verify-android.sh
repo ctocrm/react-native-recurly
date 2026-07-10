@@ -46,7 +46,7 @@ if [ -n "$DEV_MODE" ]; then
     "$SCRIPT_DIR/build-android.sh" --dev ${FORCE_MODEL:+$FORCE_MODEL} ${WATCH:+$WATCH}
 else
     echo "[VERIFY] Building self-contained APK..."
-    "$SCRIPT_DIR/build-android.sh" --arch x86_64 ${FORCE_MODEL:+$FORCE_MODEL} ${WATCH:+$WATCH}
+    "$SCRIPT_DIR/build-android.sh" --arch x86_64 --install ${FORCE_MODEL:+$FORCE_MODEL} ${WATCH:+$WATCH}
 fi
 echo ""
 

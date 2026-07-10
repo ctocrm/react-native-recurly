@@ -6,7 +6,6 @@
  */
 
 import {
-  cacheDirectory,
   deleteAsync,
   EncodingType,
   readAsStringAsync,
@@ -25,7 +24,7 @@ export async function detectWhiteBg(
 ): Promise<boolean> {
   if (format === "svg") return false;
 
-  const tmpUri = `${cacheDirectory}white_detect_${Date.now()}.png`;
+  let tmpUri: string | undefined;
   try {
     const mime = format === "svg" ? "image/svg+xml" : `image/${format}`;
     const srcUri = `data:${mime};base64,${base64}`;
@@ -36,6 +35,7 @@ export async function detectWhiteBg(
       [{ resize: { width: 128 } }], // keep it small for speed
       { compress: 1, format: SaveFormat.PNG },
     );
+    tmpUri = result.uri;
 
     const pngB64 = await readAsStringAsync(result.uri, {
       encoding: EncodingType.Base64,
@@ -80,7 +80,9 @@ export async function detectWhiteBg(
     console.warn("[WHITE_BG] detect failed:", err);
     return false;
   } finally {
-    await deleteAsync(tmpUri, { idempotent: true }).catch(() => {});
+    if (tmpUri) {
+      await deleteAsync(tmpUri, { idempotent: true }).catch(() => {});
+    }
   }
 }
 
@@ -96,8 +98,7 @@ export async function removeWhiteBg(
 ): Promise<string | null> {
   if (format === "svg") return null;
 
-  const tmpUri = `${cacheDirectory}white_remove_${Date.now()}.png`;
-  const outUri = `${cacheDirectory}white_remove_out_${Date.now()}.png`;
+  let tmpUri: string | undefined;
   try {
     const mime = format === "svg" ? "image/svg+xml" : `image/${format}`;
     const srcUri = `data:${mime};base64,${base64}`;
@@ -107,6 +108,7 @@ export async function removeWhiteBg(
       compress: 1,
       format: SaveFormat.PNG,
     });
+    tmpUri = result.uri;
 
     const pngB64 = await readAsStringAsync(result.uri, {
       encoding: EncodingType.Base64,
@@ -136,8 +138,8 @@ export async function removeWhiteBg(
       }
     }
 
-    // Encode back to PNG.
-    const pngData = UPNG.encode([rgba.buffer as ArrayBuffer], w, h, 256);
+    // Encode back to PNG (cnum=0 → full 32-bit RGBA, no palette quantization).
+    const pngData = UPNG.encode([rgba.buffer as ArrayBuffer], w, h, 0);
     // Chunk the conversion to avoid "Maximum call stack size exceeded" from
     // spreading a large Uint8Array into String.fromCharCode() arguments.
     const uint8 = new Uint8Array(pngData);
@@ -155,7 +157,8 @@ export async function removeWhiteBg(
     console.warn("[WHITE_BG] removal failed:", err);
     return null;
   } finally {
-    await deleteAsync(tmpUri, { idempotent: true }).catch(() => {});
-    await deleteAsync(outUri, { idempotent: true }).catch(() => {});
+    if (tmpUri) {
+      await deleteAsync(tmpUri, { idempotent: true }).catch(() => {});
+    }
   }
 }

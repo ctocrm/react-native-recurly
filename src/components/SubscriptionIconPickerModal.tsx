@@ -130,46 +130,80 @@ const SubscriptionIconPickerModal = ({
   }, [refreshRateLimitedDomains]);
 
   // Detect white-bg + low-res for every (non-local) icon so the corrective
-  // chips show directly under each tile, like report chips.
+  // chips show directly under each tile, like report chips. Icons are processed
+  // with bounded concurrency so detection stays responsive for large sets.
   const detectIcons = useCallback(
     async (icons: PickerIcon[], requestKey: string) => {
-      const next: Record<string, IconDetection> = {};
+      // Local assets and SVGs are handled immediately (no detection needed).
       for (const icon of icons) {
         if (!isMounted.current || latestKeyRef.current !== requestKey) return;
         if (
           icon.imageData.startsWith("local_asset:") ||
           icon.format === "svg"
         ) {
-          next[icon.id] = { hasWhite: false, isLowRes: false };
-          continue;
-        }
-        try {
-          const lowResTask = isLowResIcon(
-            icon.imageData,
-            icon.format,
-            icon.originalWidth,
-            icon.originalHeight,
-          ).catch(() => false);
-          const whiteTask = detectWhiteBg(
-            icon.imageData,
-            icon.format,
-            60,
-          ).catch(() => false);
-          const [hasWhite, isLowRes] = await Promise.all([
-            whiteTask,
-            lowResTask,
-          ]);
-          next[icon.id] = {
-            hasWhite: Boolean(hasWhite),
-            isLowRes: Boolean(isLowRes),
-          };
-        } catch {
-          next[icon.id] = { hasWhite: false, isLowRes: false };
+          setDetections((prev) => ({
+            ...prev,
+            [icon.id]: { hasWhite: false, isLowRes: false },
+          }));
         }
       }
-      if (isMounted.current && latestKeyRef.current === requestKey) {
-        setDetections((prev) => ({ ...prev, ...next }));
-      }
+
+      const toDetect = icons.filter(
+        (icon) =>
+          !icon.imageData.startsWith("local_asset:") && icon.format !== "svg",
+      );
+
+      // Process with bounded concurrency (e.g. 4 at a time).
+      const CONCURRENCY = 4;
+      let cursor = 0;
+
+      const worker = async () => {
+        while (cursor < toDetect.length) {
+          const index = cursor++;
+          const icon = toDetect[index];
+          if (!isMounted.current || latestKeyRef.current !== requestKey) return;
+          try {
+            const lowResTask = isLowResIcon(
+              icon.imageData,
+              icon.format,
+              icon.originalWidth,
+              icon.originalHeight,
+            ).catch(() => false);
+            const whiteTask = detectWhiteBg(
+              icon.imageData,
+              icon.format,
+              60,
+            ).catch(() => false);
+            const [hasWhite, isLowRes] = await Promise.all([
+              whiteTask,
+              lowResTask,
+            ]);
+            // Ignore results from a superseded request.
+            if (!isMounted.current || latestKeyRef.current !== requestKey)
+              return;
+            setDetections((prev) => ({
+              ...prev,
+              [icon.id]: {
+                hasWhite: Boolean(hasWhite),
+                isLowRes: Boolean(isLowRes),
+              },
+            }));
+          } catch {
+            if (!isMounted.current || latestKeyRef.current !== requestKey)
+              return;
+            setDetections((prev) => ({
+              ...prev,
+              [icon.id]: { hasWhite: false, isLowRes: false },
+            }));
+          }
+        }
+      };
+
+      const workers = Array.from(
+        { length: Math.min(CONCURRENCY, toDetect.length) },
+        () => worker(),
+      );
+      await Promise.all(workers);
     },
     [],
   );
@@ -506,36 +540,40 @@ const SubscriptionIconPickerModal = ({
           />
         </Pressable>
 
-        {/* Corrective chips (white-bg / upscale) — always shown */}
+        {/* Corrective chips (white-bg / upscale) — shown based on detection */}
         <View className="flex-row items-center gap-1">
-          <Pressable
-            onPress={() => handleClearWhiteBackground(item)}
-            disabled={!!processing}
-            className="items-center rounded-full bg-blue-100 px-2 py-1"
-            hitSlop={8}
-          >
-            {isProcessingWhite ? (
-              <ActivityIndicator size="small" color="#1d4ed8" />
-            ) : (
-              <Text className="text-[10px] font-sans-semibold text-blue-700">
-                Clear White BG
-              </Text>
-            )}
-          </Pressable>
-          <Pressable
-            onPress={() => handleUpscale(item)}
-            disabled={!!processing}
-            className="items-center rounded-full bg-purple-100 px-2 py-1"
-            hitSlop={8}
-          >
-            {isProcessingUpscale ? (
-              <ActivityIndicator size="small" color="#7c3aed" />
-            ) : (
-              <Text className="text-[10px] font-sans-semibold text-purple-700">
-                Upscale (AI)
-              </Text>
-            )}
-          </Pressable>
+          {detections[item.id]?.hasWhite && (
+            <Pressable
+              onPress={() => handleClearWhiteBackground(item)}
+              disabled={!!processing}
+              className="items-center rounded-full bg-blue-100 px-2 py-1"
+              hitSlop={8}
+            >
+              {isProcessingWhite ? (
+                <ActivityIndicator size="small" color="#1d4ed8" />
+              ) : (
+                <Text className="text-[10px] font-sans-semibold text-blue-700">
+                  Clear White BG
+                </Text>
+              )}
+            </Pressable>
+          )}
+          {detections[item.id]?.isLowRes && (
+            <Pressable
+              onPress={() => handleUpscale(item)}
+              disabled={!!processing}
+              className="items-center rounded-full bg-purple-100 px-2 py-1"
+              hitSlop={8}
+            >
+              {isProcessingUpscale ? (
+                <ActivityIndicator size="small" color="#7c3aed" />
+              ) : (
+                <Text className="text-[10px] font-sans-semibold text-purple-700">
+                  Upscale (AI)
+                </Text>
+              )}
+            </Pressable>
+          )}
         </View>
 
         {/* Report chips */}

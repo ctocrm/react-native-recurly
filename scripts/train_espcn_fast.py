@@ -20,13 +20,41 @@ def build_espcn():
     return Model(inp, out)
 
 def synth_data(n=1000):
-    hr = np.random.rand(n, HR, HR, 3).astype(np.float32)
-    hr = tf.image.resize(tf.image.resize(hr, (8, 8)), (HR, HR)).numpy()
+    """Generate synthetic icon-like images with edges and shapes (deterministic).
+
+    These stand in for real high-resolution app icons: flat coloured shapes
+    (circles, rectangles) on a contrasting background, exercising real edges
+    rather than random pixel noise so the upscaler learns meaningful detail.
+    """
+    rng = np.random.default_rng(42)
+    hr = np.zeros((n, HR, HR, 3), dtype=np.float32)
+    for i in range(n):
+        # Background colour
+        bg = rng.uniform(0.0, 0.3, size=3)
+        hr[i] = bg
+        # Foreground shape colour
+        fg = rng.uniform(0.6, 1.0, size=3)
+        cy, cx = rng.integers(HR // 4, 3 * HR // 4, size=2)
+        r = rng.integers(HR // 5, HR // 3)
+        yy, xx = np.mgrid[0:HR, 0:HR]
+        mask = (xx - cx) ** 2 + (yy - cy) ** 2 <= r * r
+        if rng.random() < 0.5:
+            hr[i, mask] = fg
+        else:
+            # Square / rectangle region
+            half = r
+            rect = (
+                (np.abs(xx - cx) <= half)
+                & (np.abs(yy - cy) <= half)
+            )
+            hr[i, rect] = fg
     lr = tf.image.resize(hr, (LR, LR), method="bicubic").numpy()
     return lr, hr
 
 def main():
-    os.makedirs("/home/d/Desktop/jsmastery/assets/models", exist_ok=True)
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    model_dir = os.path.join(script_dir, "..", "assets", "models")
+    os.makedirs(model_dir, exist_ok=True)
     model = build_espcn()
     model.compile(optimizer="adam", loss="mae")
     print(f"Model params: {model.count_params()}")
@@ -38,7 +66,7 @@ def main():
     converter = tf.lite.TFLiteConverter.from_keras_model(model)
     tflite_model = converter.convert()
 
-    out = "/home/d/Desktop/jsmastery/assets/models/espcn_2x.tflite"
+    out = os.path.join(model_dir, "espcn_2x.tflite")
     with open(out, "wb") as f:
         f.write(tflite_model)
     print(f"WROTE {out} ({len(tflite_model)} bytes)")

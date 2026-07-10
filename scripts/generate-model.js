@@ -9,7 +9,7 @@
  *   --force    Force regeneration even if model exists and is fresh
  */
 
-const { execSync } = require("child_process");
+const { execFileSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 
@@ -69,7 +69,7 @@ function main() {
 
   try {
     console.log(`[MODEL] Running training script: ${PYTHON_SCRIPT}`);
-    execSync(`"${pythonCmd}" "${PYTHON_SCRIPT}"`, {
+    execFileSync(pythonCmd, [PYTHON_SCRIPT], {
       stdio: "inherit",
       cwd: path.join(__dirname, ".."),
     });

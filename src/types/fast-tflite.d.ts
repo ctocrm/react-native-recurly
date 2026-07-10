@@ -2,12 +2,12 @@
 // via a native dev build and is not present in the Expo Go type environment,
 // so we declare its surface here to keep tsc green.
 declare module "react-native-fast-tflite" {
-  export function loadTfliteModel(
+  export function loadTensorflowModel(
     modelPath: any,
     options?: any,
   ): Promise<{
-    runSync: (inputs: Uint8Array[]) => Promise<Uint8Array[]>;
-    run: (inputs: Uint8Array[]) => Promise<Uint8Array[]>;
+    runSync: (inputs: TypedArray[]) => TypedArray[];
+    run: (inputs: TypedArray[]) => Promise<TypedArray[]>;
     [key: string]: any;
   }>;
   const _default: any;

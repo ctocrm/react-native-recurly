@@ -9,6 +9,11 @@
 # No set -e: this is a long-running monitor that should not exit on transient errors
 set -u
 
+if [ "$#" -lt 2 ]; then
+  echo "Usage: $0 <log_file> <arch> [pid_to_watch]" >&2
+  exit 1
+fi
+
 LOG_FILE="$1"
 ARCH="$2"
 WATCH_PID="${3:-}"

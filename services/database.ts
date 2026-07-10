@@ -1149,8 +1149,8 @@ export async function getIconCacheStats(): Promise<IconCacheStats> {
 
 /**
  * Clears stored icon image data: the chosen icon cache, all crawl candidate
- * results, and the pending background fetch queue. After this a re-search will
- * re-download everything from scratch.
+ * results, and the pending background fetch queue. The crawled_urls dedup
+ * table is preserved, so previously crawled URLs may not be re-downloaded.
  */
 export async function clearIconCache(): Promise<void> {
   const db = getDatabase();

@@ -25,6 +25,7 @@ This project uses `react-native-fast-tflite` for on-device AI icon upscaling. Si
 The build script supports multiple modes for different workflows:
 
 ### Usage
+
 ```
 ./scripts/build-android.sh [options]
 
@@ -39,12 +40,12 @@ Options:
 
 ### Modes
 
-| Mode | Command | Description |
-|------|---------|-------------|
-| **Default** | `./scripts/build-android.sh` | Builds all 4 architectures sequentially |
-| **Dev** | `./scripts/build-android.sh --dev` | x86_64 only + install + launch on emulator |
-| **Single arch** | `./scripts/build-android.sh --arch arm64-v8a` | Build a specific architecture |
-| **With monitor** | `./scripts/build-android.sh --dev --watch` | Live status display during build |
+| Mode             | Command                                       | Description                                |
+| ---------------- | --------------------------------------------- | ------------------------------------------ |
+| **Default**      | `./scripts/build-android.sh`                  | Builds all 4 architectures sequentially    |
+| **Dev**          | `./scripts/build-android.sh --dev`            | x86_64 only + install + launch on emulator |
+| **Single arch**  | `./scripts/build-android.sh --arch arm64-v8a` | Build a specific architecture              |
+| **With monitor** | `./scripts/build-android.sh --dev --watch`    | Live status display during build           |
 
 ### Live Monitor
 
@@ -55,6 +56,7 @@ When `--watch` is enabled, the build-monitor shows a live status line:
 ```
 
 Features:
+
 - **Live task tracking**: Shows current Gradle task
 - **CPU usage**: Total CPU % of all build processes
 - **Process count**: Number of active build processes
@@ -101,6 +103,7 @@ npm run prebuild:android
 ```
 
 This generates/updates the native Android project with:
+
 - All Expo plugins (including `react-native-fast-tflite`)
 - Native module linking
 - Asset bundling configuration
@@ -119,10 +122,9 @@ This generates/updates the native Android project with:
 ```
 
 Output per architecture:
-- `android/app/build/outputs/apk/debug/app-x86_64-debug.apk`
-- `android/app/build/outputs/apk/debug/app-arm64-v8a-debug.apk`
-- `android/app/build/outputs/apk/debug/app-armeabi-v7a-debug.apk`
-- `android/app/build/outputs/apk/debug/app-x86-debug.apk`
+
+- `android/app/build/outputs/apk/debug/app-debug.apk`
+- `android/app/build/outputs/apk/release/app-release.apk`
 
 #### Step 4: Start Emulator and Install
 
@@ -149,20 +151,20 @@ Output per architecture:
 
 ### Build Commands Reference
 
-| Command                                       | Description                               |
-| --------------------------------------------- | ----------------------------------------- |
-| `npm run generate-model`                      | Generate TFLite model if needed           |
-| `npm run generate-model:force`                | Force model regeneration                  |
-| `npm run prebuild:android`                    | Generate native Android project           |
-| `./scripts/build-android.sh`                  | Build all archs (sequential)              |
-| `./scripts/build-android.sh --dev --watch`    | Quick dev build + install + launch        |
-| `./scripts/build-android.sh --arch x86_64`    | Build specific arch                       |
-| `./scripts/verify-android.sh --watch`         | Full verification with log monitoring     |
-| `./scripts/android-emulator.sh start`         | Start the emulator                        |
-| `./scripts/android-emulator.sh install <apk>` | Install APK to emulator                   |
-| `./scripts/android-emulator.sh launch`        | Launch the app                            |
-| `./scripts/android-emulator.sh logcat`        | Monitor app logs                          |
-| `./scripts/android-emulator.sh status`        | Check emulator status                     |
+| Command                                       | Description                           |
+| --------------------------------------------- | ------------------------------------- |
+| `npm run generate-model`                      | Generate TFLite model if needed       |
+| `npm run generate-model:force`                | Force model regeneration              |
+| `npm run prebuild:android`                    | Generate native Android project       |
+| `./scripts/build-android.sh`                  | Build all archs (sequential)          |
+| `./scripts/build-android.sh --dev --watch`    | Quick dev build + install + launch    |
+| `./scripts/build-android.sh --arch x86_64`    | Build specific arch                   |
+| `./scripts/verify-android.sh --watch`         | Full verification with log monitoring |
+| `./scripts/android-emulator.sh start`         | Start the emulator                    |
+| `./scripts/android-emulator.sh install <apk>` | Install APK to emulator               |
+| `./scripts/android-emulator.sh launch`        | Launch the app                        |
+| `./scripts/android-emulator.sh logcat`        | Monitor app logs                      |
+| `./scripts/android-emulator.sh status`        | Check emulator status                 |
 
 ---
 
@@ -223,6 +225,7 @@ The build will fail with error:
 ### EAS Build Removal
 
 EAS build configuration was removed:
+
 - Deleted `eas.json`
 - Removed build profiles from `app.config.js`
 - Kept only the `react-native-fast-tflite` plugin
@@ -270,6 +273,7 @@ Output: 64x64 RGB image
 ### TFLite Module Not Loading
 
 If you see `[ICON_AI] RNTflite native module not available`:
+
 - Ensure you're running a native build, not Expo Go
 - Check the APK was installed correctly
 - Verify `react-native-fast-tflite` is in `app.config.js` plugins
@@ -284,6 +288,7 @@ If you see `[ICON_AI] RNTflite native module not available`:
 ### Python Environment Issues
 
 The model training script requires TensorFlow:
+
 - Uses `/tmp/tfenv/bin/python` if available
 - Falls back to `python3` with `tensorflow` package
 - Create a virtual environment: `python3 -m venv .venv && pip install tensorflow numpy`

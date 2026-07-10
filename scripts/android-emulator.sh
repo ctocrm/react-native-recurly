@@ -12,7 +12,7 @@ ANDROID_SDK="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/home/d/Android/Sdk}}"
 AVD_NAME="Pixel_6a"
 APP_PACKAGE="com.ctocrm.jsmastery"
 APP_ACTIVITY="com.ctocrm.jsmastery.MainActivity"
-EMULATOR_LOG="/tmp/emu-boot-$$.log"
+EMULATOR_LOG="$(mktemp -t emu-boot.XXXXXX.log)"
 
 # Timeout in seconds
 TIMEOUT_SECONDS=300
