@@ -229,6 +229,8 @@ if [ "$DEV_MODE" = "true" ] && [ "$ALL_PASSED" = "true" ]; then
     echo "[BUILD] Dev mode: Installing APK on emulator..."
     APK_FILE="$BUILD_DIR/app/build/outputs/apk/debug/app-debug.apk"
     if [ -f "$APK_FILE" ]; then
+        # Ensure the emulator is running before installing (no-op if already up)
+        "$SCRIPT_DIR/android-emulator.sh" start
         "$SCRIPT_DIR/android-emulator.sh" install "$APK_FILE"
         "$SCRIPT_DIR/android-emulator.sh" launch
         echo ""
