@@ -5,6 +5,7 @@
 # Usage:
 #   ./scripts/build-android.sh                    # Self-contained build, all archs (default)
 #   ./scripts/build-android.sh --arch x86_64      # Build a specific arch (self-contained)
+#   ./scripts/build-android.sh --arch x86_64 --install   # Build + install on emulator
 #   ./scripts/build-android.sh --dev              # Dev client: x86_64 + expo start + install + launch
 #   ./scripts/build-android.sh --dev --watch      # Dev client with live monitor + expo server
 #   ./scripts/build-android.sh --parallel N       # Build all with N workers
@@ -18,6 +19,7 @@
 # Options:
 #   --arch all|x86_64|arm64-v8a|armeabi-v7a|x86   Architecture to build (default: all)
 #   --dev                                         Dev client mode (x86_64 + expo start + install + launch)
+#   --install                                     Install APK on emulator after build (self-contained mode only)
 #   --parallel N                                  Workers per arch (default: 1)
 #   --force-model                                 Force model regeneration
 #   --watch                                       Enable live build monitoring
@@ -37,6 +39,7 @@ FORCE_MODEL=false
 WATCH=false
 CLEAN=false
 DEV_MODE=false
+DO_INSTALL=false
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -48,6 +51,10 @@ while [[ $# -gt 0 ]]; do
         --dev)
             DEV_MODE=true
             ARCH_TARGET="x86_64"
+            shift
+            ;;
+        --install)
+            DO_INSTALL=true
             shift
             ;;
         --parallel)
@@ -247,11 +254,13 @@ if [ "$DEV_MODE" = "true" ] && [ "$ALL_PASSED" = "true" ]; then
         exit 1
     fi
 # Self-contained mode: install and launch on emulator (no server needed)
-elif [ "$ALL_PASSED" = "true" ] && [ "$ARCH_TARGET" != "all" ]; then
+# Only installs if --install flag was passed
+elif [ "$ALL_PASSED" = "true" ] && [ "$ARCH_TARGET" != "all" ] && [ "$DO_INSTALL" = "true" ]; then
     echo ""
     echo "[BUILD] Self-contained mode: Installing and launching on emulator..."
     APK_FILE="$BUILD_DIR/app/build/outputs/apk/debug/app-debug.apk"
     if [ -f "$APK_FILE" ]; then
+        "$SCRIPT_DIR/android-emulator.sh" start
         "$SCRIPT_DIR/android-emulator.sh" install "$APK_FILE"
         "$SCRIPT_DIR/android-emulator.sh" launch
         echo ""
@@ -260,6 +269,10 @@ elif [ "$ALL_PASSED" = "true" ] && [ "$ARCH_TARGET" != "all" ]; then
         echo "[BUILD] Error: APK not found at $APK_FILE"
         exit 1
     fi
+elif [ "$ALL_PASSED" = "true" ] && [ "$ARCH_TARGET" != "all" ]; then
+    echo ""
+    echo "[BUILD] APK built at: $BUILD_DIR/app/build/outputs/apk/debug/app-debug.apk"
+    echo "[BUILD] Run with --install to install on emulator."
 fi
 
 echo ""
