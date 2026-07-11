@@ -75,8 +75,8 @@ wait_for_device() {
 
 list_avds() {
     "$ANDROID_SDK/cmdline-tools/latest/bin/avdmanager" list avd 2>/dev/null | \
-        grep -E "Name: " | sed 's/Name: \(.*\)/\1/' || \
-        ls "$HOME/.android/avd" 2>/dev/null | sed 's/\.avd$//' || true
+        grep -E "Name: " | sed -E 's/Name:[[:space:]]+//' | sed 's/^[[:space:]]+//' || \
+        ls "$HOME/.android/avd" 2>/dev/null | sed 's/\.avd$//' | sed 's/^[[:space:]]+//' || true
 }
 
 # Create an AVD. When stdin is a TTY, prompts for device/API/ABI; otherwise
@@ -87,13 +87,18 @@ create_avd() {
     local device_name="pixel_6a"
     local api_level="34"
     local abi="x86_64"
+    local ram_size="4096"
+    local sdcard_size="4096M"
     local interactive=0
     [ -t 0 ] && interactive=1
 
     # Allow callers to pass explicit values.
+    # Signature: create_avd <device> <api> <abi> [ram_mb] [sdcard_size]
     [ -n "${1:-}" ] && device_name="$1"
     [ -n "${2:-}" ] && api_level="$2"
     [ -n "${3:-}" ] && abi="$3"
+    [ -n "${4:-}" ] && ram_size="$4"
+    [ -n "${5:-}" ] && sdcard_size="$5"
 
     if [ "$interactive" = "1" ] && { [ -z "${1:-}" ] || [ -z "${2:-}" ] || [ -z "${3:-}" ]; }; then
         read -r -p "[EMULATOR] Device name [$device_name]: " input
@@ -102,6 +107,10 @@ create_avd() {
         [ -n "$input" ] && api_level="$input"
         read -r -p "[EMULATOR] ABI [$abi]: " input
         [ -n "$input" ] && abi="$abi"
+        read -r -p "[EMULATOR] RAM size in MB [$ram_size]: " input
+        [ -n "$input" ] && ram_size="$input"
+        read -r -p "[EMULATOR] SD card size [$sdcard_size]: " input
+        [ -n "$input" ] && sdcard_size="$input"
     fi
 
     local new_avd_name="${device_name}_API${api_level}"
@@ -135,11 +144,26 @@ create_avd() {
     fi
 
     echo ""
-    echo "[EMULATOR] [2/2] Creating AVD '$new_avd_name'..."
+    echo "[EMULATOR] [2/2] Creating AVD '$new_avd_name' (RAM=${ram_size}MB, SD=$sdcard_size)..."
     echo "no" | "$ANDROID_SDK/cmdline-tools/latest/bin/avdmanager" create avd \
         --name "$new_avd_name" --device "$device_name" \
         --package "system-images;android-$api_level;default;$abi" --abi "$abi" \
-        --sdcard 4096M
+        --sdcard "$sdcard_size"
+
+    # Apply the requested RAM size. avdmanager has no --ram flag, so we patch the
+    # AVD's config.ini with hw.ramSize (and a few sensible defaults) after creation.
+    avd_cfg="$HOME/.android/avd/${new_avd_name}.avd/config.ini"
+    if [ -f "$avd_cfg" ]; then
+        if grep -q "^hw.ramSize=" "$avd_cfg"; then
+            sed -i "s/^hw.ramSize=.*/hw.ramSize=${ram_size}/" "$avd_cfg"
+        else
+            echo "hw.ramSize=${ram_size}" >> "$avd_cfg"
+        fi
+        # Ensure these are present so the emulator does not pick tiny defaults.
+        grep -q "^hw.sdCard=" "$avd_cfg" || echo "hw.sdCard=yes" >> "$avd_cfg"
+        grep -q "^hw.sdCard.path=" "$avd_cfg" || echo "hw.sdCard.path=$HOME/.android/avd/${new_avd_name}.avd/sdcard.img" >> "$avd_cfg"
+        grep -q "^disk.dataPartition.size=" "$avd_cfg" || echo "disk.dataPartition.size=${sdcard_size}" >> "$avd_cfg"
+    fi
     echo ""
     echo "[EMULATOR] =========================================="
     echo "[EMULATOR] AVD '$new_avd_name' CREATED SUCCESSFULLY"
@@ -243,70 +267,86 @@ case "$CMD" in
         ;;
     start)
         export DISPLAY=${DISPLAY:-:0}
-        if is_emulator_running; then
-            SERIAL=$(get_emulator_serial)
-            echo "[EMULATOR] Emulator already running (${SERIAL:-default}). Reusing it."
-        else
-            AVD_NAME=$(resolve_avd_name "$DEVICE_NAME")
-            if [ -z "$AVD_NAME" ]; then
-                echo "[EMULATOR] Error: Could not resolve or create an AVD." >&2
-                exit 1
-            fi
-            # Guard against a zombie/background qemu still holding this AVD's
-            # lock from a previous run (before adb connected). Launching a second
-            # instance of the same AVD triggers a FATAL emulator error.
-            if is_avd_process_running "$AVD_NAME"; then
-                echo "[EMULATOR] A '$AVD_NAME' emulator process is already alive. Reusing it."
-            else
-                # Cache if requested or if a specific device name was given
-                if [ -n "$DEVICE_NAME" ] || [ "${EMULATOR_CACHE:-0}" = "1" ]; then
-                    echo "$AVD_NAME" > "$CACHE_FILE"
-                fi
-                # Clear any stale lock files left behind by a previously killed
-                # emulator. A leftover *.lock makes the new emulator abort with
-                # "exited immediately" / FATAL multi-instance errors.
-                avd_dir="$HOME/.android/avd/${AVD_NAME}.avd"
-                rm -f "$avd_dir"/*.lock 2>/dev/null || true
-                echo "[EMULATOR] Starting $AVD_NAME..."
-                # Actually launch the emulator NOW (backgrounded). Boot output is
-                # buffered to a file so it does not pollute the prompt.
-                "$ANDROID_SDK/emulator/emulator" -avd "$AVD_NAME" \
-                    -no-snapshot-load -no-audio -gpu host -accel on \
-                    > "$EMULATOR_LOG" 2>&1 &
-                EMULATOR_BG_PID=$!
-
-                # Verify the emulator process actually started (did not immediately die).
-                sleep 3
-                if ! kill -0 "$EMULATOR_BG_PID" 2>/dev/null; then
-                    echo "[EMULATOR] ERROR: emulator process exited immediately." >&2
-                    echo "[EMULATOR] ----- emulator output (buffered) -----" >&2
-                    cat "$EMULATOR_LOG" 2>/dev/null >&2 || true
-                    echo "[EMULATOR] ---------------------------------------" >&2
-                    rm -f "$EMULATOR_LOG"
-                    exit 1
-                fi
-                echo "[EMULATOR] Emulator process started (pid $EMULATOR_BG_PID)."
-
-                # If running interactively (a real TTY), prompt ONCE (no timeout)
-                # for the user to confirm the device UI is up. When there is no
-                # TTY (e.g. invoked from the build script) the read hits EOF; we
-                # must NOT let that abort the script (set -e) — just skip it.
-                if [ -t 0 ]; then
-                    echo ""
-                    echo "[EMULATOR] =========================================="
-                    echo "[EMULATOR] The emulator is now launching in the background."
-                    echo "[EMULATOR] Press ENTER here ONCE the emulator has fully booted"
-                    echo "[EMULATOR] (you should see the home screen / device UI)."
-                    echo "[EMULATOR] =========================================="
-                    read -r _ || true
-                    # Flush the buffered boot log now that the user has responded.
-                    echo "[EMULATOR] ----- emulator boot log (buffered) -----"
-                    cat "$EMULATOR_LOG" 2>/dev/null || true
-                    echo "[EMULATOR] ----------------------------------------"
-                fi
-                rm -f "$EMULATOR_LOG"
-            fi
+        # Trim any leading/trailing whitespace from the requested name. The
+        # build script captures the AVD name via `list | sed '1d' | head -1`,
+        # and avdmanager's "Name: " prefix can leave stray leading spaces that
+        # would otherwise break the -avd argument and the pkill patterns.
+        DEVICE_NAME=$(echo "$DEVICE_NAME" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+        AVD_NAME=$(resolve_avd_name "$DEVICE_NAME" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+        if [ -z "$AVD_NAME" ]; then
+            echo "[EMULATOR] Error: Could not resolve or create an AVD." >&2
+            exit 1
         fi
+
+        # Cache if requested or if a specific device name was given.
+        if [ -n "$DEVICE_NAME" ] || [ "${EMULATOR_CACHE:-0}" = "1" ]; then
+            echo "$AVD_NAME" > "$CACHE_FILE"
+        fi
+
+        # SELF-HEAL: aggressively tear down any existing emulator instance for
+        # this AVD (live OR defunct/zombie) and clear its lock files BEFORE
+        # launching a fresh one. A previous build that was killed mid-run leaves
+        # behind a qemu process and/or *.lock files; if we don't clean these up
+        # the new emulator aborts with "exited immediately" / FATAL multi-instance
+        # errors. This is done automatically on every start — no manual steps.
+        echo "[EMULATOR] Cleaning up any stale emulator state for '$AVD_NAME'..."
+        # 1) Kill by adb if reachable.
+        if is_emulator_running; then
+            EMULATOR_SERIAL=$(get_emulator_serial)
+            [ -n "$EMULATOR_SERIAL" ] && adb -s "$EMULATOR_SERIAL" emu kill 2>/dev/null || true
+            sleep 2
+        fi
+        # 2) Kill any qemu process for this AVD. We scope the match strictly to
+        #    the emulator binary (qemu-system* OR the emulator launcher) so we
+        #    NEVER match this script's own process (its cmdline also contains
+        #    the AVD name, and pkill -f "$AVD_NAME" would kill ourselves).
+        pkill -9 -f "qemu-system.*-avd[ =]$AVD_NAME" 2>/dev/null || true
+        pkill -9 -f "$ANDROID_SDK/emulator/emulator.*-avd[ =]$AVD_NAME" 2>/dev/null || true
+        sleep 2
+        # 4) Remove all lock files for this AVD.
+        avd_dir="$HOME/.android/avd/${AVD_NAME}.avd"
+        rm -f "$avd_dir"/*.lock 2>/dev/null || true
+        # 5) Remove the emulator's runtime advertising files.
+        rm -f /run/user/1000/avd/running/pid_*.ini 2>/dev/null || true
+
+        echo "[EMULATOR] Starting $AVD_NAME..."
+        # Launch the emulator NOW (backgrounded). Boot output is buffered to a
+        # file so it does not pollute the prompt.
+        "$ANDROID_SDK/emulator/emulator" -avd "$AVD_NAME" \
+            -no-snapshot-load -no-audio -gpu host -accel on \
+            > "$EMULATOR_LOG" 2>&1 &
+        EMULATOR_BG_PID=$!
+
+        # Verify the emulator process actually started (did not immediately die).
+        sleep 3
+        if ! kill -0 "$EMULATOR_BG_PID" 2>/dev/null; then
+            echo "[EMULATOR] ERROR: emulator process exited immediately." >&2
+            echo "[EMULATOR] ----- emulator output (buffered) -----" >&2
+            cat "$EMULATOR_LOG" 2>/dev/null >&2 || true
+            echo "[EMULATOR] ---------------------------------------" >&2
+            rm -f "$EMULATOR_LOG"
+            exit 1
+        fi
+        echo "[EMULATOR] Emulator process started (pid $EMULATOR_BG_PID)."
+
+        # If running interactively (a real TTY), prompt ONCE (no timeout) for the
+        # user to confirm the device UI is up. When there is no TTY (e.g. invoked
+        # from the build script) the read hits EOF; we must NOT let that abort the
+        # script (set -e) — just skip it.
+        if [ -t 0 ]; then
+            echo ""
+            echo "[EMULATOR] =========================================="
+            echo "[EMULATOR] The emulator is now launching in the background."
+            echo "[EMULATOR] Press ENTER here ONCE the emulator has fully booted"
+            echo "[EMULATOR] (you should see the home screen / device UI)."
+            echo "[EMULATOR] =========================================="
+            read -r _ || true
+            # Flush the buffered boot log now that the user has responded.
+            echo "[EMULATOR] ----- emulator boot log (buffered) -----"
+            cat "$EMULATOR_LOG" 2>/dev/null || true
+            echo "[EMULATOR] ----------------------------------------"
+        fi
+        rm -f "$EMULATOR_LOG"
         ;;
     stop)
         echo "[EMULATOR] Stopping..."
