@@ -43,22 +43,22 @@ echo "Android Build Verification Script"
 echo "=========================================="
 echo ""
 
-# Check emulator
-echo "[VERIFY] Checking emulator..."
-"$SCRIPT_DIR/android-emulator.sh" status || true
+# Tell build-android.sh to cache the AVD if --cache was requested. The build
+# script owns emulator startup through its Step 0 and install/dev flow, so we
+# do not start the emulator here.
 if [ -n "$CACHE" ]; then
     export EMULATOR_CACHE=1
 fi
-"$SCRIPT_DIR/android-emulator.sh" start "$DEVICE_NAME"
-echo ""
 
 # Build (dev client or self-contained) + install + launch
+# Forward the device name via build-android.sh's expected --device flag so it
+# is not split on spaces and preserves special characters.
 if [ -n "$DEV_MODE" ]; then
     echo "[VERIFY] Building dev client (connects to Metro)..."
-    "$SCRIPT_DIR/build-android.sh" --dev ${FORCE_MODEL:+$FORCE_MODEL} ${WATCH:+$WATCH} ${CACHE:+$CACHE} $DEVICE_NAME
+    "$SCRIPT_DIR/build-android.sh" --dev ${FORCE_MODEL:+$FORCE_MODEL} ${WATCH:+$WATCH} ${CACHE:+$CACHE} ${DEVICE_NAME:+--device "$DEVICE_NAME"}
 else
     echo "[VERIFY] Building self-contained APK..."
-    "$SCRIPT_DIR/build-android.sh" --arch x86_64 --install ${FORCE_MODEL:+$FORCE_MODEL} ${WATCH:+$WATCH} ${CACHE:+$CACHE} $DEVICE_NAME
+    "$SCRIPT_DIR/build-android.sh" --arch x86_64 --install ${FORCE_MODEL:+$FORCE_MODEL} ${WATCH:+$WATCH} ${CACHE:+$CACHE} ${DEVICE_NAME:+--device "$DEVICE_NAME"}
 fi
 echo ""
 

@@ -29,23 +29,18 @@ APP_ACTIVITY="com.ctocrm.jsmastery.MainActivity"
 EMULATOR_LOG="$(mktemp -t emu-boot.XXXXXX.log)"
 CACHE_FILE=".emulator-device"
 
+# Clean up the temporary boot log on every exit path (not only start).
+cleanup_emulator_log() {
+    rm -f "$EMULATOR_LOG" 2>/dev/null || true
+}
+trap cleanup_emulator_log EXIT
+
 get_emulator_serial() {
     adb devices 2>/dev/null | grep 'emulator-' | head -1 | awk '{print $1}'
 }
 
 is_emulator_running() {
     adb shell getprop sys.boot_completed 2>/dev/null | grep -q 1
-}
-
-# Returns 0 if a LIVE (non-defunct) qemu process for the given AVD is already
-# alive (even if adb has not yet connected). Prevents the "multiple emulators
-# same AVD" FATAL that occurs when a previous run left a background emulator
-# holding the lock. Defunct/zombie qemu processes are ignored — they are stale
-# leftovers from killed builds and would otherwise falsely report "alive".
-is_avd_process_running() {
-    local avd="$1"
-    # ps selection: match the qemu cmdline for this AVD, exclude state 'Z' (zombie).
-    ps -eo pid,stat,args 2>/dev/null | grep -E "qemu-system.*-avd[ =]$avd" | grep -v " Z " | grep -qv "defunct"
 }
 
 # Block until the emulator is online AND fully booted (or timeout).
@@ -74,9 +69,14 @@ wait_for_device() {
 }
 
 list_avds() {
-    "$ANDROID_SDK/cmdline-tools/latest/bin/avdmanager" list avd 2>/dev/null | \
-        grep -E "Name: " | sed -E 's/Name:[[:space:]]+//' | sed 's/^[[:space:]]+//' || \
-        ls "$HOME/.android/avd" 2>/dev/null | sed 's/\.avd$//' | sed 's/^[[:space:]]+//' || true
+    local output
+    output=$("$ANDROID_SDK/cmdline-tools/latest/bin/avdmanager" list avd 2>/dev/null | \
+        grep -E "Name: " | sed -E 's/Name:[[:space:]]+//' | sed 's/^[[:space:]]*//')
+    if [ -n "$output" ]; then
+        echo "$output"
+    elif [ -d "$HOME/.android/avd" ]; then
+        ls "$HOME/.android/avd" 2>/dev/null | sed 's/\.avd$//' | sed 's/^[[:space:]]*//'
+    fi
 }
 
 # Create an AVD. When stdin is a TTY, prompts for device/API/ABI; otherwise
@@ -106,7 +106,7 @@ create_avd() {
         read -r -p "[EMULATOR] API level [$api_level]: " input
         [ -n "$input" ] && api_level="$input"
         read -r -p "[EMULATOR] ABI [$abi]: " input
-        [ -n "$input" ] && abi="$abi"
+        [ -n "$input" ] && abi="$input"
         read -r -p "[EMULATOR] RAM size in MB [$ram_size]: " input
         [ -n "$input" ] && ram_size="$input"
         read -r -p "[EMULATOR] SD card size [$sdcard_size]: " input
@@ -199,7 +199,7 @@ edit_avd() {
         read -r -p "[EMULATOR] API level [$api_level]: " input
         [ -n "$input" ] && api_level="$input"
         read -r -p "[EMULATOR] ABI [$abi]: " input
-        [ -n "$input" ] && abi="$abi"
+        [ -n "$input" ] && abi="$input"
     fi
 
     echo "[EMULATOR] Editing AVD '$name' (deleting old, creating new)..."
@@ -218,18 +218,26 @@ edit_avd() {
 # Else create one and return its name.
 resolve_avd_name() {
     local requested_avd="$1"
+    local use_cache=0
+    if [ "$requested_avd" = "cache" ] || [ "${EMULATOR_CACHE:-0}" = "1" ]; then
+        use_cache=1
+    fi
     if [ -n "$requested_avd" ] && [ "$requested_avd" != "cache" ]; then
         echo "$requested_avd"
         return 0
     fi
-    # Reuse cache file if present
-    if [ "$requested_avd" = "cache" ] && [ -f "$CACHE_FILE" ]; then
+    # Reuse cache file if cache mode is active and a non-empty value is present
+    if [ "$use_cache" = "1" ] && [ -f "$CACHE_FILE" ]; then
         local cached; cached="$(cat "$CACHE_FILE")"
         if [ -n "$cached" ]; then echo "$cached"; return 0; fi
     fi
     if is_emulator_running; then
         local running; running=$(get_emulator_serial)
-        if [ -n "$running" ]; then echo "$running"; return 0; fi
+        if [ -n "$running" ]; then
+            local avd_name
+            avd_name=$(adb -s "$running" emu avd name 2>/dev/null | head -1)
+            if [ -n "$avd_name" ]; then echo "$avd_name"; return 0; fi
+        fi
     fi
     local first_avd; first_avd=$(list_avds | head -1)
     if [ -n "$first_avd" ] && [ "$first_avd" != "None" ]; then
@@ -307,7 +315,8 @@ case "$CMD" in
         avd_dir="$HOME/.android/avd/${AVD_NAME}.avd"
         rm -f "$avd_dir"/*.lock 2>/dev/null || true
         # 5) Remove the emulator's runtime advertising files.
-        rm -f /run/user/1000/avd/running/pid_*.ini 2>/dev/null || true
+        RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+        rm -f "$RUNTIME_DIR/avd/running/pid_*.ini" 2>/dev/null || true
 
         echo "[EMULATOR] Starting $AVD_NAME..."
         # Launch the emulator NOW (backgrounded). Boot output is buffered to a
