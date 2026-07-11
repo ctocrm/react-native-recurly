@@ -46,3 +46,4 @@ app-example
 /ios
 /android
 .env
+.emulator-device

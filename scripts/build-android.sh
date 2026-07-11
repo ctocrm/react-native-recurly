@@ -6,6 +6,7 @@
 #   ./scripts/build-android.sh                    # Self-contained build, all archs (default)
 #   ./scripts/build-android.sh --arch x86_64      # Build a specific arch (self-contained)
 #   ./scripts/build-android.sh --arch x86_64 --install   # Build + install on emulator
+#   ./scripts/build-android.sh --arch x86_64 --device pixel_6a  # Use specific AVD
 #   ./scripts/build-android.sh --dev              # Dev client: x86_64 + expo start + install + launch
 #   ./scripts/build-android.sh --dev --watch      # Dev client with live monitor + expo server
 #   ./scripts/build-android.sh --parallel N       # Build all with N workers
@@ -24,6 +25,8 @@
 #   --force-model                                 Force model regeneration
 #   --watch                                       Enable live build monitoring
 #   --clean                                       Clean prebuild (expo prebuild --clean)
+#   --device|--avd <name>                         Use specific AVD (overrides smart selection)
+#   --cache                                       Cache AVD name for next run (sets EMULATOR_CACHE=1)
 
 set -euo pipefail
 
@@ -40,6 +43,8 @@ WATCH=false
 CLEAN=false
 DEV_MODE=false
 DO_INSTALL=false
+DEVICE_NAME=""
+CACHE=false
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -71,6 +76,14 @@ while [[ $# -gt 0 ]]; do
             ;;
         --clean)
             CLEAN=true
+            shift
+            ;;
+        --device|--avd)
+            DEVICE_NAME="$2"
+            shift 2
+            ;;
+        --cache)
+            CACHE=true
             shift
             ;;
         *)
@@ -105,6 +118,53 @@ if [ "$DEV_MODE" = "true" ]; then
 else
     echo "[BUILD] Self-contained mode: embedding JS bundle via gradle assembleRelease"
     export NODE_ENV=production
+fi
+
+# Step 0: Ensure AVD exists (detect or create BEFORE building) and capture its name.
+# The captured AVD_NAME is passed to the emulator `start` later so we never
+# prompt-with-no-AVD (the create step has already finished by then).
+AVD_NAME=""
+if [ "$DO_INSTALL" = "true" ] || [ "$DEV_MODE" = "true" ]; then
+    echo ""
+    echo "[BUILD] Step 0: Checking for Android emulator AVD..."
+    if [ -n "$DEVICE_NAME" ]; then
+        # Specific AVD requested - use it directly
+        AVD_NAME="$DEVICE_NAME"
+        echo "[BUILD] Using specified AVD: $AVD_NAME"
+        export EMULATOR_CACHE=1
+    else
+        # Detect existing AVDs or create one with visible progress
+        AVD_CHECK=$("$SCRIPT_DIR/android-emulator.sh" list 2>/dev/null | sed '1d' | head -1)
+        if [ -z "$AVD_CHECK" ]; then
+            echo "[BUILD] No AVD found. Creating one now (interactive: device/API/ABI, may download a system image)..."
+            if [ "$CACHE" = "true" ]; then
+                export EMULATOR_CACHE=1
+            fi
+            # Capture the created AVD name. create_avd echoes the AVD name as
+            # its final stdout line, but the wrapper's "is ready" message is
+            # appended afterwards, so we extract the name reliably from the
+            # "AVD '<name>' CREATED SUCCESSFULLY" marker instead of line position.
+            CREATE_OUTPUT=$(mktemp)
+            "$SCRIPT_DIR/android-emulator.sh" create > "$CREATE_OUTPUT"
+            AVD_NAME=$(grep -oP "AVD '\K[^']+(?=' CREATED SUCCESSFULLY)" "$CREATE_OUTPUT" | head -1)
+            if [ -z "$AVD_NAME" ]; then
+                # Fallback: the bare AVD name line emitted by create_avd itself.
+                AVD_NAME=$(grep -E "^[a-zA-Z0-9_.-]+_API[0-9]+$" "$CREATE_OUTPUT" | head -1)
+            fi
+            cat "$CREATE_OUTPUT"
+            rm -f "$CREATE_OUTPUT"
+            echo "[BUILD] Created AVD: $AVD_NAME"
+        else
+            AVD_NAME="$AVD_CHECK"
+            echo "[BUILD] Found AVD: $AVD_NAME"
+            if [ "$CACHE" = "true" ]; then
+                echo "$AVD_NAME" > ".emulator-device"
+                export EMULATOR_CACHE=1
+            fi
+        fi
+    fi
+    # Make the resolved AVD name available to the emulator start calls below.
+    export AVD_NAME
 fi
 
 # Step 1: Model generation
@@ -210,8 +270,11 @@ if [ "$DEV_MODE" = "true" ] && [ "$ALL_PASSED" = "true" ]; then
     echo "[BUILD] Dev mode: Installing APK on emulator..."
     APK_FILE="$BUILD_DIR/app/build/outputs/apk/debug/app-debug.apk"
     if [ -f "$APK_FILE" ]; then
-        # Ensure the emulator is running before installing (no-op if already up)
-        "$SCRIPT_DIR/android-emulator.sh" start
+        if [ "$CACHE" = "true" ]; then
+            export EMULATOR_CACHE=1
+        fi
+        "$SCRIPT_DIR/android-emulator.sh" start "$AVD_NAME"
+        "$SCRIPT_DIR/android-emulator.sh" wait-device 180
         "$SCRIPT_DIR/android-emulator.sh" install "$APK_FILE"
         "$SCRIPT_DIR/android-emulator.sh" launch
         echo ""
@@ -219,8 +282,6 @@ if [ "$DEV_MODE" = "true" ] && [ "$ALL_PASSED" = "true" ]; then
         echo "[BUILD] The app will connect to this server for live reload."
         echo "[BUILD] Press Ctrl+C to stop the dev server."
         echo ""
-        # Start Metro in the foreground so the user can use live reload.
-        # The app connects to this server (dev client mode).
         cd "$PROJECT_ROOT"
         npx expo start --host lan --android
     else
@@ -234,7 +295,11 @@ elif [ "$ALL_PASSED" = "true" ] && [ "$ARCH_TARGET" != "all" ] && [ "$DO_INSTALL
     echo "[BUILD] Self-contained mode: Installing and launching on emulator..."
     APK_FILE="$BUILD_DIR/app/build/outputs/apk/release/app-release.apk"
     if [ -f "$APK_FILE" ]; then
-        "$SCRIPT_DIR/android-emulator.sh" start
+        if [ "$CACHE" = "true" ]; then
+            export EMULATOR_CACHE=1
+        fi
+        "$SCRIPT_DIR/android-emulator.sh" start "$AVD_NAME"
+        "$SCRIPT_DIR/android-emulator.sh" wait-device 180
         "$SCRIPT_DIR/android-emulator.sh" install "$APK_FILE"
         "$SCRIPT_DIR/android-emulator.sh" launch
         echo ""
@@ -251,4 +316,5 @@ elif [ "$ALL_PASSED" = "true" ] && [ "$ARCH_TARGET" != "all" ]; then
 fi
 
 echo ""
+
 echo "[BUILD] Done."
