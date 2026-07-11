@@ -54,6 +54,20 @@ Created a minimal ESPCN (Enhanced Super-Resolution Generative Adversarial Networ
 - Training: 12 epochs on synthetic icon-like data
 - Result: 11,880 byte TFLite model
 
+#### Python Environment Setup
+
+The `scripts/generate-model.js` script automatically sets up the Python virtual environment if needed:
+
+- Creates `.venv` with `python3 -m venv .venv` if it doesn't exist
+- Installs `numpy` and `tensorflow` from `requirements.txt` if packages are missing
+- Reuses existing venv if packages are already installed
+
+This means **no manual Python setup is required** - the first run of `npm run generate-model:force` will automatically:
+
+1. Create the virtual environment
+2. Install dependencies (may take 1-2 minutes for TensorFlow)
+3. Train and generate the model
+
 To retrain the model:
 
 ```bash
@@ -223,6 +237,8 @@ Output: (None, None, None, 3)  - 2x upscaled image
 - `app.config.js` - Added owner, android package, plugin (removed EAS config)
 - `src/services/iconProcessing.ts` - Fixed inference pipeline
 - `src/services/whiteBgRemoval.ts` - Fixed chunked btoa conversion
+- `scripts/generate-model.js` - Added auto-setup of Python venv with numpy/tensorflow
+- `requirements.txt` - Added to specify Python dependencies
 
 ---
 
@@ -234,4 +250,3 @@ Output: (None, None, None, 3)  - 2x upscaled image
 - `scripts/verify-android.sh` - Build verification script
 - `scripts/prebuild-ios.sh` - iOS prebuild script (macOS)
 - `BUILD.md` - Detailed build instructions
-

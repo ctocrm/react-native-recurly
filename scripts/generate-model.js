@@ -50,21 +50,57 @@ function main() {
     console.log("[MODEL] Model is stale, regenerating...");
   }
 
-  // Try to use existing tfenv, otherwise use system python
-  const tfEnvPython = "/tmp/tfenv/bin/python";
-  const venvPython = path.join(__dirname, "..", ".venv", "bin", "python");
+  const venvPath = path.join(__dirname, "..", ".venv");
+  const venvPython = path.join(venvPath, "bin", "python");
+  const requirementsPath = path.join(__dirname, "..", "requirements.txt");
 
+  // Helper: check if a python command has required packages
+  function hasRequiredPackages(pythonPath) {
+    try {
+      execFileSync(pythonPath, ["-c", "import numpy; import tensorflow"], {
+        stdio: "pipe",
+      });
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // Determine python command with auto-setup logic
   let pythonCmd;
 
-  if (fs.existsSync(tfEnvPython)) {
+  // 1. Try /tmp/tfenv first (if it has packages)
+  const tfEnvPython = "/tmp/tfenv/bin/python";
+  if (fs.existsSync(tfEnvPython) && hasRequiredPackages(tfEnvPython)) {
     pythonCmd = tfEnvPython;
     console.log(`[MODEL] Using tfenv python at ${pythonCmd}`);
-  } else if (fs.existsSync(venvPython)) {
+  }
+  // 2. Try .venv (create/install if needed)
+  else if (fs.existsSync(venvPython)) {
+    if (hasRequiredPackages(venvPython)) {
+      pythonCmd = venvPython;
+      console.log(`[MODEL] Using venv python at ${pythonCmd}`);
+    } else {
+      pythonCmd = venvPython;
+      console.log(`[MODEL] Setting up Python packages in .venv...`);
+      execFileSync(
+        venvPython,
+        ["-m", "pip", "install", "-r", requirementsPath],
+        { stdio: "inherit" },
+      );
+      console.log(`[MODEL] Using venv python at ${pythonCmd}`);
+    }
+  }
+  // 3. Create .venv and install packages
+  else {
+    console.log(`[MODEL] Creating Python virtual environment...`);
+    execFileSync("python3", ["-m", "venv", venvPath], { stdio: "inherit" });
     pythonCmd = venvPython;
+    console.log(`[MODEL] Installing required packages (numpy, tensorflow)...`);
+    execFileSync(pythonCmd, ["-m", "pip", "install", "-r", requirementsPath], {
+      stdio: "inherit",
+    });
     console.log(`[MODEL] Using venv python at ${pythonCmd}`);
-  } else {
-    pythonCmd = "python3";
-    console.log(`[MODEL] Using system python (${pythonCmd})`);
   }
 
   try {

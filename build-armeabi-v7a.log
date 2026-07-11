@@ -1,34 +1,34 @@
 To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.14.3/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
 Daemon will be stopped at the end of the build 
+> Task :expo-gradle-plugin:expo-autolinking-settings-plugin:checkKotlinGradlePluginConfigurationErrors SKIPPED
 > Task :gradle-plugin:shared:checkKotlinGradlePluginConfigurationErrors SKIPPED
 > Task :gradle-plugin:settings-plugin:checkKotlinGradlePluginConfigurationErrors SKIPPED
-> Task :expo-gradle-plugin:expo-autolinking-settings-plugin:checkKotlinGradlePluginConfigurationErrors SKIPPED
 > Task :expo-gradle-plugin:expo-autolinking-plugin-shared:checkKotlinGradlePluginConfigurationErrors SKIPPED
-> Task :expo-gradle-plugin:expo-autolinking-settings-plugin:pluginDescriptors UP-TO-DATE
 > Task :gradle-plugin:settings-plugin:pluginDescriptors UP-TO-DATE
-> Task :expo-gradle-plugin:expo-autolinking-settings-plugin:processResources UP-TO-DATE
+> Task :expo-gradle-plugin:expo-autolinking-settings-plugin:pluginDescriptors UP-TO-DATE
 > Task :gradle-plugin:settings-plugin:processResources UP-TO-DATE
-> Task :expo-gradle-plugin:expo-autolinking-plugin-shared:compileKotlin UP-TO-DATE
+> Task :expo-gradle-plugin:expo-autolinking-settings-plugin:processResources UP-TO-DATE
 > Task :gradle-plugin:shared:compileKotlin UP-TO-DATE
+> Task :expo-gradle-plugin:expo-autolinking-plugin-shared:compileKotlin UP-TO-DATE
 > Task :expo-gradle-plugin:expo-autolinking-plugin-shared:compileJava NO-SOURCE
 > Task :gradle-plugin:shared:compileJava NO-SOURCE
-> Task :gradle-plugin:shared:processResources NO-SOURCE
 > Task :expo-gradle-plugin:expo-autolinking-plugin-shared:processResources NO-SOURCE
-> Task :expo-gradle-plugin:expo-autolinking-plugin-shared:classes UP-TO-DATE
+> Task :gradle-plugin:shared:processResources NO-SOURCE
 > Task :gradle-plugin:shared:classes UP-TO-DATE
-> Task :gradle-plugin:shared:jar UP-TO-DATE
+> Task :expo-gradle-plugin:expo-autolinking-plugin-shared:classes UP-TO-DATE
 > Task :expo-gradle-plugin:expo-autolinking-plugin-shared:jar UP-TO-DATE
+> Task :gradle-plugin:shared:jar UP-TO-DATE
+> Task :expo-gradle-plugin:expo-autolinking-settings-plugin:compileKotlin UP-TO-DATE
 > Task :gradle-plugin:settings-plugin:compileKotlin UP-TO-DATE
+> Task :expo-gradle-plugin:expo-autolinking-settings-plugin:compileJava NO-SOURCE
 > Task :gradle-plugin:settings-plugin:compileJava NO-SOURCE
+> Task :expo-gradle-plugin:expo-autolinking-settings-plugin:classes UP-TO-DATE
 > Task :gradle-plugin:settings-plugin:classes UP-TO-DATE
 > Task :gradle-plugin:settings-plugin:jar UP-TO-DATE
-> Task :expo-gradle-plugin:expo-autolinking-settings-plugin:compileKotlin UP-TO-DATE
-> Task :expo-gradle-plugin:expo-autolinking-settings-plugin:compileJava NO-SOURCE
-> Task :expo-gradle-plugin:expo-autolinking-settings-plugin:classes UP-TO-DATE
 > Task :expo-gradle-plugin:expo-autolinking-settings-plugin:jar UP-TO-DATE
+> Task :expo-module-gradle-plugin:checkKotlinGradlePluginConfigurationErrors SKIPPED
 > Task :expo-gradle-plugin:expo-autolinking-plugin:checkKotlinGradlePluginConfigurationErrors SKIPPED
 > Task :gradle-plugin:react-native-gradle-plugin:checkKotlinGradlePluginConfigurationErrors SKIPPED
-> Task :expo-module-gradle-plugin:checkKotlinGradlePluginConfigurationErrors SKIPPED
 > Task :expo-module-gradle-plugin:pluginDescriptors UP-TO-DATE
 > Task :expo-module-gradle-plugin:processResources UP-TO-DATE
 > Task :expo-gradle-plugin:expo-autolinking-plugin:compileKotlin UP-TO-DATE
@@ -132,630 +132,539 @@ WARNING: [CXX5202] This app only has 32-bit [armeabi-v7a] native libraries. Begi
 
 > Task :expo-sqlite:preBuild UP-TO-DATE
 > Task :expo-modules-core:preBuild UP-TO-DATE
-> Task :app:generateAutolinkingNewArchitectureFiles UP-TO-DATE
-> Task :react-native-fast-tflite:generateCodegenSchemaFromJavaScript UP-TO-DATE
-> Task :clerk_expo:generateCodegenSchemaFromJavaScript UP-TO-DATE
 > Task :expo:generatePackagesList UP-TO-DATE
-> Task :react-native-gesture-handler:generateCodegenSchemaFromJavaScript UP-TO-DATE
 > Task :expo:preBuild UP-TO-DATE
-> Task :react-native-fast-tflite:generateCodegenArtifactsFromSchema UP-TO-DATE
+> Task :react-native-gesture-handler:generateCodegenSchemaFromJavaScript UP-TO-DATE
+> Task :clerk_expo:generateCodegenSchemaFromJavaScript UP-TO-DATE
+> Task :react-native-fast-tflite:generateCodegenSchemaFromJavaScript UP-TO-DATE
+> Task :app:generateAutolinkingNewArchitectureFiles UP-TO-DATE
 > Task :clerk_expo:generateCodegenArtifactsFromSchema UP-TO-DATE
 > Task :clerk_expo:preBuild UP-TO-DATE
-> Task :react-native-fast-tflite:preBuild UP-TO-DATE
-> Task :react-native-safe-area-context:generateCodegenSchemaFromJavaScript UP-TO-DATE
-> Task :react-native-screens:generateCodegenSchemaFromJavaScript UP-TO-DATE
 > Task :react-native-gesture-handler:generateCodegenArtifactsFromSchema UP-TO-DATE
 > Task :react-native-gesture-handler:preBuild UP-TO-DATE
+> Task :react-native-fast-tflite:generateCodegenArtifactsFromSchema UP-TO-DATE
+> Task :react-native-safe-area-context:generateCodegenSchemaFromJavaScript UP-TO-DATE
+> Task :app:generateAutolinkingPackageList UP-TO-DATE
+> Task :react-native-fast-tflite:preBuild UP-TO-DATE
+> Task :app:generateCodegenSchemaFromJavaScript SKIPPED
+> Task :app:generateCodegenArtifactsFromSchema SKIPPED
+> Task :app:generateReactNativeEntryPoint UP-TO-DATE
+> Task :react-native-screens:generateCodegenSchemaFromJavaScript UP-TO-DATE
 > Task :react-native-safe-area-context:generateCodegenArtifactsFromSchema UP-TO-DATE
 > Task :react-native-safe-area-context:preBuild UP-TO-DATE
-> Task :app:generateAutolinkingPackageList UP-TO-DATE
-> Task :app:generateCodegenSchemaFromJavaScript SKIPPED
+> Task :react-native-svg:generateCodegenSchemaFromJavaScript UP-TO-DATE
+> Task :react-native-webview:generateCodegenSchemaFromJavaScript UP-TO-DATE
 > Task :react-native-screens:generateCodegenArtifactsFromSchema UP-TO-DATE
 > Task :react-native-screens:preBuild UP-TO-DATE
-> Task :app:generateCodegenArtifactsFromSchema SKIPPED
-> Task :react-native-svg:generateCodegenSchemaFromJavaScript UP-TO-DATE
-> Task :app:generateReactNativeEntryPoint UP-TO-DATE
-> Task :react-native-webview:generateCodegenSchemaFromJavaScript UP-TO-DATE
-> Task :solana-mobile_mobile-wallet-adapter-protocol:generateCodegenSchemaFromJavaScript UP-TO-DATE
-> Task :react-native-worklets:assertMinimalReactNativeVersionTask
-> Task :react-native-worklets:assertNewArchitectureEnabledTask SKIPPED
+> Task :react-native-svg:generateCodegenArtifactsFromSchema UP-TO-DATE
+> Task :react-native-svg:preBuild UP-TO-DATE
+> Task :clerk_expo:preReleaseBuild UP-TO-DATE
+> Task :clerk_expo:mergeReleaseJniLibFolders UP-TO-DATE
 > Task :react-native-reanimated:assertMinimalReactNativeVersionTask
 > Task :react-native-reanimated:assertNewArchitectureEnabledTask SKIPPED
 > Task :react-native-webview:generateCodegenArtifactsFromSchema UP-TO-DATE
+> Task :solana-mobile_mobile-wallet-adapter-protocol:generateCodegenSchemaFromJavaScript UP-TO-DATE
 > Task :react-native-webview:preBuild UP-TO-DATE
-> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :expo:preReleaseBuild UP-TO-DATE
+> Task :expo:mergeReleaseJniLibFolders UP-TO-DATE
+> Task :clerk_expo:mergeReleaseNativeLibs NO-SOURCE
+> Task :clerk_expo:copyReleaseJniLibsProjectOnly UP-TO-DATE
+> Task :expo-modules-core:preReleaseBuild UP-TO-DATE
+> Task :expo:mergeReleaseNativeLibs NO-SOURCE
 > Task :solana-mobile_mobile-wallet-adapter-protocol:generateCodegenArtifactsFromSchema UP-TO-DATE
 > Task :solana-mobile_mobile-wallet-adapter-protocol:preBuild UP-TO-DATE
-> Task :clerk_expo:preDebugBuild UP-TO-DATE
-> Task :expo:preDebugBuild UP-TO-DATE
-> Task :clerk_expo:writeDebugAarMetadata UP-TO-DATE
-> Task :expo-modules-core:preDebugBuild UP-TO-DATE
-> Task :react-native-svg:generateCodegenArtifactsFromSchema UP-TO-DATE
-> Task :react-native-svg:preBuild UP-TO-DATE
-> Task :expo-sqlite:preDebugBuild UP-TO-DATE
-> Task :expo:writeDebugAarMetadata UP-TO-DATE
-> Task :react-native-fast-tflite:preDebugBuild UP-TO-DATE
-> Task :expo-modules-core:writeDebugAarMetadata UP-TO-DATE
-> Task :react-native-gesture-handler:preDebugBuild UP-TO-DATE
-> Task :expo-sqlite:writeDebugAarMetadata UP-TO-DATE
-> Task :react-native-safe-area-context:preDebugBuild UP-TO-DATE
-> Task :react-native-fast-tflite:writeDebugAarMetadata UP-TO-DATE
-> Task :react-native-screens:preDebugBuild UP-TO-DATE
+> Task :expo-sqlite:preReleaseBuild UP-TO-DATE
+> Task :react-native-worklets:assertMinimalReactNativeVersionTask
+> Task :react-native-worklets:assertNewArchitectureEnabledTask SKIPPED
+> Task :expo:copyReleaseJniLibsProjectOnly UP-TO-DATE
 > Task :react-native-worklets:generateCodegenSchemaFromJavaScript UP-TO-DATE
-> Task :react-native-gesture-handler:writeDebugAarMetadata UP-TO-DATE
-> Task :react-native-svg:preDebugBuild UP-TO-DATE
-> Task :react-native-screens:writeDebugAarMetadata UP-TO-DATE
-> Task :react-native-safe-area-context:writeDebugAarMetadata UP-TO-DATE
-> Task :react-native-svg:writeDebugAarMetadata UP-TO-DATE
 > Task :react-native-worklets:generateCodegenArtifactsFromSchema UP-TO-DATE
-> Task :react-native-webview:preDebugBuild UP-TO-DATE
-> Task :solana-mobile_mobile-wallet-adapter-protocol:preDebugBuild UP-TO-DATE
-> Task :react-native-webview:writeDebugAarMetadata UP-TO-DATE
-> Task :solana-mobile_mobile-wallet-adapter-protocol:writeDebugAarMetadata UP-TO-DATE
-> Task :clerk_expo:generateDebugResValues UP-TO-DATE
-> Task :expo:generateDebugResValues UP-TO-DATE
-> Task :expo-modules-core:generateDebugResValues UP-TO-DATE
-> Task :clerk_expo:generateDebugResources UP-TO-DATE
-> Task :expo:generateDebugResources UP-TO-DATE
-> Task :expo-modules-core:generateDebugResources UP-TO-DATE
 > Task :react-native-reanimated:assertWorkletsVersionTask
 > Task :react-native-worklets:prepareWorkletsHeadersForPrefabs UP-TO-DATE
 > Task :react-native-worklets:preBuild
-> Task :clerk_expo:packageDebugResources UP-TO-DATE
-> Task :react-native-worklets:preDebugBuild
+> Task :react-native-worklets:preReleaseBuild
 > Task :react-native-reanimated:generateCodegenSchemaFromJavaScript UP-TO-DATE
-> Task :react-native-worklets:writeDebugAarMetadata UP-TO-DATE
-> Task :expo-sqlite:generateDebugResValues UP-TO-DATE
-> Task :expo-modules-core:packageDebugResources UP-TO-DATE
-> Task :expo:packageDebugResources UP-TO-DATE
-> Task :react-native-fast-tflite:generateDebugResValues UP-TO-DATE
-> Task :expo-sqlite:generateDebugResources UP-TO-DATE
-> Task :react-native-safe-area-context:generateDebugResValues UP-TO-DATE
 > Task :react-native-reanimated:generateCodegenArtifactsFromSchema UP-TO-DATE
-> Task :react-native-gesture-handler:generateDebugResValues UP-TO-DATE
-> Task :react-native-safe-area-context:generateDebugResources UP-TO-DATE
-> Task :react-native-fast-tflite:generateDebugResources UP-TO-DATE
-> Task :react-native-gesture-handler:generateDebugResources UP-TO-DATE
-> Task :expo-sqlite:packageDebugResources UP-TO-DATE
-> Task :react-native-safe-area-context:packageDebugResources UP-TO-DATE
-> Task :react-native-svg:generateDebugResValues UP-TO-DATE
-> Task :react-native-screens:generateDebugResValues UP-TO-DATE
-> Task :react-native-fast-tflite:packageDebugResources UP-TO-DATE
-> Task :react-native-svg:generateDebugResources UP-TO-DATE
-> Task :react-native-webview:generateDebugResValues UP-TO-DATE
-> Task :react-native-screens:generateDebugResources UP-TO-DATE
-> Task :react-native-webview:generateDebugResources UP-TO-DATE
-> Task :react-native-svg:packageDebugResources UP-TO-DATE
-> Task :react-native-worklets:generateDebugResValues UP-TO-DATE
 
 > Task :expo-constants:createExpoConfig
 env: load .env
 env: export EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY POSTHOG_PROJECT_TOKEN POSTHOG_HOST
-
-> Task :react-native-gesture-handler:packageDebugResources UP-TO-DATE
-> Task :react-native-screens:packageDebugResources UP-TO-DATE
-> Task :react-native-webview:packageDebugResources UP-TO-DATE
-> Task :react-native-worklets:generateDebugResources UP-TO-DATE
-> Task :solana-mobile_mobile-wallet-adapter-protocol:generateDebugResValues UP-TO-DATE
-> Task :clerk_expo:extractDeepLinksDebug UP-TO-DATE
-> Task :expo:extractDeepLinksDebug UP-TO-DATE
-
-> Task :expo-constants:createExpoConfig
 ✅ Clerk iOS plugin loaded
 ✅ Clerk Android plugin loaded
 
 > Task :expo-constants:preBuild
-> Task :expo-constants:preDebugBuild
-> Task :solana-mobile_mobile-wallet-adapter-protocol:generateDebugResources UP-TO-DATE
+> Task :expo-constants:preReleaseBuild
+> Task :expo-constants:mergeReleaseJniLibFolders UP-TO-DATE
+> Task :expo-constants:mergeReleaseNativeLibs NO-SOURCE
 > Task :react-native-reanimated:prepareReanimatedHeadersForPrefabs UP-TO-DATE
 > Task :react-native-reanimated:preBuild
-> Task :expo-constants:writeDebugAarMetadata UP-TO-DATE
-> Task :react-native-worklets:packageDebugResources UP-TO-DATE
-> Task :expo:processDebugManifest UP-TO-DATE
-> Task :react-native-reanimated:preDebugBuild
 > Task :app:preBuild
-> Task :clerk_expo:processDebugManifest UP-TO-DATE
-> Task :expo-constants:generateDebugResValues UP-TO-DATE
-> Task :app:preDebugBuild
-> Task :expo-modules-core:extractDeepLinksDebug UP-TO-DATE
-> Task :react-native-reanimated:writeDebugAarMetadata UP-TO-DATE
-> Task :expo-sqlite:extractDeepLinksDebug UP-TO-DATE
-> Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
-> Task :expo-constants:generateDebugResources UP-TO-DATE
-> Task :react-native-reanimated:generateDebugResValues UP-TO-DATE
-> Task :expo-modules-core:processDebugManifest UP-TO-DATE
-> Task :expo-sqlite:processDebugManifest UP-TO-DATE
-> Task :solana-mobile_mobile-wallet-adapter-protocol:packageDebugResources UP-TO-DATE
-> Task :react-native-reanimated:generateDebugResources UP-TO-DATE
-> Task :react-native-gesture-handler:extractDeepLinksDebug UP-TO-DATE
-> Task :expo-constants:packageDebugResources UP-TO-DATE
-> Task :react-native-fast-tflite:extractDeepLinksDebug UP-TO-DATE
-> Task :react-native-safe-area-context:extractDeepLinksDebug UP-TO-DATE
-> Task :app:generateDebugBuildConfig UP-TO-DATE
-> Task :expo-constants:extractDeepLinksDebug UP-TO-DATE
-> Task :react-native-safe-area-context:processDebugManifest UP-TO-DATE
-> Task :react-native-gesture-handler:processDebugManifest UP-TO-DATE
-> Task :react-native-fast-tflite:processDebugManifest UP-TO-DATE
-> Task :react-native-reanimated:packageDebugResources UP-TO-DATE
-> Task :react-native-webview:extractDeepLinksDebug UP-TO-DATE
-> Task :react-native-screens:extractDeepLinksDebug UP-TO-DATE
-> Task :expo-constants:processDebugManifest UP-TO-DATE
-> Task :react-native-reanimated:extractDeepLinksDebug UP-TO-DATE
-> Task :react-native-svg:extractDeepLinksDebug UP-TO-DATE
-> Task :react-native-webview:processDebugManifest UP-TO-DATE
-> Task :react-native-worklets:extractDeepLinksDebug UP-TO-DATE
-> Task :react-native-reanimated:processDebugManifest UP-TO-DATE
-> Task :solana-mobile_mobile-wallet-adapter-protocol:extractDeepLinksDebug UP-TO-DATE
-> Task :clerk_expo:compileDebugLibraryResources UP-TO-DATE
-> Task :react-native-worklets:processDebugManifest UP-TO-DATE
-> Task :solana-mobile_mobile-wallet-adapter-protocol:processDebugManifest UP-TO-DATE
-> Task :expo-constants:compileDebugLibraryResources UP-TO-DATE
-> Task :expo:compileDebugLibraryResources UP-TO-DATE
-> Task :expo-constants:parseDebugLocalResources UP-TO-DATE
-> Task :expo:parseDebugLocalResources UP-TO-DATE
-> Task :expo-constants:generateDebugRFile UP-TO-DATE
-> Task :expo-modules-core:compileDebugLibraryResources UP-TO-DATE
-> Task :expo-modules-core:parseDebugLocalResources UP-TO-DATE
-> Task :expo-modules-core:generateDebugRFile UP-TO-DATE
-> Task :expo-sqlite:compileDebugLibraryResources UP-TO-DATE
-> Task :expo-sqlite:parseDebugLocalResources UP-TO-DATE
-> Task :expo-sqlite:generateDebugRFile UP-TO-DATE
-> Task :react-native-fast-tflite:compileDebugLibraryResources UP-TO-DATE
-> Task :react-native-fast-tflite:parseDebugLocalResources UP-TO-DATE
-> Task :react-native-fast-tflite:generateDebugRFile UP-TO-DATE
-> Task :react-native-gesture-handler:compileDebugLibraryResources UP-TO-DATE
-> Task :react-native-screens:processDebugManifest UP-TO-DATE
-> Task :react-native-svg:processDebugManifest UP-TO-DATE
-> Task :react-native-reanimated:compileDebugLibraryResources UP-TO-DATE
-> Task :react-native-safe-area-context:compileDebugLibraryResources UP-TO-DATE
-> Task :react-native-reanimated:parseDebugLocalResources UP-TO-DATE
-> Task :react-native-reanimated:generateDebugRFile UP-TO-DATE
-> Task :react-native-safe-area-context:parseDebugLocalResources UP-TO-DATE
-> Task :expo:generateDebugRFile UP-TO-DATE
-> Task :react-native-gesture-handler:parseDebugLocalResources UP-TO-DATE
-> Task :react-native-safe-area-context:generateDebugRFile UP-TO-DATE
-> Task :react-native-screens:compileDebugLibraryResources UP-TO-DATE
-> Task :react-native-gesture-handler:generateDebugRFile UP-TO-DATE
-> Task :react-native-worklets:compileDebugLibraryResources UP-TO-DATE
-> Task :react-native-webview:compileDebugLibraryResources UP-TO-DATE
-> Task :react-native-svg:compileDebugLibraryResources UP-TO-DATE
-> Task :react-native-worklets:parseDebugLocalResources UP-TO-DATE
-> Task :react-native-screens:parseDebugLocalResources UP-TO-DATE
-> Task :react-native-svg:parseDebugLocalResources UP-TO-DATE
-> Task :react-native-webview:parseDebugLocalResources UP-TO-DATE
-> Task :react-native-worklets:generateDebugRFile UP-TO-DATE
-> Task :react-native-screens:generateDebugRFile UP-TO-DATE
-> Task :expo:checkKotlinGradlePluginConfigurationErrors SKIPPED
-> Task :react-native-svg:generateDebugRFile UP-TO-DATE
-> Task :expo-constants:checkKotlinGradlePluginConfigurationErrors SKIPPED
-> Task :expo:generateDebugBuildConfig UP-TO-DATE
-> Task :solana-mobile_mobile-wallet-adapter-protocol:compileDebugLibraryResources UP-TO-DATE
-> Task :expo-modules-core:checkKotlinGradlePluginConfigurationErrors SKIPPED
-> Task :react-native-webview:generateDebugRFile UP-TO-DATE
-> Task :expo-sqlite:checkKotlinGradlePluginConfigurationErrors SKIPPED
-> Task :expo-constants:generateDebugBuildConfig UP-TO-DATE
-> Task :expo-modules-core:generateDebugBuildConfig UP-TO-DATE
-> Task :solana-mobile_mobile-wallet-adapter-protocol:parseDebugLocalResources UP-TO-DATE
-> Task :expo-constants:javaPreCompileDebug UP-TO-DATE
-> Task :expo-sqlite:generateDebugBuildConfig UP-TO-DATE
-> Task :solana-mobile_mobile-wallet-adapter-protocol:generateDebugRFile UP-TO-DATE
-> Task :expo-sqlite:javaPreCompileDebug UP-TO-DATE
-> Task :react-native-gesture-handler:checkKotlinGradlePluginConfigurationErrors SKIPPED
-> Task :react-native-fast-tflite:generateDebugBuildConfig UP-TO-DATE
-> Task :expo:javaPreCompileDebug UP-TO-DATE
-> Task :react-native-fast-tflite:javaPreCompileDebug UP-TO-DATE
-> Task :react-native-gesture-handler:generateDebugBuildConfig UP-TO-DATE
-> Task :react-native-reanimated:generateDebugBuildConfig UP-TO-DATE
-> Task :react-native-worklets:generateDebugBuildConfig UP-TO-DATE
-> Task :react-native-worklets:javaPreCompileDebug UP-TO-DATE
-> Task :react-native-reanimated:javaPreCompileDebug UP-TO-DATE
-> Task :react-native-svg:generateDebugBuildConfig UP-TO-DATE
-> Task :react-native-svg:javaPreCompileDebug UP-TO-DATE
-> Task :clerk_expo:parseDebugLocalResources UP-TO-DATE
-> Task :clerk_expo:generateDebugRFile UP-TO-DATE
-> Task :clerk_expo:checkKotlinGradlePluginConfigurationErrors SKIPPED
-> Task :clerk_expo:generateDebugBuildConfig UP-TO-DATE
-> Task :app:checkDebugAarMetadata UP-TO-DATE
-> Task :react-native-worklets:compileDebugJavaWithJavac UP-TO-DATE
-> Task :react-native-svg:compileDebugJavaWithJavac UP-TO-DATE
-> Task :clerk_expo:compileDebugKotlin UP-TO-DATE
-> Task :react-native-fast-tflite:compileDebugJavaWithJavac UP-TO-DATE
-> Task :react-native-worklets:bundleLibCompileToJarDebug UP-TO-DATE
-> Task :react-native-svg:bundleLibCompileToJarDebug UP-TO-DATE
-> Task :clerk_expo:javaPreCompileDebug UP-TO-DATE
-> Task :react-native-fast-tflite:bundleLibCompileToJarDebug UP-TO-DATE
-> Task :react-native-safe-area-context:checkKotlinGradlePluginConfigurationErrors SKIPPED
-> Task :react-native-gesture-handler:javaPreCompileDebug UP-TO-DATE
-> Task :react-native-screens:checkKotlinGradlePluginConfigurationErrors SKIPPED
-> Task :app:generateDebugResValues UP-TO-DATE
-> Task :react-native-safe-area-context:generateDebugBuildConfig UP-TO-DATE
-> Task :react-native-screens:generateDebugBuildConfig UP-TO-DATE
-> Task :clerk_expo:compileDebugJavaWithJavac UP-TO-DATE
-> Task :expo-modules-core:compileDebugKotlin UP-TO-DATE
-> Task :clerk_expo:bundleLibCompileToJarDebug UP-TO-DATE
-> Task :react-native-webview:checkKotlinGradlePluginConfigurationErrors SKIPPED
-> Task :expo-modules-core:javaPreCompileDebug UP-TO-DATE
-> Task :react-native-webview:generateDebugBuildConfig UP-TO-DATE
-> Task :react-native-reanimated:compileDebugJavaWithJavac UP-TO-DATE
-> Task :react-native-reanimated:bundleLibCompileToJarDebug UP-TO-DATE
-> Task :expo-modules-core:compileDebugJavaWithJavac UP-TO-DATE
-> Task :expo-modules-core:bundleLibCompileToJarDebug UP-TO-DATE
-> Task :react-native-safe-area-context:compileDebugKotlin UP-TO-DATE
-> Task :react-native-webview:compileDebugKotlin UP-TO-DATE
-> Task :react-native-safe-area-context:javaPreCompileDebug UP-TO-DATE
-> Task :react-native-gesture-handler:compileDebugKotlin UP-TO-DATE
-> Task :expo-constants:compileDebugKotlin UP-TO-DATE
-> Task :app:mapDebugSourceSetPaths UP-TO-DATE
-> Task :expo-sqlite:compileDebugKotlin UP-TO-DATE
-> Task :react-native-screens:compileDebugKotlin UP-TO-DATE
-> Task :react-native-safe-area-context:compileDebugJavaWithJavac UP-TO-DATE
-> Task :expo-constants:compileDebugJavaWithJavac UP-TO-DATE
-> Task :react-native-gesture-handler:compileDebugJavaWithJavac UP-TO-DATE
-> Task :expo-constants:bundleLibCompileToJarDebug UP-TO-DATE
-> Task :react-native-screens:javaPreCompileDebug UP-TO-DATE
-> Task :react-native-gesture-handler:bundleLibCompileToJarDebug UP-TO-DATE
-> Task :app:generateDebugResources UP-TO-DATE
-> Task :react-native-safe-area-context:bundleLibCompileToJarDebug UP-TO-DATE
-> Task :solana-mobile_mobile-wallet-adapter-protocol:checkKotlinGradlePluginConfigurationErrors SKIPPED
-> Task :expo-sqlite:compileDebugJavaWithJavac UP-TO-DATE
-> Task :react-native-webview:javaPreCompileDebug UP-TO-DATE
-> Task :expo-sqlite:bundleLibCompileToJarDebug UP-TO-DATE
-> Task :solana-mobile_mobile-wallet-adapter-protocol:generateDebugBuildConfig UP-TO-DATE
-> Task :react-native-screens:compileDebugJavaWithJavac UP-TO-DATE
-> Task :react-native-screens:bundleLibCompileToJarDebug UP-TO-DATE
-> Task :expo-constants:mergeDebugShaders UP-TO-DATE
-> Task :expo-constants:compileDebugShaders NO-SOURCE
-> Task :expo-constants:generateDebugAssets UP-TO-DATE
-> Task :react-native-webview:compileDebugJavaWithJavac UP-TO-DATE
-> Task :clerk_expo:mergeDebugShaders UP-TO-DATE
-> Task :expo-constants:mergeDebugAssets UP-TO-DATE
-> Task :clerk_expo:compileDebugShaders NO-SOURCE
-> Task :clerk_expo:generateDebugAssets UP-TO-DATE
-> Task :expo-modules-core:mergeDebugShaders UP-TO-DATE
-> Task :expo-modules-core:compileDebugShaders NO-SOURCE
-> Task :clerk_expo:mergeDebugAssets UP-TO-DATE
-> Task :expo-modules-core:generateDebugAssets UP-TO-DATE
-> Task :expo-sqlite:mergeDebugShaders UP-TO-DATE
-> Task :expo-modules-core:mergeDebugAssets UP-TO-DATE
-> Task :expo-sqlite:compileDebugShaders NO-SOURCE
-> Task :expo-sqlite:generateDebugAssets UP-TO-DATE
-> Task :expo-sqlite:mergeDebugAssets UP-TO-DATE
-> Task :react-native-gesture-handler:mergeDebugShaders UP-TO-DATE
-> Task :react-native-gesture-handler:compileDebugShaders NO-SOURCE
-> Task :react-native-gesture-handler:generateDebugAssets UP-TO-DATE
-> Task :react-native-gesture-handler:mergeDebugAssets UP-TO-DATE
-> Task :react-native-reanimated:mergeDebugShaders UP-TO-DATE
-> Task :react-native-webview:bundleLibCompileToJarDebug UP-TO-DATE
-> Task :react-native-fast-tflite:mergeDebugShaders UP-TO-DATE
-> Task :react-native-reanimated:compileDebugShaders NO-SOURCE
-> Task :react-native-reanimated:generateDebugAssets UP-TO-DATE
-> Task :react-native-safe-area-context:mergeDebugShaders UP-TO-DATE
-> Task :react-native-safe-area-context:compileDebugShaders NO-SOURCE
-> Task :react-native-safe-area-context:generateDebugAssets UP-TO-DATE
-> Task :react-native-reanimated:mergeDebugAssets UP-TO-DATE
-> Task :react-native-safe-area-context:mergeDebugAssets UP-TO-DATE
-> Task :react-native-fast-tflite:compileDebugShaders NO-SOURCE
-> Task :react-native-fast-tflite:generateDebugAssets UP-TO-DATE
-> Task :app:mergeDebugResources UP-TO-DATE
-> Task :react-native-screens:mergeDebugShaders UP-TO-DATE
-> Task :react-native-fast-tflite:mergeDebugAssets UP-TO-DATE
-> Task :react-native-screens:compileDebugShaders NO-SOURCE
-> Task :react-native-screens:generateDebugAssets UP-TO-DATE
-> Task :react-native-svg:mergeDebugShaders UP-TO-DATE
-> Task :react-native-webview:mergeDebugShaders UP-TO-DATE
-> Task :app:packageDebugResources UP-TO-DATE
-> Task :react-native-svg:compileDebugShaders NO-SOURCE
-> Task :react-native-webview:compileDebugShaders NO-SOURCE
-> Task :react-native-webview:generateDebugAssets UP-TO-DATE
-> Task :react-native-svg:generateDebugAssets UP-TO-DATE
-> Task :react-native-webview:mergeDebugAssets UP-TO-DATE
-> Task :solana-mobile_mobile-wallet-adapter-protocol:compileDebugKotlin UP-TO-DATE
-> Task :app:parseDebugLocalResources UP-TO-DATE
-> Task :react-native-screens:mergeDebugAssets UP-TO-DATE
-> Task :react-native-svg:mergeDebugAssets UP-TO-DATE
-> Task :react-native-worklets:mergeDebugShaders UP-TO-DATE
-> Task :solana-mobile_mobile-wallet-adapter-protocol:javaPreCompileDebug UP-TO-DATE
-> Task :app:createDebugCompatibleScreenManifests UP-TO-DATE
-> Task :clerk_expo:bundleLibRuntimeToJarDebug UP-TO-DATE
-> Task :react-native-gesture-handler:bundleLibRuntimeToJarDebug UP-TO-DATE
-> Task :react-native-worklets:compileDebugShaders NO-SOURCE
-> Task :react-native-worklets:generateDebugAssets UP-TO-DATE
-> Task :app:extractDeepLinksDebug UP-TO-DATE
-> Task :react-native-worklets:mergeDebugAssets UP-TO-DATE
-> Task :react-native-safe-area-context:bundleLibRuntimeToJarDebug UP-TO-DATE
-> Task :solana-mobile_mobile-wallet-adapter-protocol:compileDebugJavaWithJavac UP-TO-DATE
-> Task :solana-mobile_mobile-wallet-adapter-protocol:bundleLibCompileToJarDebug UP-TO-DATE
-> Task :react-native-screens:bundleLibRuntimeToJarDebug UP-TO-DATE
-> Task :solana-mobile_mobile-wallet-adapter-protocol:mergeDebugShaders UP-TO-DATE
-> Task :solana-mobile_mobile-wallet-adapter-protocol:compileDebugShaders NO-SOURCE
-> Task :solana-mobile_mobile-wallet-adapter-protocol:generateDebugAssets UP-TO-DATE
-> Task :solana-mobile_mobile-wallet-adapter-protocol:mergeDebugAssets UP-TO-DATE
-> Task :react-native-webview:bundleLibRuntimeToJarDebug UP-TO-DATE
-> Task :react-native-fast-tflite:bundleLibRuntimeToJarDebug UP-TO-DATE
-> Task :solana-mobile_mobile-wallet-adapter-protocol:bundleLibRuntimeToJarDebug UP-TO-DATE
-> Task :react-native-svg:bundleLibRuntimeToJarDebug UP-TO-DATE
-> Task :react-native-reanimated:bundleLibRuntimeToJarDebug UP-TO-DATE
-> Task :react-native-worklets:bundleLibRuntimeToJarDebug UP-TO-DATE
-> Task :expo-modules-core:bundleLibRuntimeToJarDebug UP-TO-DATE
-> Task :expo-constants:bundleLibRuntimeToJarDebug UP-TO-DATE
-> Task :expo-sqlite:bundleLibRuntimeToJarDebug UP-TO-DATE
-> Task :expo-constants:processDebugJavaRes UP-TO-DATE
-> Task :clerk_expo:processDebugJavaRes UP-TO-DATE
-> Task :react-native-fast-tflite:processDebugJavaRes NO-SOURCE
-> Task :expo-sqlite:processDebugJavaRes UP-TO-DATE
-> Task :react-native-reanimated:processDebugJavaRes NO-SOURCE
-> Task :react-native-gesture-handler:processDebugJavaRes UP-TO-DATE
-> Task :expo-modules-core:processDebugJavaRes UP-TO-DATE
-> Task :react-native-svg:processDebugJavaRes NO-SOURCE
-> Task :react-native-safe-area-context:processDebugJavaRes UP-TO-DATE
-> Task :react-native-screens:processDebugJavaRes UP-TO-DATE
-> Task :react-native-worklets:processDebugJavaRes NO-SOURCE
-> Task :react-native-webview:processDebugJavaRes UP-TO-DATE
-> Task :clerk_expo:bundleLibRuntimeToDirDebug UP-TO-DATE
-> Task :react-native-gesture-handler:bundleLibRuntimeToDirDebug UP-TO-DATE
-> Task :solana-mobile_mobile-wallet-adapter-protocol:processDebugJavaRes UP-TO-DATE
-> Task :react-native-safe-area-context:bundleLibRuntimeToDirDebug UP-TO-DATE
-> Task :react-native-webview:bundleLibRuntimeToDirDebug UP-TO-DATE
-> Task :solana-mobile_mobile-wallet-adapter-protocol:bundleLibRuntimeToDirDebug UP-TO-DATE
-> Task :react-native-screens:bundleLibRuntimeToDirDebug UP-TO-DATE
-> Task :react-native-fast-tflite:bundleLibRuntimeToDirDebug UP-TO-DATE
-> Task :react-native-reanimated:bundleLibRuntimeToDirDebug UP-TO-DATE
-> Task :react-native-worklets:bundleLibRuntimeToDirDebug UP-TO-DATE
-> Task :react-native-svg:bundleLibRuntimeToDirDebug UP-TO-DATE
-> Task :expo-constants:bundleLibRuntimeToDirDebug UP-TO-DATE
-> Task :expo-sqlite:bundleLibRuntimeToDirDebug UP-TO-DATE
-> Task :clerk_expo:mergeDebugJniLibFolders UP-TO-DATE
-> Task :expo-modules-core:bundleLibRuntimeToDirDebug UP-TO-DATE
-> Task :expo-constants:mergeDebugJniLibFolders UP-TO-DATE
-> Task :clerk_expo:mergeDebugNativeLibs NO-SOURCE
-> Task :expo-constants:mergeDebugNativeLibs NO-SOURCE
-> Task :clerk_expo:copyDebugJniLibsProjectOnly UP-TO-DATE
-> Task :expo-constants:copyDebugJniLibsProjectOnly UP-TO-DATE
-> Task :expo:compileDebugKotlin UP-TO-DATE
-> Task :expo:compileDebugJavaWithJavac UP-TO-DATE
-> Task :expo:bundleLibCompileToJarDebug UP-TO-DATE
-> Task :expo:mergeDebugShaders UP-TO-DATE
-> Task :expo:compileDebugShaders NO-SOURCE
-> Task :expo:generateDebugAssets UP-TO-DATE
-> Task :expo:mergeDebugAssets UP-TO-DATE
-> Task :expo:bundleLibRuntimeToJarDebug UP-TO-DATE
-> Task :expo:processDebugJavaRes UP-TO-DATE
-> Task :expo:bundleLibRuntimeToDirDebug UP-TO-DATE
-> Task :expo:mergeDebugJniLibFolders UP-TO-DATE
-> Task :expo:mergeDebugNativeLibs NO-SOURCE
-> Task :expo:copyDebugJniLibsProjectOnly UP-TO-DATE
-> Task :react-native-gesture-handler:mergeDebugJniLibFolders UP-TO-DATE
-> Task :react-native-reanimated:mergeDebugJniLibFolders UP-TO-DATE
-> Task :react-native-safe-area-context:mergeDebugJniLibFolders UP-TO-DATE
-> Task :react-native-safe-area-context:mergeDebugNativeLibs NO-SOURCE
-> Task :react-native-safe-area-context:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :expo-constants:copyReleaseJniLibsProjectOnly UP-TO-DATE
+> Task :app:preReleaseBuild
+> Task :react-native-reanimated:preReleaseBuild
+> Task :react-native-gesture-handler:preReleaseBuild UP-TO-DATE
+> Task :react-native-gesture-handler:mergeReleaseJniLibFolders UP-TO-DATE
+> Task :app:mergeReleaseJniLibFolders UP-TO-DATE
+> Task :react-native-safe-area-context:preReleaseBuild UP-TO-DATE
+> Task :react-native-reanimated:mergeReleaseJniLibFolders UP-TO-DATE
+> Task :react-native-screens:preReleaseBuild UP-TO-DATE
+> Task :react-native-safe-area-context:mergeReleaseJniLibFolders UP-TO-DATE
+> Task :react-native-safe-area-context:mergeReleaseNativeLibs NO-SOURCE
+> Task :react-native-safe-area-context:copyReleaseJniLibsProjectOnly UP-TO-DATE
+> Task :react-native-svg:preReleaseBuild UP-TO-DATE
+> Task :react-native-svg:mergeReleaseJniLibFolders UP-TO-DATE
+> Task :react-native-svg:mergeReleaseNativeLibs NO-SOURCE
+> Task :react-native-svg:copyReleaseJniLibsProjectOnly UP-TO-DATE
+> Task :react-native-webview:preReleaseBuild UP-TO-DATE
+> Task :react-native-webview:mergeReleaseJniLibFolders UP-TO-DATE
+> Task :react-native-webview:mergeReleaseNativeLibs NO-SOURCE
 > Task :react-native-fast-tflite:extractAARHeaders
-> Task :app:processDebugMainManifest UP-TO-DATE
-> Task :app:processDebugManifest UP-TO-DATE
-> Task :app:processDebugManifestForPackage UP-TO-DATE
-> Task :react-native-screens:configureCMakeDebug[armeabi-v7a]
-> Task :react-native-worklets:configureCMakeDebug[armeabi-v7a]
-> Task :react-native-worklets:generateJsonModelDebug
-> Task :expo-sqlite:configureCMakeDebug[armeabi-v7a]
-> Task :expo-modules-core:configureCMakeDebug[armeabi-v7a]
-> Task :react-native-worklets:prefabDebugConfigurePackage
-> Task :expo-sqlite:buildCMakeDebug[armeabi-v7a]
-> Task :expo-modules-core:buildCMakeDebug[armeabi-v7a]
-> Task :expo-modules-core:mergeDebugJniLibFolders UP-TO-DATE
-> Task :react-native-reanimated:configureCMakeDebug[armeabi-v7a]
-> Task :react-native-reanimated:generateJsonModelDebug
-> Task :react-native-screens:buildCMakeDebug[armeabi-v7a]
-> Task :expo-sqlite:mergeDebugJniLibFolders UP-TO-DATE
-> Task :react-native-reanimated:prefabDebugConfigurePackage
-> Task :react-native-worklets:buildCMakeDebug[armeabi-v7a][worklets]
-> Task :react-native-worklets:externalNativeBuildDebug
+> Task :react-native-webview:copyReleaseJniLibsProjectOnly UP-TO-DATE
+> Task :solana-mobile_mobile-wallet-adapter-protocol:preReleaseBuild UP-TO-DATE
+> Task :solana-mobile_mobile-wallet-adapter-protocol:mergeReleaseJniLibFolders UP-TO-DATE
+> Task :solana-mobile_mobile-wallet-adapter-protocol:mergeReleaseNativeLibs NO-SOURCE
+> Task :solana-mobile_mobile-wallet-adapter-protocol:copyReleaseJniLibsProjectOnly UP-TO-DATE
+> Task :clerk_expo:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :clerk_expo:generateReleaseBuildConfig UP-TO-DATE
+> Task :clerk_expo:generateReleaseResValues UP-TO-DATE
+> Task :clerk_expo:generateReleaseResources UP-TO-DATE
+> Task :clerk_expo:packageReleaseResources UP-TO-DATE
+> Task :clerk_expo:parseReleaseLocalResources UP-TO-DATE
+> Task :clerk_expo:generateReleaseRFile UP-TO-DATE
 > Task :react-native-fast-tflite:extractSOFiles
-> Task :react-native-worklets:prefabDebugPackage
-> Task :expo-modules-core:mergeDebugNativeLibs
-> Task :react-native-worklets:mergeDebugJniLibFolders UP-TO-DATE
-> Task :react-native-fast-tflite:configureCMakeDebug[arm64-v8a]
-> Task :react-native-gesture-handler:configureCMakeDebug[armeabi-v7a]
-> Task :expo-sqlite:mergeDebugNativeLibs
-> Task :react-native-reanimated:buildCMakeDebug[armeabi-v7a][reanimated]
-> Task :app:processDebugResources UP-TO-DATE
-> Task :app:compileDebugKotlin UP-TO-DATE
-> Task :app:javaPreCompileDebug UP-TO-DATE
-> Task :expo-sqlite:copyDebugJniLibsProjectOnly
-> Task :react-native-screens:mergeDebugJniLibFolders UP-TO-DATE
-> Task :app:compileDebugJavaWithJavac UP-TO-DATE
-> Task :app:mergeDebugShaders UP-TO-DATE
-> Task :app:compileDebugShaders NO-SOURCE
-> Task :app:generateDebugAssets UP-TO-DATE
-> Task :expo-modules-core:copyDebugJniLibsProjectOnly
-> Task :react-native-svg:mergeDebugJniLibFolders UP-TO-DATE
-> Task :react-native-svg:mergeDebugNativeLibs NO-SOURCE
-> Task :react-native-svg:copyDebugJniLibsProjectOnly UP-TO-DATE
-> Task :react-native-webview:mergeDebugJniLibFolders UP-TO-DATE
-> Task :react-native-webview:mergeDebugNativeLibs NO-SOURCE
-> Task :react-native-screens:mergeDebugNativeLibs
-> Task :react-native-webview:copyDebugJniLibsProjectOnly UP-TO-DATE
-> Task :solana-mobile_mobile-wallet-adapter-protocol:mergeDebugJniLibFolders UP-TO-DATE
-> Task :react-native-worklets:mergeDebugNativeLibs
-> Task :solana-mobile_mobile-wallet-adapter-protocol:mergeDebugNativeLibs NO-SOURCE
-> Task :solana-mobile_mobile-wallet-adapter-protocol:copyDebugJniLibsProjectOnly UP-TO-DATE
-> Task :clerk_expo:stripDebugDebugSymbols NO-SOURCE
-> Task :clerk_expo:copyDebugJniLibsProjectAndLocalJars UP-TO-DATE
-> Task :clerk_expo:extractDebugAnnotations UP-TO-DATE
-> Task :clerk_expo:extractDeepLinksForAarDebug UP-TO-DATE
-> Task :clerk_expo:mergeDebugGeneratedProguardFiles UP-TO-DATE
-> Task :clerk_expo:mergeDebugConsumerProguardFiles UP-TO-DATE
-> Task :clerk_expo:prepareDebugArtProfile UP-TO-DATE
-> Task :clerk_expo:prepareLintJarForPublish UP-TO-DATE
-> Task :clerk_expo:mergeDebugJavaResource UP-TO-DATE
-> Task :react-native-worklets:copyDebugJniLibsProjectOnly
-> Task :clerk_expo:syncDebugLibJars UP-TO-DATE
-> Task :clerk_expo:bundleDebugAar UP-TO-DATE
-> Task :clerk_expo:assembleDebug UP-TO-DATE
-> Task :react-native-reanimated:externalNativeBuildDebug
-> Task :expo:stripDebugDebugSymbols NO-SOURCE
-> Task :expo:copyDebugJniLibsProjectAndLocalJars UP-TO-DATE
-> Task :expo:extractDebugAnnotations UP-TO-DATE
-> Task :expo:extractDeepLinksForAarDebug UP-TO-DATE
-> Task :expo:mergeDebugGeneratedProguardFiles UP-TO-DATE
-> Task :expo:mergeDebugConsumerProguardFiles UP-TO-DATE
-> Task :expo:prepareDebugArtProfile UP-TO-DATE
-> Task :expo:prepareLintJarForPublish UP-TO-DATE
-> Task :expo:mergeDebugJavaResource UP-TO-DATE
-> Task :expo:syncDebugLibJars UP-TO-DATE
-> Task :expo:bundleDebugAar UP-TO-DATE
-> Task :expo:assembleDebug UP-TO-DATE
-> Task :expo-constants:stripDebugDebugSymbols NO-SOURCE
-> Task :expo-constants:copyDebugJniLibsProjectAndLocalJars UP-TO-DATE
-> Task :expo-constants:extractDebugAnnotations UP-TO-DATE
-> Task :expo-constants:extractDeepLinksForAarDebug UP-TO-DATE
-> Task :expo-constants:mergeDebugGeneratedProguardFiles UP-TO-DATE
-> Task :expo-constants:mergeDebugConsumerProguardFiles UP-TO-DATE
-> Task :react-native-screens:copyDebugJniLibsProjectOnly
-> Task :expo-constants:prepareDebugArtProfile UP-TO-DATE
+> Task :react-native-fast-tflite:preReleaseBuild UP-TO-DATE
+> Task :react-native-fast-tflite:configureCMakeRelWithDebInfo[arm64-v8a]
+> Task :clerk_expo:compileReleaseKotlin UP-TO-DATE
+> Task :clerk_expo:javaPreCompileRelease UP-TO-DATE
+> Task :clerk_expo:compileReleaseJavaWithJavac UP-TO-DATE
+> Task :clerk_expo:bundleLibRuntimeToDirRelease UP-TO-DATE
+> Task :react-native-gesture-handler:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :react-native-gesture-handler:generateReleaseBuildConfig UP-TO-DATE
+> Task :react-native-gesture-handler:generateReleaseResValues UP-TO-DATE
+> Task :react-native-gesture-handler:generateReleaseResources UP-TO-DATE
+> Task :react-native-gesture-handler:packageReleaseResources UP-TO-DATE
+> Task :react-native-gesture-handler:parseReleaseLocalResources UP-TO-DATE
+> Task :react-native-gesture-handler:generateReleaseRFile UP-TO-DATE
+> Task :react-native-reanimated:generateReleaseBuildConfig UP-TO-DATE
+> Task :react-native-reanimated:generateReleaseResValues UP-TO-DATE
+> Task :react-native-reanimated:generateReleaseResources UP-TO-DATE
+> Task :react-native-reanimated:packageReleaseResources UP-TO-DATE
+> Task :react-native-reanimated:parseReleaseLocalResources UP-TO-DATE
+> Task :react-native-reanimated:generateReleaseRFile UP-TO-DATE
+> Task :react-native-reanimated:javaPreCompileRelease UP-TO-DATE
+> Task :react-native-svg:generateReleaseBuildConfig UP-TO-DATE
+> Task :react-native-svg:generateReleaseResValues UP-TO-DATE
+> Task :react-native-svg:generateReleaseResources UP-TO-DATE
+> Task :react-native-svg:packageReleaseResources UP-TO-DATE
+> Task :react-native-svg:parseReleaseLocalResources UP-TO-DATE
+> Task :react-native-svg:generateReleaseRFile UP-TO-DATE
+> Task :react-native-svg:javaPreCompileRelease UP-TO-DATE
+> Task :react-native-svg:compileReleaseJavaWithJavac UP-TO-DATE
+> Task :react-native-svg:bundleLibCompileToJarRelease UP-TO-DATE
+> Task :react-native-gesture-handler:javaPreCompileRelease UP-TO-DATE
+> Task :react-native-safe-area-context:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :react-native-safe-area-context:generateReleaseBuildConfig UP-TO-DATE
+> Task :react-native-safe-area-context:generateReleaseResValues UP-TO-DATE
+> Task :react-native-safe-area-context:generateReleaseResources UP-TO-DATE
+> Task :react-native-safe-area-context:packageReleaseResources UP-TO-DATE
+> Task :react-native-safe-area-context:parseReleaseLocalResources UP-TO-DATE
+> Task :react-native-safe-area-context:generateReleaseRFile UP-TO-DATE
+> Task :react-native-safe-area-context:compileReleaseKotlin UP-TO-DATE
+> Task :react-native-safe-area-context:javaPreCompileRelease UP-TO-DATE
+> Task :react-native-safe-area-context:compileReleaseJavaWithJavac UP-TO-DATE
+> Task :react-native-safe-area-context:bundleLibRuntimeToDirRelease UP-TO-DATE
+> Task :react-native-webview:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :react-native-webview:generateReleaseBuildConfig UP-TO-DATE
+> Task :react-native-webview:generateReleaseResValues UP-TO-DATE
+> Task :react-native-webview:generateReleaseResources UP-TO-DATE
+> Task :react-native-webview:packageReleaseResources UP-TO-DATE
+> Task :react-native-webview:parseReleaseLocalResources UP-TO-DATE
+> Task :react-native-webview:generateReleaseRFile UP-TO-DATE
+> Task :react-native-webview:compileReleaseKotlin UP-TO-DATE
+> Task :react-native-webview:javaPreCompileRelease UP-TO-DATE
+> Task :react-native-webview:compileReleaseJavaWithJavac UP-TO-DATE
+> Task :react-native-webview:bundleLibRuntimeToDirRelease UP-TO-DATE
+> Task :solana-mobile_mobile-wallet-adapter-protocol:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :solana-mobile_mobile-wallet-adapter-protocol:generateReleaseBuildConfig UP-TO-DATE
+> Task :solana-mobile_mobile-wallet-adapter-protocol:generateReleaseResValues UP-TO-DATE
+> Task :solana-mobile_mobile-wallet-adapter-protocol:generateReleaseResources UP-TO-DATE
+> Task :solana-mobile_mobile-wallet-adapter-protocol:packageReleaseResources UP-TO-DATE
+> Task :solana-mobile_mobile-wallet-adapter-protocol:parseReleaseLocalResources UP-TO-DATE
+> Task :solana-mobile_mobile-wallet-adapter-protocol:generateReleaseRFile UP-TO-DATE
+> Task :solana-mobile_mobile-wallet-adapter-protocol:compileReleaseKotlin UP-TO-DATE
+> Task :solana-mobile_mobile-wallet-adapter-protocol:javaPreCompileRelease UP-TO-DATE
+> Task :solana-mobile_mobile-wallet-adapter-protocol:compileReleaseJavaWithJavac UP-TO-DATE
+> Task :solana-mobile_mobile-wallet-adapter-protocol:bundleLibRuntimeToDirRelease UP-TO-DATE
+> Task :expo:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :expo:generateReleaseBuildConfig UP-TO-DATE
+> Task :expo:generateReleaseResValues UP-TO-DATE
+> Task :expo:generateReleaseResources UP-TO-DATE
+> Task :expo:packageReleaseResources UP-TO-DATE
+> Task :expo:parseReleaseLocalResources UP-TO-DATE
+> Task :expo:generateReleaseRFile UP-TO-DATE
+> Task :expo-constants:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :expo-constants:generateReleaseBuildConfig UP-TO-DATE
+> Task :expo-constants:generateReleaseResValues UP-TO-DATE
+> Task :expo-constants:generateReleaseResources UP-TO-DATE
+> Task :react-native-screens:configureCMakeRelWithDebInfo[armeabi-v7a]
+> Task :expo-constants:packageReleaseResources UP-TO-DATE
+> Task :expo-constants:parseReleaseLocalResources UP-TO-DATE
+> Task :expo-constants:generateReleaseRFile UP-TO-DATE
+> Task :expo-constants:javaPreCompileRelease UP-TO-DATE
+> Task :expo:javaPreCompileRelease UP-TO-DATE
+> Task :react-native-worklets:configureCMakeRelWithDebInfo[armeabi-v7a]
+> Task :react-native-worklets:generateJsonModelRelease
+> Task :react-native-worklets:prefabReleaseConfigurePackage
+> Task :react-native-svg:bundleLibRuntimeToDirRelease UP-TO-DATE
+> Task :expo-modules-core:configureCMakeRelWithDebInfo[armeabi-v7a]
+> Task :expo-sqlite:configureCMakeRelWithDebInfo[armeabi-v7a]
+> Task :react-native-reanimated:configureCMakeRelWithDebInfo[armeabi-v7a]
+> Task :react-native-reanimated:generateJsonModelRelease
+> Task :react-native-reanimated:prefabReleaseConfigurePackage
+> Task :app:configureCMakeRelWithDebInfo[armeabi-v7a]
+> Task :react-native-fast-tflite:buildCMakeRelWithDebInfo[arm64-v8a]
+> Task :react-native-gesture-handler:configureCMakeRelWithDebInfo[armeabi-v7a]
+
+> Task :react-native-fast-tflite:buildCMakeRelWithDebInfo[arm64-v8a]
+C/C++: ninja: Entering directory `/home/d/Desktop/jsmastery/node_modules/react-native-fast-tflite/android/.cxx/RelWithDebInfo/1x3y3830/arm64-v8a'
+C/C++: /home/d/Desktop/jsmastery/node_modules/react-native-fast-tflite/cpp/TensorflowPlugin.cpp:73:11: warning: ignoring return value of function declared with 'nodiscard' attribute [-Wunused-result]
+C/C++:    73 |           std::async(std::launch::async, [=, &runtime]() {
+C/C++:       |           ^~~~~~~~~~ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C/C++:    74 |             try {
+C/C++:       |             ~~~~~
+C/C++:    75 |               // Fetch model from URL (JS bundle)
+C/C++:       |               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C/C++:    76 |               Buffer buffer = fetchURL(modelPath);
+C/C++:       |               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C/C++:    77 | 
+C/C++:    78 |               // Load Model into Tensorflow
+C/C++:       |               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C/C++:    79 |               auto model = TfLiteModelCreate(buffer.data, buffer.size);
+C/C++:       |               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C/C++:    80 |               if (model == nullptr) {
+C/C++:       |               ~~~~~~~~~~~~~~~~~~~~~~~
+C/C++:    81 |                 callInvoker->invokeAsync(
+C/C++:       |                 ~~~~~~~~~~~~~~~~~~~~~~~~~
+C/C++:    82 |                     [=]() { promise->reject("Failed to load model from \"" + modelPath + "\"!"); });
+C/C++:       |                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C/C++:    83 |                 return;
+C/C++:       |                 ~~~~~~~
+C/C++:    84 |               }
+C/C++:       |               ~
+C/C++:    85 | 
+C/C++:    86 |               // Create TensorFlow Interpreter
+C/C++:       |               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C/C++:    87 |               auto options = TfLiteInterpreterOptionsCreate();
+C/C++:       |               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C/C++:    88 | 
+C/C++: /home/d/Desktop/jsmastery/node_modules/react-native-fast-tflite/cpp/TensorflowPlugin.cpp:317:17: warning: ignoring return value of function declared with 'nodiscard' attribute [-Wunused-result]
+C/C++:   317 |                 std::async(std::launch::async, [=, &runtime]() {
+C/C++:       |                 ^~~~~~~~~~ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C/C++:   318 |                   // 2.
+C/C++:       |                   ~~~~~
+C/C++:   319 |                   try {
+C/C++:       |                   ~~~~~
+C/C++:   320 |                     this->run();
+C/C++:       |                     ~~~~~~~~~~~~
+C/C++:   321 | 
+C/C++:   322 |                     this->_callInvoker->invokeAsync([=, &runtime]() {
+C/C++:       |                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C/C++:   323 |                       // 3.
+C/C++:       |                       ~~~~~
+C/C++:   324 |                       auto result = this->copyOutputBuffers(runtime);
+C/C++:       |                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C/C++:   325 |                       promise->resolve(std::move(result));
+C/C++:       |                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C/C++:   326 |                     });
+C/C++:       |                     ~~~
+C/C++:   327 |                   } catch (std::exception& error) {
+C/C++:       |                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C/C++:   328 |                     promise->reject(error.what());
+C/C++:       |                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C/C++:   329 |                   }
+C/C++:       |                   ~
+C/C++:   330 |                 });
+C/C++:       |                 ~
+C/C++: 2 warnings generated.
+
+> Task :react-native-fast-tflite:configureCMakeRelWithDebInfo[armeabi-v7a]
+> Task :react-native-screens:buildCMakeRelWithDebInfo[armeabi-v7a]
+> Task :react-native-worklets:buildCMakeRelWithDebInfo[armeabi-v7a][worklets]
+> Task :expo-modules-core:buildCMakeRelWithDebInfo[armeabi-v7a]
+> Task :expo-sqlite:buildCMakeRelWithDebInfo[armeabi-v7a]
+> Task :app:checkReleaseDuplicateClasses UP-TO-DATE
+> Task :app:buildKotlinToolingMetadata UP-TO-DATE
+> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :app:generateReleaseBuildConfig UP-TO-DATE
+> Task :clerk_expo:writeReleaseAarMetadata UP-TO-DATE
+> Task :expo:writeReleaseAarMetadata UP-TO-DATE
+> Task :expo-constants:writeReleaseAarMetadata UP-TO-DATE
+> Task :react-native-gesture-handler:writeReleaseAarMetadata UP-TO-DATE
+> Task :react-native-reanimated:writeReleaseAarMetadata UP-TO-DATE
+> Task :react-native-safe-area-context:writeReleaseAarMetadata UP-TO-DATE
+> Task :react-native-svg:writeReleaseAarMetadata UP-TO-DATE
+> Task :react-native-webview:writeReleaseAarMetadata UP-TO-DATE
+> Task :solana-mobile_mobile-wallet-adapter-protocol:writeReleaseAarMetadata UP-TO-DATE
+> Task :app:createBundleReleaseJsAndAssets UP-TO-DATE
+> Task :app:generateReleaseResValues UP-TO-DATE
+> Task :app:generateReleaseResources UP-TO-DATE
+> Task :app:packageReleaseResources UP-TO-DATE
+> Task :app:parseReleaseLocalResources UP-TO-DATE
+> Task :app:createReleaseCompatibleScreenManifests UP-TO-DATE
+> Task :app:extractDeepLinksRelease UP-TO-DATE
+> Task :clerk_expo:extractDeepLinksRelease UP-TO-DATE
+> Task :clerk_expo:processReleaseManifest UP-TO-DATE
+> Task :expo:extractDeepLinksRelease UP-TO-DATE
+> Task :react-native-screens:mergeReleaseJniLibFolders UP-TO-DATE
+> Task :expo:processReleaseManifest UP-TO-DATE
+> Task :expo-constants:extractDeepLinksRelease UP-TO-DATE
+> Task :expo-constants:processReleaseManifest UP-TO-DATE
+> Task :react-native-gesture-handler:extractDeepLinksRelease UP-TO-DATE
+> Task :react-native-gesture-handler:processReleaseManifest UP-TO-DATE
+> Task :react-native-reanimated:extractDeepLinksRelease UP-TO-DATE
+> Task :react-native-reanimated:processReleaseManifest UP-TO-DATE
+> Task :react-native-safe-area-context:extractDeepLinksRelease UP-TO-DATE
+> Task :react-native-safe-area-context:processReleaseManifest UP-TO-DATE
+> Task :react-native-svg:extractDeepLinksRelease UP-TO-DATE
+> Task :react-native-svg:processReleaseManifest UP-TO-DATE
+> Task :react-native-webview:extractDeepLinksRelease UP-TO-DATE
+> Task :react-native-screens:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :react-native-screens:generateReleaseBuildConfig UP-TO-DATE
+> Task :react-native-screens:generateReleaseResValues UP-TO-DATE
+> Task :react-native-screens:generateReleaseResources UP-TO-DATE
+> Task :react-native-screens:packageReleaseResources UP-TO-DATE
+> Task :react-native-screens:parseReleaseLocalResources UP-TO-DATE
+> Task :react-native-screens:generateReleaseRFile UP-TO-DATE
+> Task :react-native-screens:mergeReleaseNativeLibs
+> Task :react-native-webview:processReleaseManifest UP-TO-DATE
+> Task :solana-mobile_mobile-wallet-adapter-protocol:extractDeepLinksRelease UP-TO-DATE
+> Task :solana-mobile_mobile-wallet-adapter-protocol:processReleaseManifest UP-TO-DATE
+> Task :clerk_expo:compileReleaseLibraryResources UP-TO-DATE
+> Task :expo:compileReleaseLibraryResources UP-TO-DATE
+> Task :expo-constants:compileReleaseLibraryResources UP-TO-DATE
+> Task :react-native-gesture-handler:compileReleaseLibraryResources UP-TO-DATE
+> Task :react-native-reanimated:compileReleaseLibraryResources UP-TO-DATE
+> Task :react-native-safe-area-context:compileReleaseLibraryResources UP-TO-DATE
+> Task :react-native-svg:compileReleaseLibraryResources UP-TO-DATE
+> Task :react-native-webview:compileReleaseLibraryResources UP-TO-DATE
+> Task :solana-mobile_mobile-wallet-adapter-protocol:compileReleaseLibraryResources UP-TO-DATE
+> Task :clerk_expo:bundleLibCompileToJarRelease UP-TO-DATE
+> Task :react-native-safe-area-context:bundleLibCompileToJarRelease UP-TO-DATE
+> Task :react-native-webview:bundleLibCompileToJarRelease UP-TO-DATE
+> Task :solana-mobile_mobile-wallet-adapter-protocol:bundleLibCompileToJarRelease UP-TO-DATE
+> Task :app:javaPreCompileRelease UP-TO-DATE
+> Task :app:desugarReleaseFileDependencies UP-TO-DATE
+> Task :app:mergeReleaseStartupProfile UP-TO-DATE
+> Task :app:mergeExtDexRelease UP-TO-DATE
+> Task :clerk_expo:prepareReleaseArtProfile UP-TO-DATE
+> Task :expo:prepareReleaseArtProfile UP-TO-DATE
+> Task :expo-constants:prepareReleaseArtProfile UP-TO-DATE
+> Task :react-native-gesture-handler:prepareReleaseArtProfile UP-TO-DATE
+> Task :react-native-reanimated:prepareReleaseArtProfile UP-TO-DATE
+> Task :react-native-safe-area-context:prepareReleaseArtProfile UP-TO-DATE
+> Task :react-native-svg:prepareReleaseArtProfile UP-TO-DATE
+> Task :react-native-webview:prepareReleaseArtProfile UP-TO-DATE
+> Task :solana-mobile_mobile-wallet-adapter-protocol:prepareReleaseArtProfile UP-TO-DATE
+> Task :clerk_expo:bundleLibRuntimeToJarRelease UP-TO-DATE
+> Task :react-native-safe-area-context:bundleLibRuntimeToJarRelease UP-TO-DATE
+> Task :react-native-screens:compileReleaseKotlin UP-TO-DATE
+> Task :react-native-webview:bundleLibRuntimeToJarRelease UP-TO-DATE
+> Task :solana-mobile_mobile-wallet-adapter-protocol:bundleLibRuntimeToJarRelease UP-TO-DATE
+> Task :react-native-screens:javaPreCompileRelease UP-TO-DATE
+> Task :react-native-screens:compileReleaseJavaWithJavac UP-TO-DATE
+> Task :react-native-screens:copyReleaseJniLibsProjectOnly
+> Task :react-native-svg:bundleLibRuntimeToJarRelease UP-TO-DATE
+> Task :react-native-screens:bundleLibRuntimeToDirRelease UP-TO-DATE
+> Task :react-native-screens:writeReleaseAarMetadata UP-TO-DATE
+> Task :react-native-screens:extractDeepLinksRelease UP-TO-DATE
+> Task :react-native-screens:processReleaseManifest UP-TO-DATE
+> Task :react-native-screens:compileReleaseLibraryResources UP-TO-DATE
+> Task :react-native-screens:bundleLibCompileToJarRelease UP-TO-DATE
+> Task :react-native-screens:prepareReleaseArtProfile UP-TO-DATE
+> Task :app:mergeReleaseShaders UP-TO-DATE
+> Task :react-native-screens:bundleLibRuntimeToJarRelease UP-TO-DATE
+> Task :app:compileReleaseShaders NO-SOURCE
+> Task :app:generateReleaseAssets UP-TO-DATE
+> Task :clerk_expo:mergeReleaseShaders UP-TO-DATE
+> Task :expo:mergeReleaseShaders UP-TO-DATE
+> Task :clerk_expo:compileReleaseShaders NO-SOURCE
+> Task :clerk_expo:generateReleaseAssets UP-TO-DATE
+> Task :expo:compileReleaseShaders NO-SOURCE
+> Task :clerk_expo:mergeReleaseAssets UP-TO-DATE
+> Task :expo:generateReleaseAssets UP-TO-DATE
+> Task :expo-constants:mergeReleaseShaders UP-TO-DATE
+> Task :expo:mergeReleaseAssets UP-TO-DATE
+> Task :expo-constants:compileReleaseShaders NO-SOURCE
+> Task :expo-constants:generateReleaseAssets UP-TO-DATE
+> Task :react-native-gesture-handler:mergeReleaseShaders UP-TO-DATE
+> Task :react-native-gesture-handler:compileReleaseShaders NO-SOURCE
+> Task :react-native-gesture-handler:generateReleaseAssets UP-TO-DATE
+> Task :expo-constants:mergeReleaseAssets UP-TO-DATE
+> Task :react-native-gesture-handler:mergeReleaseAssets UP-TO-DATE
+> Task :react-native-reanimated:mergeReleaseShaders UP-TO-DATE
+> Task :react-native-safe-area-context:mergeReleaseShaders UP-TO-DATE
+> Task :react-native-reanimated:compileReleaseShaders NO-SOURCE
+> Task :react-native-reanimated:generateReleaseAssets UP-TO-DATE
+> Task :react-native-safe-area-context:compileReleaseShaders NO-SOURCE
+> Task :react-native-safe-area-context:generateReleaseAssets UP-TO-DATE
+> Task :react-native-reanimated:mergeReleaseAssets UP-TO-DATE
+> Task :react-native-safe-area-context:mergeReleaseAssets UP-TO-DATE
+> Task :react-native-screens:mergeReleaseShaders UP-TO-DATE
+> Task :react-native-screens:compileReleaseShaders NO-SOURCE
+> Task :react-native-svg:mergeReleaseShaders UP-TO-DATE
+> Task :react-native-screens:generateReleaseAssets UP-TO-DATE
+> Task :react-native-svg:compileReleaseShaders NO-SOURCE
+> Task :react-native-svg:generateReleaseAssets UP-TO-DATE
+> Task :react-native-screens:mergeReleaseAssets UP-TO-DATE
+> Task :react-native-svg:mergeReleaseAssets UP-TO-DATE
+> Task :react-native-webview:mergeReleaseShaders UP-TO-DATE
+> Task :react-native-webview:compileReleaseShaders NO-SOURCE
+> Task :react-native-webview:generateReleaseAssets UP-TO-DATE
+> Task :solana-mobile_mobile-wallet-adapter-protocol:mergeReleaseShaders UP-TO-DATE
+> Task :solana-mobile_mobile-wallet-adapter-protocol:compileReleaseShaders NO-SOURCE
+> Task :solana-mobile_mobile-wallet-adapter-protocol:generateReleaseAssets UP-TO-DATE
+> Task :react-native-webview:mergeReleaseAssets UP-TO-DATE
+> Task :app:extractReleaseVersionControlInfo UP-TO-DATE
+> Task :solana-mobile_mobile-wallet-adapter-protocol:mergeReleaseAssets UP-TO-DATE
+> Task :app:extractProguardFiles UP-TO-DATE
+> Task :expo:extractProguardFiles UP-TO-DATE
+> Task :clerk_expo:processReleaseJavaRes UP-TO-DATE
+> Task :expo-constants:extractProguardFiles UP-TO-DATE
+> Task :clerk_expo:createFullJarRelease UP-TO-DATE
 > Task :expo-constants:prepareLintJarForPublish UP-TO-DATE
-> Task :react-native-reanimated:prefabDebugPackage
-> Task :expo-constants:mergeDebugJavaResource UP-TO-DATE
-> Task :expo-constants:syncDebugLibJars UP-TO-DATE
-> Task :expo-constants:bundleDebugAar UP-TO-DATE
-> Task :expo-constants:assembleDebug UP-TO-DATE
-> Task :react-native-gesture-handler:buildCMakeDebug[armeabi-v7a]
-> Task :expo-modules-core:stripDebugDebugSymbols
-> Task :expo-modules-core:copyDebugJniLibsProjectAndLocalJars
-> Task :expo-modules-core:extractDebugAnnotations UP-TO-DATE
-> Task :react-native-gesture-handler:mergeDebugNativeLibs
-> Task :expo-modules-core:extractDeepLinksForAarDebug UP-TO-DATE
-> Task :react-native-reanimated:mergeDebugNativeLibs
-> Task :expo-modules-core:mergeDebugGeneratedProguardFiles UP-TO-DATE
-> Task :app:mergeDebugAssets UP-TO-DATE
-> Task :react-native-gesture-handler:copyDebugJniLibsProjectOnly
-> Task :expo-modules-core:mergeDebugConsumerProguardFiles UP-TO-DATE
-> Task :expo-modules-core:prepareDebugArtProfile UP-TO-DATE
-> Task :app:compressDebugAssets UP-TO-DATE
-> Task :expo-modules-core:prepareLintJarForPublish UP-TO-DATE
-> Task :expo-sqlite:extractDebugAnnotations UP-TO-DATE
-> Task :expo-sqlite:extractDeepLinksForAarDebug UP-TO-DATE
-> Task :app:desugarDebugFileDependencies UP-TO-DATE
-> Task :expo-modules-core:mergeDebugJavaResource UP-TO-DATE
-> Task :expo-sqlite:mergeDebugGeneratedProguardFiles UP-TO-DATE
-> Task :expo-sqlite:mergeDebugConsumerProguardFiles UP-TO-DATE
-> Task :expo-modules-core:syncDebugLibJars UP-TO-DATE
-> Task :expo-sqlite:stripDebugDebugSymbols
-> Task :app:dexBuilderDebug UP-TO-DATE
-> Task :expo-sqlite:prepareDebugArtProfile UP-TO-DATE
-> Task :expo-modules-core:bundleDebugAar
-> Task :expo-modules-core:assembleDebug
-> Task :expo-sqlite:prepareLintJarForPublish UP-TO-DATE
-> Task :expo-sqlite:mergeDebugJavaResource UP-TO-DATE
-> Task :expo-sqlite:syncDebugLibJars UP-TO-DATE
-> Task :react-native-gesture-handler:extractDebugAnnotations UP-TO-DATE
-> Task :react-native-gesture-handler:extractDeepLinksForAarDebug UP-TO-DATE
-> Task :react-native-gesture-handler:mergeDebugGeneratedProguardFiles UP-TO-DATE
-> Task :react-native-gesture-handler:mergeDebugConsumerProguardFiles UP-TO-DATE
-> Task :react-native-gesture-handler:prepareDebugArtProfile UP-TO-DATE
-> Task :react-native-gesture-handler:prepareLintJarForPublish UP-TO-DATE
-> Task :react-native-gesture-handler:mergeDebugJavaResource UP-TO-DATE
-> Task :react-native-gesture-handler:syncDebugLibJars UP-TO-DATE
-> Task :expo-sqlite:copyDebugJniLibsProjectAndLocalJars
-> Task :expo-sqlite:bundleDebugAar
-> Task :expo-sqlite:assembleDebug
-> Task :react-native-reanimated:extractDebugAnnotations UP-TO-DATE
-> Task :react-native-reanimated:extractDeepLinksForAarDebug UP-TO-DATE
-> Task :react-native-reanimated:mergeDebugGeneratedProguardFiles UP-TO-DATE
-> Task :react-native-reanimated:mergeDebugConsumerProguardFiles UP-TO-DATE
-> Task :react-native-reanimated:prepareDebugArtProfile UP-TO-DATE
+> Task :clerk_expo:extractProguardFiles UP-TO-DATE
+> Task :expo:prepareLintJarForPublish UP-TO-DATE
+> Task :react-native-gesture-handler:extractProguardFiles UP-TO-DATE
+> Task :react-native-reanimated:processReleaseJavaRes NO-SOURCE
+> Task :react-native-reanimated:extractProguardFiles UP-TO-DATE
 > Task :react-native-reanimated:prepareLintJarForPublish UP-TO-DATE
-> Task :react-native-reanimated:mergeDebugJavaResource UP-TO-DATE
-> Task :react-native-reanimated:syncDebugLibJars UP-TO-DATE
-> Task :react-native-safe-area-context:stripDebugDebugSymbols NO-SOURCE
-> Task :react-native-safe-area-context:copyDebugJniLibsProjectAndLocalJars UP-TO-DATE
-> Task :react-native-safe-area-context:extractDebugAnnotations UP-TO-DATE
-> Task :react-native-safe-area-context:extractDeepLinksForAarDebug UP-TO-DATE
-> Task :react-native-safe-area-context:mergeDebugGeneratedProguardFiles UP-TO-DATE
-> Task :react-native-safe-area-context:mergeDebugConsumerProguardFiles UP-TO-DATE
-> Task :react-native-safe-area-context:prepareDebugArtProfile UP-TO-DATE
-> Task :react-native-safe-area-context:prepareLintJarForPublish UP-TO-DATE
-> Task :react-native-safe-area-context:mergeDebugJavaResource UP-TO-DATE
-> Task :react-native-safe-area-context:syncDebugLibJars UP-TO-DATE
-> Task :react-native-safe-area-context:bundleDebugAar UP-TO-DATE
-> Task :react-native-safe-area-context:assembleDebug UP-TO-DATE
-> Task :react-native-reanimated:stripDebugDebugSymbols
-> Task :react-native-reanimated:copyDebugJniLibsProjectOnly
-> Task :react-native-screens:extractDebugAnnotations UP-TO-DATE
-> Task :react-native-screens:extractDeepLinksForAarDebug UP-TO-DATE
-> Task :react-native-gesture-handler:stripDebugDebugSymbols
-> Task :react-native-screens:mergeDebugGeneratedProguardFiles UP-TO-DATE
-> Task :react-native-screens:mergeDebugConsumerProguardFiles UP-TO-DATE
-> Task :react-native-screens:prepareDebugArtProfile UP-TO-DATE
-> Task :app:mergeDebugGlobalSynthetics UP-TO-DATE
-> Task :react-native-screens:stripDebugDebugSymbols
-> Task :react-native-screens:prepareLintJarForPublish UP-TO-DATE
-> Task :react-native-svg:stripDebugDebugSymbols NO-SOURCE
-> Task :react-native-gesture-handler:copyDebugJniLibsProjectAndLocalJars
-> Task :react-native-screens:copyDebugJniLibsProjectAndLocalJars
-> Task :app:processDebugJavaRes UP-TO-DATE
-> Task :react-native-svg:copyDebugJniLibsProjectAndLocalJars UP-TO-DATE
-> Task :react-native-screens:mergeDebugJavaResource UP-TO-DATE
-> Task :react-native-screens:syncDebugLibJars UP-TO-DATE
-> Task :react-native-svg:extractDebugAnnotations UP-TO-DATE
-> Task :react-native-svg:extractDeepLinksForAarDebug UP-TO-DATE
-> Task :react-native-svg:mergeDebugGeneratedProguardFiles UP-TO-DATE
-> Task :react-native-svg:mergeDebugConsumerProguardFiles UP-TO-DATE
-> Task :react-native-svg:prepareDebugArtProfile UP-TO-DATE
+> Task :react-native-svg:processReleaseJavaRes NO-SOURCE
+> Task :react-native-svg:createFullJarRelease UP-TO-DATE
+> Task :react-native-svg:extractProguardFiles UP-TO-DATE
+> Task :react-native-fast-tflite:buildCMakeRelWithDebInfo[armeabi-v7a]
+> Task :react-native-svg:generateReleaseLintModel UP-TO-DATE
+> Task :clerk_expo:generateReleaseLintModel UP-TO-DATE
 > Task :react-native-svg:prepareLintJarForPublish UP-TO-DATE
-> Task :react-native-gesture-handler:bundleDebugAar
-> Task :react-native-gesture-handler:assembleDebug
-> Task :react-native-svg:mergeDebugJavaResource UP-TO-DATE
-> Task :react-native-webview:stripDebugDebugSymbols NO-SOURCE
-> Task :react-native-webview:copyDebugJniLibsProjectAndLocalJars UP-TO-DATE
-> Task :react-native-svg:syncDebugLibJars UP-TO-DATE
-> Task :react-native-svg:bundleDebugAar UP-TO-DATE
-> Task :react-native-reanimated:copyDebugJniLibsProjectAndLocalJars
-> Task :react-native-svg:assembleDebug UP-TO-DATE
-> Task :react-native-webview:extractDebugAnnotations UP-TO-DATE
-> Task :react-native-webview:extractDeepLinksForAarDebug UP-TO-DATE
-> Task :react-native-webview:mergeDebugGeneratedProguardFiles UP-TO-DATE
-> Task :react-native-webview:mergeDebugConsumerProguardFiles UP-TO-DATE
-> Task :react-native-webview:prepareDebugArtProfile UP-TO-DATE
+> Task :clerk_expo:prepareLintJarForPublish UP-TO-DATE
+> Task :react-native-gesture-handler:prepareLintJarForPublish UP-TO-DATE
+> Task :react-native-safe-area-context:processReleaseJavaRes UP-TO-DATE
+> Task :react-native-safe-area-context:createFullJarRelease UP-TO-DATE
+> Task :react-native-screens:processReleaseJavaRes UP-TO-DATE
+> Task :react-native-safe-area-context:extractProguardFiles UP-TO-DATE
+> Task :react-native-screens:createFullJarRelease UP-TO-DATE
+> Task :react-native-screens:extractProguardFiles UP-TO-DATE
+> Task :react-native-safe-area-context:generateReleaseLintModel UP-TO-DATE
+> Task :react-native-safe-area-context:prepareLintJarForPublish UP-TO-DATE
+> Task :react-native-webview:processReleaseJavaRes UP-TO-DATE
+> Task :react-native-webview:createFullJarRelease UP-TO-DATE
+> Task :react-native-webview:extractProguardFiles UP-TO-DATE
+> Task :react-native-webview:generateReleaseLintModel UP-TO-DATE
 > Task :react-native-webview:prepareLintJarForPublish UP-TO-DATE
-> Task :react-native-screens:bundleDebugAar
-> Task :react-native-screens:assembleDebug
-> Task :react-native-webview:mergeDebugJavaResource UP-TO-DATE
-> Task :react-native-worklets:extractDebugAnnotations UP-TO-DATE
-> Task :react-native-worklets:extractDeepLinksForAarDebug UP-TO-DATE
-> Task :react-native-worklets:mergeDebugGeneratedProguardFiles UP-TO-DATE
-> Task :react-native-webview:syncDebugLibJars UP-TO-DATE
-> Task :react-native-worklets:mergeDebugConsumerProguardFiles UP-TO-DATE
-> Task :react-native-webview:bundleDebugAar UP-TO-DATE
-> Task :react-native-webview:assembleDebug UP-TO-DATE
-> Task :react-native-worklets:prepareDebugArtProfile UP-TO-DATE
-> Task :react-native-worklets:prepareLintJarForPublish UP-TO-DATE
-> Task :solana-mobile_mobile-wallet-adapter-protocol:stripDebugDebugSymbols NO-SOURCE
-> Task :solana-mobile_mobile-wallet-adapter-protocol:copyDebugJniLibsProjectAndLocalJars UP-TO-DATE
-> Task :react-native-worklets:mergeDebugJavaResource UP-TO-DATE
-> Task :react-native-worklets:syncDebugLibJars UP-TO-DATE
-> Task :solana-mobile_mobile-wallet-adapter-protocol:extractDebugAnnotations UP-TO-DATE
-> Task :solana-mobile_mobile-wallet-adapter-protocol:extractDeepLinksForAarDebug UP-TO-DATE
-> Task :solana-mobile_mobile-wallet-adapter-protocol:mergeDebugGeneratedProguardFiles UP-TO-DATE
-> Task :solana-mobile_mobile-wallet-adapter-protocol:mergeDebugConsumerProguardFiles UP-TO-DATE
-> Task :solana-mobile_mobile-wallet-adapter-protocol:prepareDebugArtProfile UP-TO-DATE
+> Task :solana-mobile_mobile-wallet-adapter-protocol:processReleaseJavaRes UP-TO-DATE
+> Task :react-native-screens:generateReleaseLintModel UP-TO-DATE
+> Task :react-native-screens:prepareLintJarForPublish UP-TO-DATE
+> Task :solana-mobile_mobile-wallet-adapter-protocol:createFullJarRelease UP-TO-DATE
+> Task :clerk_expo:stripReleaseDebugSymbols NO-SOURCE
+> Task :solana-mobile_mobile-wallet-adapter-protocol:extractProguardFiles UP-TO-DATE
+> Task :clerk_expo:copyReleaseJniLibsProjectAndLocalJars UP-TO-DATE
+> Task :clerk_expo:extractDeepLinksForAarRelease UP-TO-DATE
+> Task :clerk_expo:extractReleaseAnnotations UP-TO-DATE
+> Task :clerk_expo:mergeReleaseGeneratedProguardFiles UP-TO-DATE
+> Task :clerk_expo:mergeReleaseConsumerProguardFiles UP-TO-DATE
+> Task :clerk_expo:mergeReleaseJavaResource UP-TO-DATE
+> Task :clerk_expo:syncReleaseLibJars UP-TO-DATE
+> Task :clerk_expo:bundleReleaseLocalLintAar UP-TO-DATE
+> Task :react-native-gesture-handler:extractDeepLinksForAarRelease UP-TO-DATE
+> Task :react-native-safe-area-context:stripReleaseDebugSymbols NO-SOURCE
+> Task :solana-mobile_mobile-wallet-adapter-protocol:generateReleaseLintModel UP-TO-DATE
+> Task :react-native-safe-area-context:copyReleaseJniLibsProjectAndLocalJars UP-TO-DATE
 > Task :solana-mobile_mobile-wallet-adapter-protocol:prepareLintJarForPublish UP-TO-DATE
-> Task :solana-mobile_mobile-wallet-adapter-protocol:mergeDebugJavaResource UP-TO-DATE
-> Task :solana-mobile_mobile-wallet-adapter-protocol:syncDebugLibJars UP-TO-DATE
-> Task :solana-mobile_mobile-wallet-adapter-protocol:bundleDebugAar UP-TO-DATE
-> Task :solana-mobile_mobile-wallet-adapter-protocol:assembleDebug UP-TO-DATE
-> Task :app:mergeDebugJavaResource UP-TO-DATE
-> Task :react-native-worklets:stripDebugDebugSymbols
-> Task :app:checkDebugDuplicateClasses UP-TO-DATE
-> Task :react-native-worklets:copyDebugJniLibsProjectAndLocalJars
-> Task :app:mergeExtDexDebug UP-TO-DATE
-> Task :app:mergeLibDexDebug UP-TO-DATE
-> Task :app:mergeProjectDexDebug UP-TO-DATE
-> Task :app:configureCMakeDebug[armeabi-v7a]
-> Task :react-native-worklets:bundleDebugAar
-> Task :react-native-worklets:assembleDebug
+> Task :react-native-safe-area-context:extractDeepLinksForAarRelease UP-TO-DATE
+> Task :react-native-safe-area-context:extractReleaseAnnotations UP-TO-DATE
+> Task :react-native-safe-area-context:mergeReleaseGeneratedProguardFiles UP-TO-DATE
+> Task :react-native-safe-area-context:mergeReleaseConsumerProguardFiles UP-TO-DATE
+> Task :react-native-safe-area-context:mergeReleaseJavaResource UP-TO-DATE
+> Task :react-native-safe-area-context:syncReleaseLibJars UP-TO-DATE
+> Task :react-native-safe-area-context:bundleReleaseLocalLintAar UP-TO-DATE
+> Task :react-native-screens:extractDeepLinksForAarRelease UP-TO-DATE
+> Task :react-native-screens:stripReleaseDebugSymbols
+> Task :react-native-webview:stripReleaseDebugSymbols NO-SOURCE
+> Task :react-native-webview:copyReleaseJniLibsProjectAndLocalJars UP-TO-DATE
+> Task :react-native-webview:extractDeepLinksForAarRelease UP-TO-DATE
+> Task :react-native-screens:extractReleaseAnnotations UP-TO-DATE
+> Task :react-native-webview:extractReleaseAnnotations UP-TO-DATE
+> Task :react-native-webview:mergeReleaseGeneratedProguardFiles UP-TO-DATE
+> Task :react-native-webview:mergeReleaseConsumerProguardFiles UP-TO-DATE
+> Task :react-native-screens:copyReleaseJniLibsProjectAndLocalJars
+> Task :react-native-webview:mergeReleaseJavaResource UP-TO-DATE
+> Task :react-native-screens:mergeReleaseGeneratedProguardFiles UP-TO-DATE
+> Task :react-native-screens:mergeReleaseConsumerProguardFiles UP-TO-DATE
+> Task :react-native-webview:syncReleaseLibJars UP-TO-DATE
+> Task :react-native-screens:mergeReleaseJavaResource UP-TO-DATE
+> Task :react-native-webview:bundleReleaseLocalLintAar UP-TO-DATE
+> Task :react-native-screens:syncReleaseLibJars UP-TO-DATE
+> Task :solana-mobile_mobile-wallet-adapter-protocol:stripReleaseDebugSymbols NO-SOURCE
+> Task :solana-mobile_mobile-wallet-adapter-protocol:copyReleaseJniLibsProjectAndLocalJars UP-TO-DATE
+> Task :solana-mobile_mobile-wallet-adapter-protocol:extractDeepLinksForAarRelease UP-TO-DATE
+> Task :solana-mobile_mobile-wallet-adapter-protocol:extractReleaseAnnotations UP-TO-DATE
+> Task :solana-mobile_mobile-wallet-adapter-protocol:mergeReleaseGeneratedProguardFiles UP-TO-DATE
+> Task :solana-mobile_mobile-wallet-adapter-protocol:mergeReleaseConsumerProguardFiles UP-TO-DATE
+> Task :solana-mobile_mobile-wallet-adapter-protocol:mergeReleaseJavaResource UP-TO-DATE
+> Task :solana-mobile_mobile-wallet-adapter-protocol:syncReleaseLibJars UP-TO-DATE
+> Task :solana-mobile_mobile-wallet-adapter-protocol:bundleReleaseLocalLintAar UP-TO-DATE
+> Task :expo:stripReleaseDebugSymbols NO-SOURCE
+> Task :expo:copyReleaseJniLibsProjectAndLocalJars UP-TO-DATE
+> Task :expo:extractDeepLinksForAarRelease UP-TO-DATE
+> Task :react-native-reanimated:extractDeepLinksForAarRelease UP-TO-DATE
+> Task :react-native-screens:bundleReleaseLocalLintAar
+> Task :react-native-reanimated:mergeReleaseJavaResource UP-TO-DATE
+> Task :react-native-svg:stripReleaseDebugSymbols NO-SOURCE
+> Task :react-native-svg:copyReleaseJniLibsProjectAndLocalJars UP-TO-DATE
+> Task :react-native-svg:extractDeepLinksForAarRelease UP-TO-DATE
+> Task :react-native-svg:extractReleaseAnnotations UP-TO-DATE
+> Task :react-native-svg:mergeReleaseGeneratedProguardFiles UP-TO-DATE
+> Task :react-native-svg:mergeReleaseConsumerProguardFiles UP-TO-DATE
+> Task :react-native-svg:mergeReleaseJavaResource UP-TO-DATE
+> Task :react-native-svg:syncReleaseLibJars UP-TO-DATE
+> Task :react-native-svg:bundleReleaseLocalLintAar UP-TO-DATE
+> Task :expo-constants:stripReleaseDebugSymbols NO-SOURCE
+> Task :expo-constants:copyReleaseJniLibsProjectAndLocalJars UP-TO-DATE
+> Task :expo-constants:extractDeepLinksForAarRelease UP-TO-DATE
+> Task :expo-constants:writeReleaseLintModelMetadata UP-TO-DATE
+> Task :expo:writeReleaseLintModelMetadata UP-TO-DATE
+> Task :react-native-reanimated:writeReleaseLintModelMetadata UP-TO-DATE
+> Task :react-native-svg:writeReleaseLintModelMetadata UP-TO-DATE
+> Task :react-native-gesture-handler:writeReleaseLintModelMetadata UP-TO-DATE
+> Task :clerk_expo:lintVitalAnalyzeRelease UP-TO-DATE
+> Task :clerk_expo:writeReleaseLintModelMetadata UP-TO-DATE
+> Task :react-native-safe-area-context:lintVitalAnalyzeRelease UP-TO-DATE
+> Task :react-native-safe-area-context:writeReleaseLintModelMetadata UP-TO-DATE
+> Task :react-native-screens:lintVitalAnalyzeRelease UP-TO-DATE
+> Task :react-native-screens:writeReleaseLintModelMetadata UP-TO-DATE
+> Task :react-native-svg:lintVitalAnalyzeRelease UP-TO-DATE
+> Task :solana-mobile_mobile-wallet-adapter-protocol:lintVitalAnalyzeRelease UP-TO-DATE
+> Task :react-native-webview:lintVitalAnalyzeRelease UP-TO-DATE
+> Task :react-native-webview:writeReleaseLintModelMetadata UP-TO-DATE
+> Task :solana-mobile_mobile-wallet-adapter-protocol:writeReleaseLintModelMetadata UP-TO-DATE
+> Task :clerk_expo:generateReleaseLintVitalModel UP-TO-DATE
+> Task :react-native-safe-area-context:generateReleaseLintVitalModel UP-TO-DATE
+> Task :react-native-screens:generateReleaseLintVitalModel UP-TO-DATE
+> Task :react-native-svg:generateReleaseLintVitalModel UP-TO-DATE
+> Task :react-native-webview:generateReleaseLintVitalModel UP-TO-DATE
+> Task :solana-mobile_mobile-wallet-adapter-protocol:generateReleaseLintVitalModel UP-TO-DATE
+> Task :clerk_expo:bundleReleaseAar UP-TO-DATE
+> Task :app:collectReleaseDependencies UP-TO-DATE
+> Task :app:sdkReleaseDependencyData UP-TO-DATE
+> Task :app:validateSigningRelease UP-TO-DATE
+> Task :app:writeReleaseAppMetadata UP-TO-DATE
+> Task :app:writeReleaseSigningConfigVersions UP-TO-DATE
+> Task :expo-constants:mapReleaseSourceSetPaths UP-TO-DATE
+> Task :expo-constants:mergeReleaseResources UP-TO-DATE
+> Task :expo-constants:verifyReleaseResources UP-TO-DATE
+> Task :react-native-safe-area-context:bundleReleaseAar UP-TO-DATE
 
-> Task :react-native-fast-tflite:buildCMakeDebug[arm64-v8a]
-C/C++: ninja: Entering directory `/home/d/Desktop/jsmastery/node_modules/react-native-fast-tflite/android/.cxx/Debug/1k4g634r/arm64-v8a'
+> Task :react-native-fast-tflite:buildCMakeRelWithDebInfo[armeabi-v7a]
+C/C++: ninja: Entering directory `/home/d/Desktop/jsmastery/node_modules/react-native-fast-tflite/android/.cxx/RelWithDebInfo/1x3y3830/armeabi-v7a'
 C/C++: /home/d/Desktop/jsmastery/node_modules/react-native-fast-tflite/cpp/TensorflowPlugin.cpp:73:11: warning: ignoring return value of function declared with 'nodiscard' attribute [-Wunused-result]
 C/C++:    73 |           std::async(std::launch::async, [=, &runtime]() {
 C/C++:       |           ^~~~~~~~~~ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -816,13 +725,38 @@ C/C++:   330 |                 });
 C/C++:       |                 ~
 C/C++: 2 warnings generated.
 
-> Task :react-native-fast-tflite:configureCMakeDebug[armeabi-v7a]
-> Task :react-native-reanimated:bundleDebugAar
-> Task :react-native-reanimated:assembleDebug
-> Task :app:buildCMakeDebug[armeabi-v7a]
+> Task :react-native-safe-area-context:mapReleaseSourceSetPaths UP-TO-DATE
+> Task :clerk_expo:mapReleaseSourceSetPaths UP-TO-DATE
+> Task :react-native-fast-tflite:configureCMakeRelWithDebInfo[x86]
+> Task :react-native-safe-area-context:mergeReleaseResources UP-TO-DATE
+> Task :clerk_expo:mergeReleaseResources UP-TO-DATE
+> Task :clerk_expo:verifyReleaseResources UP-TO-DATE
+> Task :clerk_expo:assembleRelease UP-TO-DATE
+> Task :react-native-safe-area-context:verifyReleaseResources UP-TO-DATE
+> Task :react-native-safe-area-context:assembleRelease UP-TO-DATE
+> Task :react-native-svg:bundleReleaseAar UP-TO-DATE
+> Task :react-native-svg:mapReleaseSourceSetPaths UP-TO-DATE
+> Task :react-native-screens:bundleReleaseAar
+> Task :react-native-screens:mapReleaseSourceSetPaths UP-TO-DATE
+> Task :react-native-svg:mergeReleaseResources UP-TO-DATE
+> Task :react-native-svg:verifyReleaseResources UP-TO-DATE
+> Task :react-native-svg:assembleRelease UP-TO-DATE
+> Task :react-native-webview:bundleReleaseAar UP-TO-DATE
+> Task :react-native-webview:mapReleaseSourceSetPaths UP-TO-DATE
+> Task :react-native-screens:mergeReleaseResources UP-TO-DATE
+> Task :react-native-webview:mergeReleaseResources UP-TO-DATE
+> Task :react-native-webview:verifyReleaseResources UP-TO-DATE
+> Task :react-native-webview:assembleRelease UP-TO-DATE
+> Task :solana-mobile_mobile-wallet-adapter-protocol:bundleReleaseAar UP-TO-DATE
+> Task :solana-mobile_mobile-wallet-adapter-protocol:mapReleaseSourceSetPaths UP-TO-DATE
+> Task :react-native-screens:verifyReleaseResources UP-TO-DATE
+> Task :react-native-screens:assembleRelease
+> Task :solana-mobile_mobile-wallet-adapter-protocol:mergeReleaseResources UP-TO-DATE
+> Task :solana-mobile_mobile-wallet-adapter-protocol:verifyReleaseResources UP-TO-DATE
+> Task :solana-mobile_mobile-wallet-adapter-protocol:assembleRelease UP-TO-DATE
 
-> Task :react-native-fast-tflite:buildCMakeDebug[armeabi-v7a]
-C/C++: ninja: Entering directory `/home/d/Desktop/jsmastery/node_modules/react-native-fast-tflite/android/.cxx/Debug/1k4g634r/armeabi-v7a'
+> Task :react-native-fast-tflite:buildCMakeRelWithDebInfo[x86]
+C/C++: ninja: Entering directory `/home/d/Desktop/jsmastery/node_modules/react-native-fast-tflite/android/.cxx/RelWithDebInfo/1x3y3830/x86'
 C/C++: /home/d/Desktop/jsmastery/node_modules/react-native-fast-tflite/cpp/TensorflowPlugin.cpp:73:11: warning: ignoring return value of function declared with 'nodiscard' attribute [-Wunused-result]
 C/C++:    73 |           std::async(std::launch::async, [=, &runtime]() {
 C/C++:       |           ^~~~~~~~~~ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -883,10 +817,74 @@ C/C++:   330 |                 });
 C/C++:       |                 ~
 C/C++: 2 warnings generated.
 
-> Task :react-native-fast-tflite:configureCMakeDebug[x86]
+> Task :react-native-fast-tflite:configureCMakeRelWithDebInfo[x86_64]
+> Task :expo-modules-core:mergeReleaseJniLibFolders UP-TO-DATE
+> Task :expo-modules-core:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :expo-modules-core:generateReleaseBuildConfig UP-TO-DATE
+> Task :expo-modules-core:generateReleaseResValues UP-TO-DATE
+> Task :expo-modules-core:generateReleaseResources UP-TO-DATE
+> Task :expo-modules-core:packageReleaseResources UP-TO-DATE
+> Task :expo-modules-core:parseReleaseLocalResources UP-TO-DATE
+> Task :expo-modules-core:generateReleaseRFile UP-TO-DATE
+> Task :expo-modules-core:mergeReleaseNativeLibs
+> Task :expo-modules-core:compileReleaseKotlin UP-TO-DATE
+> Task :expo-modules-core:javaPreCompileRelease UP-TO-DATE
+> Task :expo-modules-core:compileReleaseJavaWithJavac UP-TO-DATE
+> Task :expo-modules-core:bundleLibCompileToJarRelease UP-TO-DATE
+> Task :expo-constants:compileReleaseKotlin UP-TO-DATE
+> Task :expo-modules-core:copyReleaseJniLibsProjectOnly
+> Task :expo-modules-core:bundleLibRuntimeToDirRelease UP-TO-DATE
+> Task :expo-modules-core:writeReleaseAarMetadata UP-TO-DATE
+> Task :expo-modules-core:extractDeepLinksRelease UP-TO-DATE
+> Task :expo-constants:compileReleaseJavaWithJavac UP-TO-DATE
+> Task :expo-constants:bundleLibCompileToJarRelease UP-TO-DATE
+> Task :expo-constants:bundleLibRuntimeToDirRelease UP-TO-DATE
+> Task :expo-modules-core:processReleaseManifest UP-TO-DATE
+> Task :expo-modules-core:compileReleaseLibraryResources UP-TO-DATE
+> Task :expo-modules-core:prepareReleaseArtProfile UP-TO-DATE
+> Task :expo-constants:bundleLibRuntimeToJarRelease UP-TO-DATE
+> Task :expo-modules-core:bundleLibRuntimeToJarRelease UP-TO-DATE
+> Task :expo-constants:processReleaseJavaRes UP-TO-DATE
+> Task :expo-modules-core:mergeReleaseShaders UP-TO-DATE
+> Task :expo-constants:createFullJarRelease UP-TO-DATE
+> Task :expo-modules-core:compileReleaseShaders NO-SOURCE
+> Task :expo-modules-core:generateReleaseAssets UP-TO-DATE
+> Task :expo-modules-core:mergeReleaseAssets UP-TO-DATE
+> Task :expo-constants:extractReleaseAnnotations UP-TO-DATE
+> Task :expo-constants:mergeReleaseGeneratedProguardFiles UP-TO-DATE
+> Task :expo-constants:mergeReleaseConsumerProguardFiles UP-TO-DATE
+> Task :expo-constants:mergeReleaseJavaResource UP-TO-DATE
+> Task :expo-constants:syncReleaseLibJars UP-TO-DATE
+> Task :expo-constants:bundleReleaseLocalLintAar UP-TO-DATE
+> Task :expo-constants:bundleReleaseAar UP-TO-DATE
+> Task :expo-constants:assembleRelease UP-TO-DATE
+> Task :expo-modules-core:processReleaseJavaRes UP-TO-DATE
+> Task :expo-modules-core:createFullJarRelease UP-TO-DATE
+> Task :expo-modules-core:extractProguardFiles UP-TO-DATE
+> Task :expo-modules-core:generateReleaseLintModel UP-TO-DATE
+> Task :expo-modules-core:prepareLintJarForPublish UP-TO-DATE
+> Task :expo-modules-core:extractDeepLinksForAarRelease UP-TO-DATE
+> Task :expo-constants:generateReleaseLintModel UP-TO-DATE
+> Task :expo-modules-core:extractReleaseAnnotations UP-TO-DATE
+> Task :expo-modules-core:mergeReleaseGeneratedProguardFiles UP-TO-DATE
+> Task :expo-constants:generateReleaseLintVitalModel UP-TO-DATE
+> Task :expo-modules-core:mergeReleaseConsumerProguardFiles UP-TO-DATE
+> Task :expo-modules-core:stripReleaseDebugSymbols
+> Task :expo-modules-core:mergeReleaseJavaResource UP-TO-DATE
+> Task :expo-modules-core:syncReleaseLibJars UP-TO-DATE
+> Task :expo-modules-core:copyReleaseJniLibsProjectAndLocalJars
+> Task :expo-modules-core:writeReleaseLintModelMetadata UP-TO-DATE
+> Task :expo-modules-core:bundleReleaseLocalLintAar
+> Task :expo-modules-core:lintVitalAnalyzeRelease UP-TO-DATE
+> Task :expo-modules-core:generateReleaseLintVitalModel UP-TO-DATE
+> Task :expo-modules-core:bundleReleaseAar
+> Task :expo-modules-core:mapReleaseSourceSetPaths UP-TO-DATE
+> Task :expo-modules-core:mergeReleaseResources UP-TO-DATE
+> Task :expo-modules-core:verifyReleaseResources UP-TO-DATE
+> Task :expo-modules-core:assembleRelease
 
-> Task :react-native-fast-tflite:buildCMakeDebug[x86]
-C/C++: ninja: Entering directory `/home/d/Desktop/jsmastery/node_modules/react-native-fast-tflite/android/.cxx/Debug/1k4g634r/x86'
+> Task :react-native-fast-tflite:buildCMakeRelWithDebInfo[x86_64]
+C/C++: ninja: Entering directory `/home/d/Desktop/jsmastery/node_modules/react-native-fast-tflite/android/.cxx/RelWithDebInfo/1x3y3830/x86_64'
 C/C++: /home/d/Desktop/jsmastery/node_modules/react-native-fast-tflite/cpp/TensorflowPlugin.cpp:73:11: warning: ignoring return value of function declared with 'nodiscard' attribute [-Wunused-result]
 C/C++:    73 |           std::async(std::launch::async, [=, &runtime]() {
 C/C++:       |           ^~~~~~~~~~ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -947,94 +945,249 @@ C/C++:   330 |                 });
 C/C++:       |                 ~
 C/C++: 2 warnings generated.
 
-> Task :react-native-fast-tflite:configureCMakeDebug[x86_64]
-
-> Task :react-native-fast-tflite:buildCMakeDebug[x86_64]
-C/C++: ninja: Entering directory `/home/d/Desktop/jsmastery/node_modules/react-native-fast-tflite/android/.cxx/Debug/1k4g634r/x86_64'
-C/C++: /home/d/Desktop/jsmastery/node_modules/react-native-fast-tflite/cpp/TensorflowPlugin.cpp:73:11: warning: ignoring return value of function declared with 'nodiscard' attribute [-Wunused-result]
-C/C++:    73 |           std::async(std::launch::async, [=, &runtime]() {
-C/C++:       |           ^~~~~~~~~~ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-C/C++:    74 |             try {
-C/C++:       |             ~~~~~
-C/C++:    75 |               // Fetch model from URL (JS bundle)
-C/C++:       |               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-C/C++:    76 |               Buffer buffer = fetchURL(modelPath);
-C/C++:       |               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-C/C++:    77 | 
-C/C++:    78 |               // Load Model into Tensorflow
-C/C++:       |               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-C/C++:    79 |               auto model = TfLiteModelCreate(buffer.data, buffer.size);
-C/C++:       |               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-C/C++:    80 |               if (model == nullptr) {
-C/C++:       |               ~~~~~~~~~~~~~~~~~~~~~~~
-C/C++:    81 |                 callInvoker->invokeAsync(
-C/C++:       |                 ~~~~~~~~~~~~~~~~~~~~~~~~~
-C/C++:    82 |                     [=]() { promise->reject("Failed to load model from \"" + modelPath + "\"!"); });
-C/C++:       |                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-C/C++:    83 |                 return;
-C/C++:       |                 ~~~~~~~
-C/C++:    84 |               }
-C/C++:       |               ~
-C/C++:    85 | 
-C/C++:    86 |               // Create TensorFlow Interpreter
-C/C++:       |               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-C/C++:    87 |               auto options = TfLiteInterpreterOptionsCreate();
-C/C++:       |               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-C/C++:    88 | 
-C/C++: /home/d/Desktop/jsmastery/node_modules/react-native-fast-tflite/cpp/TensorflowPlugin.cpp:317:17: warning: ignoring return value of function declared with 'nodiscard' attribute [-Wunused-result]
-C/C++:   317 |                 std::async(std::launch::async, [=, &runtime]() {
-C/C++:       |                 ^~~~~~~~~~ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-C/C++:   318 |                   // 2.
-C/C++:       |                   ~~~~~
-C/C++:   319 |                   try {
-C/C++:       |                   ~~~~~
-C/C++:   320 |                     this->run();
-C/C++:       |                     ~~~~~~~~~~~~
-C/C++:   321 | 
-C/C++:   322 |                     this->_callInvoker->invokeAsync([=, &runtime]() {
-C/C++:       |                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-C/C++:   323 |                       // 3.
-C/C++:       |                       ~~~~~
-C/C++:   324 |                       auto result = this->copyOutputBuffers(runtime);
-C/C++:       |                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-C/C++:   325 |                       promise->resolve(std::move(result));
-C/C++:       |                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-C/C++:   326 |                     });
-C/C++:       |                     ~~~
-C/C++:   327 |                   } catch (std::exception& error) {
-C/C++:       |                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-C/C++:   328 |                     promise->reject(error.what());
-C/C++:       |                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-C/C++:   329 |                   }
-C/C++:       |                   ~
-C/C++:   330 |                 });
-C/C++:       |                 ~
-C/C++: 2 warnings generated.
-
-> Task :react-native-fast-tflite:mergeDebugJniLibFolders UP-TO-DATE
-> Task :react-native-fast-tflite:mergeDebugNativeLibs UP-TO-DATE
-> Task :react-native-fast-tflite:copyDebugJniLibsProjectOnly UP-TO-DATE
-> Task :react-native-fast-tflite:stripDebugDebugSymbols UP-TO-DATE
-> Task :react-native-fast-tflite:copyDebugJniLibsProjectAndLocalJars UP-TO-DATE
-> Task :react-native-fast-tflite:extractDebugAnnotations UP-TO-DATE
-> Task :react-native-fast-tflite:extractDeepLinksForAarDebug UP-TO-DATE
-> Task :react-native-fast-tflite:mergeDebugGeneratedProguardFiles UP-TO-DATE
-> Task :react-native-fast-tflite:mergeDebugConsumerProguardFiles UP-TO-DATE
-> Task :react-native-fast-tflite:prepareDebugArtProfile UP-TO-DATE
+> Task :react-native-fast-tflite:mergeReleaseJniLibFolders UP-TO-DATE
+> Task :react-native-fast-tflite:mergeReleaseNativeLibs UP-TO-DATE
+> Task :react-native-worklets:externalNativeBuildRelease
+> Task :react-native-fast-tflite:copyReleaseJniLibsProjectOnly UP-TO-DATE
+> Task :react-native-fast-tflite:generateReleaseBuildConfig UP-TO-DATE
+> Task :react-native-fast-tflite:generateReleaseResValues UP-TO-DATE
+> Task :react-native-fast-tflite:generateReleaseResources UP-TO-DATE
+> Task :react-native-fast-tflite:packageReleaseResources UP-TO-DATE
+> Task :react-native-fast-tflite:parseReleaseLocalResources UP-TO-DATE
+> Task :react-native-fast-tflite:generateReleaseRFile UP-TO-DATE
+> Task :react-native-fast-tflite:javaPreCompileRelease UP-TO-DATE
+> Task :react-native-fast-tflite:compileReleaseJavaWithJavac UP-TO-DATE
+> Task :react-native-fast-tflite:bundleLibRuntimeToDirRelease UP-TO-DATE
+> Task :react-native-fast-tflite:writeReleaseAarMetadata UP-TO-DATE
+> Task :react-native-fast-tflite:extractDeepLinksRelease UP-TO-DATE
+> Task :react-native-fast-tflite:processReleaseManifest UP-TO-DATE
+> Task :react-native-fast-tflite:compileReleaseLibraryResources UP-TO-DATE
+> Task :react-native-fast-tflite:bundleLibCompileToJarRelease UP-TO-DATE
+> Task :react-native-fast-tflite:prepareReleaseArtProfile UP-TO-DATE
+> Task :react-native-fast-tflite:bundleLibRuntimeToJarRelease UP-TO-DATE
+> Task :react-native-fast-tflite:mergeReleaseShaders UP-TO-DATE
+> Task :react-native-fast-tflite:compileReleaseShaders NO-SOURCE
+> Task :react-native-fast-tflite:generateReleaseAssets UP-TO-DATE
+> Task :react-native-fast-tflite:mergeReleaseAssets UP-TO-DATE
+> Task :react-native-worklets:prefabReleasePackage
+> Task :react-native-fast-tflite:processReleaseJavaRes NO-SOURCE
+> Task :react-native-worklets:mergeReleaseJniLibFolders UP-TO-DATE
+> Task :react-native-fast-tflite:createFullJarRelease UP-TO-DATE
+> Task :react-native-fast-tflite:extractProguardFiles UP-TO-DATE
+> Task :react-native-worklets:generateReleaseBuildConfig UP-TO-DATE
+> Task :react-native-worklets:generateReleaseResValues UP-TO-DATE
+> Task :react-native-fast-tflite:generateReleaseLintModel UP-TO-DATE
+> Task :react-native-worklets:generateReleaseResources UP-TO-DATE
 > Task :react-native-fast-tflite:prepareLintJarForPublish UP-TO-DATE
-> Task :react-native-fast-tflite:mergeDebugJavaResource UP-TO-DATE
-> Task :react-native-fast-tflite:syncDebugLibJars UP-TO-DATE
-> Task :react-native-fast-tflite:bundleDebugAar UP-TO-DATE
-> Task :react-native-fast-tflite:assembleDebug UP-TO-DATE
-> Task :app:mergeDebugJniLibFolders UP-TO-DATE
-> Task :app:validateSigningDebug UP-TO-DATE
-> Task :app:writeDebugAppMetadata UP-TO-DATE
-> Task :app:writeDebugSigningConfigVersions UP-TO-DATE
-> Task :app:mergeDebugNativeLibs
-> Task :app:stripDebugDebugSymbols
-> Task :app:packageDebug
-> Task :app:createDebugApkListingFileRedirect UP-TO-DATE
-> Task :app:assembleDebug
+> Task :react-native-fast-tflite:stripReleaseDebugSymbols UP-TO-DATE
+> Task :react-native-worklets:packageReleaseResources UP-TO-DATE
+> Task :react-native-fast-tflite:copyReleaseJniLibsProjectAndLocalJars UP-TO-DATE
+> Task :react-native-worklets:parseReleaseLocalResources UP-TO-DATE
+> Task :react-native-fast-tflite:extractDeepLinksForAarRelease UP-TO-DATE
+> Task :react-native-worklets:generateReleaseRFile UP-TO-DATE
+> Task :react-native-worklets:javaPreCompileRelease UP-TO-DATE
+> Task :react-native-fast-tflite:extractReleaseAnnotations UP-TO-DATE
+> Task :react-native-fast-tflite:mergeReleaseGeneratedProguardFiles UP-TO-DATE
+> Task :react-native-fast-tflite:mergeReleaseConsumerProguardFiles UP-TO-DATE
+> Task :react-native-fast-tflite:mergeReleaseJavaResource UP-TO-DATE
+> Task :react-native-fast-tflite:syncReleaseLibJars UP-TO-DATE
+> Task :react-native-fast-tflite:bundleReleaseLocalLintAar UP-TO-DATE
+> Task :react-native-worklets:compileReleaseJavaWithJavac UP-TO-DATE
+> Task :react-native-worklets:bundleLibCompileToJarRelease UP-TO-DATE
+> Task :react-native-worklets:bundleLibRuntimeToDirRelease UP-TO-DATE
+> Task :react-native-worklets:writeReleaseAarMetadata UP-TO-DATE
+> Task :react-native-worklets:mergeReleaseNativeLibs
+> Task :react-native-fast-tflite:lintVitalAnalyzeRelease UP-TO-DATE
+> Task :react-native-worklets:extractDeepLinksRelease UP-TO-DATE
+> Task :react-native-fast-tflite:writeReleaseLintModelMetadata UP-TO-DATE
+> Task :react-native-gesture-handler:mapReleaseSourceSetPaths UP-TO-DATE
+> Task :react-native-worklets:processReleaseManifest UP-TO-DATE
+> Task :react-native-worklets:compileReleaseLibraryResources UP-TO-DATE
+> Task :react-native-fast-tflite:generateReleaseLintVitalModel UP-TO-DATE
+> Task :react-native-worklets:prepareReleaseArtProfile UP-TO-DATE
+> Task :react-native-fast-tflite:bundleReleaseAar UP-TO-DATE
+> Task :react-native-worklets:bundleLibRuntimeToJarRelease UP-TO-DATE
+> Task :react-native-fast-tflite:mapReleaseSourceSetPaths UP-TO-DATE
+> Task :react-native-worklets:mergeReleaseShaders UP-TO-DATE
+> Task :react-native-worklets:compileReleaseShaders NO-SOURCE
+> Task :react-native-worklets:generateReleaseAssets UP-TO-DATE
+> Task :react-native-worklets:mergeReleaseAssets UP-TO-DATE
+> Task :react-native-worklets:processReleaseJavaRes NO-SOURCE
+> Task :react-native-worklets:createFullJarRelease UP-TO-DATE
+> Task :react-native-worklets:extractProguardFiles UP-TO-DATE
+> Task :react-native-worklets:copyReleaseJniLibsProjectOnly
+> Task :react-native-worklets:generateReleaseLintModel UP-TO-DATE
+> Task :react-native-worklets:prepareLintJarForPublish UP-TO-DATE
+> Task :react-native-fast-tflite:mergeReleaseResources UP-TO-DATE
+> Task :react-native-worklets:extractDeepLinksForAarRelease UP-TO-DATE
+> Task :react-native-worklets:extractReleaseAnnotations UP-TO-DATE
+> Task :react-native-gesture-handler:mergeReleaseResources UP-TO-DATE
+> Task :react-native-worklets:mergeReleaseGeneratedProguardFiles UP-TO-DATE
+> Task :react-native-worklets:mergeReleaseConsumerProguardFiles UP-TO-DATE
+> Task :react-native-worklets:mergeReleaseJavaResource UP-TO-DATE
+> Task :react-native-worklets:syncReleaseLibJars UP-TO-DATE
+> Task :react-native-worklets:writeReleaseLintModelMetadata UP-TO-DATE
+> Task :react-native-worklets:lintVitalAnalyzeRelease UP-TO-DATE
+> Task :react-native-worklets:stripReleaseDebugSymbols
+> Task :react-native-fast-tflite:verifyReleaseResources UP-TO-DATE
+> Task :react-native-fast-tflite:assembleRelease UP-TO-DATE
+> Task :react-native-worklets:generateReleaseLintVitalModel UP-TO-DATE
+> Task :react-native-worklets:mapReleaseSourceSetPaths UP-TO-DATE
+> Task :react-native-gesture-handler:verifyReleaseResources UP-TO-DATE
+> Task :react-native-worklets:copyReleaseJniLibsProjectAndLocalJars
+> Task :react-native-worklets:mergeReleaseResources UP-TO-DATE
+> Task :react-native-worklets:bundleReleaseLocalLintAar
+> Task :react-native-worklets:bundleReleaseAar
+> Task :react-native-worklets:verifyReleaseResources UP-TO-DATE
+> Task :react-native-worklets:assembleRelease
+> Task :expo-constants:lintVitalAnalyzeRelease
+> Task :react-native-reanimated:buildCMakeRelWithDebInfo[armeabi-v7a][reanimated]
+> Task :expo-sqlite:mergeReleaseJniLibFolders UP-TO-DATE
+> Task :expo-sqlite:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :expo-sqlite:generateReleaseBuildConfig UP-TO-DATE
+> Task :expo-sqlite:generateReleaseResValues UP-TO-DATE
+> Task :expo-sqlite:generateReleaseResources UP-TO-DATE
+> Task :expo-sqlite:packageReleaseResources UP-TO-DATE
+> Task :expo-sqlite:parseReleaseLocalResources UP-TO-DATE
+> Task :expo-sqlite:generateReleaseRFile UP-TO-DATE
+> Task :expo-sqlite:mergeReleaseNativeLibs
+> Task :expo:mapReleaseSourceSetPaths UP-TO-DATE
+> Task :app:mapReleaseSourceSetPaths UP-TO-DATE
+> Task :expo-sqlite:compileReleaseKotlin UP-TO-DATE
+> Task :expo-sqlite:javaPreCompileRelease UP-TO-DATE
+> Task :expo-sqlite:compileReleaseJavaWithJavac UP-TO-DATE
+> Task :expo-sqlite:bundleLibCompileToJarRelease UP-TO-DATE
+> Task :expo-sqlite:copyReleaseJniLibsProjectOnly
+> Task :expo-sqlite:bundleLibRuntimeToDirRelease UP-TO-DATE
+> Task :app:mergeReleaseResources UP-TO-DATE
+> Task :expo-sqlite:writeReleaseAarMetadata UP-TO-DATE
+> Task :expo-sqlite:extractDeepLinksRelease UP-TO-DATE
+> Task :expo-sqlite:processReleaseManifest UP-TO-DATE
+> Task :expo-sqlite:compileReleaseLibraryResources UP-TO-DATE
+> Task :expo:mergeReleaseResources UP-TO-DATE
+> Task :expo-sqlite:prepareReleaseArtProfile UP-TO-DATE
+> Task :expo-sqlite:bundleLibRuntimeToJarRelease UP-TO-DATE
+> Task :expo-sqlite:mergeReleaseShaders UP-TO-DATE
+> Task :expo-sqlite:compileReleaseShaders NO-SOURCE
+> Task :expo-sqlite:generateReleaseAssets UP-TO-DATE
+> Task :expo-sqlite:mergeReleaseAssets UP-TO-DATE
+> Task :expo-sqlite:processReleaseJavaRes UP-TO-DATE
+> Task :expo-sqlite:createFullJarRelease UP-TO-DATE
+> Task :expo-sqlite:extractProguardFiles UP-TO-DATE
+> Task :expo-sqlite:generateReleaseLintModel UP-TO-DATE
+> Task :expo-sqlite:prepareLintJarForPublish UP-TO-DATE
+> Task :app:checkReleaseAarMetadata UP-TO-DATE
+> Task :expo-sqlite:extractDeepLinksForAarRelease UP-TO-DATE
+> Task :expo-sqlite:extractReleaseAnnotations UP-TO-DATE
+> Task :expo-sqlite:mergeReleaseGeneratedProguardFiles UP-TO-DATE
+> Task :expo-sqlite:mergeReleaseConsumerProguardFiles UP-TO-DATE
+> Task :expo-sqlite:mergeReleaseJavaResource UP-TO-DATE
+> Task :expo-sqlite:syncReleaseLibJars UP-TO-DATE
+> Task :expo-sqlite:writeReleaseLintModelMetadata UP-TO-DATE
+> Task :expo-sqlite:generateReleaseLintVitalModel UP-TO-DATE
+> Task :expo-sqlite:mapReleaseSourceSetPaths UP-TO-DATE
+> Task :expo-sqlite:stripReleaseDebugSymbols
+> Task :expo-sqlite:mergeReleaseResources UP-TO-DATE
+> Task :expo-sqlite:verifyReleaseResources UP-TO-DATE
+> Task :expo-sqlite:copyReleaseJniLibsProjectAndLocalJars
+> Task :expo:compileReleaseKotlin UP-TO-DATE
+> Task :expo:compileReleaseJavaWithJavac UP-TO-DATE
+> Task :expo:bundleLibRuntimeToDirRelease UP-TO-DATE
+> Task :expo:bundleLibCompileToJarRelease UP-TO-DATE
+> Task :expo:bundleLibRuntimeToJarRelease UP-TO-DATE
+> Task :expo-sqlite:bundleReleaseLocalLintAar
+> Task :expo:processReleaseJavaRes UP-TO-DATE
+> Task :expo:createFullJarRelease UP-TO-DATE
+> Task :app:processReleaseMainManifest UP-TO-DATE
+> Task :app:processReleaseManifest UP-TO-DATE
+> Task :app:processReleaseManifestForPackage UP-TO-DATE
+> Task :expo:generateReleaseLintModel UP-TO-DATE
+> Task :expo:extractReleaseAnnotations UP-TO-DATE
+> Task :expo:mergeReleaseGeneratedProguardFiles UP-TO-DATE
+> Task :expo:mergeReleaseConsumerProguardFiles UP-TO-DATE
+> Task :expo:mergeReleaseJavaResource UP-TO-DATE
+> Task :expo:syncReleaseLibJars UP-TO-DATE
+> Task :expo:bundleReleaseLocalLintAar UP-TO-DATE
+> Task :app:processReleaseResources UP-TO-DATE
+> Task :expo:generateReleaseLintVitalModel UP-TO-DATE
+> Task :expo:bundleReleaseAar UP-TO-DATE
+> Task :expo-sqlite:bundleReleaseAar
+> Task :expo-sqlite:assembleRelease
+> Task :app:mergeReleaseArtProfile UP-TO-DATE
+> Task :expo:verifyReleaseResources UP-TO-DATE
+> Task :expo:assembleRelease UP-TO-DATE
+> Task :app:mergeReleaseAssets UP-TO-DATE
+> Task :app:compressReleaseAssets UP-TO-DATE
+> Task :app:optimizeReleaseResources UP-TO-DATE
+> Task :expo-sqlite:lintVitalAnalyzeRelease
+> Task :expo:lintVitalAnalyzeRelease
+> Task :react-native-reanimated:externalNativeBuildRelease
+> Task :react-native-reanimated:prefabReleasePackage
+> Task :react-native-reanimated:compileReleaseJavaWithJavac UP-TO-DATE
+> Task :react-native-reanimated:bundleLibCompileToJarRelease UP-TO-DATE
+> Task :react-native-reanimated:bundleLibRuntimeToDirRelease UP-TO-DATE
+> Task :react-native-reanimated:bundleLibRuntimeToJarRelease UP-TO-DATE
+> Task :react-native-reanimated:createFullJarRelease UP-TO-DATE
+> Task :react-native-reanimated:generateReleaseLintModel UP-TO-DATE
+> Task :react-native-reanimated:extractReleaseAnnotations UP-TO-DATE
+> Task :react-native-reanimated:mergeReleaseGeneratedProguardFiles UP-TO-DATE
+> Task :react-native-reanimated:mergeReleaseConsumerProguardFiles UP-TO-DATE
+> Task :react-native-reanimated:syncReleaseLibJars UP-TO-DATE
+> Task :react-native-reanimated:generateReleaseLintVitalModel UP-TO-DATE
+> Task :react-native-reanimated:mapReleaseSourceSetPaths UP-TO-DATE
+> Task :react-native-reanimated:mergeReleaseResources UP-TO-DATE
+> Task :react-native-reanimated:mergeReleaseNativeLibs
+> Task :react-native-reanimated:verifyReleaseResources UP-TO-DATE
+> Task :react-native-reanimated:stripReleaseDebugSymbols
+> Task :react-native-reanimated:copyReleaseJniLibsProjectOnly
+> Task :react-native-reanimated:copyReleaseJniLibsProjectAndLocalJars
+> Task :react-native-reanimated:bundleReleaseLocalLintAar
+> Task :react-native-gesture-handler:buildCMakeRelWithDebInfo[armeabi-v7a]
+> Task :react-native-gesture-handler:mergeReleaseNativeLibs
+> Task :react-native-gesture-handler:compileReleaseKotlin UP-TO-DATE
+> Task :react-native-gesture-handler:copyReleaseJniLibsProjectOnly
+> Task :react-native-gesture-handler:compileReleaseJavaWithJavac UP-TO-DATE
+> Task :react-native-gesture-handler:bundleLibRuntimeToDirRelease UP-TO-DATE
+> Task :react-native-gesture-handler:bundleLibCompileToJarRelease UP-TO-DATE
+> Task :react-native-gesture-handler:bundleLibRuntimeToJarRelease UP-TO-DATE
+> Task :react-native-gesture-handler:processReleaseJavaRes UP-TO-DATE
+> Task :react-native-gesture-handler:createFullJarRelease UP-TO-DATE
+> Task :react-native-gesture-handler:generateReleaseLintModel UP-TO-DATE
+> Task :react-native-gesture-handler:extractReleaseAnnotations UP-TO-DATE
+> Task :react-native-gesture-handler:mergeReleaseGeneratedProguardFiles UP-TO-DATE
+> Task :react-native-gesture-handler:mergeReleaseConsumerProguardFiles UP-TO-DATE
+> Task :react-native-gesture-handler:stripReleaseDebugSymbols
+> Task :react-native-gesture-handler:mergeReleaseJavaResource UP-TO-DATE
+> Task :react-native-gesture-handler:syncReleaseLibJars UP-TO-DATE
+> Task :react-native-gesture-handler:copyReleaseJniLibsProjectAndLocalJars
+> Task :react-native-gesture-handler:bundleReleaseLocalLintAar
+> Task :react-native-gesture-handler:generateReleaseLintVitalModel UP-TO-DATE
+> Task :react-native-gesture-handler:bundleReleaseAar
+> Task :react-native-gesture-handler:assembleRelease
+> Task :react-native-reanimated:bundleReleaseAar
+> Task :react-native-reanimated:assembleRelease
+> Task :app:buildCMakeRelWithDebInfo[armeabi-v7a]
+> Task :react-native-reanimated:lintVitalAnalyzeRelease
+> Task :react-native-gesture-handler:lintVitalAnalyzeRelease
+> Task :app:compileReleaseKotlin UP-TO-DATE
+> Task :app:compileReleaseJavaWithJavac UP-TO-DATE
+> Task :app:dexBuilderRelease UP-TO-DATE
+> Task :app:mergeDexRelease UP-TO-DATE
+> Task :app:mergeReleaseGlobalSynthetics UP-TO-DATE
+> Task :app:compileReleaseArtProfile UP-TO-DATE
+> Task :app:generateReleaseLintVitalReportModel UP-TO-DATE
+> Task :app:processReleaseJavaRes UP-TO-DATE
+> Task :app:mergeReleaseJavaResource UP-TO-DATE
+> Task :app:mergeReleaseNativeLibs
+> Task :app:stripReleaseDebugSymbols
+> Task :app:extractReleaseNativeSymbolTables
+> Task :app:lintVitalAnalyzeRelease
+> Task :app:lintVitalReportRelease UP-TO-DATE
+> Task :app:lintVitalRelease
+> Task :app:packageRelease
+> Task :app:createReleaseApkListingFileRedirect UP-TO-DATE
+> Task :app:mergeReleaseNativeDebugMetadata
+> Task :app:assembleRelease
 
 [Incubating] Problems report is available at: file:///home/d/Desktop/jsmastery/android/build/reports/problems/problems-report.html
 
@@ -1044,5 +1197,26 @@ You can use '--warning-mode all' to show the individual deprecation warnings and
 
 For more on this, please refer to https://docs.gradle.org/8.14.3/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
 
-BUILD SUCCESSFUL in 5m 59s
-561 actionable tasks: 67 executed, 494 up-to-date
+BUILD SUCCESSFUL in 9m 42s
+716 actionable tasks: 82 executed, 634 up-to-date
+Exception in thread "Thread-3" org.gradle.api.UncheckedIOException: java.io.IOException: Input/output error
+	at org.gradle.internal.UncheckedException.throwAsUncheckedException(UncheckedException.java:63)
+	at org.gradle.internal.UncheckedException.throwAsUncheckedException(UncheckedException.java:42)
+	at org.gradle.internal.daemon.client.clientinput.DaemonClientInputForwarder$ForwardingUserInput.lambda$readAndForwardStdin$0(DaemonClientInputForwarder.java:99)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635)
+	at java.base/java.lang.Thread.run(Thread.java:840)
+Caused by: java.io.IOException: Input/output error
+	at java.base/java.io.FileInputStream.readBytes(Native Method)
+	at java.base/java.io.FileInputStream.read(FileInputStream.java:276)
+	at java.base/java.io.BufferedInputStream.read1(BufferedInputStream.java:282)
+	at java.base/java.io.BufferedInputStream.read(BufferedInputStream.java:343)
+	at java.base/sun.nio.cs.StreamDecoder.readBytes(StreamDecoder.java:287)
+	at java.base/sun.nio.cs.StreamDecoder.implRead(StreamDecoder.java:330)
+	at java.base/sun.nio.cs.StreamDecoder.read(StreamDecoder.java:190)
+	at java.base/java.io.InputStreamReader.read(InputStreamReader.java:177)
+	at java.base/java.io.BufferedReader.read1(BufferedReader.java:211)
+	at java.base/java.io.BufferedReader.read(BufferedReader.java:287)
+	at java.base/java.io.Reader.read(Reader.java:250)
+	at org.gradle.internal.daemon.client.clientinput.DaemonClientInputForwarder$ForwardingUserInput.lambda$readAndForwardStdin$0(DaemonClientInputForwarder.java:97)
+	... 3 more
