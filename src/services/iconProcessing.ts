@@ -56,6 +56,33 @@ const MODEL_REGISTRY: Record<number, Record<number, string>> = {
   },
 };
 
+// Static model map - Metro requires static paths at build time
+const MODEL_MAP: Record<string, any> = {
+  "espcn_16x_64x.tflite": require("../../assets/models/espcn_16x_64x.tflite"),
+  "espcn_16x_128x.tflite": require("../../assets/models/espcn_16x_128x.tflite"),
+  "espcn_16x_192x.tflite": require("../../assets/models/espcn_16x_192x.tflite"),
+  "espcn_16x_256x.tflite": require("../../assets/models/espcn_16x_256x.tflite"),
+  "espcn_16x_384x.tflite": require("../../assets/models/espcn_16x_384x.tflite"),
+  "espcn_16x_512x.tflite": require("../../assets/models/espcn_16x_512x.tflite"),
+  "espcn_32x_64x.tflite": require("../../assets/models/espcn_32x_64x.tflite"),
+  "espcn_32x_128x.tflite": require("../../assets/models/espcn_32x_128x.tflite"),
+  "espcn_32x_192x.tflite": require("../../assets/models/espcn_32x_192x.tflite"),
+  "espcn_32x_256x.tflite": require("../../assets/models/espcn_32x_256x.tflite"),
+  "espcn_32x_384x.tflite": require("../../assets/models/espcn_32x_384x.tflite"),
+  "espcn_32x_512x.tflite": require("../../assets/models/espcn_32x_512x.tflite"),
+  "espcn_48x_96x.tflite": require("../../assets/models/espcn_48x_96x.tflite"),
+  "espcn_48x_144x.tflite": require("../../assets/models/espcn_48x_144x.tflite"),
+  "espcn_48x_192x.tflite": require("../../assets/models/espcn_48x_192x.tflite"),
+  "espcn_48x_240x.tflite": require("../../assets/models/espcn_48x_240x.tflite"),
+  "espcn_48x_384x.tflite": require("../../assets/models/espcn_48x_384x.tflite"),
+  "espcn_48x_576x.tflite": require("../../assets/models/espcn_48x_576x.tflite"),
+  "espcn_64x_128x.tflite": require("../../assets/models/espcn_64x_128x.tflite"),
+  "espcn_64x_192x.tflite": require("../../assets/models/espcn_64x_192x.tflite"),
+  "espcn_64x_256x.tflite": require("../../assets/models/espcn_64x_256x.tflite"),
+  "espcn_64x_384x.tflite": require("../../assets/models/espcn_64x_384x.tflite"),
+  "espcn_64x_512x.tflite": require("../../assets/models/espcn_64x_512x.tflite"),
+};
+
 // Cache for loaded models
 const loadedModels: Map<string, any> = new Map();
 let modelsLoaded = false;
@@ -199,9 +226,13 @@ async function loadModel(modelFile: string): Promise<any | null> {
     const { loadTensorflowModel } = require("react-native-fast-tflite");
     if (!loadTensorflowModel) return null;
 
-    const model = await loadTensorflowModel(
-      require(`../../assets/models/${modelFile}`),
-    );
+    const modelAsset = MODEL_MAP[modelFile];
+    if (!modelAsset) {
+      console.warn(`[ICON_AI] Model not found in map: ${modelFile}`);
+      return null;
+    }
+
+    const model = await loadTensorflowModel(modelAsset);
     console.log(`[ICON_AI] Loaded model: ${modelFile}`);
     loadedModels.set(modelFile, model);
     return model;
