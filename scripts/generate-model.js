@@ -122,6 +122,9 @@ function main() {
 
   try {
     const args = [pythonScript];
+    if (FORCE) {
+      args.push("--force");
+    }
     if (SPECIFIC_MODEL) {
       args.push(`--model=${SPECIFIC_MODEL}`);
     }

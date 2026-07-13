@@ -1,5 +1,6 @@
 """Multi-resolution ESPCN model training with optimized epochs per scale ratio."""
 import os
+import sys
 import json
 import numpy as np
 import tensorflow as tf
@@ -7,6 +8,8 @@ from tensorflow import keras
 from tensorflow.keras import layers, Model
 import urllib.request
 from io import BytesIO
+
+FORCE = "--force" in sys.argv
 
 # Model configurations: input_size -> list of (scale, epochs) tuples
 # Scale = output_size / input_size
@@ -182,6 +185,12 @@ def train_and_export_model(model_dir: str, input_size: int, scale: int, epochs: 
     
     model_name = f"espcn_{input_size}x_{output_size}x.tflite"
     out_path = os.path.join(model_dir, model_name)
+
+    # Skip if model already exists and not forced
+    if not FORCE and os.path.exists(out_path):
+        size = os.path.getsize(out_path)
+        print(f"[SKIP] {model_name} exists ({size} bytes), use --force to retrain")
+        return model_name, size
     with open(out_path, "wb") as f:
         f.write(tflite_model)
     print(f"[TRAIN] WROTE {out_path} ({len(tflite_model)} bytes)")
