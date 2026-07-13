@@ -245,6 +245,17 @@ for ARCH in "${BUILD_ARCHS[@]}"; do
     # Show result
     if [ $BUILD_EXIT -eq 0 ]; then
         echo "[BUILD] SUCCESS: $ARCH -> $APK_FILE"
+        
+        # Copy APK to arch-specific filename to prevent overwriting
+        if [ -f "$APK_FILE" ]; then
+            if [ "$DEV_MODE" = "true" ]; then
+                ARCH_APK="$PROJECT_ROOT/app-debug-${ARCH}.apk"
+            else
+                ARCH_APK="$PROJECT_ROOT/app-release-${ARCH}.apk"
+            fi
+            cp "$APK_FILE" "$ARCH_APK"
+            echo "[BUILD] Copied to: $ARCH_APK"
+        fi
     else
         echo "[BUILD] FAILED: $ARCH (exit code $BUILD_EXIT)"
         echo "[BUILD] See $LOG_FILE for details"

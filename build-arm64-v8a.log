@@ -1,22 +1,22 @@
 To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.14.3/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
 Daemon will be stopped at the end of the build 
-> Task :expo-gradle-plugin:expo-autolinking-plugin-shared:checkKotlinGradlePluginConfigurationErrors SKIPPED
-> Task :gradle-plugin:settings-plugin:checkKotlinGradlePluginConfigurationErrors SKIPPED
-> Task :gradle-plugin:shared:checkKotlinGradlePluginConfigurationErrors SKIPPED
 > Task :expo-gradle-plugin:expo-autolinking-settings-plugin:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :expo-gradle-plugin:expo-autolinking-plugin-shared:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :gradle-plugin:shared:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :gradle-plugin:settings-plugin:checkKotlinGradlePluginConfigurationErrors SKIPPED
 > Task :expo-gradle-plugin:expo-autolinking-settings-plugin:pluginDescriptors UP-TO-DATE
 > Task :gradle-plugin:settings-plugin:pluginDescriptors UP-TO-DATE
-> Task :expo-gradle-plugin:expo-autolinking-settings-plugin:processResources UP-TO-DATE
 > Task :gradle-plugin:settings-plugin:processResources UP-TO-DATE
+> Task :expo-gradle-plugin:expo-autolinking-settings-plugin:processResources UP-TO-DATE
 > Task :expo-gradle-plugin:expo-autolinking-plugin-shared:compileKotlin UP-TO-DATE
-> Task :gradle-plugin:shared:compileKotlin UP-TO-DATE
 > Task :expo-gradle-plugin:expo-autolinking-plugin-shared:compileJava NO-SOURCE
-> Task :gradle-plugin:shared:compileJava NO-SOURCE
 > Task :expo-gradle-plugin:expo-autolinking-plugin-shared:processResources NO-SOURCE
+> Task :gradle-plugin:shared:compileKotlin UP-TO-DATE
 > Task :expo-gradle-plugin:expo-autolinking-plugin-shared:classes UP-TO-DATE
+> Task :gradle-plugin:shared:compileJava NO-SOURCE
 > Task :gradle-plugin:shared:processResources NO-SOURCE
-> Task :gradle-plugin:shared:classes UP-TO-DATE
 > Task :expo-gradle-plugin:expo-autolinking-plugin-shared:jar UP-TO-DATE
+> Task :gradle-plugin:shared:classes UP-TO-DATE
 > Task :gradle-plugin:shared:jar UP-TO-DATE
 > Task :gradle-plugin:settings-plugin:compileKotlin UP-TO-DATE
 > Task :gradle-plugin:settings-plugin:compileJava NO-SOURCE
@@ -27,18 +27,18 @@ Daemon will be stopped at the end of the build
 > Task :expo-gradle-plugin:expo-autolinking-settings-plugin:classes UP-TO-DATE
 > Task :expo-gradle-plugin:expo-autolinking-settings-plugin:jar UP-TO-DATE
 > Task :expo-gradle-plugin:expo-autolinking-plugin:checkKotlinGradlePluginConfigurationErrors SKIPPED
-> Task :expo-module-gradle-plugin:checkKotlinGradlePluginConfigurationErrors SKIPPED
 > Task :gradle-plugin:react-native-gradle-plugin:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :expo-module-gradle-plugin:checkKotlinGradlePluginConfigurationErrors SKIPPED
 > Task :expo-module-gradle-plugin:pluginDescriptors UP-TO-DATE
 > Task :expo-module-gradle-plugin:processResources UP-TO-DATE
 > Task :expo-gradle-plugin:expo-autolinking-plugin:compileKotlin UP-TO-DATE
 > Task :expo-gradle-plugin:expo-autolinking-plugin:compileJava NO-SOURCE
 > Task :expo-gradle-plugin:expo-autolinking-plugin:pluginDescriptors UP-TO-DATE
+> Task :gradle-plugin:react-native-gradle-plugin:compileKotlin UP-TO-DATE
 > Task :expo-gradle-plugin:expo-autolinking-plugin:processResources UP-TO-DATE
 > Task :expo-gradle-plugin:expo-autolinking-plugin:classes UP-TO-DATE
-> Task :expo-gradle-plugin:expo-autolinking-plugin:jar UP-TO-DATE
-> Task :gradle-plugin:react-native-gradle-plugin:compileKotlin UP-TO-DATE
 > Task :gradle-plugin:react-native-gradle-plugin:compileJava NO-SOURCE
+> Task :expo-gradle-plugin:expo-autolinking-plugin:jar UP-TO-DATE
 > Task :gradle-plugin:react-native-gradle-plugin:pluginDescriptors UP-TO-DATE
 > Task :gradle-plugin:react-native-gradle-plugin:processResources UP-TO-DATE
 > Task :gradle-plugin:react-native-gradle-plugin:classes UP-TO-DATE
@@ -93,160 +93,165 @@ Using expo modules
 > Task :app:generateReactNativeEntryPoint
 > Task :react-native-reanimated:assertMinimalReactNativeVersionTask
 > Task :react-native-reanimated:assertNewArchitectureEnabledTask SKIPPED
-> Task :react-native-fast-tflite:generateCodegenSchemaFromJavaScript
-> Task :clerk_expo:generateCodegenSchemaFromJavaScript
-> Task :react-native-gesture-handler:generateCodegenSchemaFromJavaScript
 
 > Task :expo-constants:createExpoConfig
 env: load .env
 env: export EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY POSTHOG_PROJECT_TOKEN POSTHOG_HOST
+
+> Task :react-native-fast-tflite:generateCodegenSchemaFromJavaScript
+> Task :react-native-gesture-handler:generateCodegenSchemaFromJavaScript
+> Task :clerk_expo:generateCodegenSchemaFromJavaScript
+
+> Task :expo-constants:createExpoConfig
 ✅ Clerk iOS plugin loaded
 ✅ Clerk Android plugin loaded
 
 > Task :expo-constants:preBuild
 > Task :react-native-reanimated:assertWorkletsVersionTask
-> Task :react-native-reanimated:generateCodegenSchemaFromJavaScript
+> Task :react-native-fast-tflite:generateCodegenArtifactsFromSchema
+> Task :react-native-fast-tflite:preBuild
 > Task :react-native-safe-area-context:generateCodegenSchemaFromJavaScript
+> Task :react-native-reanimated:generateCodegenSchemaFromJavaScript
+> Task :react-native-screens:generateCodegenSchemaFromJavaScript
+> Task :react-native-safe-area-context:generateCodegenArtifactsFromSchema
+> Task :react-native-safe-area-context:preBuild
 > Task :clerk_expo:generateCodegenArtifactsFromSchema
 > Task :clerk_expo:preBuild
 > Task :react-native-gesture-handler:generateCodegenArtifactsFromSchema
 > Task :react-native-gesture-handler:preBuild
-> Task :react-native-fast-tflite:generateCodegenArtifactsFromSchema
-> Task :react-native-fast-tflite:preBuild
-> Task :react-native-reanimated:generateCodegenArtifactsFromSchema
-> Task :react-native-safe-area-context:generateCodegenArtifactsFromSchema
-> Task :react-native-safe-area-context:preBuild
-> Task :react-native-svg:generateCodegenSchemaFromJavaScript
-> Task :react-native-screens:generateCodegenSchemaFromJavaScript
 > Task :react-native-worklets:assertMinimalReactNativeVersionTask
 > Task :react-native-worklets:assertNewArchitectureEnabledTask SKIPPED
+> Task :react-native-reanimated:generateCodegenArtifactsFromSchema
+> Task :react-native-worklets:generateCodegenSchemaFromJavaScript
+> Task :react-native-screens:generateCodegenArtifactsFromSchema
+> Task :react-native-screens:preBuild
+> Task :react-native-svg:generateCodegenSchemaFromJavaScript
 > Task :react-native-webview:generateCodegenSchemaFromJavaScript
 > Task :react-native-reanimated:prepareReanimatedHeadersForPrefabs
 > Task :react-native-reanimated:preBuild
-> Task :react-native-screens:generateCodegenArtifactsFromSchema
-> Task :react-native-screens:preBuild
 > Task :react-native-reanimated:preReleaseBuild
 > Task :clerk_expo:preReleaseBuild
-> Task :react-native-worklets:generateCodegenSchemaFromJavaScript
 > Task :clerk_expo:mergeReleaseJniLibFolders
-> Task :clerk_expo:mergeReleaseNativeLibs NO-SOURCE
 > Task :solana-mobile_mobile-wallet-adapter-protocol:generateCodegenSchemaFromJavaScript
-> Task :react-native-webview:generateCodegenArtifactsFromSchema
-> Task :react-native-webview:preBuild
-> Task :react-native-svg:generateCodegenArtifactsFromSchema
-> Task :react-native-svg:preBuild
+> Task :clerk_expo:mergeReleaseNativeLibs NO-SOURCE
+> Task :react-native-worklets:generateCodegenArtifactsFromSchema
+> Task :clerk_expo:copyReleaseJniLibsProjectOnly
 > Task :expo-constants:preReleaseBuild
-> Task :expo-modules-core:preReleaseBuild UP-TO-DATE
 > Task :expo-constants:mergeReleaseJniLibFolders
 > Task :expo-constants:mergeReleaseNativeLibs NO-SOURCE
-> Task :clerk_expo:copyReleaseJniLibsProjectOnly
-> Task :expo-sqlite:preReleaseBuild UP-TO-DATE
 > Task :expo-constants:copyReleaseJniLibsProjectOnly
-> Task :react-native-worklets:generateCodegenArtifactsFromSchema
-> Task :react-native-fast-tflite:extractAARHeaders
-> Task :solana-mobile_mobile-wallet-adapter-protocol:generateCodegenArtifactsFromSchema
-> Task :solana-mobile_mobile-wallet-adapter-protocol:preBuild
-> Task :react-native-gesture-handler:preReleaseBuild
+> Task :expo-modules-core:preReleaseBuild UP-TO-DATE
+> Task :react-native-webview:generateCodegenArtifactsFromSchema
+> Task :react-native-webview:preBuild
+> Task :expo-sqlite:preReleaseBuild UP-TO-DATE
+> Task :react-native-svg:generateCodegenArtifactsFromSchema
+> Task :react-native-svg:preBuild
 > Task :react-native-worklets:prepareWorkletsHeadersForPrefabs
 > Task :react-native-worklets:preBuild
 > Task :react-native-worklets:preReleaseBuild
+> Task :solana-mobile_mobile-wallet-adapter-protocol:generateCodegenArtifactsFromSchema
+> Task :solana-mobile_mobile-wallet-adapter-protocol:preBuild
+> Task :react-native-gesture-handler:preReleaseBuild
+> Task :react-native-fast-tflite:extractAARHeaders
 > Task :react-native-fast-tflite:extractSOFiles
 > Task :react-native-fast-tflite:preReleaseBuild
-> Task :react-native-gesture-handler:mergeReleaseJniLibFolders
-> Task :react-native-reanimated:mergeReleaseJniLibFolders
-> Task :react-native-safe-area-context:preReleaseBuild
-> Task :react-native-safe-area-context:mergeReleaseJniLibFolders
-> Task :react-native-safe-area-context:mergeReleaseNativeLibs NO-SOURCE
-> Task :react-native-safe-area-context:copyReleaseJniLibsProjectOnly
-> Task :react-native-screens:preReleaseBuild
-> Task :react-native-worklets:configureCMakeRelWithDebInfo[arm64-v8a]
-> Task :react-native-worklets:generateJsonModelRelease
-> Task :react-native-fast-tflite:configureCMakeRelWithDebInfo[arm64-v8a]
-> Task :expo-sqlite:configureCMakeRelWithDebInfo[arm64-v8a]
-> Task :expo-modules-core:configureCMakeRelWithDebInfo[arm64-v8a]
-> Task :react-native-worklets:prefabReleaseConfigurePackage
-> Task :react-native-reanimated:configureCMakeRelWithDebInfo[arm64-v8a]
-> Task :react-native-reanimated:generateJsonModelRelease
-> Task :react-native-reanimated:prefabReleaseConfigurePackage
-> Task :react-native-screens:configureCMakeRelWithDebInfo[arm64-v8a]
-> Task :react-native-gesture-handler:configureCMakeRelWithDebInfo[arm64-v8a]
 > Task :expo:generatePackagesList
 > Task :expo:preBuild
 > Task :app:preBuild
 > Task :app:preReleaseBuild
-> Task :expo-sqlite:buildCMakeRelWithDebInfo[arm64-v8a]
+> Task :app:mergeReleaseJniLibFolders
 > Task :expo:preReleaseBuild
-> Task :react-native-screens:buildCMakeRelWithDebInfo[arm64-v8a]
+> Task :expo:mergeReleaseJniLibFolders
+> Task :expo:mergeReleaseNativeLibs NO-SOURCE
+> Task :react-native-gesture-handler:mergeReleaseJniLibFolders
+> Task :expo:copyReleaseJniLibsProjectOnly
+> Task :react-native-safe-area-context:preReleaseBuild
+> Task :react-native-reanimated:mergeReleaseJniLibFolders
+> Task :react-native-screens:preReleaseBuild
+> Task :react-native-safe-area-context:mergeReleaseJniLibFolders
+> Task :react-native-safe-area-context:mergeReleaseNativeLibs NO-SOURCE
+> Task :expo-sqlite:configureCMakeRelWithDebInfo[arm64-v8a]
+> Task :react-native-fast-tflite:configureCMakeRelWithDebInfo[arm64-v8a]
+> Task :react-native-worklets:configureCMakeRelWithDebInfo[arm64-v8a]
+> Task :react-native-worklets:generateJsonModelRelease
+> Task :react-native-worklets:prefabReleaseConfigurePackage
+> Task :react-native-safe-area-context:copyReleaseJniLibsProjectOnly
+> Task :react-native-reanimated:configureCMakeRelWithDebInfo[arm64-v8a]
+> Task :react-native-reanimated:generateJsonModelRelease
+> Task :expo-modules-core:configureCMakeRelWithDebInfo[arm64-v8a]
+> Task :react-native-reanimated:prefabReleaseConfigurePackage
+> Task :react-native-screens:configureCMakeRelWithDebInfo[arm64-v8a]
+> Task :expo-sqlite:buildCMakeRelWithDebInfo[arm64-v8a]
 > Task :expo-modules-core:buildCMakeRelWithDebInfo[arm64-v8a]
 > Task :react-native-worklets:buildCMakeRelWithDebInfo[arm64-v8a][worklets]
 > Task :expo-sqlite:mergeReleaseJniLibFolders
-> Task :expo:mergeReleaseJniLibFolders
-> Task :expo:mergeReleaseNativeLibs NO-SOURCE
-> Task :expo:copyReleaseJniLibsProjectOnly
-> Task :react-native-screens:mergeReleaseJniLibFolders
+> Task :expo-sqlite:mergeReleaseNativeLibs
+> Task :react-native-gesture-handler:configureCMakeRelWithDebInfo[arm64-v8a]
 > Task :react-native-worklets:externalNativeBuildRelease
 > Task :expo-modules-core:mergeReleaseJniLibFolders
-> Task :react-native-screens:mergeReleaseNativeLibs
-> Task :react-native-screens:copyReleaseJniLibsProjectOnly
+> Task :expo-sqlite:copyReleaseJniLibsProjectOnly
 > Task :react-native-svg:preReleaseBuild
 > Task :react-native-svg:mergeReleaseJniLibFolders
 > Task :react-native-svg:mergeReleaseNativeLibs NO-SOURCE
-> Task :expo-sqlite:mergeReleaseNativeLibs
 > Task :react-native-svg:copyReleaseJniLibsProjectOnly
 > Task :react-native-webview:preReleaseBuild
-> Task :react-native-worklets:prefabReleasePackage
-> Task :react-native-webview:mergeReleaseJniLibFolders
-> Task :react-native-worklets:mergeReleaseJniLibFolders
-> Task :react-native-worklets:mergeReleaseNativeLibs
 > Task :expo-modules-core:mergeReleaseNativeLibs
-> Task :expo-sqlite:copyReleaseJniLibsProjectOnly
+> Task :react-native-webview:mergeReleaseJniLibFolders
+> Task :react-native-worklets:prefabReleasePackage
 > Task :react-native-webview:mergeReleaseNativeLibs NO-SOURCE
+> Task :react-native-worklets:mergeReleaseJniLibFolders
 > Task :expo-modules-core:copyReleaseJniLibsProjectOnly
-> Task :solana-mobile_mobile-wallet-adapter-protocol:preReleaseBuild
 > Task :react-native-webview:copyReleaseJniLibsProjectOnly
-> Task :clerk_expo:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :solana-mobile_mobile-wallet-adapter-protocol:preReleaseBuild
+> Task :react-native-worklets:mergeReleaseNativeLibs
+> Task :react-native-screens:buildCMakeRelWithDebInfo[arm64-v8a]
 > Task :solana-mobile_mobile-wallet-adapter-protocol:mergeReleaseJniLibFolders
 > Task :solana-mobile_mobile-wallet-adapter-protocol:mergeReleaseNativeLibs NO-SOURCE
+> Task :react-native-screens:mergeReleaseJniLibFolders
 > Task :solana-mobile_mobile-wallet-adapter-protocol:copyReleaseJniLibsProjectOnly
+> Task :clerk_expo:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :react-native-screens:mergeReleaseNativeLibs
+> Task :clerk_expo:generateReleaseBuildConfig
+> Task :clerk_expo:generateReleaseResValues
+> Task :react-native-screens:copyReleaseJniLibsProjectOnly
 > Task :react-native-gesture-handler:checkKotlinGradlePluginConfigurationErrors SKIPPED
 > Task :react-native-worklets:copyReleaseJniLibsProjectOnly
 > Task :react-native-gesture-handler:generateReleaseBuildConfig
-> Task :react-native-worklets:generateReleaseBuildConfig
-> Task :react-native-gesture-handler:generateReleaseResValues
-> Task :clerk_expo:generateReleaseBuildConfig
-> Task :react-native-worklets:generateReleaseResValues
-> Task :clerk_expo:generateReleaseResValues
-> Task :react-native-gesture-handler:generateReleaseResources
-> Task :react-native-worklets:generateReleaseResources
 > Task :clerk_expo:generateReleaseResources
-> Task :react-native-gesture-handler:packageReleaseResources
+> Task :react-native-worklets:generateReleaseBuildConfig
+> Task :react-native-worklets:generateReleaseResValues
+> Task :react-native-gesture-handler:generateReleaseResValues
+> Task :react-native-worklets:generateReleaseResources
+> Task :react-native-gesture-handler:generateReleaseResources
 > Task :clerk_expo:packageReleaseResources
 > Task :react-native-worklets:packageReleaseResources
+> Task :react-native-gesture-handler:packageReleaseResources
 > Task :react-native-gesture-handler:parseReleaseLocalResources
-> Task :react-native-worklets:parseReleaseLocalResources
 > Task :clerk_expo:parseReleaseLocalResources
+> Task :react-native-worklets:parseReleaseLocalResources
 > Task :clerk_expo:javaPreCompileRelease
 > Task :react-native-reanimated:buildCMakeRelWithDebInfo[arm64-v8a][reanimated]
-> Task :clerk_expo:generateReleaseRFile
 > Task :react-native-gesture-handler:generateReleaseRFile
-> Task :react-native-worklets:generateReleaseRFile
 > Task :react-native-worklets:javaPreCompileRelease
+> Task :react-native-worklets:generateReleaseRFile
+> Task :clerk_expo:generateReleaseRFile
 > Task :react-native-svg:generateReleaseBuildConfig
 > Task :react-native-svg:generateReleaseResValues
 > Task :react-native-svg:generateReleaseResources
 > Task :react-native-reanimated:externalNativeBuildRelease
 > Task :react-native-svg:packageReleaseResources
 > Task :react-native-svg:parseReleaseLocalResources
-> Task :react-native-reanimated:prefabReleasePackage
 > Task :react-native-svg:generateReleaseRFile
+> Task :react-native-svg:javaPreCompileRelease
+> Task :react-native-reanimated:prefabReleasePackage
 > Task :react-native-gesture-handler:buildCMakeRelWithDebInfo[arm64-v8a]
 > Task :react-native-gesture-handler:mergeReleaseNativeLibs
+> Task :app:configureCMakeRelWithDebInfo[arm64-v8a]
 > Task :react-native-gesture-handler:copyReleaseJniLibsProjectOnly
 > Task :react-native-reanimated:mergeReleaseNativeLibs
-> Task :react-native-reanimated:generateReleaseBuildConfig
-> Task :react-native-svg:javaPreCompileRelease
-> Task :app:configureCMakeRelWithDebInfo[arm64-v8a]
+> Task :react-native-fast-tflite:buildCMakeRelWithDebInfo[arm64-v8a]
 > Task :react-native-reanimated:copyReleaseJniLibsProjectOnly
+> Task :react-native-reanimated:generateReleaseBuildConfig
 > Task :react-native-reanimated:generateReleaseResValues
 > Task :react-native-reanimated:generateReleaseResources
 > Task :react-native-reanimated:packageReleaseResources
@@ -261,11 +266,10 @@ env: export EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY POSTHOG_PROJECT_TOKEN POSTHOG_HOST
 > Task :react-native-safe-area-context:packageReleaseResources
 > Task :react-native-safe-area-context:parseReleaseLocalResources
 > Task :react-native-safe-area-context:generateReleaseRFile
-> Task :react-native-fast-tflite:buildCMakeRelWithDebInfo[arm64-v8a]
-> Task :clerk_expo:compileReleaseKotlin
 > Task :react-native-worklets:compileReleaseJavaWithJavac
-Note: /home/d/Desktop/jsmastery/node_modules/react-native-worklets/android/src/main/java/com/swmansion/worklets/WorkletsPackage.java uses unchecked or unsafe operations.
-Note: Recompile with -Xlint:unchecked for details.
+> Task :clerk_expo:compileReleaseKotlin
+> Task :react-native-svg:compileReleaseJavaWithJavac
+> Task :app:buildCMakeRelWithDebInfo[arm64-v8a]
 
 > Task :react-native-fast-tflite:buildCMakeRelWithDebInfo[arm64-v8a]
 C/C++: ninja: Entering directory `/home/d/Desktop/jsmastery/node_modules/react-native-fast-tflite/android/.cxx/RelWithDebInfo/1x3y3830/arm64-v8a'
@@ -330,8 +334,11 @@ C/C++:       |                 ~
 C/C++: 2 warnings generated.
 
 > Task :react-native-fast-tflite:configureCMakeRelWithDebInfo[armeabi-v7a]
-> Task :react-native-svg:compileReleaseJavaWithJavac
-> Task :app:buildCMakeRelWithDebInfo[arm64-v8a]
+
+> Task :react-native-worklets:compileReleaseJavaWithJavac
+Note: /home/d/Desktop/jsmastery/node_modules/react-native-worklets/android/src/main/java/com/swmansion/worklets/WorkletsPackage.java uses unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+
 > Task :react-native-worklets:bundleLibCompileToJarRelease
 > Task :react-native-safe-area-context:compileReleaseKotlin
 
@@ -423,8 +430,8 @@ C/C++:   330 |                 });
 C/C++:       |                 ~
 C/C++: 2 warnings generated.
 
-> Task :react-native-fast-tflite:configureCMakeRelWithDebInfo[x86]
 > Task :react-native-gesture-handler:compileReleaseKotlin
+> Task :react-native-fast-tflite:configureCMakeRelWithDebInfo[x86]
 > Task :react-native-fast-tflite:buildCMakeRelWithDebInfo[x86]
 C/C++: ninja: Entering directory `/home/d/Desktop/jsmastery/node_modules/react-native-fast-tflite/android/.cxx/RelWithDebInfo/1x3y3830/x86'
 C/C++: /home/d/Desktop/jsmastery/node_modules/react-native-fast-tflite/cpp/TensorflowPlugin.cpp:73:11: warning: ignoring return value of function declared with 'nodiscard' attribute [-Wunused-result]
@@ -597,6 +604,14 @@ w: file:///home/d/Desktop/jsmastery/node_modules/@clerk/expo/android/src/main/ja
 
 > Task :clerk_expo:compileReleaseJavaWithJavac
 > Task :clerk_expo:bundleLibRuntimeToDirRelease
+> Task :react-native-webview:javaPreCompileRelease
+> Task :solana-mobile_mobile-wallet-adapter-protocol:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :solana-mobile_mobile-wallet-adapter-protocol:generateReleaseBuildConfig
+> Task :solana-mobile_mobile-wallet-adapter-protocol:generateReleaseResValues
+> Task :solana-mobile_mobile-wallet-adapter-protocol:generateReleaseResources
+> Task :solana-mobile_mobile-wallet-adapter-protocol:packageReleaseResources
+> Task :solana-mobile_mobile-wallet-adapter-protocol:parseReleaseLocalResources
+> Task :solana-mobile_mobile-wallet-adapter-protocol:generateReleaseRFile
 
 > Task :react-native-webview:compileReleaseKotlin
 w: file:///home/d/Desktop/jsmastery/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewManagerImpl.kt:22:8 'object MapBuilder : Any' is deprecated. Use Kotlin's built-in collections extensions.
@@ -669,20 +684,6 @@ w: file:///home/d/Desktop/jsmastery/node_modules/react-native-webview/android/sr
 w: file:///home/d/Desktop/jsmastery/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/events/TopShouldStartLoadWithRequestEvent.kt:27:42 'interface RCTEventEmitter : JavaScriptModule' is deprecated. Use [RCTModernEventEmitter] instead.
 w: file:///home/d/Desktop/jsmastery/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/events/TopShouldStartLoadWithRequestEvent.kt:28:21 'fun receiveEvent(targetTag: Int, eventName: String, params: WritableMap?): Unit' is deprecated. Use [RCTModernEventEmitter.receiveEvent] instead.
 
-> Task :react-native-webview:javaPreCompileRelease
-> Task :solana-mobile_mobile-wallet-adapter-protocol:checkKotlinGradlePluginConfigurationErrors SKIPPED
-> Task :solana-mobile_mobile-wallet-adapter-protocol:generateReleaseBuildConfig
-> Task :solana-mobile_mobile-wallet-adapter-protocol:generateReleaseResValues
-> Task :solana-mobile_mobile-wallet-adapter-protocol:generateReleaseResources
-> Task :solana-mobile_mobile-wallet-adapter-protocol:packageReleaseResources
-> Task :solana-mobile_mobile-wallet-adapter-protocol:parseReleaseLocalResources
-> Task :solana-mobile_mobile-wallet-adapter-protocol:generateReleaseRFile
-
-> Task :react-native-webview:compileReleaseJavaWithJavac
-Note: Some input files use or override a deprecated API.
-Note: Recompile with -Xlint:deprecation for details.
-
-> Task :react-native-webview:bundleLibRuntimeToDirRelease
 > Task :solana-mobile_mobile-wallet-adapter-protocol:javaPreCompileRelease
 > Task :expo:checkKotlinGradlePluginConfigurationErrors SKIPPED
 > Task :expo:generateReleaseBuildConfig
@@ -706,6 +707,13 @@ Note: Recompile with -Xlint:deprecation for details.
 > Task :expo-modules-core:parseReleaseLocalResources
 > Task :expo-modules-core:generateReleaseRFile
 
+> Task :react-native-webview:compileReleaseJavaWithJavac
+Note: Some input files use or override a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+
+> Task :solana-mobile_mobile-wallet-adapter-protocol:compileReleaseKotlin
+> Task :react-native-webview:bundleLibRuntimeToDirRelease
+
 > Task :solana-mobile_mobile-wallet-adapter-protocol:compileReleaseKotlin
 w: file:///home/d/Desktop/jsmastery/node_modules/@solana-mobile/mobile-wallet-adapter-protocol/android/src/main/java/com/solanamobile/mobilewalletadapter/reactnative/SolanaMobileWalletAdapterPackage.kt:3:8 'class TurboReactPackage : BaseReactPackage' is deprecated. Use BaseReactPackage instead.
 w: file:///home/d/Desktop/jsmastery/node_modules/@solana-mobile/mobile-wallet-adapter-protocol/android/src/main/java/com/solanamobile/mobilewalletadapter/reactnative/SolanaMobileWalletAdapterPackage.kt:10:48 'class TurboReactPackage : BaseReactPackage' is deprecated. Use BaseReactPackage instead.
@@ -713,6 +721,7 @@ w: file:///home/d/Desktop/jsmastery/node_modules/@solana-mobile/mobile-wallet-ad
 
 > Task :solana-mobile_mobile-wallet-adapter-protocol:compileReleaseJavaWithJavac
 > Task :solana-mobile_mobile-wallet-adapter-protocol:bundleLibRuntimeToDirRelease
+> Task :expo-modules-core:compileReleaseKotlin
 > Task :expo-modules-core:javaPreCompileRelease
 > Task :expo-constants:javaPreCompileRelease
 > Task :expo-sqlite:checkKotlinGradlePluginConfigurationErrors SKIPPED
@@ -720,17 +729,17 @@ w: file:///home/d/Desktop/jsmastery/node_modules/@solana-mobile/mobile-wallet-ad
 > Task :expo-sqlite:generateReleaseResValues
 > Task :expo-sqlite:generateReleaseResources
 > Task :expo-sqlite:packageReleaseResources
+> Task :expo-sqlite:parseReleaseLocalResources
+> Task :expo-sqlite:generateReleaseRFile
+> Task :expo-sqlite:javaPreCompileRelease
 > Task :expo:javaPreCompileRelease
 > Task :react-native-fast-tflite:generateReleaseBuildConfig
-> Task :expo-sqlite:javaPreCompileRelease
 > Task :react-native-fast-tflite:generateReleaseResValues
 > Task :react-native-fast-tflite:generateReleaseResources
-> Task :expo-sqlite:parseReleaseLocalResources
 > Task :react-native-fast-tflite:packageReleaseResources
-> Task :expo-sqlite:generateReleaseRFile
 > Task :react-native-fast-tflite:parseReleaseLocalResources
-> Task :react-native-fast-tflite:javaPreCompileRelease
 > Task :react-native-fast-tflite:generateReleaseRFile
+> Task :react-native-fast-tflite:javaPreCompileRelease
 > Task :react-native-reanimated:bundleLibRuntimeToDirRelease
 
 > Task :react-native-fast-tflite:compileReleaseJavaWithJavac
@@ -738,6 +747,10 @@ Note: Some input files use or override a deprecated API.
 Note: Recompile with -Xlint:deprecation for details.
 
 > Task :react-native-fast-tflite:bundleLibRuntimeToDirRelease
+
+> Task :react-native-gesture-handler:compileReleaseKotlin
+w: file:///home/d/Desktop/jsmastery/node_modules/react-native-gesture-handler/android/src/main/java/com/swmansion/gesturehandler/react/RNGestureHandlerRootView.kt:41:43 The corresponding parameter in the supertype 'ReactViewGroup' is named 'ev'. This may cause problems when calling this function with named arguments.
+
 > Task :react-native-svg:bundleLibRuntimeToDirRelease
 > Task :react-native-worklets:bundleLibRuntimeToDirRelease
 > Task :clerk_expo:writeReleaseAarMetadata
@@ -746,7 +759,6 @@ Note: Recompile with -Xlint:deprecation for details.
 > Task :expo-modules-core:writeReleaseAarMetadata
 > Task :expo-sqlite:writeReleaseAarMetadata
 > Task :react-native-fast-tflite:writeReleaseAarMetadata
-> Task :react-native-gesture-handler:writeReleaseAarMetadata
 > Task :react-native-reanimated:writeReleaseAarMetadata
 > Task :react-native-safe-area-context:writeReleaseAarMetadata
 > Task :react-native-screens:writeReleaseAarMetadata
@@ -759,17 +771,19 @@ Note: Recompile with -Xlint:deprecation for details.
 > Task :expo:extractDeepLinksRelease
 > Task :expo:processReleaseManifest
 > Task :expo-constants:extractDeepLinksRelease
-> Task :expo-modules-core:compileReleaseKotlin
 > Task :expo-constants:processReleaseManifest
 > Task :expo-modules-core:extractDeepLinksRelease
+> Task :react-native-gesture-handler:compileReleaseJavaWithJavac
 
 > Task :expo-modules-core:processReleaseManifest
 /home/d/Desktop/jsmastery/node_modules/expo-modules-core/android/src/main/AndroidManifest.xml:8:9-11:45 Warning:
 	meta-data#com.facebook.soloader.enabled@android:value was tagged at AndroidManifest.xml:8 to replace other declarations but no other declaration present
 
 > Task :expo-sqlite:extractDeepLinksRelease
+> Task :react-native-gesture-handler:writeReleaseAarMetadata
 > Task :expo-sqlite:processReleaseManifest
 > Task :react-native-fast-tflite:extractDeepLinksRelease
+> Task :react-native-gesture-handler:bundleLibRuntimeToDirRelease
 
 > Task :react-native-fast-tflite:processReleaseManifest
 package="com.tflite" found in source AndroidManifest.xml: /home/d/Desktop/jsmastery/node_modules/react-native-fast-tflite/android/src/main/AndroidManifest.xml.
@@ -792,10 +806,6 @@ Recommendation: remove package="com.th3rdwave.safeareacontext" from the source A
 > Task :react-native-svg:extractDeepLinksRelease
 > Task :react-native-svg:processReleaseManifest
 > Task :react-native-webview:extractDeepLinksRelease
-
-> Task :react-native-gesture-handler:compileReleaseKotlin
-w: file:///home/d/Desktop/jsmastery/node_modules/react-native-gesture-handler/android/src/main/java/com/swmansion/gesturehandler/react/RNGestureHandlerRootView.kt:41:43 The corresponding parameter in the supertype 'ReactViewGroup' is named 'ev'. This may cause problems when calling this function with named arguments.
-
 > Task :react-native-webview:processReleaseManifest
 > Task :react-native-worklets:extractDeepLinksRelease
 > Task :react-native-worklets:processReleaseManifest
@@ -812,6 +822,7 @@ Recommendation: remove package="com.solanamobile.mobilewalletadapter.reactnative
 > Task :expo-modules-core:compileReleaseLibraryResources
 > Task :expo-sqlite:compileReleaseLibraryResources
 > Task :react-native-fast-tflite:compileReleaseLibraryResources
+> Task :react-native-gesture-handler:compileReleaseLibraryResources
 > Task :react-native-reanimated:compileReleaseLibraryResources
 > Task :react-native-safe-area-context:compileReleaseLibraryResources
 > Task :react-native-screens:compileReleaseLibraryResources
@@ -821,13 +832,11 @@ Recommendation: remove package="com.solanamobile.mobilewalletadapter.reactnative
 > Task :solana-mobile_mobile-wallet-adapter-protocol:compileReleaseLibraryResources
 > Task :clerk_expo:bundleLibCompileToJarRelease
 > Task :react-native-fast-tflite:bundleLibCompileToJarRelease
+> Task :react-native-gesture-handler:bundleLibCompileToJarRelease
 > Task :react-native-safe-area-context:bundleLibCompileToJarRelease
-> Task :react-native-gesture-handler:compileReleaseJavaWithJavac
 > Task :react-native-webview:bundleLibCompileToJarRelease
 > Task :solana-mobile_mobile-wallet-adapter-protocol:bundleLibCompileToJarRelease
 > Task :clerk_expo:prepareReleaseArtProfile
-> Task :react-native-gesture-handler:compileReleaseLibraryResources
-> Task :react-native-gesture-handler:bundleLibCompileToJarRelease
 > Task :expo:prepareReleaseArtProfile
 > Task :expo-constants:prepareReleaseArtProfile
 > Task :expo-modules-core:prepareReleaseArtProfile
@@ -837,7 +846,6 @@ Recommendation: remove package="com.solanamobile.mobilewalletadapter.reactnative
 > Task :react-native-reanimated:prepareReleaseArtProfile
 > Task :react-native-safe-area-context:prepareReleaseArtProfile
 > Task :react-native-screens:prepareReleaseArtProfile
-> Task :react-native-gesture-handler:bundleLibRuntimeToDirRelease
 > Task :react-native-svg:prepareReleaseArtProfile
 > Task :react-native-webview:prepareReleaseArtProfile
 > Task :react-native-worklets:prepareReleaseArtProfile
@@ -862,18 +870,18 @@ Recommendation: remove package="com.solanamobile.mobilewalletadapter.reactnative
 > Task :expo-constants:mergeReleaseShaders
 > Task :expo-constants:compileReleaseShaders NO-SOURCE
 > Task :expo-constants:generateReleaseAssets UP-TO-DATE
+> Task :expo-constants:mergeReleaseAssets
 > Task :expo-modules-core:mergeReleaseShaders
 > Task :expo-modules-core:compileReleaseShaders NO-SOURCE
 > Task :expo-modules-core:generateReleaseAssets UP-TO-DATE
 > Task :expo-modules-core:mergeReleaseAssets
-> Task :expo-constants:mergeReleaseAssets
 > Task :expo-sqlite:mergeReleaseShaders
-> Task :react-native-fast-tflite:mergeReleaseShaders
 > Task :expo-sqlite:compileReleaseShaders NO-SOURCE
 > Task :expo-sqlite:generateReleaseAssets UP-TO-DATE
+> Task :react-native-fast-tflite:mergeReleaseShaders
+> Task :expo-sqlite:mergeReleaseAssets
 > Task :react-native-fast-tflite:compileReleaseShaders NO-SOURCE
 > Task :react-native-fast-tflite:generateReleaseAssets UP-TO-DATE
-> Task :expo-sqlite:mergeReleaseAssets
 > Task :react-native-fast-tflite:mergeReleaseAssets
 > Task :react-native-gesture-handler:mergeReleaseShaders
 > Task :react-native-gesture-handler:compileReleaseShaders NO-SOURCE
@@ -881,39 +889,39 @@ Recommendation: remove package="com.solanamobile.mobilewalletadapter.reactnative
 > Task :react-native-reanimated:mergeReleaseShaders
 > Task :react-native-reanimated:compileReleaseShaders NO-SOURCE
 > Task :react-native-reanimated:generateReleaseAssets UP-TO-DATE
-> Task :react-native-gesture-handler:mergeReleaseAssets
-> Task :react-native-safe-area-context:mergeReleaseShaders
 > Task :react-native-reanimated:mergeReleaseAssets
+> Task :react-native-safe-area-context:mergeReleaseShaders
 > Task :react-native-safe-area-context:compileReleaseShaders NO-SOURCE
 > Task :react-native-safe-area-context:generateReleaseAssets UP-TO-DATE
-> Task :react-native-screens:mergeReleaseShaders
 > Task :react-native-safe-area-context:mergeReleaseAssets
+> Task :react-native-gesture-handler:mergeReleaseAssets
+> Task :react-native-screens:mergeReleaseShaders
 > Task :react-native-screens:compileReleaseShaders NO-SOURCE
 > Task :react-native-screens:generateReleaseAssets UP-TO-DATE
-> Task :react-native-screens:mergeReleaseAssets
 > Task :react-native-svg:mergeReleaseShaders
 > Task :react-native-svg:compileReleaseShaders NO-SOURCE
 > Task :react-native-svg:generateReleaseAssets UP-TO-DATE
+> Task :react-native-screens:mergeReleaseAssets
 > Task :react-native-webview:mergeReleaseShaders
 > Task :react-native-webview:compileReleaseShaders NO-SOURCE
 > Task :react-native-webview:generateReleaseAssets UP-TO-DATE
 > Task :react-native-webview:mergeReleaseAssets
 > Task :react-native-svg:mergeReleaseAssets
 > Task :react-native-worklets:mergeReleaseShaders
-> Task :react-native-worklets:compileReleaseShaders NO-SOURCE
-> Task :react-native-worklets:generateReleaseAssets UP-TO-DATE
 > Task :solana-mobile_mobile-wallet-adapter-protocol:mergeReleaseShaders
 > Task :solana-mobile_mobile-wallet-adapter-protocol:compileReleaseShaders NO-SOURCE
+> Task :react-native-worklets:compileReleaseShaders NO-SOURCE
 > Task :solana-mobile_mobile-wallet-adapter-protocol:generateReleaseAssets UP-TO-DATE
+> Task :react-native-worklets:generateReleaseAssets UP-TO-DATE
 > Task :react-native-worklets:mergeReleaseAssets
 > Task :solana-mobile_mobile-wallet-adapter-protocol:mergeReleaseAssets
 > Task :clerk_expo:processReleaseJavaRes
 > Task :expo:extractProguardFiles
 > Task :expo-constants:extractProguardFiles
-> Task :expo-modules-core:extractProguardFiles
 > Task :clerk_expo:createFullJarRelease
-> Task :expo-modules-core:prepareLintJarForPublish
+> Task :expo-modules-core:extractProguardFiles
 > Task :clerk_expo:extractProguardFiles
+> Task :expo-modules-core:prepareLintJarForPublish
 > Task :expo-constants:prepareLintJarForPublish
 > Task :expo-sqlite:extractProguardFiles
 > Task :expo-sqlite:prepareLintJarForPublish
@@ -921,59 +929,6 @@ Recommendation: remove package="com.solanamobile.mobilewalletadapter.reactnative
 > Task :react-native-fast-tflite:processReleaseJavaRes NO-SOURCE
 > Task :react-native-fast-tflite:createFullJarRelease
 > Task :react-native-fast-tflite:extractProguardFiles
-> Task :react-native-fast-tflite:generateReleaseLintModel
-> Task :react-native-fast-tflite:prepareLintJarForPublish
-> Task :react-native-gesture-handler:processReleaseJavaRes
-> Task :react-native-gesture-handler:createFullJarRelease
-> Task :react-native-gesture-handler:extractProguardFiles
-> Task :react-native-reanimated:processReleaseJavaRes NO-SOURCE
-> Task :react-native-reanimated:createFullJarRelease
-> Task :react-native-reanimated:extractProguardFiles
-> Task :react-native-worklets:processReleaseJavaRes NO-SOURCE
-> Task :react-native-worklets:createFullJarRelease
-> Task :react-native-worklets:extractProguardFiles
-> Task :react-native-worklets:generateReleaseLintModel
-> Task :react-native-worklets:prepareLintJarForPublish
-> Task :clerk_expo:generateReleaseLintModel
-> Task :clerk_expo:prepareLintJarForPublish
-> Task :react-native-svg:processReleaseJavaRes NO-SOURCE
-> Task :react-native-reanimated:generateReleaseLintModel
-> Task :react-native-reanimated:prepareLintJarForPublish
-> Task :react-native-svg:createFullJarRelease
-> Task :react-native-svg:extractProguardFiles
-> Task :react-native-gesture-handler:prepareLintJarForPublish
-> Task :react-native-svg:generateReleaseLintModel
-> Task :react-native-svg:prepareLintJarForPublish
-> Task :react-native-safe-area-context:processReleaseJavaRes
-> Task :react-native-safe-area-context:createFullJarRelease
-> Task :react-native-safe-area-context:extractProguardFiles
-> Task :react-native-safe-area-context:generateReleaseLintModel
-> Task :react-native-gesture-handler:generateReleaseLintModel
-> Task :react-native-safe-area-context:prepareLintJarForPublish
-> Task :react-native-screens:extractProguardFiles
-> Task :react-native-screens:prepareLintJarForPublish
-> Task :react-native-webview:processReleaseJavaRes
-> Task :solana-mobile_mobile-wallet-adapter-protocol:processReleaseJavaRes
-> Task :react-native-webview:createFullJarRelease
-> Task :react-native-webview:extractProguardFiles
-> Task :solana-mobile_mobile-wallet-adapter-protocol:createFullJarRelease
-> Task :solana-mobile_mobile-wallet-adapter-protocol:extractProguardFiles
-> Task :react-native-webview:generateReleaseLintModel
-> Task :react-native-webview:prepareLintJarForPublish
-> Task :clerk_expo:stripReleaseDebugSymbols NO-SOURCE
-> Task :solana-mobile_mobile-wallet-adapter-protocol:generateReleaseLintModel
-> Task :clerk_expo:copyReleaseJniLibsProjectAndLocalJars
-> Task :solana-mobile_mobile-wallet-adapter-protocol:prepareLintJarForPublish
-> Task :clerk_expo:extractDeepLinksForAarRelease
-> Task :clerk_expo:extractReleaseAnnotations
-> Task :clerk_expo:mergeReleaseGeneratedProguardFiles
-> Task :react-native-gesture-handler:stripReleaseDebugSymbols
-> Task :clerk_expo:mergeReleaseConsumerProguardFiles
-> Task :react-native-gesture-handler:copyReleaseJniLibsProjectAndLocalJars
-> Task :react-native-gesture-handler:extractDeepLinksForAarRelease
-> Task :react-native-gesture-handler:extractReleaseAnnotations
-> Task :react-native-gesture-handler:mergeReleaseGeneratedProguardFiles
-> Task :react-native-gesture-handler:mergeReleaseConsumerProguardFiles
 
 > Task :react-native-screens:compileReleaseKotlin
 w: file:///home/d/Desktop/jsmastery/node_modules/react-native-screens/android/src/main/java/com/swmansion/rnscreens/RNScreensPackage.kt:56:9 The corresponding parameter in the supertype 'BaseReactPackage' is named 'name'. This may cause problems when calling this function with named arguments.
@@ -1034,117 +989,657 @@ w: file:///home/d/Desktop/jsmastery/node_modules/react-native-screens/android/sr
 w: file:///home/d/Desktop/jsmastery/node_modules/react-native-screens/android/src/main/java/com/swmansion/rnscreens/bottomsheet/DimmingView.kt:69:9 The corresponding parameter in the supertype 'ReactCompoundViewGroup' is named 'touchY'. This may cause problems when calling this function with named arguments.
 w: file:///home/d/Desktop/jsmastery/node_modules/react-native-screens/android/src/main/java/com/swmansion/rnscreens/gamma/tabs/TabsHostViewManager.kt:37:9 The corresponding parameter in the supertype 'TabsHostViewManager' is named 'view'. This may cause problems when calling this function with named arguments.
 
+> Task :react-native-fast-tflite:generateReleaseLintModel
+> Task :react-native-fast-tflite:prepareLintJarForPublish
+> Task :clerk_expo:generateReleaseLintModel
+> Task :clerk_expo:prepareLintJarForPublish
+> Task :react-native-reanimated:processReleaseJavaRes NO-SOURCE
+> Task :react-native-gesture-handler:processReleaseJavaRes
+> Task :react-native-reanimated:createFullJarRelease
+> Task :react-native-reanimated:extractProguardFiles
+> Task :react-native-worklets:processReleaseJavaRes NO-SOURCE
+> Task :react-native-worklets:createFullJarRelease
+> Task :react-native-gesture-handler:createFullJarRelease
+> Task :react-native-gesture-handler:extractProguardFiles
+> Task :react-native-reanimated:prepareLintJarForPublish
+> Task :react-native-svg:processReleaseJavaRes NO-SOURCE
+> Task :react-native-worklets:extractProguardFiles
+> Task :react-native-svg:createFullJarRelease
+> Task :react-native-svg:extractProguardFiles
+> Task :react-native-worklets:generateReleaseLintModel
+> Task :react-native-worklets:prepareLintJarForPublish
+> Task :react-native-svg:generateReleaseLintModel
+> Task :react-native-svg:prepareLintJarForPublish
+> Task :react-native-gesture-handler:prepareLintJarForPublish
+> Task :react-native-safe-area-context:processReleaseJavaRes
+> Task :react-native-reanimated:generateReleaseLintModel
+> Task :react-native-safe-area-context:createFullJarRelease
+> Task :react-native-safe-area-context:extractProguardFiles
+> Task :react-native-gesture-handler:generateReleaseLintModel
+> Task :react-native-safe-area-context:generateReleaseLintModel
+> Task :react-native-webview:processReleaseJavaRes
+> Task :react-native-safe-area-context:prepareLintJarForPublish
+> Task :react-native-webview:createFullJarRelease
+> Task :solana-mobile_mobile-wallet-adapter-protocol:processReleaseJavaRes
+> Task :react-native-webview:extractProguardFiles
+> Task :solana-mobile_mobile-wallet-adapter-protocol:createFullJarRelease
+> Task :solana-mobile_mobile-wallet-adapter-protocol:extractProguardFiles
+> Task :react-native-webview:generateReleaseLintModel
+> Task :react-native-webview:prepareLintJarForPublish
+> Task :clerk_expo:stripReleaseDebugSymbols NO-SOURCE
+> Task :clerk_expo:copyReleaseJniLibsProjectAndLocalJars
+> Task :clerk_expo:extractDeepLinksForAarRelease
+> Task :solana-mobile_mobile-wallet-adapter-protocol:generateReleaseLintModel
+> Task :solana-mobile_mobile-wallet-adapter-protocol:prepareLintJarForPublish
+> Task :clerk_expo:extractReleaseAnnotations
+> Task :clerk_expo:mergeReleaseGeneratedProguardFiles
+> Task :clerk_expo:mergeReleaseConsumerProguardFiles
+> Task :react-native-gesture-handler:stripReleaseDebugSymbols
+> Task :react-native-gesture-handler:copyReleaseJniLibsProjectAndLocalJars
+> Task :react-native-gesture-handler:extractDeepLinksForAarRelease
+> Task :react-native-gesture-handler:extractReleaseAnnotations
+> Task :react-native-gesture-handler:mergeReleaseGeneratedProguardFiles
+> Task :react-native-gesture-handler:mergeReleaseConsumerProguardFiles
 > Task :clerk_expo:mergeReleaseJavaResource
 > Task :react-native-gesture-handler:mergeReleaseJavaResource
-> Task :react-native-gesture-handler:syncReleaseLibJars
 > Task :clerk_expo:syncReleaseLibJars
-> Task :react-native-safe-area-context:stripReleaseDebugSymbols NO-SOURCE
-> Task :react-native-safe-area-context:copyReleaseJniLibsProjectAndLocalJars
-> Task :react-native-safe-area-context:extractDeepLinksForAarRelease
-> Task :clerk_expo:bundleReleaseLocalLintAar
+> Task :react-native-gesture-handler:syncReleaseLibJars
 > Task :react-native-gesture-handler:bundleReleaseLocalLintAar
+> Task :clerk_expo:bundleReleaseLocalLintAar
+> Task :react-native-screens:compileReleaseJavaWithJavac
+> Task :react-native-safe-area-context:stripReleaseDebugSymbols NO-SOURCE
+> Task :react-native-webview:stripReleaseDebugSymbols NO-SOURCE
+> Task :react-native-safe-area-context:copyReleaseJniLibsProjectAndLocalJars
+> Task :react-native-webview:copyReleaseJniLibsProjectAndLocalJars
+> Task :react-native-webview:extractDeepLinksForAarRelease
+> Task :react-native-safe-area-context:extractDeepLinksForAarRelease
 > Task :react-native-safe-area-context:extractReleaseAnnotations
+> Task :react-native-webview:extractReleaseAnnotations
 > Task :react-native-safe-area-context:mergeReleaseGeneratedProguardFiles
 > Task :react-native-safe-area-context:mergeReleaseConsumerProguardFiles
-> Task :react-native-webview:stripReleaseDebugSymbols NO-SOURCE
+> Task :react-native-screens:processReleaseJavaRes
+> Task :react-native-screens:bundleLibCompileToJarRelease
+> Task :react-native-screens:extractProguardFiles
 > Task :react-native-safe-area-context:mergeReleaseJavaResource
-> Task :solana-mobile_mobile-wallet-adapter-protocol:stripReleaseDebugSymbols NO-SOURCE
-> Task :solana-mobile_mobile-wallet-adapter-protocol:copyReleaseJniLibsProjectAndLocalJars
-> Task :react-native-webview:copyReleaseJniLibsProjectAndLocalJars
-> Task :solana-mobile_mobile-wallet-adapter-protocol:extractDeepLinksForAarRelease
-> Task :react-native-webview:extractDeepLinksForAarRelease
-> Task :solana-mobile_mobile-wallet-adapter-protocol:extractReleaseAnnotations
-> Task :solana-mobile_mobile-wallet-adapter-protocol:mergeReleaseGeneratedProguardFiles
 > Task :react-native-safe-area-context:syncReleaseLibJars
-> Task :solana-mobile_mobile-wallet-adapter-protocol:mergeReleaseConsumerProguardFiles
-> Task :react-native-webview:extractReleaseAnnotations
+> Task :react-native-screens:bundleLibRuntimeToJarRelease
 > Task :react-native-webview:mergeReleaseGeneratedProguardFiles
 > Task :react-native-webview:mergeReleaseConsumerProguardFiles
 > Task :react-native-safe-area-context:bundleReleaseLocalLintAar
-> Task :solana-mobile_mobile-wallet-adapter-protocol:mergeReleaseJavaResource
-> Task :expo:stripReleaseDebugSymbols NO-SOURCE
-> Task :expo:copyReleaseJniLibsProjectAndLocalJars
-> Task :expo:extractDeepLinksForAarRelease
-> Task :solana-mobile_mobile-wallet-adapter-protocol:syncReleaseLibJars
 > Task :react-native-webview:mergeReleaseJavaResource
-> Task :solana-mobile_mobile-wallet-adapter-protocol:bundleReleaseLocalLintAar
-> Task :react-native-fast-tflite:extractDeepLinksForAarRelease
-> Task :react-native-fast-tflite:extractReleaseAnnotations
+> Task :solana-mobile_mobile-wallet-adapter-protocol:stripReleaseDebugSymbols NO-SOURCE
+> Task :solana-mobile_mobile-wallet-adapter-protocol:copyReleaseJniLibsProjectAndLocalJars
+> Task :solana-mobile_mobile-wallet-adapter-protocol:extractDeepLinksForAarRelease
 > Task :react-native-webview:syncReleaseLibJars
+> Task :solana-mobile_mobile-wallet-adapter-protocol:extractReleaseAnnotations
+> Task :solana-mobile_mobile-wallet-adapter-protocol:mergeReleaseGeneratedProguardFiles
+> Task :react-native-webview:bundleReleaseLocalLintAar
+> Task :solana-mobile_mobile-wallet-adapter-protocol:mergeReleaseConsumerProguardFiles
+> Task :react-native-screens:generateReleaseLintModel
+> Task :expo:stripReleaseDebugSymbols NO-SOURCE
+> Task :solana-mobile_mobile-wallet-adapter-protocol:mergeReleaseJavaResource
+> Task :solana-mobile_mobile-wallet-adapter-protocol:syncReleaseLibJars
+> Task :solana-mobile_mobile-wallet-adapter-protocol:bundleReleaseLocalLintAar
+> Task :react-native-screens:createFullJarRelease
+> Task :react-native-screens:prepareLintJarForPublish
+> Task :react-native-screens:extractDeepLinksForAarRelease
+> Task :react-native-screens:stripReleaseDebugSymbols
+> Task :expo:copyReleaseJniLibsProjectAndLocalJars
+> Task :react-native-screens:bundleLibRuntimeToDirRelease
+> Task :expo:extractDeepLinksForAarRelease
+> Task :react-native-screens:extractReleaseAnnotations
+> Task :react-native-fast-tflite:stripReleaseDebugSymbols
+> Task :react-native-screens:copyReleaseJniLibsProjectAndLocalJars
+> Task :react-native-screens:mergeReleaseGeneratedProguardFiles
+> Task :react-native-screens:mergeReleaseConsumerProguardFiles
+> Task :react-native-screens:mergeReleaseJavaResource
+> Task :react-native-screens:syncReleaseLibJars
+> Task :react-native-reanimated:stripReleaseDebugSymbols
+> Task :react-native-fast-tflite:copyReleaseJniLibsProjectAndLocalJars
+> Task :react-native-fast-tflite:extractDeepLinksForAarRelease
+> Task :react-native-screens:bundleReleaseLocalLintAar
+> Task :react-native-fast-tflite:extractReleaseAnnotations
 > Task :react-native-fast-tflite:mergeReleaseGeneratedProguardFiles
 > Task :react-native-fast-tflite:mergeReleaseConsumerProguardFiles
-> Task :react-native-fast-tflite:stripReleaseDebugSymbols
-> Task :react-native-webview:bundleReleaseLocalLintAar
 > Task :react-native-fast-tflite:mergeReleaseJavaResource
 > Task :react-native-fast-tflite:syncReleaseLibJars
-> Task :react-native-fast-tflite:copyReleaseJniLibsProjectAndLocalJars
+> Task :react-native-fast-tflite:bundleReleaseLocalLintAar
 > Task :react-native-reanimated:extractDeepLinksForAarRelease
 > Task :react-native-reanimated:extractReleaseAnnotations
 > Task :react-native-reanimated:mergeReleaseGeneratedProguardFiles
-> Task :react-native-fast-tflite:bundleReleaseLocalLintAar
 > Task :react-native-reanimated:mergeReleaseConsumerProguardFiles
+> Task :react-native-reanimated:mergeReleaseJavaResource
+> Task :react-native-reanimated:syncReleaseLibJars
 > Task :react-native-svg:stripReleaseDebugSymbols NO-SOURCE
 > Task :react-native-svg:copyReleaseJniLibsProjectAndLocalJars
 > Task :react-native-svg:extractDeepLinksForAarRelease
-> Task :react-native-reanimated:mergeReleaseJavaResource
 > Task :react-native-svg:extractReleaseAnnotations
-> Task :react-native-reanimated:syncReleaseLibJars
 > Task :react-native-svg:mergeReleaseGeneratedProguardFiles
 > Task :react-native-svg:mergeReleaseConsumerProguardFiles
 > Task :react-native-svg:mergeReleaseJavaResource
-> Task :react-native-worklets:stripReleaseDebugSymbols
+> Task :react-native-reanimated:copyReleaseJniLibsProjectAndLocalJars
 > Task :react-native-svg:syncReleaseLibJars
 > Task :react-native-svg:bundleReleaseLocalLintAar
+> Task :react-native-worklets:stripReleaseDebugSymbols
+> Task :react-native-worklets:copyReleaseJniLibsProjectAndLocalJars
 > Task :react-native-worklets:extractDeepLinksForAarRelease
 > Task :react-native-worklets:extractReleaseAnnotations
-> Task :react-native-worklets:copyReleaseJniLibsProjectAndLocalJars
 > Task :react-native-worklets:mergeReleaseGeneratedProguardFiles
-> Task :react-native-reanimated:stripReleaseDebugSymbols
 > Task :react-native-worklets:mergeReleaseConsumerProguardFiles
-> Task :expo-modules-core:stripReleaseDebugSymbols
 > Task :react-native-worklets:mergeReleaseJavaResource
+> Task :react-native-worklets:syncReleaseLibJars
+> Task :react-native-worklets:bundleReleaseLocalLintAar
+> Task :expo-modules-core:stripReleaseDebugSymbols
 > Task :expo-modules-core:copyReleaseJniLibsProjectAndLocalJars
 > Task :expo-modules-core:extractDeepLinksForAarRelease
-> Task :react-native-worklets:syncReleaseLibJars
 > Task :expo-constants:stripReleaseDebugSymbols NO-SOURCE
+> Task :react-native-reanimated:bundleReleaseLocalLintAar
 > Task :expo-constants:copyReleaseJniLibsProjectAndLocalJars
 > Task :expo-constants:extractDeepLinksForAarRelease
 > Task :expo-sqlite:stripReleaseDebugSymbols
 > Task :expo-sqlite:copyReleaseJniLibsProjectAndLocalJars
 > Task :expo-sqlite:extractDeepLinksForAarRelease
-> Task :react-native-reanimated:copyReleaseJniLibsProjectAndLocalJars
-> Task :react-native-worklets:bundleReleaseLocalLintAar
 > Task :clerk_expo:writeReleaseLintModelMetadata
 > Task :expo-constants:writeReleaseLintModelMetadata
 > Task :expo-modules-core:writeReleaseLintModelMetadata
 > Task :expo-sqlite:writeReleaseLintModelMetadata
 > Task :expo:writeReleaseLintModelMetadata
-> Task :react-native-screens:compileReleaseJavaWithJavac
-> Task :react-native-reanimated:bundleReleaseLocalLintAar
-> Task :react-native-screens:bundleLibRuntimeToDirRelease
-> Task :react-native-screens:bundleLibCompileToJarRelease
-> Task :react-native-screens:bundleLibRuntimeToJarRelease
-> Task :clerk_expo:lintVitalAnalyzeRelease
-> Task :react-native-fast-tflite:lintVitalAnalyzeRelease
-> Task :react-native-screens:processReleaseJavaRes
-> Task :react-native-screens:createFullJarRelease
-> Task :react-native-screens:generateReleaseLintModel
-> Task :react-native-screens:stripReleaseDebugSymbols
-> Task :react-native-screens:copyReleaseJniLibsProjectAndLocalJars
-> Task :react-native-screens:extractDeepLinksForAarRelease
-> Task :react-native-screens:extractReleaseAnnotations
-> Task :react-native-screens:mergeReleaseGeneratedProguardFiles
-> Task :react-native-screens:mergeReleaseConsumerProguardFiles
-> Task :react-native-screens:mergeReleaseJavaResource
 > Task :react-native-fast-tflite:writeReleaseLintModelMetadata
 > Task :react-native-reanimated:writeReleaseLintModelMetadata
 > Task :react-native-svg:writeReleaseLintModelMetadata
 > Task :react-native-worklets:writeReleaseLintModelMetadata
-> Task :react-native-screens:syncReleaseLibJars
-> Task :react-native-screens:bundleReleaseLocalLintAar
 > Task :react-native-gesture-handler:writeReleaseLintModelMetadata
+> Task :clerk_expo:lintVitalAnalyzeRelease
+> Task :react-native-fast-tflite:lintVitalAnalyzeRelease
 > Task :react-native-gesture-handler:lintVitalAnalyzeRelease
 > Task :react-native-reanimated:lintVitalAnalyzeRelease
 > Task :react-native-safe-area-context:writeReleaseLintModelMetadata
 > Task :react-native-safe-area-context:lintVitalAnalyzeRelease
 > Task :react-native-screens:lintVitalAnalyzeRelease
+> Task :react-native-screens:writeReleaseLintModelMetadata
+> Task :react-native-svg:lintVitalAnalyzeRelease
+> Task :react-native-webview:lintVitalAnalyzeRelease
+
+> Task :expo-modules-core:compileReleaseKotlin
+w: file:///home/d/Desktop/jsmastery/node_modules/expo-modules-core/android/src/main/java/expo/modules/adapters/react/apploader/RNHeadlessAppLoader.kt:48:87 'val reactNativeHost: ReactNativeHost' is deprecated. You should not use ReactNativeHost directly in the New Architecture. Use ReactHost instead.
+w: file:///home/d/Desktop/jsmastery/node_modules/expo-modules-core/android/src/main/java/expo/modules/adapters/react/apploader/RNHeadlessAppLoader.kt:91:85 'val reactNativeHost: ReactNativeHost' is deprecated. You should not use ReactNativeHost directly in the New Architecture. Use ReactHost instead.
+w: file:///home/d/Desktop/jsmastery/node_modules/expo-modules-core/android/src/main/java/expo/modules/adapters/react/apploader/RNHeadlessAppLoader.kt:120:83 'val reactNativeHost: ReactNativeHost' is deprecated. You should not use ReactNativeHost directly in the New Architecture. Use ReactHost instead.
+w: file:///home/d/Desktop/jsmastery/node_modules/expo-modules-core/android/src/main/java/expo/modules/apploader/AppLoaderProvider.kt:34:52 Unchecked cast of 'Class<*>!' to 'Class<out HeadlessAppLoader>'.
+w: file:///home/d/Desktop/jsmastery/node_modules/expo-modules-core/android/src/main/java/expo/modules/kotlin/AppContext.kt:30:8 'typealias ErrorManagerModule = JSLoggerModule' is deprecated. Use JSLoggerModule instead.
+w: file:///home/d/Desktop/jsmastery/node_modules/expo-modules-core/android/src/main/java/expo/modules/kotlin/AppContext.kt:253:21 'typealias ErrorManagerModule = JSLoggerModule' is deprecated. Use JSLoggerModule instead.
+w: file:///home/d/Desktop/jsmastery/node_modules/expo-modules-core/android/src/main/java/expo/modules/kotlin/AppContext.kt:343:21 'val DEFAULT: Int' is deprecated. UIManagerType.DEFAULT will be deleted in the next release of React Native. Use [LEGACY] instead.
+w: file:///home/d/Desktop/jsmastery/node_modules/expo-modules-core/android/src/main/java/expo/modules/kotlin/defaultmodules/NativeModulesProxyModule.kt:16:5 'fun Constants(legacyConstantsProvider: () -> Map<String, Any?>): Unit' is deprecated. Use `Constant` or `Property` instead.
+w: file:///home/d/Desktop/jsmastery/node_modules/expo-modules-core/android/src/main/java/expo/modules/kotlin/jni/PromiseImpl.kt:65:51 'val errorManager: JSLoggerModule?' is deprecated. Use AppContext.jsLogger instead.
+w: file:///home/d/Desktop/jsmastery/node_modules/expo-modules-core/android/src/main/java/expo/modules/kotlin/jni/PromiseImpl.kt:69:22 'fun reportExceptionToLogBox(codedException: CodedException): Unit' is deprecated. Use appContext.jsLogger.error(...) instead.
+w: file:///home/d/Desktop/jsmastery/node_modules/expo-modules-core/android/src/main/java/expo/modules/kotlin/views/ViewDefinitionBuilder.kt:464:16 'val errorManager: JSLoggerModule?' is deprecated. Use AppContext.jsLogger instead.
+w: file:///home/d/Desktop/jsmastery/node_modules/expo-modules-core/android/src/main/java/expo/modules/kotlin/views/ViewDefinitionBuilder.kt:464:30 'fun reportExceptionToLogBox(codedException: CodedException): Unit' is deprecated. Use appContext.jsLogger.error(...) instead.
+w: file:///home/d/Desktop/jsmastery/node_modules/expo-modules-core/android/src/main/java/expo/modules/kotlin/views/ViewManagerDefinition.kt:41:16 'val errorManager: JSLoggerModule?' is deprecated. Use AppContext.jsLogger instead.
+w: file:///home/d/Desktop/jsmastery/node_modules/expo-modules-core/android/src/main/java/expo/modules/kotlin/views/ViewManagerDefinition.kt:41:30 'fun reportExceptionToLogBox(codedException: CodedException): Unit' is deprecated. Use appContext.jsLogger.error(...) instead.
+
+> Task :expo-modules-core:compileReleaseJavaWithJavac
+Note: Some input files use or override a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+
+> Task :expo-modules-core:bundleLibCompileToJarRelease
+> Task :app:mergeReleaseNativeLibs
+
+> Task :expo-constants:compileReleaseKotlin
+w: file:///home/d/Desktop/jsmastery/node_modules/expo-constants/android/src/main/java/expo/modules/constants/ConstantsModule.kt:12:5 'fun Constants(legacyConstantsProvider: () -> Map<String, Any?>): Unit' is deprecated. Use `Constant` or `Property` instead.
+
+> Task :app:stripReleaseDebugSymbols
+> Task :expo-constants:compileReleaseJavaWithJavac
+> Task :expo-sqlite:compileReleaseKotlin
+> Task :expo-constants:bundleLibCompileToJarRelease
+> Task :expo-constants:bundleLibRuntimeToDirRelease
+> Task :app:extractReleaseNativeSymbolTables
+> Task :expo-modules-core:bundleLibRuntimeToDirRelease
+> Task :expo-sqlite:compileReleaseJavaWithJavac
+> Task :app:checkReleaseDuplicateClasses
+> Task :expo-modules-core:bundleLibRuntimeToJarRelease
+> Task :expo-sqlite:bundleLibCompileToJarRelease
+> Task :app:buildKotlinToolingMetadata
+> Task :expo-sqlite:bundleLibRuntimeToDirRelease
+> Task :app:mergeReleaseNativeDebugMetadata
+> Task :expo:compileReleaseKotlin
+> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :app:generateReleaseBuildConfig
+> Task :app:checkReleaseAarMetadata
+
+> Task :expo:compileReleaseKotlin
+w: file:///home/d/Desktop/jsmastery/node_modules/expo/android/src/main/java/expo/modules/ExpoModulesPackage.kt:34:16 This declaration overrides a deprecated member but is not marked as deprecated itself. Add the '@Deprecated' annotation or suppress the diagnostic.
+w: file:///home/d/Desktop/jsmastery/node_modules/expo/android/src/main/java/expo/modules/ExpoReactHostFactory.kt:8:8 'class ReactNativeHost : Any' is deprecated. Deprecated in Java.
+w: file:///home/d/Desktop/jsmastery/node_modules/expo/android/src/main/java/expo/modules/ExpoReactHostFactory.kt:80:22 'class ReactNativeHost : Any' is deprecated. Deprecated in Java.
+w: file:///home/d/Desktop/jsmastery/node_modules/expo/android/src/main/java/expo/modules/ReactActivityDelegateWrapper.kt:24:8 'class ReactNativeHost : Any' is deprecated. Deprecated in Java.
+w: file:///home/d/Desktop/jsmastery/node_modules/expo/android/src/main/java/expo/modules/ReactActivityDelegateWrapper.kt:58:33 'class ReactNativeHost : Any' is deprecated. Deprecated in Java.
+w: file:///home/d/Desktop/jsmastery/node_modules/expo/android/src/main/java/expo/modules/ReactActivityDelegateWrapper.kt:105:16 This declaration overrides a deprecated member but is not marked as deprecated itself. Add the '@Deprecated' annotation or suppress the diagnostic.
+w: file:///home/d/Desktop/jsmastery/node_modules/expo/android/src/main/java/expo/modules/ReactActivityDelegateWrapper.kt:105:38 'class ReactNativeHost : Any' is deprecated. Deprecated in Java.
+w: file:///home/d/Desktop/jsmastery/node_modules/expo/android/src/main/java/expo/modules/ReactActivityDelegateWrapper.kt:113:16 This declaration overrides a deprecated member but is not marked as deprecated itself. Add the '@Deprecated' annotation or suppress the diagnostic.
+w: file:///home/d/Desktop/jsmastery/node_modules/expo/android/src/main/java/expo/modules/ReactActivityDelegateWrapper.kt:114:21 'val reactInstanceManager: ReactInstanceManager' is deprecated. Deprecated in Java.
+w: file:///home/d/Desktop/jsmastery/node_modules/expo/android/src/main/java/expo/modules/ReactActivityDelegateWrapper.kt:168:36 'constructor(activity: Activity, reactNativeHost: ReactNativeHost?, appKey: String?, launchOptions: Bundle?, fabricEnabled: Boolean): ReactDelegate' is deprecated. Deprecated since 0.81.0, use one of the other constructors instead.
+w: file:///home/d/Desktop/jsmastery/node_modules/expo/android/src/main/java/expo/modules/ReactActivityDelegateWrapper.kt:279:77 'val reactInstanceManager: ReactInstanceManager' is deprecated. Deprecated in Java.
+w: file:///home/d/Desktop/jsmastery/node_modules/expo/android/src/main/java/expo/modules/ReactActivityDelegateWrapper.kt:282:22 'val reactInstanceManager: ReactInstanceManager' is deprecated. Deprecated in Java.
+w: file:///home/d/Desktop/jsmastery/node_modules/expo/android/src/main/java/expo/modules/ReactActivityDelegateWrapper.kt:286:54 'val reactInstanceManager: ReactInstanceManager' is deprecated. Deprecated in Java.
+w: file:///home/d/Desktop/jsmastery/node_modules/expo/android/src/main/java/expo/modules/ReactNativeHostWrapper.kt:6:8 'class ReactNativeHost : Any' is deprecated. Deprecated in Java.
+w: file:///home/d/Desktop/jsmastery/node_modules/expo/android/src/main/java/expo/modules/ReactNativeHostWrapper.kt:15:9 'class ReactNativeHost : Any' is deprecated. Deprecated in Java.
+w: file:///home/d/Desktop/jsmastery/node_modules/expo/android/src/main/java/expo/modules/ReactNativeHostWrapper.kt:47:60 'class ReactNativeHost : Any' is deprecated. Deprecated in Java.
+w: file:///home/d/Desktop/jsmastery/node_modules/expo/android/src/main/java/expo/modules/ReactNativeHostWrapperBase.kt:7:8 'class ReactNativeHost : Any' is deprecated. Deprecated in Java.
+w: file:///home/d/Desktop/jsmastery/node_modules/expo/android/src/main/java/expo/modules/ReactNativeHostWrapperBase.kt:16:23 'class ReactNativeHost : Any' is deprecated. Deprecated in Java.
+w: file:///home/d/Desktop/jsmastery/node_modules/expo/android/src/main/java/expo/modules/ReactNativeHostWrapperBase.kt:89:16 'class ReactNativeHost : Any' is deprecated. Deprecated in Java.
+w: file:///home/d/Desktop/jsmastery/node_modules/expo/android/src/main/java/expo/modules/ReactNativeHostWrapperBase.kt:101:38 'class ReactNativeHost : Any' is deprecated. Deprecated in Java.
+w: file:///home/d/Desktop/jsmastery/node_modules/expo/android/src/main/java/expo/modules/fetch/ExpoFetchModule.kt:30:39 'constructor(reactContext: ReactContext): ForwardingCookieHandler' is deprecated. Use the default constructor.
+w: file:///home/d/Desktop/jsmastery/node_modules/expo/android/src/main/java/expo/modules/fetch/NativeResponse.kt:42:16 This declaration overrides a deprecated member but is not marked as deprecated itself. Add the '@Deprecated' annotation or suppress the diagnostic.
+w: file:///home/d/Desktop/jsmastery/node_modules/expo/android/src/main/java/expo/modules/fetch/NativeResponse.kt:44:11 'fun deallocate(): Unit' is deprecated. Use sharedObjectDidRelease() instead.
+
+> Task :expo:compileReleaseJavaWithJavac
+> Task :expo:bundleLibRuntimeToDirRelease
+> Task :expo:bundleLibCompileToJarRelease
+> Task :expo:bundleLibRuntimeToJarRelease
+> Task :expo-constants:bundleLibRuntimeToJarRelease
+> Task :app:createBundleReleaseJsAndAssets
+> Task :expo-sqlite:bundleLibRuntimeToJarRelease
+> Task :expo:processReleaseJavaRes
+> Task :expo:createFullJarRelease
+> Task :expo-constants:processReleaseJavaRes
+> Task :expo-constants:createFullJarRelease
+> Task :expo-modules-core:processReleaseJavaRes
+> Task :expo-modules-core:createFullJarRelease
+> Task :expo-modules-core:generateReleaseLintModel
+> Task :expo-constants:generateReleaseLintModel
+> Task :expo-sqlite:processReleaseJavaRes
+
+> Task :app:createBundleReleaseJsAndAssets
+env: load .env
+env: export EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY POSTHOG_PROJECT_TOKEN POSTHOG_HOST
+
+> Task :expo-sqlite:createFullJarRelease
+> Task :expo-sqlite:generateReleaseLintModel
+
+> Task :app:createBundleReleaseJsAndAssets
+✅ Clerk iOS plugin loaded
+
+> Task :expo:generateReleaseLintModel
+> Task :expo:extractReleaseAnnotations
+> Task :expo:mergeReleaseGeneratedProguardFiles
+> Task :expo:mergeReleaseConsumerProguardFiles
+> Task :expo:mergeReleaseJavaResource
+> Task :expo:syncReleaseLibJars
+> Task :expo:bundleReleaseLocalLintAar
+> Task :expo-modules-core:extractReleaseAnnotations
+> Task :expo-modules-core:mergeReleaseGeneratedProguardFiles
+> Task :expo-modules-core:mergeReleaseConsumerProguardFiles
+> Task :expo-modules-core:mergeReleaseJavaResource
+
+> Task :app:createBundleReleaseJsAndAssets
+✅ Clerk Android plugin loaded
+✅ Clerk iOS plugin loaded
+✅ Clerk Android plugin loaded
+React Compiler enabled
+
+> Task :expo-modules-core:syncReleaseLibJars
+> Task :expo-modules-core:bundleReleaseLocalLintAar
+> Task :expo-constants:extractReleaseAnnotations
+> Task :expo-constants:mergeReleaseGeneratedProguardFiles
+
+> Task :app:createBundleReleaseJsAndAssets
+Starting Metro Bundler
+
+> Task :expo-constants:mergeReleaseConsumerProguardFiles
+> Task :expo-constants:mergeReleaseJavaResource
+> Task :expo-constants:syncReleaseLibJars
+> Task :expo-constants:bundleReleaseLocalLintAar
+> Task :expo-sqlite:extractReleaseAnnotations
+> Task :expo-sqlite:mergeReleaseGeneratedProguardFiles
+> Task :expo-sqlite:mergeReleaseConsumerProguardFiles
+> Task :expo-sqlite:mergeReleaseJavaResource
+
+> Task :app:createBundleReleaseJsAndAssets
+warning: Bundler cache is empty, rebuilding (this may take a minute)
+✅ Clerk iOS plugin loaded
+✅ Clerk Android plugin loaded
+
+> Task :expo-sqlite:syncReleaseLibJars
+> Task :expo-sqlite:bundleReleaseLocalLintAar
+> Task :expo-constants:lintVitalAnalyzeRelease
+> Task :expo:lintVitalAnalyzeRelease
+> Task :expo-modules-core:lintVitalAnalyzeRelease
+> Task :expo-sqlite:lintVitalAnalyzeRelease
+> Task :react-native-webview:writeReleaseLintModelMetadata
+> Task :react-native-worklets:lintVitalAnalyzeRelease
+> Task :solana-mobile_mobile-wallet-adapter-protocol:writeReleaseLintModelMetadata
+> Task :clerk_expo:generateReleaseLintVitalModel
+> Task :expo:generateReleaseLintVitalModel
+> Task :expo-constants:generateReleaseLintVitalModel
+> Task :expo-modules-core:generateReleaseLintVitalModel
+> Task :expo-sqlite:generateReleaseLintVitalModel
+> Task :react-native-fast-tflite:generateReleaseLintVitalModel
+> Task :react-native-gesture-handler:generateReleaseLintVitalModel
+> Task :react-native-reanimated:generateReleaseLintVitalModel
+> Task :react-native-safe-area-context:generateReleaseLintVitalModel
+> Task :react-native-screens:generateReleaseLintVitalModel
+> Task :react-native-webview:generateReleaseLintVitalModel
+> Task :react-native-svg:generateReleaseLintVitalModel
+> Task :react-native-worklets:generateReleaseLintVitalModel
+> Task :solana-mobile_mobile-wallet-adapter-protocol:generateReleaseLintVitalModel
+> Task :clerk_expo:bundleReleaseAar
+> Task :expo:bundleReleaseAar
+> Task :expo:mapReleaseSourceSetPaths
+> Task :clerk_expo:mapReleaseSourceSetPaths
+> Task :expo-constants:bundleReleaseAar
+> Task :expo-constants:mapReleaseSourceSetPaths
+
+> Task :app:createBundleReleaseJsAndAssets
+Android node_modules/expo-router/entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+
+> Task :expo-constants:mergeReleaseResources
+> Task :solana-mobile_mobile-wallet-adapter-protocol:lintVitalAnalyzeRelease
+> Task :expo-constants:verifyReleaseResources
+> Task :expo-constants:assembleRelease
+> Task :expo-modules-core:bundleReleaseAar
+
+> Task :app:createBundleReleaseJsAndAssets
+Android node_modules/expo-router/entry.js ░░░░░░░░░░░░░░░░  1.0% (1/1)
+
+> Task :expo-modules-core:mapReleaseSourceSetPaths
+
+> Task :app:createBundleReleaseJsAndAssets
+Android node_modules/expo-router/entry.js ▓▓░░░░░░░░░░░░░░ 16.0% ( 4/13)
+
+> Task :expo-sqlite:bundleReleaseAar
+> Task :expo-sqlite:mapReleaseSourceSetPaths
+> Task :expo-sqlite:mergeReleaseResources
+> Task :expo-sqlite:verifyReleaseResources
+> Task :expo-sqlite:assembleRelease
+> Task :react-native-fast-tflite:bundleReleaseAar
+> Task :react-native-fast-tflite:mapReleaseSourceSetPaths
+
+> Task :app:createBundleReleaseJsAndAssets
+Android node_modules/expo-router/entry.js ▓▓░░░░░░░░░░░░░░ 16.0% ( 5/15)
+Android node_modules/expo-router/entry.js ▓▓░░░░░░░░░░░░░░ 16.0% ( 6/15)
+Android node_modules/expo-router/entry.js ▓▓▓░░░░░░░░░░░░░ 21.8% ( 8/25)
+Android node_modules/expo-router/entry.js ▓▓▓░░░░░░░░░░░░░ 21.8% (17/56)
+Android node_modules/expo-router/entry.js ▓▓▓░░░░░░░░░░░░░ 21.8% ( 38/129)
+
+> Task :expo:mergeReleaseResources
+> Task :clerk_expo:mergeReleaseResources
+> Task :expo-modules-core:mergeReleaseResources
+> Task :react-native-fast-tflite:mergeReleaseResources
+
+> Task :app:createBundleReleaseJsAndAssets
+Android node_modules/expo-router/entry.js ▓▓▓░░░░░░░░░░░░░ 21.8% ( 67/163)
+Android node_modules/expo-router/entry.js ▓▓▓░░░░░░░░░░░░░ 21.8% ( 91/208)
+Android node_modules/expo-router/entry.js ▓▓▓▓░░░░░░░░░░░░ 25.7% (116/229)
+Android node_modules/expo-router/entry.js ▓▓▓▓░░░░░░░░░░░░ 29.8% (132/315)
+Android node_modules/expo-router/entry.js ▓▓▓▓░░░░░░░░░░░░ 29.8% (159/350)
+Android node_modules/expo-router/entry.js ▓▓▓▓░░░░░░░░░░░░ 29.8% (188/389)
+Android node_modules/expo-router/entry.js ▓▓▓▓░░░░░░░░░░░░ 29.8% (218/428)
+Android node_modules/expo-router/entry.js ▓▓▓▓░░░░░░░░░░░░ 29.8% (236/449)
+Android node_modules/expo-router/entry.js ▓▓▓▓░░░░░░░░░░░░ 29.8% (251/482)
+Android node_modules/expo-router/entry.js ▓▓▓▓░░░░░░░░░░░░ 30.5% (276/500)
+Android node_modules/expo-router/entry.js ▓▓▓▓▓░░░░░░░░░░░ 33.5% (301/520)
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓░░░░░░░░░░ 38.6% (331/533)
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓░░░░░░░░░░ 43.2% (367/561)
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓░░░░░░░░░ 44.4% (376/599)
+
+> Task :expo-modules-core:verifyReleaseResources
+> Task :react-native-fast-tflite:verifyReleaseResources
+> Task :expo:verifyReleaseResources
+> Task :react-native-fast-tflite:assembleRelease
+
+> Task :app:createBundleReleaseJsAndAssets
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓░░░░░░░░░ 44.4% (377/599)
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓░░░░░░░░░ 44.4% (377/608)
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓░░░░░░░░░ 44.4% (378/608)
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓░░░░░░░░░ 44.4% (382/622)
+
+> Task :react-native-gesture-handler:bundleReleaseAar
+> Task :react-native-gesture-handler:mapReleaseSourceSetPaths
+> Task :expo-modules-core:assembleRelease
+
+> Task :app:createBundleReleaseJsAndAssets
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓░░░░░░░░░ 44.4% (395/648)
+
+> Task :clerk_expo:verifyReleaseResources
+> Task :expo:assembleRelease
+> Task :react-native-safe-area-context:bundleReleaseAar
+
+> Task :app:createBundleReleaseJsAndAssets
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓░░░░░░░░░ 44.4% (418/669)
+
+> Task :react-native-safe-area-context:mapReleaseSourceSetPaths
+
+> Task :app:createBundleReleaseJsAndAssets
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓░░░░░░░░░ 44.4% (445/674)
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓░░░░░░░░░ 45.3% (472/702)
+
+> Task :clerk_expo:assembleRelease
+> Task :react-native-screens:bundleReleaseAar
+
+> Task :app:createBundleReleaseJsAndAssets
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓░░░░░░░░░ 46.1% (506/745)
+
+> Task :react-native-screens:mapReleaseSourceSetPaths
+
+> Task :app:createBundleReleaseJsAndAssets
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓░░░░░░░░ 51.5% (555/773)
+
+> Task :react-native-gesture-handler:mergeReleaseResources
+
+> Task :app:createBundleReleaseJsAndAssets
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓░░░░░░░░ 54.5% (584/794)
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓░░░░░░░░ 55.1% (601/826)
+
+> Task :react-native-safe-area-context:mergeReleaseResources
+
+> Task :app:createBundleReleaseJsAndAssets
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓░░░░░░░░ 55.1% (604/834)
+
+> Task :react-native-reanimated:bundleReleaseAar
+
+> Task :app:createBundleReleaseJsAndAssets
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓░░░░░░░░ 55.1% (613/872)
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓░░░░░░░░ 55.1% (616/875)
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓░░░░░░░░ 55.1% (630/885)
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓░░░░░░░░ 55.1% (656/903)
+
+> Task :react-native-screens:mergeReleaseResources
+> Task :react-native-reanimated:mapReleaseSourceSetPaths
+
+> Task :app:createBundleReleaseJsAndAssets
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓░░░░░░░░ 55.1% (673/916)
+
+> Task :react-native-gesture-handler:verifyReleaseResources
+> Task :react-native-gesture-handler:assembleRelease
+> Task :react-native-svg:bundleReleaseAar
+> Task :react-native-svg:mapReleaseSourceSetPaths
+
+> Task :app:createBundleReleaseJsAndAssets
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓░░░░░░░░ 55.1% (680/921)
+
+> Task :react-native-safe-area-context:verifyReleaseResources
+> Task :react-native-safe-area-context:assembleRelease
+> Task :react-native-webview:bundleReleaseAar
+> Task :react-native-webview:mapReleaseSourceSetPaths
+
+> Task :app:createBundleReleaseJsAndAssets
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓░░░░░░░ 56.5% (694/923)
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓░░░░░░░ 58.3% (714/935)
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓░░░░░░ 65.2% (771/955)
+
+> Task :react-native-reanimated:mergeReleaseResources
+
+> Task :app:createBundleReleaseJsAndAssets
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓░░░░░ 71.2% (814/965)
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓░░░░░ 74.9% ( 867/1018)
+
+> Task :react-native-svg:mergeReleaseResources
+
+> Task :app:createBundleReleaseJsAndAssets
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓░░░░░ 74.9% ( 881/1064)
+
+> Task :react-native-webview:mergeReleaseResources
+
+> Task :app:createBundleReleaseJsAndAssets
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓░░░░░ 74.9% ( 918/1098)
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓░░░░░ 74.9% ( 943/1108)
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓░░░░░ 74.9% ( 951/1113)
+
+> Task :react-native-screens:verifyReleaseResources
+> Task :react-native-reanimated:verifyReleaseResources
+> Task :react-native-svg:verifyReleaseResources
+> Task :react-native-reanimated:assembleRelease
+
+> Task :app:createBundleReleaseJsAndAssets
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓░░░░░ 74.9% ( 957/1118)
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓░░░░░ 74.9% ( 967/1124)
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓░░░░░ 74.9% ( 968/1124)
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓░░░░░ 74.9% ( 977/1150)
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓░░░░ 75.8% (1010/1160)
+
+> Task :react-native-webview:verifyReleaseResources
+> Task :react-native-webview:assembleRelease
+> Task :solana-mobile_mobile-wallet-adapter-protocol:bundleReleaseAar
+
+> Task :app:createBundleReleaseJsAndAssets
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓░░░░ 77.3% (1032/1174)
+
+> Task :react-native-svg:assembleRelease
+> Task :solana-mobile_mobile-wallet-adapter-protocol:mapReleaseSourceSetPaths
+> Task :react-native-screens:assembleRelease
+
+> Task :app:createBundleReleaseJsAndAssets
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓░░░░ 79.4% (1061/1203)
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓░░░░ 79.4% (1104/1251)
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓░░░░ 80.0% (1142/1277)
+
+> Task :react-native-worklets:bundleReleaseAar
+> Task :react-native-worklets:mapReleaseSourceSetPaths
+
+> Task :app:createBundleReleaseJsAndAssets
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░ 82.4% (1170/1290)
+
+> Task :solana-mobile_mobile-wallet-adapter-protocol:mergeReleaseResources
+
+> Task :app:createBundleReleaseJsAndAssets
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░ 82.6% (1188/1308)
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░ 83.9% (1218/1338)
+
+> Task :react-native-worklets:mergeReleaseResources
+
+> Task :app:createBundleReleaseJsAndAssets
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░ 83.9% (1257/1375)
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░ 84.8% (1291/1402)
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░ 85.7% (1308/1419)
+
+> Task :solana-mobile_mobile-wallet-adapter-protocol:verifyReleaseResources
+> Task :solana-mobile_mobile-wallet-adapter-protocol:assembleRelease
+
+> Task :app:createBundleReleaseJsAndAssets
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░ 86.3% (1325/1426)
+
+> Task :react-native-worklets:verifyReleaseResources
+> Task :react-native-worklets:assembleRelease
+
+> Task :app:createBundleReleaseJsAndAssets
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░ 87.1% (1331/1426)
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░ 87.8% (1337/1427)
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░ 87.9% (1367/1510)
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░ 87.9% (1387/1517)
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░ 87.9% (1405/1519)
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░ 87.9% (1433/1534)
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░ 87.9% (1443/1554)
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░ 87.9% (1445/1571)
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░ 87.9% (1471/1606)
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░ 87.9% (1503/1616)
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░ 87.9% (1533/1652)
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░ 87.9% (1540/1669)
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░ 87.9% (1552/1683)
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░ 87.9% (1566/1690)
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░ 87.9% (1589/1729)
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░ 87.9% (1625/1751)
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░ 87.9% (1651/1814)
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░ 87.9% (1668/1833)
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░ 87.9% (1693/1841)
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░ 87.9% (1697/1841)
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░ 87.9% (1706/1842)
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░ 88.6% (1735/1843)
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░ 92.8% (1780/1848)
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 94.4% (1817/1903)
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 94.4% (1868/1980)
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 94.4% (1910/1987)
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 96.1% (1975/2015)
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 96.9% (2020/2058)
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 99.1% (2066/2075)
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 99.9% (2083/2083)
+Android Bundled 358561ms node_modules/expo-router/entry.js (2083 modules)
+Android node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 99.9% (2083/2083)
+Writing bundle output to: /home/d/Desktop/jsmastery/android/app/build/generated/assets/createBundleReleaseJsAndAssets/index.android.bundle
+Writing sourcemap output to: /home/d/Desktop/jsmastery/android/app/build/intermediates/sourcemaps/react/release/index.android.bundle.packager.map
+Copying 80 asset files
+Done writing bundle output
+Done writing sourcemap output
+
+> Task :app:generateReleaseResValues
+> Task :app:mapReleaseSourceSetPaths
+> Task :app:generateReleaseResources
+> Task :app:packageReleaseResources
+> Task :app:createReleaseCompatibleScreenManifests
+> Task :app:extractDeepLinksRelease
+> Task :app:parseReleaseLocalResources
+> Task :app:mergeReleaseResources
+
+> Task :app:processReleaseMainManifest
+/home/d/Desktop/jsmastery/android/app/src/main/AndroidManifest.xml Warning:
+	provider#expo.modules.filesystem.FileSystemFileProvider@android:authorities was tagged at AndroidManifest.xml:0 to replace other declarations but no other declaration present
+
+> Task :app:processReleaseManifest
+> Task :app:javaPreCompileRelease
+> Task :app:desugarReleaseFileDependencies
+> Task :app:processReleaseManifestForPackage
+> Task :app:mergeReleaseStartupProfile
+> Task :app:mergeReleaseShaders
+> Task :app:compileReleaseShaders NO-SOURCE
+> Task :app:generateReleaseAssets UP-TO-DATE
+> Task :app:mergeReleaseArtProfile
+> Task :app:mergeReleaseAssets
+> Task :app:compressReleaseAssets
+> Task :app:extractReleaseVersionControlInfo
+> Task :app:extractProguardFiles
+> Task :app:processReleaseResources
+> Task :app:collectReleaseDependencies
+> Task :app:mergeExtDexRelease
+> Task :app:sdkReleaseDependencyData
+> Task :app:validateSigningRelease
+> Task :app:writeReleaseAppMetadata
+> Task :app:writeReleaseSigningConfigVersions
+> Task :app:optimizeReleaseResources
+
+> Task :app:compileReleaseKotlin
+w: file:///home/d/Desktop/jsmastery/android/app/src/main/java/com/ctocrm/jsmastery/MainApplication.kt:9:8 'class ReactNativeHost : Any' is deprecated. Deprecated in Java.
+w: file:///home/d/Desktop/jsmastery/android/app/src/main/java/com/ctocrm/jsmastery/MainApplication.kt:21:16 This declaration overrides a deprecated member but is not marked as deprecated itself. Add the '@Deprecated' annotation or suppress the diagnostic.
+w: file:///home/d/Desktop/jsmastery/android/app/src/main/java/com/ctocrm/jsmastery/MainApplication.kt:21:33 'class ReactNativeHost : Any' is deprecated. Deprecated in Java.
+
+> Task :app:compileReleaseJavaWithJavac
+> Task :app:dexBuilderRelease
+> Task :app:mergeReleaseGlobalSynthetics
+> Task :app:generateReleaseLintVitalReportModel
+> Task :app:processReleaseJavaRes
+> Task :app:lintVitalAnalyzeRelease
+> Task :app:lintVitalReportRelease
+> Task :app:lintVitalRelease
+> Task :app:mergeReleaseJavaResource
+> Task :app:mergeDexRelease
+> Task :app:compileReleaseArtProfile
+> Task :app:packageRelease
+> Task :app:createReleaseApkListingFileRedirect
+> Task :app:assembleRelease
+
+[Incubating] Problems report is available at: file:///home/d/Desktop/jsmastery/android/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.14.3/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 39m 1s
+716 actionable tasks: 692 executed, 24 up-to-date
