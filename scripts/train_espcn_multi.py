@@ -23,14 +23,6 @@ MODEL_CONFIGS = [
     (48, [(2, 40), (3, 60), (4, 70), (5, 80), (8, 100), (12, 120)]),
     # 64px input
     (64, [(2, 40), (3, 60), (4, 70), (6, 80), (8, 100)]),
-    # 96px input
-    (96, [(1, 30), (2, 50), (3, 60), (4, 70), (5, 80)]),
-    # 128px input
-    (128, [(1, 25), (2, 40), (3, 50), (4, 60)]),
-    # 192px input
-    (192, [(1, 25), (2, 40), (3, 60)]),
-    # 256px input
-    (256, [(1, 25), (2, 40)]),
 ]
 
 # Icon sources for real training data
@@ -165,6 +157,14 @@ def generate_training_data(input_size: int, scale: int, n: int = 1000):
 def train_and_export_model(model_dir: str, input_size: int, scale: int, epochs: int):
     """Train and export a single model."""
     output_size = input_size * scale
+
+    # Skip if model already exists and not forced
+    model_name = f"espcn_{input_size}x_{output_size}x.tflite"
+    out_path = os.path.join(model_dir, model_name)
+    if not FORCE and os.path.exists(out_path):
+        size = os.path.getsize(out_path)
+        print(f"[SKIP] {model_name} exists ({size} bytes), use --force to retrain")
+        return model_name, size
     
     print(f"\n{'='*50}")
     print(f"[TRAIN] Training {input_size}->{output_size} (scale {scale}x, {epochs} epochs)")
@@ -185,12 +185,6 @@ def train_and_export_model(model_dir: str, input_size: int, scale: int, epochs: 
     
     model_name = f"espcn_{input_size}x_{output_size}x.tflite"
     out_path = os.path.join(model_dir, model_name)
-
-    # Skip if model already exists and not forced
-    if not FORCE and os.path.exists(out_path):
-        size = os.path.getsize(out_path)
-        print(f"[SKIP] {model_name} exists ({size} bytes), use --force to retrain")
-        return model_name, size
     with open(out_path, "wb") as f:
         f.write(tflite_model)
     print(f"[TRAIN] WROTE {out_path} ({len(tflite_model)} bytes)")

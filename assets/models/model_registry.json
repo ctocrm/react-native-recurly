@@ -1,0 +1,189 @@
+{
+  "models": [
+    {
+      "input_size": 16,
+      "scale": 4,
+      "output_size": 64,
+      "epochs": 64,
+      "file": "espcn_16x_64x.tflite",
+      "size_bytes": 12680
+    },
+    {
+      "input_size": 16,
+      "scale": 8,
+      "output_size": 128,
+      "epochs": 80,
+      "file": "espcn_16x_128x.tflite",
+      "size_bytes": 35792
+    },
+    {
+      "input_size": 16,
+      "scale": 12,
+      "output_size": 192,
+      "epochs": 100,
+      "file": "espcn_16x_192x.tflite",
+      "size_bytes": 74192
+    },
+    {
+      "input_size": 16,
+      "scale": 16,
+      "output_size": 256,
+      "epochs": 120,
+      "file": "espcn_16x_256x.tflite",
+      "size_bytes": 127968
+    },
+    {
+      "input_size": 16,
+      "scale": 24,
+      "output_size": 384,
+      "epochs": 130,
+      "file": "espcn_16x_384x.tflite",
+      "size_bytes": 281576
+    },
+    {
+      "input_size": 16,
+      "scale": 32,
+      "output_size": 512,
+      "epochs": 150,
+      "file": "espcn_16x_512x.tflite",
+      "size_bytes": 496616
+    },
+    {
+      "input_size": 32,
+      "scale": 2,
+      "output_size": 64,
+      "epochs": 35,
+      "file": "espcn_32x_64x.tflite",
+      "size_bytes": 7016
+    },
+    {
+      "input_size": 32,
+      "scale": 4,
+      "output_size": 128,
+      "epochs": 60,
+      "file": "espcn_32x_128x.tflite",
+      "size_bytes": 12776
+    },
+    {
+      "input_size": 32,
+      "scale": 6,
+      "output_size": 192,
+      "epochs": 70,
+      "file": "espcn_32x_192x.tflite",
+      "size_bytes": 22376
+    },
+    {
+      "input_size": 32,
+      "scale": 8,
+      "output_size": 256,
+      "epochs": 80,
+      "file": "espcn_32x_256x.tflite",
+      "size_bytes": 35816
+    },
+    {
+      "input_size": 32,
+      "scale": 12,
+      "output_size": 384,
+      "epochs": 100,
+      "file": "espcn_32x_384x.tflite",
+      "size_bytes": 74240
+    },
+    {
+      "input_size": 32,
+      "scale": 16,
+      "output_size": 512,
+      "epochs": 120,
+      "file": "espcn_32x_512x.tflite",
+      "size_bytes": 128000
+    },
+    {
+      "input_size": 48,
+      "scale": 2,
+      "output_size": 96,
+      "epochs": 40,
+      "file": "espcn_48x_96x.tflite",
+      "size_bytes": 7040
+    },
+    {
+      "input_size": 48,
+      "scale": 3,
+      "output_size": 144,
+      "epochs": 60,
+      "file": "espcn_48x_144x.tflite",
+      "size_bytes": 9432
+    },
+    {
+      "input_size": 48,
+      "scale": 4,
+      "output_size": 192,
+      "epochs": 70,
+      "file": "espcn_48x_192x.tflite",
+      "size_bytes": 12800
+    },
+    {
+      "input_size": 48,
+      "scale": 5,
+      "output_size": 240,
+      "epochs": 80,
+      "file": "espcn_48x_240x.tflite",
+      "size_bytes": 17120
+    },
+    {
+      "input_size": 48,
+      "scale": 8,
+      "output_size": 384,
+      "epochs": 100,
+      "file": "espcn_48x_384x.tflite",
+      "size_bytes": 35840
+    },
+    {
+      "input_size": 48,
+      "scale": 12,
+      "output_size": 576,
+      "epochs": 120,
+      "file": "espcn_48x_576x.tflite",
+      "size_bytes": 74240
+    },
+    {
+      "input_size": 64,
+      "scale": 2,
+      "output_size": 128,
+      "epochs": 40,
+      "file": "espcn_64x_128x.tflite",
+      "size_bytes": 7040
+    },
+    {
+      "input_size": 64,
+      "scale": 3,
+      "output_size": 192,
+      "epochs": 60,
+      "file": "espcn_64x_192x.tflite",
+      "size_bytes": 9440
+    },
+    {
+      "input_size": 64,
+      "scale": 4,
+      "output_size": 256,
+      "epochs": 70,
+      "file": "espcn_64x_256x.tflite",
+      "size_bytes": 12800
+    },
+    {
+      "input_size": 64,
+      "scale": 6,
+      "output_size": 384,
+      "epochs": 80,
+      "file": "espcn_64x_384x.tflite",
+      "size_bytes": 22400
+    },
+    {
+      "input_size": 64,
+      "scale": 8,
+      "output_size": 512,
+      "epochs": 100,
+      "file": "espcn_64x_512x.tflite",
+      "size_bytes": 35840
+    }
+  ],
+  "total_size_bytes": 1553040
+}

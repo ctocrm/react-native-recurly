@@ -54,28 +54,6 @@ const MODEL_REGISTRY: Record<number, Record<number, string>> = {
     6: "espcn_64x_384x.tflite",
     8: "espcn_64x_512x.tflite",
   },
-  96: {
-    1: "espcn_96x_96x.tflite",
-    2: "espcn_96x_192x.tflite",
-    3: "espcn_96x_288x.tflite",
-    4: "espcn_96x_384x.tflite",
-    5: "espcn_96x_480x.tflite",
-  },
-  128: {
-    1: "espcn_128x_128x.tflite",
-    2: "espcn_128x_256x.tflite",
-    3: "espcn_128x_384x.tflite",
-    4: "espcn_128x_512x.tflite",
-  },
-  192: {
-    1: "espcn_192x_192x.tflite",
-    2: "espcn_192x_384x.tflite",
-    3: "espcn_192x_576x.tflite",
-  },
-  256: {
-    1: "espcn_256x_256x.tflite",
-    2: "espcn_256x_512x.tflite",
-  },
 };
 
 // Cache for loaded models
