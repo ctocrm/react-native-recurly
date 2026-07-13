@@ -13,6 +13,8 @@
     "lint": "expo lint",
     "generate-model": "node scripts/generate-model.js",
     "generate-model:force": "node scripts/generate-model.js --force",
+    "generate-model:multi": "node scripts/generate-model.js --train-multi",
+    "generate-model:multi:force": "node scripts/generate-model.js --train-multi --force",
     "prebuild:android": "expo prebuild --clean --platform android",
     "prebuild:ios": "expo prebuild --clean --platform ios",
     "build:android": "./scripts/build-android.sh",

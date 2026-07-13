@@ -1,28 +1,25 @@
 #!/usr/bin/env node
 /**
- * Model generation script for ESPCN 2x upscaling model.
+ * Multi-model generation script for ESPCN super-resolution models.
  *
  * Usage:
- *   node scripts/generate-model.ts [--force]
+ *   node scripts/generate-model.js [--force] [--model N]
  *
  * Options:
- *   --force    Force regeneration even if model exists and is fresh
+ *   --force    Force regeneration even if models exist and are fresh
+ *   --model N  Train only a specific model (by input_size_scale, e.g., 16_32 for 16->32)
  */
 
 const { execFileSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 
-const MODEL_PATH = path.join(
-  __dirname,
-  "..",
-  "assets",
-  "models",
-  "espcn_2x.tflite",
-);
-const PYTHON_SCRIPT = path.join(__dirname, "train_espcn_fast.py");
-
+const modelDir = path.join(__dirname, "..", "assets", "models");
+const pythonScript = path.join(__dirname, "train_espcn_multi.py");
 const FORCE = process.argv.includes("--force");
+const SPECIFIC_MODEL = process.argv
+  .find((arg) => arg.startsWith("--model="))
+  ?.split("=")[1];
 
 function fileExists(p) {
   return fs.existsSync(p);
@@ -32,22 +29,40 @@ function getFileModTime(p) {
   return fs.statSync(p).mtime.getTime();
 }
 
+function checkModelsFresh() {
+  // Check if registry exists and is fresh
+  const registryPath = path.join(modelDir, "model_registry.json");
+  if (!fileExists(registryPath)) return false;
+
+  // If specific model requested, check only that model
+  if (SPECIFIC_MODEL) {
+    const modelFile = `espcn_${SPECIFIC_MODEL.replace("_", "x_")}x.tflite`;
+    const modelPath = path.join(modelDir, modelFile);
+    if (!fileExists(modelPath)) return false;
+    const modelTime = getFileModTime(modelPath);
+    const scriptTime = getFileModTime(pythonScript);
+    return modelTime > scriptTime;
+  }
+
+  // Check registry freshness
+  const registryTime = getFileModTime(registryPath);
+  const scriptTime = getFileModTime(pythonScript);
+  return registryTime > scriptTime;
+}
+
 function main() {
-  console.log("[MODEL] Starting model generation process...");
+  console.log("[MODEL] Starting multi-model generation process...");
 
-  // Check if model exists and is fresh (unless --force)
-  if (!FORCE && fileExists(MODEL_PATH) && fileExists(PYTHON_SCRIPT)) {
-    const modelTime = getFileModTime(MODEL_PATH);
-    const scriptTime = getFileModTime(PYTHON_SCRIPT);
-
-    if (modelTime > scriptTime) {
-      console.log(
-        `[MODEL] Model exists and is fresh (${new Date(modelTime).toISOString()})`,
-      );
-      console.log("[MODEL] Skipping regeneration. Use --force to regenerate.");
-      process.exit(0);
-    }
-    console.log("[MODEL] Model is stale, regenerating...");
+  // Check if models exist and are fresh (unless --force)
+  if (
+    !FORCE &&
+    fileExists(modelDir) &&
+    fileExists(pythonScript) &&
+    checkModelsFresh()
+  ) {
+    console.log("[MODEL] Models exist and are fresh");
+    console.log("[MODEL] Skipping regeneration. Use --force to regenerate.");
+    process.exit(0);
   }
 
   const venvPath = path.join(__dirname, "..", ".venv");
@@ -86,7 +101,9 @@ function main() {
       execFileSync(
         venvPython,
         ["-m", "pip", "install", "-r", requirementsPath],
-        { stdio: "inherit" },
+        {
+          stdio: "inherit",
+        },
       );
       console.log(`[MODEL] Using venv python at ${pythonCmd}`);
     }
@@ -104,12 +121,16 @@ function main() {
   }
 
   try {
-    console.log(`[MODEL] Running training script: ${PYTHON_SCRIPT}`);
-    execFileSync(pythonCmd, [PYTHON_SCRIPT], {
+    const args = [pythonScript];
+    if (SPECIFIC_MODEL) {
+      args.push(`--model=${SPECIFIC_MODEL}`);
+    }
+    console.log(`[MODEL] Running training script: ${args.join(" ")}`);
+    execFileSync(pythonCmd, args, {
       stdio: "inherit",
       cwd: path.join(__dirname, ".."),
     });
-    console.log("[MODEL] Model generation completed successfully!");
+    console.log("[MODEL] Multi-model generation completed successfully!");
   } catch (err) {
     console.error("[MODEL] Error during model generation:", err);
     process.exit(1);
