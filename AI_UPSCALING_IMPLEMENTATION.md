@@ -201,10 +201,20 @@ Output: (None, None, 3)
 ```python
 def combined_loss(y_true, y_pred):
     mae = tf.reduce_mean(tf.abs(y_true - y_pred))
-    ssim = 1.0 - tf.reduce_mean(tf.image.ssim_multiscale(y_true, y_pred, 1.0))
+    ssim = ssim_term(y_true, y_pred)            # (MS-)SSIM, scale-adaptive
     perceptual = perceptual_loss(y_true, y_pred)  # VGG19 blocks 1-3
     return mae + 0.15 * ssim + 0.05 * perceptual
 ```
+
+> **Scale-adaptive SSIM**: `tf.image.ssim_multiscale` always downsamples through
+> 5 scales, which shrinks a 64px output to 4px — smaller than the 7px Gaussian
+> window — and crashes training. `make_combined_loss(output_size)` therefore
+> picks the number of MS-SSIM scales that fit (`output >= filter_size * 2**(n-1)`)
+> and falls back to single-scale SSIM for very small outputs.
+>
+> **NaN safety**: the VGG perceptual term is large-magnitude, so training uses
+> `Adam(learning_rate=1e-4, clipnorm=1.0)` to keep the combined loss from
+> diverging to NaN.
 
 ---
 

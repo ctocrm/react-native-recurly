@@ -82,21 +82,66 @@ def perceptual_loss(y_true, y_pred):
     return loss / len(true_features)
 
 
-def ms_ssim_loss(y_true, y_pred):
-    """MS-SSIM loss for structural similarity."""
-    # tf.image.ssim_multiscale expects images in [0, 1]
-    ssim = tf.image.ssim_multiscale(
-        y_true, y_pred, max_val=1.0, filter_size=7
-    )
-    return 1.0 - tf.reduce_mean(ssim)
+# MS-SSIM default power factors (5 scales). Each additional scale halves the
+# image, so the number of usable scales is bounded by the output resolution.
+_MS_SSIM_POWER_FACTORS = [0.0448, 0.2856, 0.3001, 0.2363, 0.1333]
+_MS_SSIM_FILTER_SIZE = 7
 
 
-def combined_loss(y_true, y_pred):
-    """Combined MAE + MS-SSIM + perceptual loss."""
-    mae = tf.reduce_mean(tf.abs(y_true - y_pred))
-    ssim = ms_ssim_loss(y_true, y_pred)
-    perceptual = perceptual_loss(y_true, y_pred)
-    return mae + 0.15 * ssim + 0.05 * perceptual
+def _ssim_scales_for(output_size: int) -> int:
+    """How many MS-SSIM scales fit a given output size.
+
+    `tf.image.ssim_multiscale` downsamples the image by 2 for each extra scale,
+    and the Gaussian window (filter_size) must still fit the smallest scale, so
+    we need `output_size >= filter_size * 2**(n-1)` for `n` scales. Using the
+    full 5 scales on a small (e.g. 64px) output shrinks it to 4px < 7px filter
+    and crashes, so we clamp the scale count to what actually fits.
+    """
+    n = 1
+    while n < len(_MS_SSIM_POWER_FACTORS) and output_size >= _MS_SSIM_FILTER_SIZE * (2 ** n):
+        n += 1
+    return n
+
+
+def make_combined_loss(output_size: int):
+    """Build a combined MAE + (MS-)SSIM + perceptual loss for a fixed output size.
+
+    The SSIM term adapts to the output resolution: multiscale SSIM when the
+    image is large enough, single-scale SSIM otherwise. This keeps the loss
+    numerically valid for every model in the matrix (smallest output is 64px).
+    """
+    n_scales = _ssim_scales_for(output_size)
+
+    if n_scales <= 1:
+        def ssim_term(y_true, y_pred):
+            filter_size = min(_MS_SSIM_FILTER_SIZE, output_size)
+            return 1.0 - tf.reduce_mean(
+                tf.image.ssim(y_true, y_pred, max_val=1.0, filter_size=filter_size)
+            )
+    else:
+        pf = _MS_SSIM_POWER_FACTORS[:n_scales]
+        total = sum(pf)
+        pf = [p / total for p in pf]  # renormalise the subset to sum to 1
+
+        def ssim_term(y_true, y_pred):
+            return 1.0 - tf.reduce_mean(
+                tf.image.ssim_multiscale(
+                    y_true,
+                    y_pred,
+                    max_val=1.0,
+                    filter_size=_MS_SSIM_FILTER_SIZE,
+                    power_factors=pf,
+                )
+            )
+
+    def combined_loss(y_true, y_pred):
+        mae = tf.reduce_mean(tf.abs(y_true - y_pred))
+        ssim = ssim_term(y_true, y_pred)
+        perceptual = perceptual_loss(y_true, y_pred)
+        return mae + 0.15 * ssim + 0.05 * perceptual
+
+    return combined_loss
+
 
 
 def build_fsrcnn(scale: int, d: int = 32, s: int = 8, m: int = 3):
@@ -236,8 +281,14 @@ def train_and_export_model(model_dir: str, input_size: int, scale: int, epochs: 
     print(f"[TRAIN] Training {input_size}->{output_size} (scale {scale}x, {epochs} epochs)")
 
     model = build_fsrcnn(scale)
-    model.compile(optimizer="adam", loss=combined_loss)
+    # A lower learning rate + gradient clipping keeps the combined loss (which
+    # includes a large-magnitude VGG perceptual term) from diverging to NaN.
+    optimizer = keras.optimizers.Adam(learning_rate=1e-4, clipnorm=1.0)
+    model.compile(optimizer=optimizer, loss=make_combined_loss(output_size))
     print(f"[TRAIN] Model params: {model.count_params()}")
+    print(f"[TRAIN] MS-SSIM scales: {_ssim_scales_for(output_size)} (output {output_size}px)")
+
+
 
     lr, hr = generate_training_data(input_size, scale)
     split = int(len(lr) * 0.9)
