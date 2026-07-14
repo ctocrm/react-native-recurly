@@ -15,6 +15,7 @@
  */
 
 import { Image, PixelRatio } from "react-native";
+import { MODEL_MAP } from "./generatedModelMap";
 import { mimeForFormat, upscaleIconIfSmall } from "./iconUpscaler";
 
 // Below this max dimension an icon is "low-res" and worth upscaling.
@@ -119,50 +120,15 @@ const MODEL_REGISTRY: Record<
   },
 };
 
-// Static model map - Metro requires static paths at build time.
-// `require` is required by Metro so asset paths are resolved at build time.
-/* eslint-disable @typescript-eslint/no-require-imports */
-const MODEL_MAP: Record<string, any> = {
-  // Fast ESPCN models
-  "espcn_16x_64x.tflite": require("../../assets/models/espcn_16x_64x.tflite"),
-  "espcn_16x_128x.tflite": require("../../assets/models/espcn_16x_128x.tflite"),
-  "espcn_16x_192x.tflite": require("../../assets/models/espcn_16x_192x.tflite"),
-  "espcn_16x_256x.tflite": require("../../assets/models/espcn_16x_256x.tflite"),
-  "espcn_16x_384x.tflite": require("../../assets/models/espcn_16x_384x.tflite"),
-  "espcn_16x_512x.tflite": require("../../assets/models/espcn_16x_512x.tflite"),
-  "espcn_32x_64x.tflite": require("../../assets/models/espcn_32x_64x.tflite"),
-  "espcn_32x_128x.tflite": require("../../assets/models/espcn_32x_128x.tflite"),
-  "espcn_32x_192x.tflite": require("../../assets/models/espcn_32x_192x.tflite"),
-  "espcn_32x_256x.tflite": require("../../assets/models/espcn_32x_256x.tflite"),
-  "espcn_32x_384x.tflite": require("../../assets/models/espcn_32x_384x.tflite"),
-  "espcn_32x_512x.tflite": require("../../assets/models/espcn_32x_512x.tflite"),
-  "espcn_48x_96x.tflite": require("../../assets/models/espcn_48x_96x.tflite"),
-  "espcn_48x_144x.tflite": require("../../assets/models/espcn_48x_144x.tflite"),
-  "espcn_48x_192x.tflite": require("../../assets/models/espcn_48x_192x.tflite"),
-  "espcn_48x_240x.tflite": require("../../assets/models/espcn_48x_240x.tflite"),
-  "espcn_48x_384x.tflite": require("../../assets/models/espcn_48x_384x.tflite"),
-  "espcn_48x_576x.tflite": require("../../assets/models/espcn_48x_576x.tflite"),
-  "espcn_64x_128x.tflite": require("../../assets/models/espcn_64x_128x.tflite"),
-  "espcn_64x_192x.tflite": require("../../assets/models/espcn_64x_192x.tflite"),
-  "espcn_64x_256x.tflite": require("../../assets/models/espcn_64x_256x.tflite"),
-  "espcn_64x_384x.tflite": require("../../assets/models/espcn_64x_384x.tflite"),
-  "espcn_64x_512x.tflite": require("../../assets/models/espcn_64x_512x.tflite"),
-  "espcn_96x_192x.tflite": require("../../assets/models/espcn_96x_192x.tflite"),
-  "espcn_96x_288x.tflite": require("../../assets/models/espcn_96x_288x.tflite"),
-  "espcn_96x_384x.tflite": require("../../assets/models/espcn_96x_384x.tflite"),
-  "espcn_96x_480x.tflite": require("../../assets/models/espcn_96x_480x.tflite"),
-  "espcn_128x_256x.tflite": require("../../assets/models/espcn_128x_256x.tflite"),
-  "espcn_128x_384x.tflite": require("../../assets/models/espcn_128x_384x.tflite"),
-  // NOTE: Only models that PHYSICALLY EXIST in assets/models/ may be `require`d
-  // here. Metro resolves these paths at build time, so referencing a missing
-  // file breaks the native bundle. The Sharp FSRCNN family has not been
-  // generated yet — when the `fsrcnn_*.tflite` files are produced (see
-  // `npm run generate-model:multi`), add the corresponding
-  // `require("../../assets/models/fsrcnn_*.tflite")` entries below. Until then
-  // `getModelForUpscale` transparently degrades sharp -> fast -> bilinear.
-};
+// MODEL_MAP (the static `require()` list Metro bundles at build time) is
+// auto-generated from the `*.tflite` files present in assets/models/ by
+// `scripts/generate-model-map.js` (run during the build and via
+// `npm run generate-model-map`). It only ever references files that exist, so
+// the build never fails on missing models and newly generated ones (e.g. the
+// sharp FSRCNN family) are bundled automatically. See `./generatedModelMap`.
 
 // Cache for loaded models
+
 const loadedModels: Map<string, any> = new Map();
 let modelLoadFailed = false;
 
@@ -328,7 +294,9 @@ export function getModelForUpscale(
  */
 function tfliteModuleExists(): boolean {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const TurboModuleRegistry = require("react-native").TurboModuleRegistry;
+
     // react-native-fast-tflite exposes its TurboModule under the name "Tflite".
     const mod =
       TurboModuleRegistry &&
@@ -359,7 +327,9 @@ async function loadModel(modelFile: string): Promise<any | null> {
   }
 
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { loadTensorflowModel } = require("react-native-fast-tflite");
+
     if (!loadTensorflowModel) return null;
 
     const modelAsset = MODEL_MAP[modelFile];

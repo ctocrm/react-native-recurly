@@ -47,13 +47,19 @@ Both families are organized as **multiple models** optimized for different input
   returns `false`: the picker defaults to (and locks onto) Fast, and any request
   for Sharp transparently degrades **sharp → fast → bilinear**.
 
-> **Build safety**: `MODEL_MAP` may only `require()` files that physically exist
-> in `assets/models/`. Metro resolves those paths at build time, so referencing a
-> missing model breaks the native bundle. When the sharp family is generated, add
-> the corresponding `require("../../assets/models/fsrcnn_*.tflite")` lines.
+> **Build safety (automatic)**: `MODEL_MAP` is **auto-generated** from the
+> `*.tflite` files that physically exist in `assets/models/` by
+> `scripts/generate-model-map.js`, which writes `src/services/generatedModelMap.ts`.
+> The codegen runs automatically during the build (Step 1 of
+> `scripts/build-android.sh`, right after model generation) and can be run
+> manually with `npm run generate-model-map`. Because the `require()` list is
+> derived from a directory scan, it can never point at a missing file — so the
+> build **never fails on absent models**, and any newly generated model (e.g. the
+> sharp FSRCNN family) is bundled automatically on the next build with **no
+> hand-editing**. Just generate the models and rebuild; `--force-model` will train
+> them first and then regenerate the map in the same run.
 
 ### Epoch Optimization
-
 
 **Fast (ESPCN)**
 
@@ -207,7 +213,11 @@ def combined_loss(y_true, y_pred):
 - `scripts/train_espcn_multi.py` — Fast ESPCN multi-model training.
 - `scripts/train_fsrcnn_multi.py` — Sharp FSRCNN multi-model training.
 - `scripts/generate-model.js` — Quality-aware wrapper with `--quality=fast|sharp`.
-- `src/services/iconProcessing.ts` — Quality-aware model registry and selection.
+- `scripts/generate-model-map.js` — Codegen that builds the static `require()` map from the files present in `assets/models/`.
+- `src/services/generatedModelMap.ts` — Auto-generated `MODEL_MAP` (do not edit by hand).
+- `src/services/iconProcessing.ts` — Quality-aware model registry and selection; imports the generated `MODEL_MAP`.
+- `scripts/build-android.sh` — Runs the model-map codegen after model generation.
+
 - `src/components/SubscriptionIconPickerModal.tsx` — Quality toggle UI.
 - `package.json` — Updated model generation scripts.
 - `requirements.txt` — Already includes `cairosvg` and `pillow`.

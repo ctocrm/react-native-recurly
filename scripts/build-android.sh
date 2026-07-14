@@ -178,6 +178,14 @@ else
     node "$SCRIPT_DIR/generate-model.js"
 fi
 
+# Regenerate the static require() map from whatever *.tflite files now exist in
+# assets/models/. This guarantees the bundle only references models that are
+# physically present (so the build never fails on missing models) and that any
+# freshly generated models are bundled automatically.
+echo "[BUILD] Regenerating model map from assets/models/..."
+node "$SCRIPT_DIR/generate-model-map.js"
+
+
 # Step 2: Prebuild Android project
 echo ""
 echo "[BUILD] Step 2: Expo Prebuild (Android)"
