@@ -178,6 +178,14 @@ else
     node "$SCRIPT_DIR/generate-model.js"
 fi
 
+# Regenerate the static require() map from whatever *.tflite files now exist in
+# assets/models/. This guarantees the bundle only references models that are
+# physically present (so the build never fails on missing models) and that any
+# freshly generated models are bundled automatically.
+echo "[BUILD] Regenerating model map from assets/models/..."
+node "$SCRIPT_DIR/generate-model-map.js"
+
+
 # Step 2: Prebuild Android project
 echo ""
 echo "[BUILD] Step 2: Expo Prebuild (Android)"
@@ -245,6 +253,17 @@ for ARCH in "${BUILD_ARCHS[@]}"; do
     # Show result
     if [ $BUILD_EXIT -eq 0 ]; then
         echo "[BUILD] SUCCESS: $ARCH -> $APK_FILE"
+        
+        # Copy APK to arch-specific filename to prevent overwriting
+        if [ -f "$APK_FILE" ]; then
+            if [ "$DEV_MODE" = "true" ]; then
+                ARCH_APK="$PROJECT_ROOT/app-debug-${ARCH}.apk"
+            else
+                ARCH_APK="$PROJECT_ROOT/app-release-${ARCH}.apk"
+            fi
+            cp "$APK_FILE" "$ARCH_APK"
+            echo "[BUILD] Copied to: $ARCH_APK"
+        fi
     else
         echo "[BUILD] FAILED: $ARCH (exit code $BUILD_EXIT)"
         echo "[BUILD] See $LOG_FILE for details"

@@ -9,7 +9,12 @@ import {
   addLoadingListener,
   isIconLoading,
 } from "@/src/services/iconLoadingRegistry";
-import { isLowResIcon, upscaleIconAi } from "@/src/services/iconProcessing";
+import {
+  isLowResIcon,
+  isQualityAvailable,
+  upscaleIconAi,
+  type UpscaleQuality,
+} from "@/src/services/iconProcessing";
 import {
   getReportsForIcon,
   rejectReportedIcon,
@@ -61,6 +66,10 @@ interface IconDetection {
   isLowRes: boolean;
 }
 
+// Whether the "sharp" (FSRCNN) family has bundled models. Until those models
+// are generated this is false, so the UI defaults to (and locks onto) "fast".
+const SHARP_AVAILABLE = isQualityAvailable("sharp");
+
 const SubscriptionIconPickerModal = ({
   visible,
   iconKey,
@@ -92,6 +101,11 @@ const SubscriptionIconPickerModal = ({
     id: string;
     kind: "white" | "upscale";
   } | null>(null);
+  // AI upscaling quality mode: "fast" (ESPCN) or "sharp" (FSRCNN). Defaults to
+  // "sharp" only when its models are bundled, otherwise "fast".
+  const [upscaleQuality, setUpscaleQuality] = useState<UpscaleQuality>(
+    SHARP_AVAILABLE ? "sharp" : "fast",
+  );
   const isMounted = useRef(true);
   const latestKeyRef = useRef(iconKey);
 
@@ -261,7 +275,7 @@ const SubscriptionIconPickerModal = ({
     } catch (error) {
       console.error("[PICKER] Failed to load icons:", error);
     }
-  }, [iconKey, subscriptionIcon, showIncorrect, showBroken, detectIcons]);
+  }, [iconKey, showIncorrect, showBroken, detectIcons]);
 
   useEffect(() => {
     isMounted.current = true;
@@ -337,12 +351,14 @@ const SubscriptionIconPickerModal = ({
   };
 
   // Persist a processed icon (white-bg removed or AI-upscaled) as the cached
-  // icon so the card reflects it immediately.
+  // icon so the card reflects it immediately. `extraProps` are merged into the
+  // PostHog event for richer analytics (e.g. the chosen upscale quality).
   const persistProcessedIcon = async (
     icon: PickerIcon,
     processedBase64: string,
     newFormat: string,
     event: string,
+    extraProps: Record<string, unknown> = {},
   ) => {
     if (!iconKey) return;
     await setCachedIcon(
@@ -356,6 +372,7 @@ const SubscriptionIconPickerModal = ({
       subscription_name: subscriptionName,
       icon_key: iconKey,
       source: icon.source,
+      ...extraProps,
     });
     // Update the visible tile in-place so the user sees the processed icon
     // right away (the tapped tile's id is derived from the ORIGINAL bytes, so
@@ -405,6 +422,13 @@ const SubscriptionIconPickerModal = ({
 
   const handleUpscale = async (icon: PickerIcon) => {
     setProcessing({ id: icon.id, kind: "upscale" });
+    // Track what the user requested vs. what actually ran: "sharp" transparently
+    // degrades to "fast" (and then bilinear) when its models aren't bundled.
+    const requestedQuality = upscaleQuality;
+    const effectiveQuality =
+      requestedQuality === "sharp" && !SHARP_AVAILABLE
+        ? "fast"
+        : requestedQuality;
     try {
       // force=true so we always re-upscale even if the stored bytes were
       // already a 256px bilinear upscale from crawl time (still low quality).
@@ -412,12 +436,19 @@ const SubscriptionIconPickerModal = ({
         icon.imageData,
         icon.format,
         true,
+        requestedQuality,
       );
       await persistProcessedIcon(
         icon,
         base64,
         format,
         "icon_picker_upscale_ai",
+        {
+          requested_quality: requestedQuality,
+          effective_quality: effectiveQuality,
+          sharp_available: SHARP_AVAILABLE,
+          output_format: format,
+        },
       );
       setDetections((prev) => ({
         ...prev,
@@ -522,6 +553,7 @@ const SubscriptionIconPickerModal = ({
 
     const isReported = !!item.reportedType;
     const detection = detections[item.id];
+
     const isProcessingWhite =
       processing?.id === item.id && processing.kind === "white";
     const isProcessingUpscale =
@@ -542,7 +574,7 @@ const SubscriptionIconPickerModal = ({
 
         {/* Corrective chips (white-bg / upscale) — shown based on detection */}
         <View className="flex-row items-center gap-1">
-          {detections[item.id]?.hasWhite && (
+          {detection?.hasWhite && (
             <Pressable
               onPress={() => handleClearWhiteBackground(item)}
               disabled={!!processing}
@@ -558,7 +590,7 @@ const SubscriptionIconPickerModal = ({
               )}
             </Pressable>
           )}
-          {detections[item.id]?.isLowRes && (
+          {detection?.isLowRes && (
             <Pressable
               onPress={() => handleUpscale(item)}
               disabled={!!processing}
@@ -658,6 +690,53 @@ const SubscriptionIconPickerModal = ({
                 }}
               />
               <Text className="text-xs text-muted-foreground">Show broken</Text>
+            </View>
+          </View>
+
+          {/* AI upscaling quality toggle */}
+          <View className="mb-3 flex-row items-center justify-between rounded-xl border border-border bg-card p-3">
+            <View>
+              <Text className="text-sm font-sans-medium text-primary">
+                AI Upscale Quality
+              </Text>
+              <Text className="text-xs text-muted-foreground">
+                {!SHARP_AVAILABLE
+                  ? "Fast: quicker, lighter models (Sharp coming soon)"
+                  : upscaleQuality === "sharp"
+                    ? "Sharp: slower, best quality"
+                    : "Fast: quicker, lighter models"}
+              </Text>
+            </View>
+            <View className="flex-row rounded-lg bg-accent/10 p-1">
+              <Pressable
+                onPress={() => setUpscaleQuality("fast")}
+                className={`rounded-md px-3 py-1 ${
+                  upscaleQuality === "fast" ? "bg-accent" : ""
+                }`}
+              >
+                <Text
+                  className={`text-xs font-sans-medium ${
+                    upscaleQuality === "fast" ? "text-white" : "text-accent"
+                  }`}
+                >
+                  Fast
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => SHARP_AVAILABLE && setUpscaleQuality("sharp")}
+                disabled={!SHARP_AVAILABLE}
+                className={`rounded-md px-3 py-1 ${
+                  upscaleQuality === "sharp" ? "bg-accent" : ""
+                } ${!SHARP_AVAILABLE ? "opacity-40" : ""}`}
+              >
+                <Text
+                  className={`text-xs font-sans-medium ${
+                    upscaleQuality === "sharp" ? "text-white" : "text-accent"
+                  }`}
+                >
+                  Sharp
+                </Text>
+              </Pressable>
             </View>
           </View>
 
