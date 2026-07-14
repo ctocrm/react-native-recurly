@@ -1,4 +1,4 @@
-"""Multi-resolution ESPCN model training with optimized epochs per scale ratio."""
+"""Multi-resolution FSRCNN model training with perceptual + MS-SSIM loss."""
 import os
 import sys
 import re
@@ -17,32 +17,27 @@ for arg in sys.argv:
         SPECIFIC_MODEL = arg.split("=")[1]
 
 # Model configurations: input_size -> list of (scale, epochs) tuples
-# Scale = output_size / input_size
-# Epochs optimized based on scale complexity
 MODEL_CONFIGS = [
     # 16px input
-    (16, [(4, 64), (8, 80), (12, 100), (16, 120), (24, 130), (32, 150)]),
+    (16, [(4, 120), (8, 150), (12, 180), (16, 200), (24, 220), (32, 250)]),
     # 32px input
-    (32, [(2, 35), (4, 60), (6, 70), (8, 80), (12, 100), (16, 120)]),
+    (32, [(2, 80), (4, 120), (6, 140), (8, 160), (12, 180), (16, 200)]),
     # 48px input
-    (48, [(2, 40), (3, 60), (4, 70), (5, 80), (8, 100), (12, 120)]),
+    (48, [(2, 80), (3, 100), (4, 120), (5, 140), (8, 160), (12, 180)]),
     # 64px input
-    (64, [(2, 40), (3, 60), (4, 70), (6, 80), (8, 100)]),
+    (64, [(2, 80), (3, 100), (4, 120), (6, 140), (8, 160)]),
     # 96px input
-    (96, [(2, 50), (3, 60), (4, 70), (5, 80)]),
+    (96, [(2, 80), (3, 100), (4, 120), (5, 140)]),
     # 128px input
-    (128, [(2, 40), (3, 50), (4, 60)]),
+    (128, [(2, 80), (3, 100), (4, 120)]),
 ]
 
 # Icon sources for real training data
 ICON_SOURCES = [
-    # Simple Icons CDN URLs (these are actual brand icons)
     "https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/{}.svg",
-    # Tabler Icons
     "https://raw.githubusercontent.com/tabler/tabler-icons/main/icons/outline/{}.svg",
 ]
 
-# Popular brand names for training data
 TRAINING_BRANDS = [
     "netflix", "spotify", "github", "figma", "notion", "dropbox", "google",
     "microsoft", "apple", "amazon", "hulu", "disney", "youtube",
@@ -52,27 +47,80 @@ TRAINING_BRANDS = [
 ]
 
 
-def calculate_epochs(scale_ratio: int) -> int:
-    """Calculate optimal epochs based on scale ratio."""
-    if scale_ratio <= 2:
-        return 35
-    elif scale_ratio <= 4:
-        return 60
-    elif scale_ratio <= 6:
-        return 75
-    elif scale_ratio <= 8:
-        return 85
-    else:
-        return 100
+def build_vgg_feature_extractor():
+    """Build a lightweight VGG-based perceptual loss feature extractor."""
+    vgg = tf.keras.applications.VGG19(
+        include_top=False,
+        weights="imagenet",
+        input_shape=(None, None, 3),
+    )
+    # Use blocks 1-3 only for efficiency
+    outputs = [vgg.get_layer(f"block{i}_conv2").output for i in [1, 2, 3]]
+    return Model(vgg.input, outputs, name="vgg_features")
 
 
-def build_espcn(scale: int):
-    """Build ESPCN model for a specific scale factor."""
+VGG_FEATURES = None
+
+
+def perceptual_loss(y_true, y_pred):
+    """Perceptual loss using VGG19 features."""
+    global VGG_FEATURES
+    if VGG_FEATURES is None:
+        VGG_FEATURES = build_vgg_feature_extractor()
+        VGG_FEATURES.trainable = False
+
+    # VGG expects 0-255 images
+    y_true_255 = y_true * 255.0
+    y_pred_255 = y_pred * 255.0
+
+    true_features = VGG_FEATURES(y_true_255)
+    pred_features = VGG_FEATURES(y_pred_255)
+
+    loss = 0.0
+    for tf_true, tf_pred in zip(true_features, pred_features):
+        loss += tf.reduce_mean(tf.abs(tf_true - tf_pred))
+    return loss / len(true_features)
+
+
+def ms_ssim_loss(y_true, y_pred):
+    """MS-SSIM loss for structural similarity."""
+    # tf.image.ssim_multiscale expects images in [0, 1]
+    ssim = tf.image.ssim_multiscale(
+        y_true, y_pred, max_val=1.0, filter_size=7
+    )
+    return 1.0 - tf.reduce_mean(ssim)
+
+
+def combined_loss(y_true, y_pred):
+    """Combined MAE + MS-SSIM + perceptual loss."""
+    mae = tf.reduce_mean(tf.abs(y_true - y_pred))
+    ssim = ms_ssim_loss(y_true, y_pred)
+    perceptual = perceptual_loss(y_true, y_pred)
+    return mae + 0.15 * ssim + 0.05 * perceptual
+
+
+def build_fsrcnn(scale: int, d: int = 32, s: int = 8, m: int = 3):
+    """Build FSRCNN model for a specific scale factor."""
     inp = layers.Input(shape=(None, None, 3))
-    x = layers.Conv2D(16, 3, padding="same", activation="relu")(inp)
-    x = layers.Conv2D(scale * scale * 3, 3, padding="same")(x)
+
+    # Feature extraction
+    x = layers.Conv2D(d, 5, padding="same", activation="relu")(inp)
+
+    # Shrinking
+    x = layers.Conv2D(s, 1, padding="same", activation="relu")(x)
+
+    # Mapping layers
+    for _ in range(m):
+        x = layers.Conv2D(s, 3, padding="same", activation="relu")(x)
+
+    # Expanding
+    x = layers.Conv2D(d, 1, padding="same", activation="relu")(x)
+
+    # Sub-pixel convolution
+    x = layers.Conv2D(scale * scale * 3, 5, padding="same")(x)
     x = layers.Lambda(lambda t: tf.nn.depth_to_space(t, scale))(x)
-    out = layers.Conv2D(3, 3, padding="same", activation="sigmoid")(x)
+
+    out = layers.Conv2D(3, 5, padding="same", activation="sigmoid")(x)
     return Model(inp, out)
 
 
@@ -93,45 +141,59 @@ def fetch_svg_icon(slug: str) -> bytes | None:
 
 
 def rasterize_svg_to_png(svg_bytes: bytes, size: int) -> np.ndarray | None:
-    """Rasterize SVG to PNG at specified size using cairosvg if available, else skip."""
+    """Rasterize SVG to PNG at specified size using cairosvg if available."""
     try:
         import cairosvg
-        png_data = cairosvg.svg2png(bytestring=svg_bytes, output_width=size, output_height=size)
+        png_data = cairosvg.svg2png(
+            bytestring=svg_bytes, output_width=size, output_height=size
+        )
         from PIL import Image
         img = Image.open(BytesIO(png_data))
         arr = np.array(img.convert("RGBA"))
         return arr.astype(np.float32) / 255.0
-    except ImportError:
-        # If cairosvg not available, generate synthetic data
+    except Exception:
         return None
 
 
+def augment_icon(hr: np.ndarray, rng: np.random.Generator) -> np.ndarray:
+    """Apply light augmentation to a training icon."""
+    # Random horizontal flip
+    if rng.random() < 0.5:
+        hr = np.flip(hr, axis=1).copy()
+    # Random 90-degree rotation
+    k = rng.integers(0, 4)
+    if k:
+        hr = np.rot90(hr, k=k, axes=(0, 1)).copy()
+    # Random brightness/contrast jitter
+    hr = hr * rng.uniform(0.9, 1.1)
+    hr = np.clip(hr, 0.0, 1.0)
+    return hr
+
+
 def generate_real_icon_data(n: int, target_size: int) -> np.ndarray:
-    """Generate training data from real icons (fallback to synthetic if unavailable)."""
+    """Generate training data from real icons (fallback to synthetic)."""
     rng = np.random.default_rng(42)
     hr_images = np.zeros((n, target_size, target_size, 3), dtype=np.float32)
 
     real_count = 0
     for i in range(n):
-        if real_count < n // 2:  # Try to get half real, half synthetic
+        if real_count < n // 2:
             brand = TRAINING_BRANDS[i % len(TRAINING_BRANDS)]
             svg = fetch_svg_icon(brand)
             if svg:
                 rasterized = rasterize_svg_to_png(svg, target_size)
                 if rasterized is not None:
-                    # Ensure RGB (drop alpha if present)
                     if rasterized.shape[-1] == 4:
-                        # Composite over white background
                         alpha = rasterized[..., 3:4]
                         rgb = rasterized[..., :3] * alpha + (1 - alpha)
-                        hr_images[i] = rgb
+                        hr_images[i] = augment_icon(rgb, rng)
                     else:
-                        hr_images[i] = rasterized[..., :3]
+                        hr_images[i] = augment_icon(rasterized[..., :3], rng)
                     real_count += 1
                     print(f"[TRAIN] Got real icon: {brand}")
                     continue
 
-        # Synthetic fallback (same as original)
+        # Synthetic fallback
         bg = rng.uniform(0.0, 0.3, size=3)
         hr_images[i] = bg
         fg = rng.uniform(0.6, 1.0, size=3)
@@ -145,7 +207,7 @@ def generate_real_icon_data(n: int, target_size: int) -> np.ndarray:
             half = r
             rect = ((np.abs(xx - cx) <= half) & (np.abs(yy - cy) <= half))
             hr_images[i, rect] = fg
-        real_count += 1  # Count synthetic too
+        real_count += 1
 
     print(f"[TRAIN] Generated {real_count} images for size {target_size}")
     return hr_images
@@ -154,23 +216,17 @@ def generate_real_icon_data(n: int, target_size: int) -> np.ndarray:
 def generate_training_data(input_size: int, scale: int, n: int = 1000):
     """Generate training data for a specific input/output size."""
     output_size = input_size * scale
-
-    # Generate high-res images
     hr = generate_real_icon_data(n, output_size)
-
-    # Downscale to create low-res inputs
     lr = tf.image.resize(hr, (input_size, input_size), method="bicubic").numpy()
-
     return lr, hr
 
 
 def train_and_export_model(model_dir: str, input_size: int, scale: int, epochs: int):
-    """Train and export a single model."""
+    """Train and export a single FSRCNN model."""
     output_size = input_size * scale
-
-    # Skip if model already exists and not forced
-    model_name = f"espcn_{input_size}x_{output_size}x.tflite"
+    model_name = f"fsrcnn_{input_size}x_{output_size}x.tflite"
     out_path = os.path.join(model_dir, model_name)
+
     if not FORCE and os.path.exists(out_path):
         size = os.path.getsize(out_path)
         print(f"[SKIP] {model_name} exists ({size} bytes), use --force to retrain")
@@ -179,22 +235,26 @@ def train_and_export_model(model_dir: str, input_size: int, scale: int, epochs: 
     print(f"\n{'='*50}")
     print(f"[TRAIN] Training {input_size}->{output_size} (scale {scale}x, {epochs} epochs)")
 
-    model = build_espcn(scale)
-    model.compile(optimizer="adam", loss="mae")
+    model = build_fsrcnn(scale)
+    model.compile(optimizer="adam", loss=combined_loss)
     print(f"[TRAIN] Model params: {model.count_params()}")
 
     lr, hr = generate_training_data(input_size, scale)
     split = int(len(lr) * 0.9)
 
-    model.fit(lr[:split], hr[:split], batch_size=32, epochs=epochs, verbose=2)
+    model.fit(
+        lr[:split],
+        hr[:split],
+        batch_size=16,
+        epochs=epochs,
+        verbose=2,
+        validation_split=0.1,
+    )
 
     converter = tf.lite.TFLiteConverter.from_keras_model(model)
-    # Optimize for size
     converter.optimizations = [tf.lite.Optimize.DEFAULT]
     tflite_model = converter.convert()
 
-    model_name = f"espcn_{input_size}x_{output_size}x.tflite"
-    out_path = os.path.join(model_dir, model_name)
     with open(out_path, "wb") as f:
         f.write(tflite_model)
     print(f"[TRAIN] WROTE {out_path} ({len(tflite_model)} bytes)")
@@ -215,9 +275,7 @@ def main():
     model_dir = os.path.join(script_dir, "..", "assets", "models")
     os.makedirs(model_dir, exist_ok=True)
 
-    # Load or initialize model registry
     registry_path = os.path.join(model_dir, "model_registry.json")
-
     results = []
 
     target = parse_specific_model(SPECIFIC_MODEL) if SPECIFIC_MODEL else None
@@ -229,22 +287,23 @@ def main():
                 if input_size != t_in or input_size * scale != t_out:
                     continue
             try:
-                model_name, size = train_and_export_model(model_dir, input_size, scale, epochs)
+                model_name, size = train_and_export_model(
+                    model_dir, input_size, scale, epochs
+                )
                 results.append({
                     "input_size": input_size,
                     "scale": scale,
                     "output_size": input_size * scale,
                     "epochs": epochs,
                     "file": model_name,
-                    "size_bytes": size
+                    "size_bytes": size,
                 })
             except Exception as e:
                 print(f"[ERROR] Failed to train {input_size}->{input_size*scale}: {e}")
 
-    # Save registry
     registry = {
         "models": results,
-        "total_size_bytes": sum(r["size_bytes"] for r in results)
+        "total_size_bytes": sum(r["size_bytes"] for r in results),
     }
 
     with open(registry_path, "w") as f:

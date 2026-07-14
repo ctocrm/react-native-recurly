@@ -2,7 +2,12 @@
 
 ## Overview
 
-The AI upscaling system uses ESPCN (Efficient Sub-Pixel Convolutional Neural Network) models for edge-AI image upscaling. The implementation now supports **multiple models** optimized for different input/output resolution combinations.
+The AI upscaling system uses **two families** of edge-AI super-resolution models:
+
+- **Fast**: small ESPCN models (lightweight, fast inference, acceptable quality).
+- **Sharp**: FSRCNN models trained with a combined MAE + MS-SSIM + VGG perceptual loss (better edges and detail, slightly larger and slower).
+
+Both families are organized as **multiple models** optimized for different input/output resolution combinations. The app selects the right model at runtime based on the icon's input size, the device's pixel density, and the user's chosen quality mode.
 
 ---
 
@@ -10,9 +15,10 @@ The AI upscaling system uses ESPCN (Efficient Sub-Pixel Convolutional Neural Net
 
 ### Why Multiple Models?
 
-1. **Resolution Preservation**: Each input resolution gets processed optimally without destructive resizing
-2. **Scale-Specific Training**: Models learn best at their specific upscale ratios
-3. **Device Pixel Density Aware**: Output size adapts to device DPI for crisp rendering
+1. **Resolution Preservation**: Each input resolution gets processed optimally without destructive resizing.
+2. **Scale-Specific Training**: Models learn best at their specific upscale ratios.
+3. **Device Pixel Density Aware**: Output size adapts to device DPI for crisp rendering.
+4. **Quality vs. Speed Choice**: Users can pick "Fast" or "Sharp" depending on their preference.
 
 ### Model Matrix
 
@@ -22,41 +28,82 @@ The AI upscaling system uses ESPCN (Efficient Sub-Pixel Convolutional Neural Net
 | 32px       | 64px (2x), 128px (4x), 192px (6x), 256px (8x), 384px (12x), 512px (16x)   | 6      |
 | 48px       | 96px (2x), 144px (3x), 192px (4x), 240px (5x), 384px (8x), 576px (12x)    | 6      |
 | 64px       | 128px (2x), 192px (3x), 256px (4x), 384px (6x), 512px (8x)                | 5      |
-| 96px       | 96px (1x), 192px (2x), 288px (3x), 384px (4x), 480px (5x)                 | 5      |
-| 128px      | 128px (1x), 256px (2x), 384px (3x), 512px (4x)                            | 4      |
-| 192px      | 192px (1x), 384px (2x), 576px (3x)                                        | 3      |
-| 256px      | 256px (1x), 512px (2x)                                                    | 2      |
+| 96px       | 192px (2x), 288px (3x), 384px (4x), 480px (5x)                            | 4      |
+| 128px      | 256px (2x), 384px (3x)                                                    | 2      |
 
-**Total: 37 models** (~740KB total with optimizations)
+> **1x scales excluded**: `tf.nn.depth_to_space` cannot infer an output shape for
+> scale=1, so the 96px/128px "1x" passthrough models are not part of the matrix.
+> The `128px → 512px` (4x) ESPCN model also failed to generate and is currently
+> omitted, so the 128px input tops out at 384px.
+
+**Fast ESPCN matrix currently bundled: 29 models (~1.9 MB).**
+
+### Current Bundle Status
+
+- **Fast (ESPCN)**: bundled and active (29 models in `assets/models/`).
+- **Sharp (FSRCNN)**: **not generated / not bundled yet.** The `MODEL_REGISTRY`
+  still describes the sharp matrix for the future, but no `fsrcnn_*.tflite`
+  files are `require`d in `MODEL_MAP`. Until they are, `isQualityAvailable("sharp")`
+  returns `false`: the picker defaults to (and locks onto) Fast, and any request
+  for Sharp transparently degrades **sharp → fast → bilinear**.
+
+> **Build safety**: `MODEL_MAP` may only `require()` files that physically exist
+> in `assets/models/`. Metro resolves those paths at build time, so referencing a
+> missing model breaks the native bundle. When the sharp family is generated, add
+> the corresponding `require("../../assets/models/fsrcnn_*.tflite")` lines.
 
 ### Epoch Optimization
 
-Training epochs are optimized per scale ratio:
 
-- **1-2x scale**: 25-35 epochs (fast convergence)
-- **3-4x scale**: 40-60 epochs
-- **5-8x scale**: 70-80 epochs
-- **12x-16x scale**: 100-120 epochs
-- **24x-32x scale**: 130-150 epochs (maximum detail hallucination)
+**Fast (ESPCN)**
+
+- **1-2x scale**: 25-35 epochs
+- **3-4x scale**: 40-70 epochs
+- **5-8x scale**: 80-100 epochs
+- **12x-32x scale**: 100-150 epochs
+
+**Sharp (FSRCNN)**
+
+- **1-2x scale**: 40-80 epochs
+- **3-4x scale**: 100-120 epochs
+- **5-8x scale**: 140-160 epochs
+- **12x-32x scale**: 180-250 epochs
+
+The sharp models train longer because the combined loss (MAE + MS-SSIM + perceptual) needs more iterations to converge.
 
 ---
 
 ## Implementation Details
 
-### 1. Training Script (`scripts/train_espcn_multi.py`)
+### 1. Training Scripts
 
-- Generates all 37 models with appropriate epochs
-- Attempts to fetch real icons from Simple Icons CDN
-- Falls back to synthetic shapes if real icons unavailable
-- Uses TensorFlow Lite optimizations for size
+- `scripts/train_espcn_multi.py` — Fast ESPCN family.
+- `scripts/train_fsrcnn_multi.py` — Sharp FSRCNN family with combined loss.
+
+Both scripts:
+
+- Generate all models for the matrix above.
+- Fetch real icons from Simple Icons / Tabler CDNs when possible.
+- Fall back to synthetic shapes if real icons are unavailable.
+- Apply data augmentation (flip, rotation, brightness) for the sharp family.
+- Use TensorFlow Lite `Optimize.DEFAULT` quantization for size.
+- Support `--force` and `--model=input_output` flags.
 
 ### 2. Model Registry (`src/services/iconProcessing.ts`)
 
 ```typescript
-const MODEL_REGISTRY: Record<number, Record<number, string>> = {
-  16: { 4: "espcn_16x_64x.tflite", 8: "espcn_16x_128x.tflite", ... },
-  32: { 2: "espcn_32x_64x.tflite", 4: "espcn_32x_128x.tflite", ... },
-  // ... etc
+const MODEL_REGISTRY: Record<
+  UpscaleQuality,
+  Record<number, Record<number, string>>
+> = {
+  fast: {
+    16: { 4: "espcn_16x_64x.tflite", 8: "espcn_16x_128x.tflite", ... },
+    // ...
+  },
+  sharp: {
+    16: { 4: "fsrcnn_16x_64x.tflite", 8: "fsrcnn_16x_128x.tflite", ... },
+    // ...
+  },
 };
 ```
 
@@ -73,21 +120,39 @@ export function getTargetOutputSize(): number {
 ### 4. Runtime Model Selection
 
 ```typescript
-// Select model based on input size and target output
-const modelInfo = getModelForUpscale(inputSize, targetOutputSize);
+// Select model based on input size, target output, and quality mode
+const modelInfo = getModelForUpscale(inputSize, targetOutputSize, "sharp");
 // Returns { inputSize, scale, modelFile, outputSize }
 ```
+
+### 5. Quality Mode UI
+
+The icon picker modal (`src/components/SubscriptionIconPickerModal.tsx`) now includes an "AI Upscale Quality" toggle:
+
+- **Sharp** (default): FSRCNN models, best visual quality.
+- **Fast**: ESPCN models, fastest inference.
+
+The selected mode is passed to `upscaleIconAi(..., quality)` and is also a good candidate for PostHog analytics.
 
 ---
 
 ## Build Commands
 
 ```bash
-# Generate all models
+# Generate sharp models (default)
 npm run generate-model:multi
 
-# Force regeneration
+# Force regeneration of sharp models
 npm run generate-model:multi:force
+
+# Generate fast models
+npm run generate-model:multi:fast
+
+# Force regeneration of fast models
+npm run generate-model:multi:fast:force
+
+# Train a single model (example: sharp 32->128)
+node scripts/generate-model.js --model=32_128
 
 # Build with models
 npm run build:android
@@ -96,7 +161,9 @@ npm run build:android:force  # Includes model regeneration
 
 ---
 
-## Model Architecture (ESPCN)
+## Model Architectures
+
+### Fast — ESPCN
 
 ```
 Input:  (None, None, 3)    - Flexible input, 3 channels
@@ -108,20 +175,57 @@ Input:  (None, None, 3)    - Flexible input, 3 channels
 Output: (None, None, 3)    - N-times upscaled image
 ```
 
+### Sharp — FSRCNN
+
+```
+Input:  (None, None, 3)
+  │
+  ├─ Conv2D(32, 5x5, padding=same, activation=relu)
+  ├─ Conv2D(8, 1x1, padding=same, activation=relu)
+  ├─ Conv2D(8, 3x3, padding=same, activation=relu) × 3
+  ├─ Conv2D(32, 1x1, padding=same, activation=relu)
+  ├─ Conv2D(scale² × 3, 5x5, padding=same)
+  ├─ Lambda(depth_to_space, scale=N)
+  └─ Conv2D(3, 5x5, padding=same, activation=sigmoid)
+Output: (None, None, 3)
+```
+
+### Loss Function (Sharp)
+
+```python
+def combined_loss(y_true, y_pred):
+    mae = tf.reduce_mean(tf.abs(y_true - y_pred))
+    ssim = 1.0 - tf.reduce_mean(tf.image.ssim_multiscale(y_true, y_pred, 1.0))
+    perceptual = perceptual_loss(y_true, y_pred)  # VGG19 blocks 1-3
+    return mae + 0.15 * ssim + 0.05 * perceptual
+```
+
 ---
 
-## Files Modified
+## Files Modified / Added
 
-- `scripts/train_espcn_multi.py` - New multi-model training script
-- `scripts/generate-model.js` - Updated to support multi-model generation
-- `src/services/iconProcessing.ts` - Dynamic model selection logic
-- `requirements.txt` - Added cairosvg and pillow for real icon processing
-- `package.json` - Added `generate-model:multi` scripts
+- `scripts/train_espcn_multi.py` — Fast ESPCN multi-model training.
+- `scripts/train_fsrcnn_multi.py` — Sharp FSRCNN multi-model training.
+- `scripts/generate-model.js` — Quality-aware wrapper with `--quality=fast|sharp`.
+- `src/services/iconProcessing.ts` — Quality-aware model registry and selection.
+- `src/components/SubscriptionIconPickerModal.tsx` — Quality toggle UI.
+- `package.json` — Updated model generation scripts.
+- `requirements.txt` — Already includes `cairosvg` and `pillow`.
+- `eslint.config.js` — Ignores `scripts/*` to avoid `__dirname` lint errors.
 
 ---
 
 ## Testing
 
-- Use native builds to test AI upscaling (Expo Go doesn't support native modules)
+- Use native builds to test AI upscaling (Expo Go doesn't support custom native modules).
 - Run: `./scripts/verify-android.sh`
 - Check logs: `./scripts/android-emulator.sh logcat`
+- Look for `[ICON_AI]` log lines to confirm which model was loaded and used.
+
+---
+
+## Notes
+
+- The old single `espcn_2x.tflite` model is no longer used by the picker; it is kept only for backward compatibility during the transition.
+- Real-ESRGAN was evaluated and removed: the models are ~65 MB each and too slow for CPU inference on mobile devices.
+- If bundle size becomes a concern, you can drop the `fast` family and ship only `sharp`, or prune the matrix to the most common input/output pairs.

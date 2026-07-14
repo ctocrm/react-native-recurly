@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 /**
- * Multi-model generation script for ESPCN super-resolution models.
+ * Multi-model generation script for super-resolution models.
  *
  * Usage:
- *   node scripts/generate-model.js [--force] [--model N]
+ *   node scripts/generate-model.js [--force] [--model N] [--quality fast|sharp]
  *
  * Options:
- *   --force    Force regeneration even if models exist and are fresh
- *   --model N  Train only a specific model (by input_size_scale, e.g., 16_32 for 16->32)
+ *   --force            Force regeneration even if models exist and are fresh
+ *   --model N          Train only a specific model (by input_size_scale, e.g., 16_32 for 16->32)
+ *   --quality fast     Train the small ESPCN models instead of the default FSRCNN sharp models
  */
 
 const { execFileSync } = require("child_process");
@@ -15,11 +16,18 @@ const fs = require("fs");
 const path = require("path");
 
 const modelDir = path.join(__dirname, "..", "assets", "models");
-const pythonScript = path.join(__dirname, "train_espcn_multi.py");
 const FORCE = process.argv.includes("--force");
 const SPECIFIC_MODEL = process.argv
   .find((arg) => arg.startsWith("--model="))
   ?.split("=")[1];
+const QUALITY =
+  process.argv.find((arg) => arg.startsWith("--quality="))?.split("=")[1] ||
+  "sharp";
+
+const pythonScript = path.join(
+  __dirname,
+  QUALITY === "fast" ? "train_espcn_multi.py" : "train_fsrcnn_multi.py",
+);
 
 function fileExists(p) {
   return fs.existsSync(p);
@@ -36,7 +44,8 @@ function checkModelsFresh() {
 
   // If specific model requested, check only that model
   if (SPECIFIC_MODEL) {
-    const modelFile = `espcn_${SPECIFIC_MODEL.replace("_", "x_")}x.tflite`;
+    const prefix = QUALITY === "fast" ? "espcn" : "fsrcnn";
+    const modelFile = `${prefix}_${SPECIFIC_MODEL.replace("_", "x_")}x.tflite`;
     const modelPath = path.join(modelDir, modelFile);
     if (!fileExists(modelPath)) return false;
     const modelTime = getFileModTime(modelPath);
@@ -52,6 +61,7 @@ function checkModelsFresh() {
 
 function main() {
   console.log("[MODEL] Starting multi-model generation process...");
+  console.log(`[MODEL] Quality mode: ${QUALITY}`);
 
   // Check if models exist and are fresh (unless --force)
   if (
@@ -72,9 +82,13 @@ function main() {
   // Helper: check if a python command has required packages
   function hasRequiredPackages(pythonPath) {
     try {
-      execFileSync(pythonPath, ["-c", "import numpy; import tensorflow"], {
-        stdio: "pipe",
-      });
+      execFileSync(
+        pythonPath,
+        ["-c", "import numpy; import tensorflow; import PIL"],
+        {
+          stdio: "pipe",
+        },
+      );
       return true;
     } catch (e) {
       return false;
@@ -113,7 +127,7 @@ function main() {
     console.log(`[MODEL] Creating Python virtual environment...`);
     execFileSync("python3", ["-m", "venv", venvPath], { stdio: "inherit" });
     pythonCmd = venvPython;
-    console.log(`[MODEL] Installing required packages (numpy, tensorflow)...`);
+    console.log(`[MODEL] Installing required packages...`);
     execFileSync(pythonCmd, ["-m", "pip", "install", "-r", requirementsPath], {
       stdio: "inherit",
     });
