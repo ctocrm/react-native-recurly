@@ -123,6 +123,10 @@ def generate_real_icon_data(n: int, target_size: int) -> np.ndarray:
     # Cache rasterized real icons so we can reuse and augment them without
     # re-fetching the same brand repeatedly.
     real_icon_cache: list[np.ndarray] = []
+    # Track the next brand to attempt independently of the cache: a failed
+    # fetch/rasterization must still advance so we don't retry the same broken
+    # brand forever (and so every brand gets at most one attempt).
+    brand_attempts = 0
     real_count = 0
     synthetic_count = 0
     target_real = n // 2  # aim for a half-real, half-synthetic distribution
@@ -130,11 +134,12 @@ def generate_real_icon_data(n: int, target_size: int) -> np.ndarray:
     for i in range(n):
         if real_count < target_real:
             base = None
-            # Fetch a not-yet-cached brand first, then fall back to reusing an
+            # Attempt the next un-tried brand first, then fall back to reusing an
             # already-cached icon (augmented) so we don't keep re-selecting the
             # same brand sequence without variation.
-            if len(real_icon_cache) < len(TRAINING_BRANDS):
-                brand = TRAINING_BRANDS[len(real_icon_cache) % len(TRAINING_BRANDS)]
+            if brand_attempts < len(TRAINING_BRANDS):
+                brand = TRAINING_BRANDS[brand_attempts]
+                brand_attempts += 1
                 svg = fetch_svg_icon(brand)
                 if svg:
                     rasterized = rasterize_svg_to_png(svg, target_size)
@@ -148,6 +153,7 @@ def generate_real_icon_data(n: int, target_size: int) -> np.ndarray:
                         base = base.astype(np.float32)
                         real_icon_cache.append(base)
                         print(f"[TRAIN] Got real icon: {brand}")
+
 
             if base is None and real_icon_cache:
                 base = real_icon_cache[int(rng.integers(0, len(real_icon_cache)))]

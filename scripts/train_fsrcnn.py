@@ -120,8 +120,12 @@ def generate_training_data(input_size: int, scale: int, n: int = 400):
 def train_and_export_model(model_dir: str, input_size: int, scale: int, epochs: int):
     """Train and export a single FSRCNN model."""
     output_size = input_size * scale
-    model_name = f"fsrcnn_{input_size}x_{output_size}x.tflite"
+    # Use a `fsrcnn_ref_` prefix so these reference/experiment exports cannot
+    # collide with the production `fsrcnn_<in>x_<out>x.tflite` outputs (from
+    # train_fsrcnn_multi.py) nor match the model-map bundling regex.
+    model_name = f"fsrcnn_ref_{input_size}x_{output_size}x.tflite"
     out_path = os.path.join(model_dir, model_name)
+
 
     if not FORCE and os.path.exists(out_path):
         size = os.path.getsize(out_path)
