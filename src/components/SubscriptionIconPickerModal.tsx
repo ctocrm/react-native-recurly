@@ -552,8 +552,8 @@ const SubscriptionIconPickerModal = ({
       : { uri: dataUri };
 
     const isReported = !!item.reportedType;
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const detection = detections[item.id];
+
     const isProcessingWhite =
       processing?.id === item.id && processing.kind === "white";
     const isProcessingUpscale =
@@ -574,7 +574,7 @@ const SubscriptionIconPickerModal = ({
 
         {/* Corrective chips (white-bg / upscale) — shown based on detection */}
         <View className="flex-row items-center gap-1">
-          {detections[item.id]?.hasWhite && (
+          {detection?.hasWhite && (
             <Pressable
               onPress={() => handleClearWhiteBackground(item)}
               disabled={!!processing}
@@ -590,7 +590,7 @@ const SubscriptionIconPickerModal = ({
               )}
             </Pressable>
           )}
-          {detections[item.id]?.isLowRes && (
+          {detection?.isLowRes && (
             <Pressable
               onPress={() => handleUpscale(item)}
               disabled={!!processing}

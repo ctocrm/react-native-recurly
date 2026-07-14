@@ -180,10 +180,16 @@ function findBestScale(
   const scaleMap = MODEL_REGISTRY[quality][inputSize];
   if (!scaleMap) return null;
 
-  // Find scales that get us closest to target
+  // Only consider scales whose model file is actually bundled. This keeps us
+  // within the same quality tier and lets us pick another bundled scale when
+  // the mathematically-closest one isn't shipped, instead of failing over to
+  // bilinear in resolveBundledModel.
   const scales = Object.keys(scaleMap)
     .map(Number)
+    .filter((s) => !!MODEL_MAP[scaleMap[s]])
     .sort((a, b) => a - b);
+
+  if (scales.length === 0) return null;
 
   // Exact match first
   const exactScale = targetOutput / inputSize;
@@ -343,7 +349,10 @@ async function loadModel(modelFile: string): Promise<any | null> {
     loadedModels.set(modelFile, model);
     return model;
   } catch (err) {
-    modelLoadFailed = true;
+    // Only record this specific model as failed; do NOT set the global
+    // modelLoadFailed flag here. A single model failing to load (e.g. a
+    // corrupt/absent file) should not disable AI upscaling for every other
+    // model. The systemic native-module-unavailable path above keeps that flag.
     console.warn(`[ICON_AI] Failed to load model ${modelFile}:`, err);
     return null;
   }

@@ -88,6 +88,10 @@ def sharpen_base64_image(base64_str: str, format: str = 'png',
 
 def test_sharpening():
     """Test sharpening on a sample image."""
+    import os
+    import tempfile
+
+
     # Create a simple test image
     test_img = Image.new('RGB', (64, 64), color='white')
     
@@ -97,15 +101,22 @@ def test_sharpening():
     draw.rectangle([10, 10, 30, 30], fill='red')
     draw.ellipse([35, 35, 55, 55], fill='blue')
     
+    # Allocate temporary output paths instead of hardcoding /tmp.
+    original_fd, original_path = tempfile.mkstemp(prefix='test_original_', suffix='.png')
+    os.close(original_fd)
+    sharpened_fd, sharpened_path = tempfile.mkstemp(prefix='test_sharpened_', suffix='.png')
+    os.close(sharpened_fd)
+
     # Save original
-    test_img.save('/tmp/test_original.png')
+    test_img.save(original_path)
     
     # Apply sharpening
     sharpened = unsharp_mask(test_img, radius=2.0, percent=150, threshold=3)
-    sharpened.save('/tmp/test_sharpened.png')
+    sharpened.save(sharpened_path)
     
-    print("✓ Test images saved to /tmp/test_original.png and /tmp/test_sharpened.png")
+    print(f"✓ Test images saved to {original_path} and {sharpened_path}")
     print("✓ Sharpening function working correctly")
+
 
 
 if __name__ == '__main__':

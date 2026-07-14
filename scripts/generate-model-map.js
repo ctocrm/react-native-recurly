@@ -46,6 +46,18 @@ function main() {
     .filter((f) => MODEL_RE.test(f))
     .sort();
 
+  if (files.length === 0) {
+    // No `<family>_<in>x_<out>x.tflite` models matched. We intentionally still
+    // write an empty map (and exit 0) rather than aborting: the build is
+    // designed to degrade gracefully to bilinear upscaling when no AI models
+    // are bundled. Emit a loud warning so the empty output is never silent.
+    console.warn(
+      `[MODEL_MAP] WARNING: no model files matched ${MODEL_RE} in ${modelDir}. ` +
+        `The generated map will be empty and AI upscaling will fall back to bilinear. ` +
+        `Run "npm run generate-model" (and/or --quality=fast) to produce models.`,
+    );
+  }
+
   const lines = files.map(
     (f) => `  "${f}": require("../../assets/models/${f}"),`,
   );

@@ -3,12 +3,12 @@
  * Multi-model generation script for super-resolution models.
  *
  * Usage:
- *   node scripts/generate-model.js [--force] [--model N] [--quality fast|sharp]
+ *   node scripts/generate-model.js [--force] [--model=N] [--quality=fast|sharp]
  *
  * Options:
  *   --force            Force regeneration even if models exist and are fresh
- *   --model N          Train only a specific model (by input_size_scale, e.g., 16_32 for 16->32)
- *   --quality fast     Train the small ESPCN models instead of the default FSRCNN sharp models
+ *   --model=N          Train only a specific model (by input_size_output_size, e.g., 16_32 for 16->32)
+ *   --quality=fast     Train the small ESPCN models instead of the default FSRCNN sharp models
  */
 
 const { execFileSync } = require("child_process");
@@ -95,6 +95,18 @@ function main() {
     }
   }
 
+  // Run a required environment-setup step, reporting failures through the same
+  // clean, actionable [MODEL] Error handling used by the training invocation
+  // instead of letting a raw exception escape.
+  function runSetupStep(description, file, args) {
+    try {
+      execFileSync(file, args, { stdio: "inherit" });
+    } catch (err) {
+      console.error(`[MODEL] Error during ${description}:`, err.message || err);
+      process.exit(1);
+    }
+  }
+
   // Determine python command with auto-setup logic
   let pythonCmd;
 
@@ -112,25 +124,33 @@ function main() {
     } else {
       pythonCmd = venvPython;
       console.log(`[MODEL] Setting up Python packages in .venv...`);
-      execFileSync(
-        venvPython,
-        ["-m", "pip", "install", "-r", requirementsPath],
-        {
-          stdio: "inherit",
-        },
-      );
+      runSetupStep("pip install into .venv", venvPython, [
+        "-m",
+        "pip",
+        "install",
+        "-r",
+        requirementsPath,
+      ]);
       console.log(`[MODEL] Using venv python at ${pythonCmd}`);
     }
   }
   // 3. Create .venv and install packages
   else {
     console.log(`[MODEL] Creating Python virtual environment...`);
-    execFileSync("python3", ["-m", "venv", venvPath], { stdio: "inherit" });
+    runSetupStep("virtual-environment creation", "python3", [
+      "-m",
+      "venv",
+      venvPath,
+    ]);
     pythonCmd = venvPython;
     console.log(`[MODEL] Installing required packages...`);
-    execFileSync(pythonCmd, ["-m", "pip", "install", "-r", requirementsPath], {
-      stdio: "inherit",
-    });
+    runSetupStep("pip install into new .venv", pythonCmd, [
+      "-m",
+      "pip",
+      "install",
+      "-r",
+      requirementsPath,
+    ]);
     console.log(`[MODEL] Using venv python at ${pythonCmd}`);
   }
 

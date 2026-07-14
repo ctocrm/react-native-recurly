@@ -69,12 +69,14 @@ def perceptual_loss(y_true, y_pred):
         VGG_FEATURES = build_vgg_feature_extractor()
         VGG_FEATURES.trainable = False
 
-    # VGG expects 0-255 images
-    y_true_255 = y_true * 255.0
-    y_pred_255 = y_pred * 255.0
+    # VGG expects 0-255 images run through the model's preprocessing
+    # (RGB->BGR + ImageNet mean subtraction) before feature extraction.
+    y_true_255 = tf.keras.applications.vgg19.preprocess_input(y_true * 255.0)
+    y_pred_255 = tf.keras.applications.vgg19.preprocess_input(y_pred * 255.0)
 
     true_features = VGG_FEATURES(y_true_255)
     pred_features = VGG_FEATURES(y_pred_255)
+
 
     loss = 0.0
     for tf_true, tf_pred in zip(true_features, pred_features):
@@ -291,9 +293,15 @@ def train_and_export_model(model_dir: str, input_size: int, scale: int, epochs: 
 
 
     lr, hr = generate_training_data(input_size, scale)
+    # Shuffle lr/hr together (preserving pairing) so the tail-based
+    # validation_split below mixes real and synthetic samples instead of
+    # validating on a synthetic-only tail (real icons are generated first).
+    perm = np.random.default_rng(1234).permutation(len(lr))
+    lr, hr = lr[perm], hr[perm]
     split = int(len(lr) * 0.9)
 
     model.fit(
+
         lr[:split],
         hr[:split],
         batch_size=16,

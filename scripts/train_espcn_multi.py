@@ -30,9 +30,12 @@ MODEL_CONFIGS = [
     (64, [(2, 40), (3, 60), (4, 70), (6, 80), (8, 100)]),
     # 96px input
     (96, [(2, 50), (3, 60), (4, 70), (5, 80)]),
-    # 128px input
-    (128, [(2, 40), (3, 50), (4, 60)]),
+    # 128px input. 128->512 (4x) is intentionally omitted: it currently fails
+    # to generate and has no MODEL_REGISTRY entry in the app, so training it
+    # would be wasted effort.
+    (128, [(2, 40), (3, 50)]),
 ]
+
 
 # Icon sources for real training data
 ICON_SOURCES = [
@@ -52,21 +55,27 @@ TRAINING_BRANDS = [
 ]
 
 
-def calculate_epochs(scale_ratio: int) -> int:
-    """Calculate optimal epochs based on scale ratio."""
-    if scale_ratio <= 2:
-        return 35
-    elif scale_ratio <= 4:
-        return 60
-    elif scale_ratio <= 6:
-        return 75
-    elif scale_ratio <= 8:
-        return 85
-    else:
-        return 100
+def augment_icon(img: np.ndarray, rng) -> np.ndarray:
+    """Apply light random augmentations to an RGB float (0-1) icon.
+
+    Mirrors the augmentation used in the FSRCNN pipeline so a small set of real
+    icons yields varied training samples instead of exact duplicates.
+    """
+    out = img
+    if rng.random() < 0.5:
+        out = out[:, ::-1, :]  # horizontal flip
+    if rng.random() < 0.5:
+        out = out[::-1, :, :]  # vertical flip
+    k = int(rng.integers(0, 4))
+    if k:
+        out = np.rot90(out, k=k, axes=(0, 1))  # 0/90/180/270 rotation
+    factor = float(rng.uniform(0.85, 1.15))  # brightness jitter
+    out = np.clip(out * factor, 0.0, 1.0)
+    return np.ascontiguousarray(out, dtype=np.float32)
 
 
 def build_espcn(scale: int):
+
     """Build ESPCN model for a specific scale factor."""
     inp = layers.Input(shape=(None, None, 3))
     x = layers.Conv2D(16, 3, padding="same", activation="relu")(inp)
@@ -111,25 +120,43 @@ def generate_real_icon_data(n: int, target_size: int) -> np.ndarray:
     rng = np.random.default_rng(42)
     hr_images = np.zeros((n, target_size, target_size, 3), dtype=np.float32)
 
+    # Cache rasterized real icons so we can reuse and augment them without
+    # re-fetching the same brand repeatedly.
+    real_icon_cache: list[np.ndarray] = []
     real_count = 0
+    synthetic_count = 0
+    target_real = n // 2  # aim for a half-real, half-synthetic distribution
+
     for i in range(n):
-        if real_count < n // 2:  # Try to get half real, half synthetic
-            brand = TRAINING_BRANDS[i % len(TRAINING_BRANDS)]
-            svg = fetch_svg_icon(brand)
-            if svg:
-                rasterized = rasterize_svg_to_png(svg, target_size)
-                if rasterized is not None:
-                    # Ensure RGB (drop alpha if present)
-                    if rasterized.shape[-1] == 4:
-                        # Composite over white background
-                        alpha = rasterized[..., 3:4]
-                        rgb = rasterized[..., :3] * alpha + (1 - alpha)
-                        hr_images[i] = rgb
-                    else:
-                        hr_images[i] = rasterized[..., :3]
-                    real_count += 1
-                    print(f"[TRAIN] Got real icon: {brand}")
-                    continue
+        if real_count < target_real:
+            base = None
+            # Fetch a not-yet-cached brand first, then fall back to reusing an
+            # already-cached icon (augmented) so we don't keep re-selecting the
+            # same brand sequence without variation.
+            if len(real_icon_cache) < len(TRAINING_BRANDS):
+                brand = TRAINING_BRANDS[len(real_icon_cache) % len(TRAINING_BRANDS)]
+                svg = fetch_svg_icon(brand)
+                if svg:
+                    rasterized = rasterize_svg_to_png(svg, target_size)
+                    if rasterized is not None:
+                        if rasterized.shape[-1] == 4:
+                            # Composite over white background
+                            alpha = rasterized[..., 3:4]
+                            base = rasterized[..., :3] * alpha + (1 - alpha)
+                        else:
+                            base = rasterized[..., :3]
+                        base = base.astype(np.float32)
+                        real_icon_cache.append(base)
+                        print(f"[TRAIN] Got real icon: {brand}")
+
+            if base is None and real_icon_cache:
+                base = real_icon_cache[int(rng.integers(0, len(real_icon_cache)))]
+
+            if base is not None:
+                # Augment every real sample so repeated brands still add variety.
+                hr_images[i] = augment_icon(base, rng)
+                real_count += 1
+                continue
 
         # Synthetic fallback (same as original)
         bg = rng.uniform(0.0, 0.3, size=3)
@@ -145,10 +172,15 @@ def generate_real_icon_data(n: int, target_size: int) -> np.ndarray:
             half = r
             rect = ((np.abs(xx - cx) <= half) & (np.abs(yy - cy) <= half))
             hr_images[i, rect] = fg
-        real_count += 1  # Count synthetic too
+        synthetic_count += 1
 
-    print(f"[TRAIN] Generated {real_count} images for size {target_size}")
+    print(
+        f"[TRAIN] Generated {n} images for size {target_size} "
+        f"({real_count} real/augmented from {len(real_icon_cache)} icons, "
+        f"{synthetic_count} synthetic)"
+    )
     return hr_images
+
 
 
 def generate_training_data(input_size: int, scale: int, n: int = 1000):
