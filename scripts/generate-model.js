@@ -20,6 +20,12 @@ const FORCE = process.argv.includes("--force");
 const SPECIFIC_MODEL = process.argv
   .find((arg) => arg.startsWith("--model="))
   ?.split("=")[1];
+const INPUT_SIZE = process.argv
+  .find((arg) => arg.startsWith("--input-size="))
+  ?.split("=")[1];
+const OUTPUT_DIR = process.argv
+  .find((arg) => arg.startsWith("--output-dir="))
+  ?.split("=")[1];
 const QUALITY =
   process.argv.find((arg) => arg.startsWith("--quality="))?.split("=")[1] ||
   "sharp";
@@ -161,6 +167,12 @@ function main() {
     }
     if (SPECIFIC_MODEL) {
       args.push(`--model=${SPECIFIC_MODEL}`);
+    }
+    if (INPUT_SIZE) {
+      args.push(`--input-size=${INPUT_SIZE}`);
+    }
+    if (OUTPUT_DIR) {
+      args.push(`--output-dir=${OUTPUT_DIR}`);
     }
     console.log(`[MODEL] Running training script: ${args.join(" ")}`);
     execFileSync(pythonCmd, args, {

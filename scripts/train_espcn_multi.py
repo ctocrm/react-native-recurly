@@ -12,9 +12,15 @@ from io import BytesIO
 
 FORCE = "--force" in sys.argv
 SPECIFIC_MODEL = None
+INPUT_SIZE = None
+OUTPUT_DIR = None
 for arg in sys.argv:
     if arg.startswith("--model="):
         SPECIFIC_MODEL = arg.split("=")[1]
+    elif arg.startswith("--input-size="):
+        INPUT_SIZE = int(arg.split("=")[1])
+    elif arg.startswith("--output-dir="):
+        OUTPUT_DIR = arg.split("=")[1]
 
 # Model configurations: input_size -> list of (scale, epochs) tuples
 # Scale = output_size / input_size
@@ -250,7 +256,7 @@ def parse_specific_model(spec: str):
 
 def main():
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    model_dir = os.path.join(script_dir, "..", "assets", "models")
+    model_dir = OUTPUT_DIR if OUTPUT_DIR else os.path.join(script_dir, "..", "assets", "models")
     os.makedirs(model_dir, exist_ok=True)
 
     # Load or initialize model registry
@@ -261,6 +267,9 @@ def main():
     target = parse_specific_model(SPECIFIC_MODEL) if SPECIFIC_MODEL else None
 
     for input_size, scale_configs in MODEL_CONFIGS:
+        # Skip if --input-size is set and doesn't match
+        if INPUT_SIZE is not None and input_size != INPUT_SIZE:
+            continue
         for scale, epochs in scale_configs:
             if target:
                 t_in, t_out = target
@@ -279,17 +288,31 @@ def main():
             except Exception as e:
                 print(f"[ERROR] Failed to train {input_size}->{input_size*scale}: {e}")
 
-    # Save registry
+    # Merge with existing registry instead of overwriting
+    existing = {"models": [], "total_size_bytes": 0}
+    if os.path.exists(registry_path):
+        try:
+            with open(registry_path, "r") as f:
+                existing = json.load(f)
+        except (json.JSONDecodeError, Exception):
+            pass
+
+    # Merge: new entries override existing ones with the same file name
+    merged_models = [m for m in existing.get("models", []) if m["file"] not in {r["file"] for r in results}]
+    merged_models.extend(results)
+    total_bytes = sum(m["size_bytes"] for m in merged_models)
+
     registry = {
-        "models": results,
-        "total_size_bytes": sum(r["size_bytes"] for r in results)
+        "models": merged_models,
+        "total_size_bytes": total_bytes,
     }
 
     with open(registry_path, "w") as f:
         json.dump(registry, f, indent=2)
 
     print(f"\n{'='*50}")
-    print(f"[TRAIN] Generated {len(results)} models, total ~{registry['total_size_bytes'] // 1024}KB")
+    print(f"[TRAIN] Generated {len(results)} models this run")
+    print(f"[TRAIN] Registry now has {len(merged_models)} models, total ~{total_bytes // 1024}KB")
     print(f"[TRAIN] Registry saved to {registry_path}")
 
 
