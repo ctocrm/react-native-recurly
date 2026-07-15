@@ -11,6 +11,7 @@ import urllib.request
 from io import BytesIO
 
 FORCE = "--force" in sys.argv
+NO_PERCEPTUAL = "--no-perceptual" in sys.argv
 SPECIFIC_MODEL = None
 for arg in sys.argv:
     if arg.startswith("--model="):
@@ -123,7 +124,7 @@ def _sanitize_grad(x):
     return tf.identity(x), grad
 
 
-def make_combined_loss(output_size: int):
+def make_combined_loss(output_size: int, use_perceptual: bool = True):
 
     """Build a combined MAE + (MS-)SSIM + perceptual loss for a fixed output size.
 
@@ -178,8 +179,10 @@ def make_combined_loss(output_size: int):
         y_pred = tf.clip_by_value(y_pred, 0.0, 1.0)
         mae = tf.reduce_mean(tf.abs(y_true - y_pred))
         ssim = ssim_term(y_true, y_pred)
-        perceptual = perceptual_loss(y_true, y_pred)
-        return mae + 0.15 * ssim + 0.05 * perceptual
+        if use_perceptual:
+            perceptual = perceptual_loss(y_true, y_pred)
+            return mae + 0.15 * ssim + 0.05 * perceptual
+        return mae + 0.15 * ssim
 
     return combined_loss
 
@@ -326,7 +329,10 @@ def train_and_export_model(model_dir: str, input_size: int, scale: int, epochs: 
     # A lower learning rate + gradient clipping keeps the combined loss (which
     # includes a large-magnitude VGG perceptual term) from diverging to NaN.
     optimizer = keras.optimizers.Adam(learning_rate=1e-4, clipnorm=1.0)
-    model.compile(optimizer=optimizer, loss=make_combined_loss(output_size))
+    use_perceptual = not NO_PERCEPTUAL
+    if not use_perceptual:
+        print("[TRAIN] Perceptual loss disabled (--no-perceptual) — using MAE + MS-SSIM only")
+    model.compile(optimizer=optimizer, loss=make_combined_loss(output_size, use_perceptual=use_perceptual))
     print(f"[TRAIN] Model params: {model.count_params()}")
     print(f"[TRAIN] MS-SSIM scales: {_ssim_scales_for(output_size)} (output {output_size}px)")
 
