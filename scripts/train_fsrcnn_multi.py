@@ -11,6 +11,7 @@ import urllib.request
 from io import BytesIO
 
 FORCE = "--force" in sys.argv
+NO_PERCEPTUAL = "--no-perceptual" in sys.argv
 SPECIFIC_MODEL = None
 for arg in sys.argv:
     if arg.startswith("--model="):
@@ -105,7 +106,26 @@ def _ssim_scales_for(output_size: int) -> int:
     return n
 
 
-def make_combined_loss(output_size: int):
+@tf.custom_gradient
+def _sanitize_grad(x):
+    """Identity in the forward pass; zeroes NaN/Inf gradients on the backward.
+
+    `tf.image.ssim_multiscale` yields NaN *gradients* for dissimilar images
+    (fractional powers of negative contrast/structure terms) even when its
+    forward value is finite. Those NaNs propagate into the weights on the very
+    first step and can't be rescued by `clipnorm` (NaN norm -> NaN clip).
+    Wrapping the SSIM input with this op replaces the non-finite gradient
+    entries with 0, so a degenerate SSIM gradient can't poison training while
+    the MAE + perceptual terms still provide a valid learning signal.
+    """
+    def grad(dy):
+        return tf.where(tf.math.is_finite(dy), dy, tf.zeros_like(dy))
+
+    return tf.identity(x), grad
+
+
+def make_combined_loss(output_size: int, use_perceptual: bool = True):
+
     """Build a combined MAE + (MS-)SSIM + perceptual loss for a fixed output size.
 
     The SSIM term adapts to the output resolution: multiscale SSIM when the
@@ -114,35 +134,58 @@ def make_combined_loss(output_size: int):
     """
     n_scales = _ssim_scales_for(output_size)
 
+    def _finite(value):
+        """Replace any NaN/Inf entries with 0 before reducing.
+
+        `tf.image.ssim`/`ssim_multiscale` can emit NaN/Inf on flat patches
+        (near-zero local variance) or from fractional powers of negative
+        contrast terms. Our synthetic icons have large constant backgrounds, so
+        this happens on the very first batch and poisons the whole loss into
+        NaN. Neutralising the non-finite entries keeps the loss well-defined.
+        """
+        return tf.where(tf.math.is_finite(value), value, tf.zeros_like(value))
+
     if n_scales <= 1:
         def ssim_term(y_true, y_pred):
             filter_size = min(_MS_SSIM_FILTER_SIZE, output_size)
-            return 1.0 - tf.reduce_mean(
-                tf.image.ssim(y_true, y_pred, max_val=1.0, filter_size=filter_size)
+            # _sanitize_grad zeroes any NaN/Inf gradient the SSIM op sends back
+            # into y_pred (see its docstring); _finite guards the forward value.
+            s = tf.image.ssim(
+                y_true, _sanitize_grad(y_pred), max_val=1.0, filter_size=filter_size
             )
+            return 1.0 - tf.reduce_mean(_finite(s))
     else:
         pf = _MS_SSIM_POWER_FACTORS[:n_scales]
         total = sum(pf)
         pf = [p / total for p in pf]  # renormalise the subset to sum to 1
 
         def ssim_term(y_true, y_pred):
-            return 1.0 - tf.reduce_mean(
-                tf.image.ssim_multiscale(
-                    y_true,
-                    y_pred,
-                    max_val=1.0,
-                    filter_size=_MS_SSIM_FILTER_SIZE,
-                    power_factors=pf,
-                )
+            # _sanitize_grad zeroes any NaN/Inf gradient MS-SSIM sends back into
+            # y_pred (see its docstring); _finite guards the forward value.
+            s = tf.image.ssim_multiscale(
+                y_true,
+                _sanitize_grad(y_pred),
+                max_val=1.0,
+                filter_size=_MS_SSIM_FILTER_SIZE,
+                power_factors=pf,
             )
+            return 1.0 - tf.reduce_mean(_finite(s))
+
 
     def combined_loss(y_true, y_pred):
+        # SSIM/MAE assume values in [0, 1]; clamp so out-of-range predictions
+        # (or targets) can't drive the metrics into undefined territory.
+        y_true = tf.clip_by_value(y_true, 0.0, 1.0)
+        y_pred = tf.clip_by_value(y_pred, 0.0, 1.0)
         mae = tf.reduce_mean(tf.abs(y_true - y_pred))
         ssim = ssim_term(y_true, y_pred)
-        perceptual = perceptual_loss(y_true, y_pred)
-        return mae + 0.15 * ssim + 0.05 * perceptual
+        if use_perceptual:
+            perceptual = perceptual_loss(y_true, y_pred)
+            return mae + 0.15 * ssim + 0.05 * perceptual
+        return mae + 0.15 * ssim
 
     return combined_loss
+
 
 
 
@@ -286,7 +329,10 @@ def train_and_export_model(model_dir: str, input_size: int, scale: int, epochs: 
     # A lower learning rate + gradient clipping keeps the combined loss (which
     # includes a large-magnitude VGG perceptual term) from diverging to NaN.
     optimizer = keras.optimizers.Adam(learning_rate=1e-4, clipnorm=1.0)
-    model.compile(optimizer=optimizer, loss=make_combined_loss(output_size))
+    use_perceptual = not NO_PERCEPTUAL
+    if not use_perceptual:
+        print("[TRAIN] Perceptual loss disabled (--no-perceptual) — using MAE + MS-SSIM only")
+    model.compile(optimizer=optimizer, loss=make_combined_loss(output_size, use_perceptual=use_perceptual))
     print(f"[TRAIN] Model params: {model.count_params()}")
     print(f"[TRAIN] MS-SSIM scales: {_ssim_scales_for(output_size)} (output {output_size}px)")
 
