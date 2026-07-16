@@ -13,9 +13,15 @@ from io import BytesIO
 FORCE = "--force" in sys.argv
 NO_PERCEPTUAL = "--no-perceptual" in sys.argv
 SPECIFIC_MODEL = None
+INPUT_SIZE = None
+OUTPUT_DIR = None
 for arg in sys.argv:
     if arg.startswith("--model="):
         SPECIFIC_MODEL = arg.split("=")[1]
+    elif arg.startswith("--input-size="):
+        INPUT_SIZE = int(arg.split("=")[1])
+    elif arg.startswith("--output-dir="):
+        OUTPUT_DIR = arg.split("=")[1]
 
 # Model configurations: input_size -> list of (scale, epochs) tuples
 MODEL_CONFIGS = [
@@ -31,6 +37,10 @@ MODEL_CONFIGS = [
     (96, [(2, 80), (3, 100), (4, 120), (5, 140)]),
     # 128px input
     (128, [(2, 80), (3, 100), (4, 120)]),
+    # 192px input (1x passthrough omitted; depth_to_space scale=1 is invalid)
+    (192, [(2, 80), (3, 100)]),
+    # 256px input (1x passthrough omitted; depth_to_space scale=1 is invalid)
+    (256, [(2, 80)]),
 ]
 
 # Icon sources for real training data
@@ -377,20 +387,29 @@ def parse_specific_model(spec: str):
 
 def main():
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    model_dir = os.path.join(script_dir, "..", "assets", "models")
+    model_dir = OUTPUT_DIR if OUTPUT_DIR else os.path.join(script_dir, "..", "assets", "models")
     os.makedirs(model_dir, exist_ok=True)
 
     registry_path = os.path.join(model_dir, "model_registry.json")
     results = []
+    matched_configs = 0
+    failures = 0
 
     target = parse_specific_model(SPECIFIC_MODEL) if SPECIFIC_MODEL else None
+    invalid_target = SPECIFIC_MODEL is not None and target is None
 
     for input_size, scale_configs in MODEL_CONFIGS:
+        if invalid_target:
+            break
+        # Skip if --input-size is set and doesn't match
+        if INPUT_SIZE is not None and input_size != INPUT_SIZE:
+            continue
         for scale, epochs in scale_configs:
             if target:
                 t_in, t_out = target
                 if input_size != t_in or input_size * scale != t_out:
                     continue
+            matched_configs += 1
             try:
                 model_name, size = train_and_export_model(
                     model_dir, input_size, scale, epochs
@@ -405,18 +424,41 @@ def main():
                 })
             except Exception as e:
                 print(f"[ERROR] Failed to train {input_size}->{input_size*scale}: {e}")
+                failures += 1
+
+    if matched_configs == 0:
+        print("[ERROR] No model configuration matched the requested filters")
+        failures += 1
+
+    # Merge with existing registry instead of overwriting
+    existing = {"models": [], "total_size_bytes": 0}
+    if os.path.exists(registry_path):
+        try:
+            with open(registry_path, "r") as f:
+                existing = json.load(f)
+        except Exception:
+            pass
+
+    # Merge: new entries override existing ones with the same file name
+    merged_models = [m for m in existing.get("models", []) if m["file"] not in {r["file"] for r in results}]
+    merged_models.extend(results)
+    total_bytes = sum(m["size_bytes"] for m in merged_models)
 
     registry = {
-        "models": results,
-        "total_size_bytes": sum(r["size_bytes"] for r in results),
+        "models": merged_models,
+        "total_size_bytes": total_bytes,
     }
 
     with open(registry_path, "w") as f:
         json.dump(registry, f, indent=2)
 
     print(f"\n{'='*50}")
-    print(f"[TRAIN] Generated {len(results)} models, total ~{registry['total_size_bytes'] // 1024}KB")
+    print(f"[TRAIN] Generated {len(results)} models this run")
+    print(f"[TRAIN] Registry now has {len(merged_models)} models, total ~{total_bytes // 1024}KB")
     print(f"[TRAIN] Registry saved to {registry_path}")
+
+    if failures:
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

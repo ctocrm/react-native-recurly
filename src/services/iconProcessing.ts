@@ -73,6 +73,13 @@ const MODEL_REGISTRY: Record<
       2: "espcn_128x_256x.tflite",
       3: "espcn_128x_384x.tflite",
     },
+    192: {
+      2: "espcn_192x_384x.tflite",
+      3: "espcn_192x_576x.tflite",
+    },
+    256: {
+      2: "espcn_256x_512x.tflite",
+    },
   },
   sharp: {
     16: {
@@ -116,6 +123,13 @@ const MODEL_REGISTRY: Record<
       2: "fsrcnn_128x_256x.tflite",
       3: "fsrcnn_128x_384x.tflite",
       4: "fsrcnn_128x_512x.tflite",
+    },
+    192: {
+      2: "fsrcnn_192x_384x.tflite",
+      3: "fsrcnn_192x_576x.tflite",
+    },
+    256: {
+      2: "fsrcnn_256x_512x.tflite",
     },
   },
 };

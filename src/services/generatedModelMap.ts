@@ -9,41 +9,16 @@
  * reference a missing file: the build never fails on absent models, and newly
  * generated models are bundled automatically on the next build.
  *
- * Current contents: 29 fast (ESPCN) + 0 sharp (FSRCNN) = 29 models.
+ * Current contents: 0 fast (ESPCN) + 4 sharp (FSRCNN) = 4 models.
  */
 
 /* eslint-disable @typescript-eslint/no-require-imports */
 // Metro resolves these static `require` paths at build time.
 export const MODEL_MAP: Record<string, number> = {
-  "espcn_128x_256x.tflite": require("../../assets/models/espcn_128x_256x.tflite"),
-  "espcn_128x_384x.tflite": require("../../assets/models/espcn_128x_384x.tflite"),
-  "espcn_16x_128x.tflite": require("../../assets/models/espcn_16x_128x.tflite"),
-  "espcn_16x_192x.tflite": require("../../assets/models/espcn_16x_192x.tflite"),
-  "espcn_16x_256x.tflite": require("../../assets/models/espcn_16x_256x.tflite"),
-  "espcn_16x_384x.tflite": require("../../assets/models/espcn_16x_384x.tflite"),
-  "espcn_16x_512x.tflite": require("../../assets/models/espcn_16x_512x.tflite"),
-  "espcn_16x_64x.tflite": require("../../assets/models/espcn_16x_64x.tflite"),
-  "espcn_32x_128x.tflite": require("../../assets/models/espcn_32x_128x.tflite"),
-  "espcn_32x_192x.tflite": require("../../assets/models/espcn_32x_192x.tflite"),
-  "espcn_32x_256x.tflite": require("../../assets/models/espcn_32x_256x.tflite"),
-  "espcn_32x_384x.tflite": require("../../assets/models/espcn_32x_384x.tflite"),
-  "espcn_32x_512x.tflite": require("../../assets/models/espcn_32x_512x.tflite"),
-  "espcn_32x_64x.tflite": require("../../assets/models/espcn_32x_64x.tflite"),
-  "espcn_48x_144x.tflite": require("../../assets/models/espcn_48x_144x.tflite"),
-  "espcn_48x_192x.tflite": require("../../assets/models/espcn_48x_192x.tflite"),
-  "espcn_48x_240x.tflite": require("../../assets/models/espcn_48x_240x.tflite"),
-  "espcn_48x_384x.tflite": require("../../assets/models/espcn_48x_384x.tflite"),
-  "espcn_48x_576x.tflite": require("../../assets/models/espcn_48x_576x.tflite"),
-  "espcn_48x_96x.tflite": require("../../assets/models/espcn_48x_96x.tflite"),
-  "espcn_64x_128x.tflite": require("../../assets/models/espcn_64x_128x.tflite"),
-  "espcn_64x_192x.tflite": require("../../assets/models/espcn_64x_192x.tflite"),
-  "espcn_64x_256x.tflite": require("../../assets/models/espcn_64x_256x.tflite"),
-  "espcn_64x_384x.tflite": require("../../assets/models/espcn_64x_384x.tflite"),
-  "espcn_64x_512x.tflite": require("../../assets/models/espcn_64x_512x.tflite"),
-  "espcn_96x_192x.tflite": require("../../assets/models/espcn_96x_192x.tflite"),
-  "espcn_96x_288x.tflite": require("../../assets/models/espcn_96x_288x.tflite"),
-  "espcn_96x_384x.tflite": require("../../assets/models/espcn_96x_384x.tflite"),
-  "espcn_96x_480x.tflite": require("../../assets/models/espcn_96x_480x.tflite"),
+  "fsrcnn_16x_128x.tflite": require("../../assets/models/fsrcnn_16x_128x.tflite"),
+  "fsrcnn_16x_192x.tflite": require("../../assets/models/fsrcnn_16x_192x.tflite"),
+  "fsrcnn_16x_256x.tflite": require("../../assets/models/fsrcnn_16x_256x.tflite"),
+  "fsrcnn_16x_64x.tflite": require("../../assets/models/fsrcnn_16x_64x.tflite"),
 };
 
 /** The set of model file names that are actually bundled. */
