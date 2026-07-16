@@ -2,6 +2,9 @@
 /**
  * Multi-model generation script for super-resolution models.
  *
+ * Requires a pre-configured Python virtual environment at `.venv/` in the
+ * project root. Run `bash scripts/train-setup.sh` to create it.
+ *
  * Usage:
  *   node scripts/generate-model.js [--force] [--model=N] [--input-size=N]
  *     [--output-dir=PATH] [--quality=fast|sharp] [--no-perceptual]
@@ -61,88 +64,22 @@ function main() {
   console.log("[MODEL] Starting multi-model generation process...");
   console.log(`[MODEL] Quality mode: ${QUALITY}`);
 
-  // Always invoke the trainer. It checks every selected output file and skips
-  // existing models individually, which is reliable for partial and
-  // distributed output directories. Registry timestamps cannot prove that a
-  // complete quality family is present.
+  const venvPython = path.join(__dirname, "..", ".venv", "bin", "python");
 
-  const venvPath = path.join(__dirname, "..", ".venv");
-  const venvPython = path.join(venvPath, "bin", "python");
-  const requirementsPath = path.join(__dirname, "..", "requirements.txt");
-
-  // Helper: check if a python command has required packages
-  function hasRequiredPackages(pythonPath) {
-    try {
-      execFileSync(
-        pythonPath,
-        ["-c", "import numpy; import tensorflow; import PIL"],
-        {
-          stdio: "pipe",
-        },
-      );
-      return true;
-    } catch (e) {
-      return false;
-    }
-  }
-
-  // Run a required environment-setup step, reporting failures through the same
-  // clean, actionable [MODEL] Error handling used by the training invocation
-  // instead of letting a raw exception escape.
-  function runSetupStep(description, file, args) {
-    try {
-      execFileSync(file, args, { stdio: "inherit" });
-    } catch (err) {
-      console.error(`[MODEL] Error during ${description}:`, err.message || err);
-      process.exit(1);
-    }
-  }
-
-  // Determine python command with auto-setup logic
-  let pythonCmd;
-
-  // 1. Try /tmp/tfenv first (if it has packages)
-  const tfEnvPython = "/tmp/tfenv/bin/python";
-  if (fs.existsSync(tfEnvPython) && hasRequiredPackages(tfEnvPython)) {
-    pythonCmd = tfEnvPython;
-    console.log(`[MODEL] Using tfenv python at ${pythonCmd}`);
-  }
-  // 2. Try .venv (create/install if needed)
-  else if (fs.existsSync(venvPython)) {
-    if (hasRequiredPackages(venvPython)) {
-      pythonCmd = venvPython;
-      console.log(`[MODEL] Using venv python at ${pythonCmd}`);
-    } else {
-      pythonCmd = venvPython;
-      console.log(`[MODEL] Setting up Python packages in .venv...`);
-      runSetupStep("pip install into .venv", venvPython, [
-        "-m",
-        "pip",
-        "install",
-        "-r",
-        requirementsPath,
-      ]);
-      console.log(`[MODEL] Using venv python at ${pythonCmd}`);
-    }
-  }
-  // 3. Create .venv and install packages
-  else {
-    console.log(`[MODEL] Creating Python virtual environment...`);
-    runSetupStep("virtual-environment creation", "python3", [
-      "-m",
-      "venv",
-      venvPath,
-    ]);
-    pythonCmd = venvPython;
-    console.log(`[MODEL] Installing required packages...`);
-    runSetupStep("pip install into new .venv", pythonCmd, [
-      "-m",
-      "pip",
-      "install",
-      "-r",
-      requirementsPath,
-    ]);
-    console.log(`[MODEL] Using venv python at ${pythonCmd}`);
+  // Fail fast if virtual environment is not set up — no auto-setup logic.
+  if (!fs.existsSync(venvPython)) {
+    console.error(
+      "[MODEL] Python virtual environment not found at " +
+        path.join(__dirname, "..", ".venv") +
+        ".",
+    );
+    console.error("");
+    console.error("[MODEL] Run the setup script first:");
+    console.error("  bash scripts/train-setup.sh");
+    console.error("");
+    console.error("[MODEL] Or via npm:");
+    console.error("  npm run train:setup");
+    process.exit(1);
   }
 
   try {
@@ -163,7 +100,7 @@ function main() {
       args.push("--no-perceptual");
     }
     console.log(`[MODEL] Running training script: ${args.join(" ")}`);
-    execFileSync(pythonCmd, args, {
+    execFileSync(venvPython, args, {
       stdio: "inherit",
       cwd: path.join(__dirname, ".."),
     });

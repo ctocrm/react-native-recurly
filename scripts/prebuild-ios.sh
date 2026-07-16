@@ -29,10 +29,9 @@ if [[ "$(uname)" != "Darwin" ]]; then
     fi
 fi
 
-# Step 1: Generate model (iOS uses the same model as Android)
-echo "[IOS] Step 1: Model Generation"
-cd "$PROJECT_ROOT"
-node "$SCRIPT_DIR/generate-model.js"
+# Step 1: Regenerate model map (iOS uses the same model assets as Android)
+echo "[IOS] Step 1: Regenerating model map from assets/models/..."
+node "$SCRIPT_DIR/generate-model-map.js"
 
 # Step 2: Prebuild iOS project
 echo ""
