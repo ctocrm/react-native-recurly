@@ -40,6 +40,10 @@ MODEL_CONFIGS = [
     # to generate and has no MODEL_REGISTRY entry in the app, so training it
     # would be wasted effort.
     (128, [(2, 40), (3, 50)]),
+    # 192px input (1x passthrough omitted; depth_to_space scale=1 is invalid)
+    (192, [(2, 40), (3, 60)]),
+    # 256px input (1x passthrough omitted; depth_to_space scale=1 is invalid)
+    (256, [(2, 40)]),
 ]
 
 
@@ -263,10 +267,15 @@ def main():
     registry_path = os.path.join(model_dir, "model_registry.json")
 
     results = []
+    matched_configs = 0
+    failures = 0
 
     target = parse_specific_model(SPECIFIC_MODEL) if SPECIFIC_MODEL else None
+    invalid_target = SPECIFIC_MODEL is not None and target is None
 
     for input_size, scale_configs in MODEL_CONFIGS:
+        if invalid_target:
+            break
         # Skip if --input-size is set and doesn't match
         if INPUT_SIZE is not None and input_size != INPUT_SIZE:
             continue
@@ -275,6 +284,7 @@ def main():
                 t_in, t_out = target
                 if input_size != t_in or input_size * scale != t_out:
                     continue
+            matched_configs += 1
             try:
                 model_name, size = train_and_export_model(model_dir, input_size, scale, epochs)
                 results.append({
@@ -287,6 +297,11 @@ def main():
                 })
             except Exception as e:
                 print(f"[ERROR] Failed to train {input_size}->{input_size*scale}: {e}")
+                failures += 1
+
+    if matched_configs == 0:
+        print("[ERROR] No model configuration matched the requested filters")
+        failures += 1
 
     # Merge with existing registry instead of overwriting
     existing = {"models": [], "total_size_bytes": 0}
@@ -294,7 +309,7 @@ def main():
         try:
             with open(registry_path, "r") as f:
                 existing = json.load(f)
-        except (json.JSONDecodeError, Exception):
+        except Exception:
             pass
 
     # Merge: new entries override existing ones with the same file name
@@ -314,6 +329,9 @@ def main():
     print(f"[TRAIN] Generated {len(results)} models this run")
     print(f"[TRAIN] Registry now has {len(merged_models)} models, total ~{total_bytes // 1024}KB")
     print(f"[TRAIN] Registry saved to {registry_path}")
+
+    if failures:
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

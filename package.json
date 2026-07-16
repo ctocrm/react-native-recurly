@@ -18,7 +18,6 @@
     "generate-model:multi:fast": "node scripts/generate-model.js --quality=fast",
     "generate-model:multi:fast:force": "node scripts/generate-model.js --quality=fast --force",
     "generate-model-map": "node scripts/generate-model-map.js",
-    "generate-model:input-size": "node scripts/generate-model.js --input-size=",
     "prebuild:android": "expo prebuild --clean --platform android",
     "prebuild:ios": "expo prebuild --clean --platform ios",
     "build:android": "./scripts/build-android.sh",

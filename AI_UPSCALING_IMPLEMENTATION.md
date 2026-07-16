@@ -30,22 +30,29 @@ Both families are organized as **multiple models** optimized for different input
 | 64px       | 128px (2x), 192px (3x), 256px (4x), 384px (6x), 512px (8x)                | 5      |
 | 96px       | 192px (2x), 288px (3x), 384px (4x), 480px (5x)                            | 4      |
 | 128px      | 256px (2x), 384px (3x)                                                    | 2      |
+| 192px      | 384px (2x), 576px (3x)                                                    | 2      |
+| 256px      | 512px (2x)                                                                | 1      |
 
 > **1x scales excluded**: `tf.nn.depth_to_space` cannot infer an output shape for
-> scale=1, so the 96px/128px "1x" passthrough models are not part of the matrix.
+> scale=1, so the 96px/128px/192px/256px "1x" passthrough models are not part
+> of the matrix.
 > The `128px → 512px` (4x) ESPCN model also failed to generate and is currently
 > omitted, so the 128px input tops out at 384px.
 
-**Fast ESPCN matrix currently bundled: 29 models (~1.9 MB).**
+The configured Fast matrix contains **32 models**. Sharp uses the same matrix
+plus `128px → 512px`, for **33 Sharp models / 65 total**. The generated
+`MODEL_MAP` determines which configured models are currently bundled.
 
 ### Current Bundle Status
 
-- **Fast (ESPCN)**: bundled and active (29 models in `assets/models/`).
-- **Sharp (FSRCNN)**: **not generated / not bundled yet.** The `MODEL_REGISTRY`
-  still describes the sharp matrix for the future, but no `fsrcnn_*.tflite`
-  files are `require`d in `MODEL_MAP`. Until they are, `isQualityAvailable("sharp")`
-  returns `false`: the picker defaults to (and locks onto) Fast, and any request
-  for Sharp transparently degrades **sharp → fast → bilinear**.
+- **Fast (ESPCN)**: no models are currently present in `assets/models/`.
+- **Sharp (FSRCNN)**: four 16px-input models are currently bundled (outputs 64,
+  128, 192, and 256px). The remaining configured models are not yet bundled.
+
+Availability is derived from generated `MODEL_MAP` entries. A request for an
+unavailable Sharp combination degrades **sharp → fast → bilinear**; with the
+current assets, unavailable combinations fall back to bilinear because no Fast
+models are bundled.
 
 > **Build safety (automatic)**: `MODEL_MAP` is **auto-generated** from the
 > `*.tflite` files that physically exist in `assets/models/` by
@@ -91,9 +98,30 @@ Both scripts:
 - Generate all models for the matrix above.
 - Fetch real icons from Simple Icons / Tabler CDNs when possible.
 - Fall back to synthetic shapes if real icons are unavailable.
-- Apply data augmentation (flip, rotation, brightness) for the sharp family.
+- Apply data augmentation (flip, rotation, brightness).
 - Use TensorFlow Lite `Optimize.DEFAULT` quantization for size.
-- Support `--force` and `--model=input_output` flags.
+- Support `--force`, `--model=input_output`, `--input-size=N`, and
+  `--output-dir=PATH` flags. FSRCNN also supports `--no-perceptual` for faster,
+  lower-quality development tests.
+
+The matrix is machine-count-agnostic. To distribute training, assign any of the
+eight input sizes (`16`, `32`, `48`, `64`, `96`, `128`, `192`, or `256`) to
+each worker and give it a local output directory, for example:
+
+```bash
+node scripts/generate-model.js --quality=fast --input-size=16 --output-dir=/tmp/models-16
+```
+
+After all workers finish, copy their `*.tflite` files into `assets/models/` and
+run `npm run generate-model-map`. Worker-local JSON registries are merged on
+each run, but the app bundle is generated from the model files physically
+present in `assets/models/`.
+
+There are two distinct app wiring layers. `MODEL_REGISTRY` in
+`src/services/iconProcessing.ts` manually describes which model should be
+selected for each input/scale combination. `src/services/generatedModelMap.ts`
+is generated from physical files and supplies Metro's static `require()` calls.
+Do not edit the generated map by hand.
 
 ### 2. Model Registry (`src/services/iconProcessing.ts`)
 
@@ -214,7 +242,9 @@ def combined_loss(y_true, y_pred):
 >
 > **NaN safety**: the VGG perceptual term is large-magnitude, so training uses
 > `Adam(learning_rate=1e-4, clipnorm=1.0)` to keep the combined loss from
-> diverging to NaN.
+> diverging to NaN. Non-finite SSIM forward values are neutralized, and a
+> custom-gradient identity zeros non-finite SSIM gradients before they can
+> poison the model weights.
 
 ---
 
