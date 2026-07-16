@@ -179,3 +179,101 @@ npm run build:android:all
 ```
 
 These are **65 independent model calls**, followed by the model-map call and the all-architecture build call.
+
+he implemented `--input-size` flag lets you generate all models for one input size in a single command. Use these for independent runs per machine.
+
+```bash
+cd /home/d/Desktop/jsmastery
+```
+
+## Fast — one command per input size (8 commands)
+
+```bash
+node scripts/generate-model.js --quality=fast --input-size=16 --force --output-dir=/home/d/Desktop/jsmastery/assets/models
+node scripts/generate-model.js --quality=fast --input-size=32 --force --output-dir=/home/d/Desktop/jsmastery/assets/models
+node scripts/generate-model.js --quality=fast --input-size=48 --force --output-dir=/home/d/Desktop/jsmastery/assets/models
+node scripts/generate-model.js --quality=fast --input-size=64 --force --output-dir=/home/d/Desktop/jsmastery/assets/models
+node scripts/generate-model.js --quality=fast --input-size=96 --force --output-dir=/home/d/Desktop/jsmastery/assets/models
+node scripts/generate-model.js --quality=fast --input-size=128 --force --output-dir=/home/d/Desktop/jsmastery/assets/models
+node scripts/generate-model.js --quality=fast --input-size=192 --force --output-dir=/home/d/Desktop/jsmastery/assets/models
+node scripts/generate-model.js --quality=fast --input-size=256 --force --output-dir=/home/d/Desktop/jsmastery/assets/models
+```
+
+## Sharp — one command per input size (8 commands)
+
+Do not add `--no-perceptual`.
+
+```bash
+node scripts/generate-model.js --quality=sharp --input-size=16 --force --output-dir=/home/d/Desktop/jsmastery/assets/models
+node scripts/generate-model.js --quality=sharp --input-size=32 --force --output-dir=/home/d/Desktop/jsmastery/assets/models
+node scripts/generate-model.js --quality=sharp --input-size=48 --force --output-dir=/home/d/Desktop/jsmastery/assets/models
+node scripts/generate-model.js --quality=sharp --input-size=64 --force --output-dir=/home/d/Desktop/jsmastery/assets/models
+node scripts/generate-model.js --quality=sharp --input-size=96 --force --output-dir=/home/d/Desktop/jsmastery/assets/models
+node scripts/generate-model.js --quality=sharp --input-size=128 --force --output-dir=/home/d/Desktop/jsmastery/assets/models
+node scripts/generate-model.js --quality=sharp --input-size=192 --force --output-dir=/home/d/Desktop/jsmastery/assets/models
+node scripts/generate-model.js --quality=sharp --input-size=256 --force --output-dir=/home/d/Desktop/jsmastery/assets/models
+```
+
+Run any subset on any machine. After all commands complete:
+
+```bash
+test "$(find assets/models -maxdepth 1 -name 'espcn_*.tflite' | wc -l)" -eq 32
+test "$(find assets/models -maxdepth 1 -name 'fsrcnn_*.tflite' | wc -l)" -eq 33
+npm run generate-model-map
+npm run build:android:all
+```
+
+</parameter> </function> </tool_call>
+
+Checkpoint
+
+Compare
+
+Restore
+
+Cline uses complex prompts and iterative task execution that may be challenging for less capable models. For best results, it's recommended to use a stronger model with better tool-calling and agentic coding capabilities.
+
+Thinking
+
+<tool_call> <function=plan_mode_respond> <parameter=response> The implemented `--input-size` flag lets you generate all models for one input size in a single command. Use these for independent runs per machine.
+
+```bash
+cd /home/d/Desktop/jsmastery
+```
+
+## Fast — one command per input size (8 commands)
+
+```bash
+node scripts/generate-model.js --quality=fast --input-size=16 --force --output-dir=/home/d/Desktop/jsmastery/assets/models
+node scripts/generate-model.js --quality=fast --input-size=32 --force --output-dir=/home/d/Desktop/jsmastery/assets/models
+node scripts/generate-model.js --quality=fast --input-size=48 --force --output-dir=/home/d/Desktop/jsmastery/assets/models
+node scripts/generate-model.js --quality=fast --input-size=64 --force --output-dir=/home/d/Desktop/jsmastery/assets/models
+node scripts/generate-model.js --quality=fast --input-size=96 --force --output-dir=/home/d/Desktop/jsmastery/assets/models
+node scripts/generate-model.js --quality=fast --input-size=128 --force --output-dir=/home/d/Desktop/jsmastery/assets/models
+node scripts/generate-model.js --quality=fast --input-size=192 --force --output-dir=/home/d/Desktop/jsmastery/assets/models
+node scripts/generate-model.js --quality=fast --input-size=256 --force --output-dir=/home/d/Desktop/jsmastery/assets/models
+```
+
+## Sharp — one command per input size (8 commands)
+
+Do not add `--no-perceptual`.
+
+```bash
+node scripts/generate-model.js --quality=sharp --input-size=16 --force --output-dir=/home/d/Desktop/jsmastery/assets/models
+node scripts/generate-model.js --quality=sharp --input-size=32 --force --output-dir=/home/d/Desktop/jsmastery/assets/models
+node scripts/generate-model.js --quality=sharp --input-size=48 --force --output-dir=/home/d/Desktop/jsmastery/assets/models
+node scripts/generate-model.js --quality=sharp --input-size=64 --force --output-dir=/home/d/Desktop/jsmastery/assets/models
+node scripts/generate-model.js --quality=sharp --input-size=96 --force --output-dir=/home/d/Desktop/jsmastery/assets/models
+node scripts/generate-model.js --quality=sharp --input-size=128 --force --output-dir=/home/d/Desktop/jsmastery/assets/models
+node scripts/generate-model.js --quality=sharp --input-size=192 --force --output-dir=/home/d/Desktop/jsmastery/assets/models
+node scripts/generate-model.js --quality=sharp --input-size=256 --force --output-dir=/home/d/Desktop/jsmastery/assets/models
+```
+
+Run any subset on any machine. After all commands complete:
+
+```bash
+test "$(find assets/models -maxdepth 1 -name 'espcn_*.tflite' | wc -l)" -eq 32
+test "$(find assets/models -maxdepth 1 -name 'fsrcnn_*.tflite' | wc -l)" -eq 33
+npm run generate-model-map
+npm run build:android:all
+```
