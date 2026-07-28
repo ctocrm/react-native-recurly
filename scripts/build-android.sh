@@ -22,7 +22,7 @@
 #   --dev                                         Dev client mode (x86_64 + expo start + install + launch)
 #   --install                                     Install APK on emulator after build (self-contained mode only)
 #   --parallel N                                  Workers per arch (default: 1)
-#   --force-model                                 Force model regeneration
+#   (removed) --force-model was moved to `npm run train:models:force`
 #   --watch                                       Enable live build monitoring
 #   --clean                                       Clean prebuild (expo prebuild --clean)
 #   --device|--avd <name>                         Use specific AVD (overrides smart selection)
@@ -38,7 +38,6 @@ ANDROID_SDK="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/home/d/Android/Sdk}}"
 ARCH_LIST=("arm64-v8a" "armeabi-v7a" "x86" "x86_64")
 ARCH_TARGET="all"
 PARALLEL=1
-FORCE_MODEL=false
 WATCH=false
 CLEAN=false
 DEV_MODE=false
@@ -65,10 +64,6 @@ while [[ $# -gt 0 ]]; do
         --parallel)
             PARALLEL="$2"
             shift 2
-            ;;
-        --force-model)
-            FORCE_MODEL=true
-            shift
             ;;
         --watch)
             WATCH=true
@@ -167,22 +162,14 @@ if [ "$DO_INSTALL" = "true" ] || [ "$DEV_MODE" = "true" ]; then
     export AVD_NAME
 fi
 
-# Step 1: Model generation
+# Step 1: Regenerate the static require() map from whatever *.tflite files
+# exist in assets/models/. This guarantees the bundle only references models
+# that are physically present (so the build never fails on missing models).
+#
+# Model training has been separated out — run `npm run train:setup && npm run train:models`
+# separately if you need to generate or update the upscaling models.
 echo ""
-echo "[BUILD] Step 1: Model Generation"
-if [ "$FORCE_MODEL" = "true" ]; then
-    echo "[BUILD] Forcing model regeneration..."
-    node "$SCRIPT_DIR/generate-model.js" --force
-else
-    echo "[BUILD] Checking model..."
-    node "$SCRIPT_DIR/generate-model.js"
-fi
-
-# Regenerate the static require() map from whatever *.tflite files now exist in
-# assets/models/. This guarantees the bundle only references models that are
-# physically present (so the build never fails on missing models) and that any
-# freshly generated models are bundled automatically.
-echo "[BUILD] Regenerating model map from assets/models/..."
+echo "[BUILD] Step 1: Regenerating model map from assets/models/..."
 node "$SCRIPT_DIR/generate-model-map.js"
 
 

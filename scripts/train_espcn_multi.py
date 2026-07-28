@@ -303,32 +303,9 @@ def main():
         print("[ERROR] No model configuration matched the requested filters")
         failures += 1
 
-    # Merge with existing registry instead of overwriting
-    existing = {"models": [], "total_size_bytes": 0}
-    if os.path.exists(registry_path):
-        try:
-            with open(registry_path, "r") as f:
-                existing = json.load(f)
-        except Exception:
-            pass
-
-    # Merge: new entries override existing ones with the same file name
-    merged_models = [m for m in existing.get("models", []) if m["file"] not in {r["file"] for r in results}]
-    merged_models.extend(results)
-    total_bytes = sum(m["size_bytes"] for m in merged_models)
-
-    registry = {
-        "models": merged_models,
-        "total_size_bytes": total_bytes,
-    }
-
-    with open(registry_path, "w") as f:
-        json.dump(registry, f, indent=2)
-
     print(f"\n{'='*50}")
     print(f"[TRAIN] Generated {len(results)} models this run")
-    print(f"[TRAIN] Registry now has {len(merged_models)} models, total ~{total_bytes // 1024}KB")
-    print(f"[TRAIN] Registry saved to {registry_path}")
+    print(f"[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry")
 
     if failures:
         raise SystemExit(1)
