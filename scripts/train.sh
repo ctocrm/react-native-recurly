@@ -29,8 +29,18 @@ while [[ $# -gt 0 ]]; do
         --sharp)  QUALITY="sharp" ; shift ;;
         --both)   QUALITY="both" ; shift ;;
         --force)  FORCE="--force" ; shift ;;
-        --input-size) INPUT_SIZE="$2" ; shift 2 ;;
-        --model)  MODEL="$2" ; shift 2 ;;
+        --input-size)
+            if [ $# -lt 2 ] || [[ "$2" == --* ]]; then
+                echo "[TRAIN] Error: --input-size requires a value" >&2
+                exit 1
+            fi
+            INPUT_SIZE="$2" ; shift 2 ;;
+        --model)
+            if [ $# -lt 2 ] || [[ "$2" == --* ]]; then
+                echo "[TRAIN] Error: --model requires a value" >&2
+                exit 1
+            fi
+            MODEL="$2" ; shift 2 ;;
         *)        echo "[TRAIN] Unknown option: $1" ; exit 1 ;;
     esac
 done
@@ -72,6 +82,13 @@ case "$QUALITY" in
         run_trainer "$QUALITY"
         ;;
 esac
+
+# Regenerate registry from actual .tflite files
+echo ""
+echo "=========================================="
+echo "[TRAIN] Regenerating model registry..."
+echo "=========================================="
+node "$SCRIPT_DIR/generate-model-registry.js"
 
 echo ""
 echo "[TRAIN] Done."
