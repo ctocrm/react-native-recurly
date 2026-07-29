@@ -199,9 +199,9 @@ def make_combined_loss(output_size: int, use_perceptual: bool = True):
 
 
 
-def build_fsrcnn(scale: int, d: int = 32, s: int = 8, m: int = 3):
-    """Build FSRCNN model for a specific scale factor."""
-    inp = layers.Input(shape=(None, None, 3))
+def build_fsrcnn(scale: int, input_size: int = 16, d: int = 32, s: int = 8, m: int = 3):
+    """Build FSRCNN model for a specific scale factor with fixed input shape."""
+    inp = layers.Input(shape=(input_size, input_size, 3))
 
     # Feature extraction
     x = layers.Conv2D(d, 5, padding="same", activation="relu")(inp)
@@ -335,7 +335,7 @@ def train_and_export_model(model_dir: str, input_size: int, scale: int, epochs: 
     print(f"\n{'='*50}")
     print(f"[TRAIN] Training {input_size}->{output_size} (scale {scale}x, {epochs} epochs)")
 
-    model = build_fsrcnn(scale)
+    model = build_fsrcnn(scale, input_size)
     # A lower learning rate + gradient clipping keeps the combined loss (which
     # includes a large-magnitude VGG perceptual term) from diverging to NaN.
     optimizer = keras.optimizers.Adam(learning_rate=1e-4, clipnorm=1.0)

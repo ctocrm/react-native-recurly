@@ -84,10 +84,10 @@ def augment_icon(img: np.ndarray, rng) -> np.ndarray:
     return np.ascontiguousarray(out, dtype=np.float32)
 
 
-def build_espcn(scale: int):
+def build_espcn(scale: int, input_size: int = 16):
 
-    """Build ESPCN model for a specific scale factor."""
-    inp = layers.Input(shape=(None, None, 3))
+    """Build ESPCN model for a specific scale factor with fixed input shape."""
+    inp = layers.Input(shape=(input_size, input_size, 3))
     x = layers.Conv2D(16, 3, padding="same", activation="relu")(inp)
     x = layers.Conv2D(scale * scale * 3, 3, padding="same")(x)
     x = layers.Lambda(lambda t: tf.nn.depth_to_space(t, scale))(x)
@@ -227,7 +227,7 @@ def train_and_export_model(model_dir: str, input_size: int, scale: int, epochs: 
     print(f"\n{'='*50}")
     print(f"[TRAIN] Training {input_size}->{output_size} (scale {scale}x, {epochs} epochs)")
 
-    model = build_espcn(scale)
+    model = build_espcn(scale, input_size)
     model.compile(optimizer="adam", loss="mae")
     print(f"[TRAIN] Model params: {model.count_params()}")
 
