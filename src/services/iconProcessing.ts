@@ -447,6 +447,15 @@ async function writeDebugLogToFile(log: string): Promise<string | null> {
     await writeAsStringAsync(debugFile.uri, existing + newEntry);
     console.log(`[ICON_AI] Debug log written to ${debugFile.uri}`);
 
+    // Share via system share sheet so user can send the log
+    try {
+      const Sharing = await import("expo-sharing");
+      await Sharing.shareAsync(debugFile.uri, {
+        mimeType: "text/plain",
+        dialogTitle: "Share Upscale Debug Log",
+      });
+    } catch {}
+
     return debugFile.uri;
   } catch (err) {
     console.warn("[ICON_AI] Failed to write debug log:", err);
