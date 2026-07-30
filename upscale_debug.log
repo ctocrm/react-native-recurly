@@ -1,0 +1,324 @@
+=== 2026-07-29T17:33:52.539Z ===
+inputSize=256px
+format=png
+targetOutput=192px
+quality=sharp
+model=fsrcnn_256x_512x.tflite
+modelInput=256x256
+modelOutput=512x512
+model loaded OK
+resized to 256x256
+inputB64 len=29312
+decoded RGBA len=262400
+decoded first px: R=255 G=255 B=255 A=255
+rgbIn len=196608 first3=[1.000,1.000,1.000]
+runSync returned 1 tensors
+outBytes len=786432
+outBytes type=Float32Array
+expected len=786432 (for 512x512x3)
+outBytes[0..5]=[0.4821,0.4868,0.4848,0.4803,0.4840,0.4818]
+outBytes range (first 100): [0.4757, 0.4868]
+rgba first px: R=123 G=124 B=124 A=255
+rgba center px: R=121 G=123 B=122
+pngData len=1533
+result b64 len=2044
+result starts: iVBORw0KGgoAAAANSUhEUgAAAgAAAAIACAMAAADDpiTIAAAAAX...
+SUCCESS
+
+=== 2026-07-29T18:39:02.369Z ===
+inputSize=256px
+format=png
+targetOutput=192px
+quality=fast
+model=espcn_256x_512x.tflite
+modelInput=256x256
+modelOutput=512x512
+model loaded OK
+resized to 256x256
+inputB64 len=48712
+decoded RGBA len=262400
+decoded first px: R=0 G=0 B=0 A=0
+rgbIn len=196608 first3=[0.000,0.000,0.000]
+runSync returned 1 tensors
+outBytes len=786432
+outBytes type=Float32Array
+expected len=786432 (for 512x512x3)
+outBytes[0..5]=[0.3972,0.4195,0.4113,0.3729,0.3901,0.3830]
+outBytes range (first 100): [0.3729, 0.4195]
+rgba first px: R=101 G=107 B=105 A=255
+rgba center px: R=96 G=104 B=98
+pngData len=1054
+result b64 len=1408
+result starts: iVBORw0KGgoAAAANSUhEUgAAAgAAAAIABAMAAAAGVsnJAAAAAX...
+SUCCESS
+
+=== 2026-07-29T23:30:41.167Z ===
+inputSize=256px
+format=png
+targetOutput=192px
+quality=fast
+model=espcn_256x_512x.tflite
+modelInput=256x256
+modelOutput=512x512
+model loaded OK
+resized to 256x256
+inputB64 len=48712
+decoded RGBA len=262400
+decoded first px: R=0 G=0 B=0 A=0
+rgbIn len=196608 first3=[0.000,0.000,0.000]
+runSync returned 1 tensors
+outBytes len=786432
+outBytes type=Float32Array
+expected len=786432 (for 512x512x3)
+outBytes[0..5]=[0.3972,0.4195,0.4113,0.3729,0.3901,0.3830]
+outBytes range (first 100): [0.3729, 0.4195]
+rgba first px: R=101 G=107 B=105 A=255
+rgba center px: R=96 G=104 B=98
+pngData len=1054
+result b64 len=1408
+result starts: iVBORw0KGgoAAAANSUhEUgAAAgAAAAIABAMAAAAGVsnJAAAAAX...
+SUCCESS
+
+=== 2026-07-29T23:30:51.574Z ===
+inputSize=256px
+format=png
+targetOutput=192px
+quality=fast
+model=espcn_256x_512x.tflite
+modelInput=256x256
+modelOutput=512x512
+model loaded OK
+resized to 256x256
+inputB64 len=29312
+decoded RGBA len=262400
+decoded first px: R=255 G=255 B=255 A=255
+rgbIn len=196608 first3=[1.000,1.000,1.000]
+runSync returned 1 tensors
+outBytes len=786432
+outBytes type=Float32Array
+expected len=786432 (for 512x512x3)
+outBytes[0..5]=[0.3972,0.4195,0.4113,0.3729,0.3901,0.3830]
+outBytes range (first 100): [0.3729, 0.4195]
+rgba first px: R=101 G=107 B=105 A=255
+rgba center px: R=96 G=104 B=98
+pngData len=1054
+result b64 len=1408
+result starts: iVBORw0KGgoAAAANSUhEUgAAAgAAAAIABAMAAAAGVsnJAAAAAX...
+SUCCESS
+
+=== 2026-07-30T03:59:22.278Z ===
+inputSize=256px
+format=png
+targetOutput=192px
+quality=sharp
+model=fsrcnn_256x_512x.tflite
+modelInput=256x256
+modelOutput=512x512
+model loaded OK
+resized to 256x256
+inputB64 len=48712
+decoded RGBA len=262400
+decoded first px: R=0 G=0 B=0 A=0
+rgbIn len=196608 first3=[0.000,0.000,0.000]
+runSync returned 1 tensors
+outBytes len=12
+outBytes type=Float32Array
+expected len=786432 (for 512x512x3)
+outBytes[0..5]=[0.4729,0.4832,0.4877,0.4776,0.4817,0.4834]
+outBytes range (first 100): [0.4688, 0.4960]
+rgba first px: R=121 G=123 B=124 A=255
+rgba center px: R=0 G=0 B=0
+pngData len=1110
+result b64 len=1480
+result starts: iVBORw0KGgoAAAANSUhEUgAAAgAAAAIABAMAAAAGVsnJAAAAAX...
+SUCCESS
+
+=== 2026-07-30T03:59:30.518Z ===
+inputSize=256px
+format=png
+targetOutput=192px
+quality=sharp
+model=fsrcnn_256x_512x.tflite
+modelInput=256x256
+modelOutput=512x512
+model loaded OK
+resized to 256x256
+inputB64 len=29312
+decoded RGBA len=262400
+decoded first px: R=255 G=255 B=255 A=255
+rgbIn len=196608 first3=[1.000,1.000,1.000]
+runSync returned 1 tensors
+outBytes len=12
+outBytes type=Float32Array
+expected len=786432 (for 512x512x3)
+outBytes[0..5]=[0.4729,0.4832,0.4877,0.4776,0.4817,0.4834]
+outBytes range (first 100): [0.4688, 0.4960]
+rgba first px: R=121 G=123 B=124 A=255
+rgba center px: R=0 G=0 B=0
+pngData len=1110
+result b64 len=1480
+result starts: iVBORw0KGgoAAAANSUhEUgAAAgAAAAIABAMAAAAGVsnJAAAAAX...
+SUCCESS
+
+=== 2026-07-30T03:59:44.227Z ===
+inputSize=256px
+format=png
+targetOutput=192px
+quality=sharp
+model=fsrcnn_256x_512x.tflite
+modelInput=256x256
+modelOutput=512x512
+model loaded OK
+resized to 256x256
+inputB64 len=48712
+decoded RGBA len=262400
+decoded first px: R=0 G=0 B=0 A=0
+rgbIn len=196608 first3=[0.000,0.000,0.000]
+runSync returned 1 tensors
+outBytes len=12
+outBytes type=Float32Array
+expected len=786432 (for 512x512x3)
+outBytes[0..5]=[0.4729,0.4832,0.4877,0.4776,0.4817,0.4834]
+outBytes range (first 100): [0.4688, 0.4960]
+rgba first px: R=121 G=123 B=124 A=255
+rgba center px: R=0 G=0 B=0
+pngData len=1110
+result b64 len=1480
+result starts: iVBORw0KGgoAAAANSUhEUgAAAgAAAAIABAMAAAAGVsnJAAAAAX...
+SUCCESS
+
+=== 2026-07-30T03:59:49.203Z ===
+inputSize=256px
+format=png
+targetOutput=192px
+quality=sharp
+model=fsrcnn_256x_512x.tflite
+modelInput=256x256
+modelOutput=512x512
+model loaded OK
+resized to 256x256
+inputB64 len=29312
+decoded RGBA len=262400
+decoded first px: R=255 G=255 B=255 A=255
+rgbIn len=196608 first3=[1.000,1.000,1.000]
+runSync returned 1 tensors
+outBytes len=12
+outBytes type=Float32Array
+expected len=786432 (for 512x512x3)
+outBytes[0..5]=[0.4729,0.4832,0.4877,0.4776,0.4817,0.4834]
+outBytes range (first 100): [0.4688, 0.4960]
+rgba first px: R=121 G=123 B=124 A=255
+rgba center px: R=0 G=0 B=0
+pngData len=1110
+result b64 len=1480
+result starts: iVBORw0KGgoAAAANSUhEUgAAAgAAAAIABAMAAAAGVsnJAAAAAX...
+SUCCESS
+
+=== 2026-07-30T05:56:48.972Z ===
+inputSize=256px
+format=png
+targetOutput=192px
+quality=sharp
+model=fsrcnn_256x_512x.tflite
+modelInput=256x256
+modelOutput=512x512
+model loaded OK
+resized to 256x256
+inputB64 len=48712
+decoded RGBA len=262400
+decoded first px: R=0 G=0 B=0 A=0
+rgbIn len=196608 first3=[0.000,0.000,0.000]
+runSync returned 1 tensors
+outBytes len=12
+outBytes type=Float32Array
+expected len=786432 (for 512x512x3)
+outBytes[0..5]=[0.4728,0.4837,0.4853,0.4790,0.4822,0.4828]
+outBytes range (first 100): [0.4698, 0.4956]
+rgba first px: R=121 G=123 B=124 A=255
+rgba center px: R=0 G=0 B=0
+pngData len=1110
+result b64 len=1480
+result starts: iVBORw0KGgoAAAANSUhEUgAAAgAAAAIABAMAAAAGVsnJAAAAAX...
+SUCCESS
+
+=== 2026-07-30T05:56:54.201Z ===
+inputSize=256px
+format=png
+targetOutput=192px
+quality=sharp
+model=fsrcnn_256x_512x.tflite
+modelInput=256x256
+modelOutput=512x512
+model loaded OK
+resized to 256x256
+inputB64 len=29312
+decoded RGBA len=262400
+decoded first px: R=255 G=255 B=255 A=255
+rgbIn len=196608 first3=[1.000,1.000,1.000]
+runSync returned 1 tensors
+outBytes len=12
+outBytes type=Float32Array
+expected len=786432 (for 512x512x3)
+outBytes[0..5]=[0.4728,0.4837,0.4853,0.4790,0.4822,0.4828]
+outBytes range (first 100): [0.4698, 0.4956]
+rgba first px: R=121 G=123 B=124 A=255
+rgba center px: R=0 G=0 B=0
+pngData len=1110
+result b64 len=1480
+result starts: iVBORw0KGgoAAAANSUhEUgAAAgAAAAIABAMAAAAGVsnJAAAAAX...
+SUCCESS
+
+=== 2026-07-30T06:02:04.219Z ===
+inputSize=256px
+format=png
+targetOutput=192px
+quality=sharp
+model=fsrcnn_256x_512x.tflite
+modelInput=256x256
+modelOutput=512x512
+model loaded OK
+resized to 256x256
+inputB64 len=48712
+decoded RGBA len=262400
+decoded first px: R=0 G=0 B=0 A=0
+rgbIn len=196608 first3=[0.000,0.000,0.000]
+runSync returned 1 tensors
+outBytes len=12
+outBytes type=Float32Array
+expected len=786432 (for 512x512x3)
+outBytes[0..5]=[0.4728,0.4837,0.4853,0.4790,0.4822,0.4828]
+outBytes range (first 100): [0.4698, 0.4956]
+rgba first px: R=121 G=123 B=124 A=255
+rgba center px: R=0 G=0 B=0
+pngData len=1110
+result b64 len=1480
+result starts: iVBORw0KGgoAAAANSUhEUgAAAgAAAAIABAMAAAAGVsnJAAAAAX...
+SUCCESS
+
+=== 2026-07-30T07:02:22.194Z ===
+inputSize=256px
+format=png
+targetOutput=192px
+quality=sharp
+model=fsrcnn_256x_512x.tflite
+modelInput=256x256
+modelOutput=512x512
+model loaded OK
+resized to 256x256
+inputB64 len=29312
+decoded RGBA len=262400
+decoded first px: R=255 G=255 B=255 A=255
+rgbIn len=196608 first3=[1.000,1.000,1.000]
+runSync returned 1 tensors
+outBytes len=12
+outBytes type=Float32Array
+expected len=786432 (for 512x512x3)
+outBytes[0..5]=[0.4729,0.4832,0.4877,0.4776,0.4817,0.4834]
+outBytes range (first 100): [0.4688, 0.4960]
+rgba first px: R=121 G=123 B=124 A=255
+rgba center px: R=0 G=0 B=0
+pngData len=1110
+result b64 len=1480
+result starts: iVBORw0KGgoAAAANSUhEUgAAAgAAAAIABAMAAAAGVsnJAAAAAX...
+SUCCESS
+

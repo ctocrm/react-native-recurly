@@ -594,18 +594,6 @@ export async function upscaleIconAi(
       `rgbIn len=${rgbIn.length} first3=[${rgbIn[0]?.toFixed(3)},${rgbIn[1]?.toFixed(3)},${rgbIn[2]?.toFixed(3)}]`,
     );
 
-    // Resize the model's input tensor to match our prepared input. This avoids
-    // shape mismatches when the model has a fixed input size that differs from
-    // previous inference shapes.
-    try {
-      if (typeof model.resizeInput === "function") {
-        model.resizeInput(0, [1, modelInfo.inputSize, modelInfo.inputSize, 3]);
-        dbg.push("resized model input tensor");
-      }
-    } catch (resizeErr) {
-      dbg.push(`resizeInput skipped: ${resizeErr}`);
-    }
-
     // Run the selected super-resolution model
     const out: Float32Array[] = await model.runSync([rgbIn]);
     dbg.push(`runSync returned ${out.length} tensors`);
