@@ -1,20 +1,12 @@
 {
   "models": [
     {
-      "input_size": 128,
-      "scale": 2,
-      "output_size": 256,
-      "epochs": 40,
-      "file": "espcn_128x_256x.tflite",
-      "size_bytes": 7040
-    },
-    {
-      "input_size": 128,
-      "scale": 3,
-      "output_size": 384,
-      "epochs": 50,
-      "file": "espcn_128x_384x.tflite",
-      "size_bytes": 9440
+      "input_size": 16,
+      "scale": 4,
+      "output_size": 64,
+      "epochs": 64,
+      "file": "espcn_16x_64x.tflite",
+      "size_bytes": 12680
     },
     {
       "input_size": 16,
@@ -57,36 +49,12 @@
       "size_bytes": 496616
     },
     {
-      "input_size": 16,
-      "scale": 4,
+      "input_size": 32,
+      "scale": 2,
       "output_size": 64,
-      "epochs": 64,
-      "file": "espcn_16x_64x.tflite",
-      "size_bytes": 12680
-    },
-    {
-      "input_size": 192,
-      "scale": 2,
-      "output_size": 384,
-      "epochs": 40,
-      "file": "espcn_192x_384x.tflite",
-      "size_bytes": 7040
-    },
-    {
-      "input_size": 192,
-      "scale": 3,
-      "output_size": 576,
-      "epochs": 60,
-      "file": "espcn_192x_576x.tflite",
-      "size_bytes": 9440
-    },
-    {
-      "input_size": 256,
-      "scale": 2,
-      "output_size": 512,
-      "epochs": 40,
-      "file": "espcn_256x_512x.tflite",
-      "size_bytes": 7040
+      "epochs": 35,
+      "file": "espcn_32x_64x.tflite",
+      "size_bytes": 6920
     },
     {
       "input_size": 32,
@@ -94,7 +62,7 @@
       "output_size": 128,
       "epochs": 60,
       "file": "espcn_32x_128x.tflite",
-      "size_bytes": 12776
+      "size_bytes": 12752
     },
     {
       "input_size": 32,
@@ -102,7 +70,7 @@
       "output_size": 192,
       "epochs": 70,
       "file": "espcn_32x_192x.tflite",
-      "size_bytes": 22376
+      "size_bytes": 22352
     },
     {
       "input_size": 32,
@@ -110,7 +78,7 @@
       "output_size": 256,
       "epochs": 80,
       "file": "espcn_32x_256x.tflite",
-      "size_bytes": 35816
+      "size_bytes": 35808
     },
     {
       "input_size": 32,
@@ -118,7 +86,7 @@
       "output_size": 384,
       "epochs": 100,
       "file": "espcn_32x_384x.tflite",
-      "size_bytes": 74240
+      "size_bytes": 74216
     },
     {
       "input_size": 32,
@@ -126,55 +94,7 @@
       "output_size": 512,
       "epochs": 120,
       "file": "espcn_32x_512x.tflite",
-      "size_bytes": 128000
-    },
-    {
-      "input_size": 32,
-      "scale": 2,
-      "output_size": 64,
-      "epochs": 35,
-      "file": "espcn_32x_64x.tflite",
-      "size_bytes": 7016
-    },
-    {
-      "input_size": 48,
-      "scale": 3,
-      "output_size": 144,
-      "epochs": 60,
-      "file": "espcn_48x_144x.tflite",
-      "size_bytes": 9432
-    },
-    {
-      "input_size": 48,
-      "scale": 4,
-      "output_size": 192,
-      "epochs": 70,
-      "file": "espcn_48x_192x.tflite",
-      "size_bytes": 12800
-    },
-    {
-      "input_size": 48,
-      "scale": 5,
-      "output_size": 240,
-      "epochs": 80,
-      "file": "espcn_48x_240x.tflite",
-      "size_bytes": 17120
-    },
-    {
-      "input_size": 48,
-      "scale": 8,
-      "output_size": 384,
-      "epochs": 100,
-      "file": "espcn_48x_384x.tflite",
-      "size_bytes": 35840
-    },
-    {
-      "input_size": 48,
-      "scale": 12,
-      "output_size": 576,
-      "epochs": 120,
-      "file": "espcn_48x_576x.tflite",
-      "size_bytes": 74240
+      "size_bytes": 127976
     },
     {
       "input_size": 48,
@@ -182,7 +102,47 @@
       "output_size": 96,
       "epochs": 40,
       "file": "espcn_48x_96x.tflite",
-      "size_bytes": 7040
+      "size_bytes": 6920
+    },
+    {
+      "input_size": 48,
+      "scale": 3,
+      "output_size": 144,
+      "epochs": 60,
+      "file": "espcn_48x_144x.tflite",
+      "size_bytes": 9392
+    },
+    {
+      "input_size": 48,
+      "scale": 4,
+      "output_size": 192,
+      "epochs": 70,
+      "file": "espcn_48x_192x.tflite",
+      "size_bytes": 12752
+    },
+    {
+      "input_size": 48,
+      "scale": 5,
+      "output_size": 240,
+      "epochs": 80,
+      "file": "espcn_48x_240x.tflite",
+      "size_bytes": 17088
+    },
+    {
+      "input_size": 48,
+      "scale": 8,
+      "output_size": 384,
+      "epochs": 100,
+      "file": "espcn_48x_384x.tflite",
+      "size_bytes": 35816
+    },
+    {
+      "input_size": 48,
+      "scale": 12,
+      "output_size": 576,
+      "epochs": 120,
+      "file": "espcn_48x_576x.tflite",
+      "size_bytes": 74216
     },
     {
       "input_size": 64,
@@ -190,7 +150,7 @@
       "output_size": 128,
       "epochs": 40,
       "file": "espcn_64x_128x.tflite",
-      "size_bytes": 7040
+      "size_bytes": 6920
     },
     {
       "input_size": 64,
@@ -198,7 +158,7 @@
       "output_size": 192,
       "epochs": 60,
       "file": "espcn_64x_192x.tflite",
-      "size_bytes": 9440
+      "size_bytes": 9392
     },
     {
       "input_size": 64,
@@ -206,7 +166,7 @@
       "output_size": 256,
       "epochs": 70,
       "file": "espcn_64x_256x.tflite",
-      "size_bytes": 12800
+      "size_bytes": 12752
     },
     {
       "input_size": 64,
@@ -214,7 +174,7 @@
       "output_size": 384,
       "epochs": 80,
       "file": "espcn_64x_384x.tflite",
-      "size_bytes": 22400
+      "size_bytes": 22368
     },
     {
       "input_size": 64,
@@ -222,7 +182,7 @@
       "output_size": 512,
       "epochs": 100,
       "file": "espcn_64x_512x.tflite",
-      "size_bytes": 35840
+      "size_bytes": 35816
     },
     {
       "input_size": 96,
@@ -230,7 +190,7 @@
       "output_size": 192,
       "epochs": 50,
       "file": "espcn_96x_192x.tflite",
-      "size_bytes": 7040
+      "size_bytes": 6920
     },
     {
       "input_size": 96,
@@ -238,7 +198,7 @@
       "output_size": 288,
       "epochs": 60,
       "file": "espcn_96x_288x.tflite",
-      "size_bytes": 9440
+      "size_bytes": 9392
     },
     {
       "input_size": 96,
@@ -246,7 +206,7 @@
       "output_size": 384,
       "epochs": 70,
       "file": "espcn_96x_384x.tflite",
-      "size_bytes": 12800
+      "size_bytes": 12752
     },
     {
       "input_size": 96,
@@ -254,71 +214,47 @@
       "output_size": 480,
       "epochs": 80,
       "file": "espcn_96x_480x.tflite",
-      "size_bytes": 17120
+      "size_bytes": 17088
     },
     {
       "input_size": 128,
       "scale": 2,
       "output_size": 256,
-      "epochs": 80,
-      "file": "fsrcnn_128x_256x.tflite",
-      "size_bytes": 22600
+      "epochs": 40,
+      "file": "espcn_128x_256x.tflite",
+      "size_bytes": 6920
     },
     {
       "input_size": 128,
       "scale": 3,
       "output_size": 384,
-      "epochs": 100,
-      "file": "fsrcnn_128x_384x.tflite",
-      "size_bytes": 34848
+      "epochs": 50,
+      "file": "espcn_128x_384x.tflite",
+      "size_bytes": 9392
     },
     {
-      "input_size": 128,
-      "scale": 4,
-      "output_size": 512,
-      "epochs": 120,
-      "file": "fsrcnn_128x_512x.tflite",
-      "size_bytes": 51976
-    },
-    {
-      "input_size": 16,
-      "scale": 8,
-      "output_size": 128,
-      "epochs": 150,
-      "file": "fsrcnn_16x_128x.tflite",
-      "size_bytes": 169480
-    },
-    {
-      "input_size": 16,
-      "scale": 12,
-      "output_size": 192,
-      "epochs": 180,
-      "file": "fsrcnn_16x_192x.tflite",
-      "size_bytes": 365320
-    },
-    {
-      "input_size": 16,
-      "scale": 16,
-      "output_size": 256,
-      "epochs": 200,
-      "file": "fsrcnn_16x_256x.tflite",
-      "size_bytes": 639496
-    },
-    {
-      "input_size": 16,
-      "scale": 24,
+      "input_size": 192,
+      "scale": 2,
       "output_size": 384,
-      "epochs": 220,
-      "file": "fsrcnn_16x_384x.tflite",
-      "size_bytes": 1422856
+      "epochs": 40,
+      "file": "espcn_192x_384x.tflite",
+      "size_bytes": 6920
     },
     {
-      "input_size": 16,
-      "scale": 32,
+      "input_size": 192,
+      "scale": 3,
+      "output_size": 576,
+      "epochs": 60,
+      "file": "espcn_192x_576x.tflite",
+      "size_bytes": 9392
+    },
+    {
+      "input_size": 256,
+      "scale": 2,
       "output_size": 512,
-      "epochs": 250,
-      "file": "fsrcnn_16x_512x.tflite",
-      "size_bytes": 2519560
+      "epochs": 40,
+      "file": "espcn_256x_512x.tflite",
+      "size_bytes": 6920
     },
     {
       "input_size": 16,
@@ -326,71 +262,47 @@
       "output_size": 64,
       "epochs": 120,
       "file": "fsrcnn_16x_64x.tflite",
-      "size_bytes": 51960
+      "size_bytes": 58016
     },
     {
-      "input_size": 192,
-      "scale": 2,
-      "output_size": 384,
-      "epochs": 80,
-      "file": "fsrcnn_192x_384x.tflite",
-      "size_bytes": 22600
-    },
-    {
-      "input_size": 192,
-      "scale": 3,
-      "output_size": 576,
-      "epochs": 100,
-      "file": "fsrcnn_192x_576x.tflite",
-      "size_bytes": 34848
-    },
-    {
-      "input_size": 256,
-      "scale": 2,
-      "output_size": 512,
-      "epochs": 80,
-      "file": "fsrcnn_256x_512x.tflite",
-      "size_bytes": 22600
-    },
-    {
-      "input_size": 32,
-      "scale": 4,
-      "output_size": 128,
-      "epochs": 120,
-      "file": "fsrcnn_32x_128x.tflite",
-      "size_bytes": 51976
-    },
-    {
-      "input_size": 32,
-      "scale": 6,
-      "output_size": 192,
-      "epochs": 140,
-      "file": "fsrcnn_32x_192x.tflite",
-      "size_bytes": 100936
-    },
-    {
-      "input_size": 32,
+      "input_size": 16,
       "scale": 8,
-      "output_size": 256,
-      "epochs": 160,
-      "file": "fsrcnn_32x_256x.tflite",
-      "size_bytes": 169480
+      "output_size": 128,
+      "epochs": 150,
+      "file": "fsrcnn_16x_128x.tflite",
+      "size_bytes": 175744
     },
     {
-      "input_size": 32,
+      "input_size": 16,
       "scale": 12,
-      "output_size": 384,
+      "output_size": 192,
       "epochs": 180,
-      "file": "fsrcnn_32x_384x.tflite",
-      "size_bytes": 365320
+      "file": "fsrcnn_16x_192x.tflite",
+      "size_bytes": 371600
     },
     {
-      "input_size": 32,
+      "input_size": 16,
       "scale": 16,
-      "output_size": 512,
+      "output_size": 256,
       "epochs": 200,
-      "file": "fsrcnn_32x_512x.tflite",
-      "size_bytes": 639496
+      "file": "fsrcnn_16x_256x.tflite",
+      "size_bytes": 645776
+    },
+    {
+      "input_size": 16,
+      "scale": 24,
+      "output_size": 384,
+      "epochs": 220,
+      "file": "fsrcnn_16x_384x.tflite",
+      "size_bytes": 1429136
+    },
+    {
+      "input_size": 16,
+      "scale": 32,
+      "output_size": 512,
+      "epochs": 250,
+      "file": "fsrcnn_16x_512x.tflite",
+      "size_bytes": 2525840
     },
     {
       "input_size": 32,
@@ -398,47 +310,47 @@
       "output_size": 64,
       "epochs": 80,
       "file": "fsrcnn_32x_64x.tflite",
-      "size_bytes": 22600
+      "size_bytes": 28640
     },
     {
-      "input_size": 48,
-      "scale": 3,
-      "output_size": 144,
-      "epochs": 100,
-      "file": "fsrcnn_48x_144x.tflite",
-      "size_bytes": 34848
-    },
-    {
-      "input_size": 48,
+      "input_size": 32,
       "scale": 4,
-      "output_size": 192,
+      "output_size": 128,
       "epochs": 120,
-      "file": "fsrcnn_48x_192x.tflite",
-      "size_bytes": 51976
+      "file": "fsrcnn_32x_128x.tflite",
+      "size_bytes": 58240
     },
     {
-      "input_size": 48,
-      "scale": 5,
-      "output_size": 240,
+      "input_size": 32,
+      "scale": 6,
+      "output_size": 192,
       "epochs": 140,
-      "file": "fsrcnn_48x_240x.tflite",
-      "size_bytes": 74016
+      "file": "fsrcnn_32x_192x.tflite",
+      "size_bytes": 106976
     },
     {
-      "input_size": 48,
+      "input_size": 32,
       "scale": 8,
-      "output_size": 384,
+      "output_size": 256,
       "epochs": 160,
-      "file": "fsrcnn_48x_384x.tflite",
-      "size_bytes": 169480
+      "file": "fsrcnn_32x_256x.tflite",
+      "size_bytes": 175744
     },
     {
-      "input_size": 48,
+      "input_size": 32,
       "scale": 12,
-      "output_size": 576,
+      "output_size": 384,
       "epochs": 180,
-      "file": "fsrcnn_48x_576x.tflite",
-      "size_bytes": 365320
+      "file": "fsrcnn_32x_384x.tflite",
+      "size_bytes": 371360
+    },
+    {
+      "input_size": 32,
+      "scale": 16,
+      "output_size": 512,
+      "epochs": 200,
+      "file": "fsrcnn_32x_512x.tflite",
+      "size_bytes": 645536
     },
     {
       "input_size": 48,
@@ -446,7 +358,47 @@
       "output_size": 96,
       "epochs": 80,
       "file": "fsrcnn_48x_96x.tflite",
-      "size_bytes": 22600
+      "size_bytes": 28640
+    },
+    {
+      "input_size": 48,
+      "scale": 3,
+      "output_size": 144,
+      "epochs": 100,
+      "file": "fsrcnn_48x_144x.tflite",
+      "size_bytes": 41112
+    },
+    {
+      "input_size": 48,
+      "scale": 4,
+      "output_size": 192,
+      "epochs": 120,
+      "file": "fsrcnn_48x_192x.tflite",
+      "size_bytes": 58256
+    },
+    {
+      "input_size": 48,
+      "scale": 5,
+      "output_size": 240,
+      "epochs": 140,
+      "file": "fsrcnn_48x_240x.tflite",
+      "size_bytes": 80048
+    },
+    {
+      "input_size": 48,
+      "scale": 8,
+      "output_size": 384,
+      "epochs": 160,
+      "file": "fsrcnn_48x_384x.tflite",
+      "size_bytes": 175744
+    },
+    {
+      "input_size": 48,
+      "scale": 12,
+      "output_size": 576,
+      "epochs": 180,
+      "file": "fsrcnn_48x_576x.tflite",
+      "size_bytes": 371360
     },
     {
       "input_size": 64,
@@ -454,7 +406,7 @@
       "output_size": 128,
       "epochs": 80,
       "file": "fsrcnn_64x_128x.tflite",
-      "size_bytes": 22600
+      "size_bytes": 28640
     },
     {
       "input_size": 64,
@@ -462,7 +414,7 @@
       "output_size": 192,
       "epochs": 100,
       "file": "fsrcnn_64x_192x.tflite",
-      "size_bytes": 34848
+      "size_bytes": 41112
     },
     {
       "input_size": 64,
@@ -470,7 +422,7 @@
       "output_size": 256,
       "epochs": 120,
       "file": "fsrcnn_64x_256x.tflite",
-      "size_bytes": 51976
+      "size_bytes": 58256
     },
     {
       "input_size": 64,
@@ -478,7 +430,7 @@
       "output_size": 384,
       "epochs": 140,
       "file": "fsrcnn_64x_384x.tflite",
-      "size_bytes": 100936
+      "size_bytes": 106976
     },
     {
       "input_size": 64,
@@ -486,7 +438,7 @@
       "output_size": 512,
       "epochs": 160,
       "file": "fsrcnn_64x_512x.tflite",
-      "size_bytes": 169480
+      "size_bytes": 175744
     },
     {
       "input_size": 96,
@@ -494,7 +446,7 @@
       "output_size": 192,
       "epochs": 80,
       "file": "fsrcnn_96x_192x.tflite",
-      "size_bytes": 22600
+      "size_bytes": 28640
     },
     {
       "input_size": 96,
@@ -502,7 +454,7 @@
       "output_size": 288,
       "epochs": 100,
       "file": "fsrcnn_96x_288x.tflite",
-      "size_bytes": 34848
+      "size_bytes": 41112
     },
     {
       "input_size": 96,
@@ -510,7 +462,7 @@
       "output_size": 384,
       "epochs": 120,
       "file": "fsrcnn_96x_384x.tflite",
-      "size_bytes": 51976
+      "size_bytes": 58256
     },
     {
       "input_size": 96,
@@ -518,8 +470,56 @@
       "output_size": 480,
       "epochs": 140,
       "file": "fsrcnn_96x_480x.tflite",
-      "size_bytes": 74016
+      "size_bytes": 80048
+    },
+    {
+      "input_size": 128,
+      "scale": 2,
+      "output_size": 256,
+      "epochs": 80,
+      "file": "fsrcnn_128x_256x.tflite",
+      "size_bytes": 28640
+    },
+    {
+      "input_size": 128,
+      "scale": 3,
+      "output_size": 384,
+      "epochs": 100,
+      "file": "fsrcnn_128x_384x.tflite",
+      "size_bytes": 41112
+    },
+    {
+      "input_size": 128,
+      "scale": 4,
+      "output_size": 512,
+      "epochs": 120,
+      "file": "fsrcnn_128x_512x.tflite",
+      "size_bytes": 58256
+    },
+    {
+      "input_size": 192,
+      "scale": 2,
+      "output_size": 384,
+      "epochs": 80,
+      "file": "fsrcnn_192x_384x.tflite",
+      "size_bytes": 28640
+    },
+    {
+      "input_size": 192,
+      "scale": 3,
+      "output_size": 576,
+      "epochs": 100,
+      "file": "fsrcnn_192x_576x.tflite",
+      "size_bytes": 40880
+    },
+    {
+      "input_size": 256,
+      "scale": 2,
+      "output_size": 512,
+      "epochs": 80,
+      "file": "fsrcnn_256x_512x.tflite",
+      "size_bytes": 28640
     }
   ],
-  "total_size_bytes": 9628912
+  "total_size_bytes": 9830696
 }

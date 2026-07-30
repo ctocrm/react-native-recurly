@@ -1,5 +1,9 @@
 import { icons } from "@/constants/icons";
-import { deleteCachedIcon, setCachedIcon } from "@/services/database";
+import {
+  deleteCachedIcon,
+  saveCrawlResult,
+  setCachedIcon,
+} from "@/services/database";
 import {
   getIconCollection,
   startIconCrawl,
@@ -362,6 +366,13 @@ const SubscriptionIconPickerModal = ({
   ) => {
     if (!iconKey) return;
     await setCachedIcon(
+      iconKey,
+      processedBase64,
+      icon.source,
+      newFormat,
+      icon.originalUrl,
+    );
+    await saveCrawlResult(
       iconKey,
       processedBase64,
       icon.source,
