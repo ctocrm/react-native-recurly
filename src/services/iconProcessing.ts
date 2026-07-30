@@ -414,78 +414,6 @@ export function isLowResIcon(
  * `quality` selects the model family: "fast" (ESPCN) or "sharp" (FSRCNN).
  * The target output size is determined dynamically based on device pixel density.
  */
-// Debug info collector for on-device diagnostics
-let lastUpscaleDebug = "";
-export function getLastUpscaleDebug(): string {
-  return lastUpscaleDebug;
-}
-
-// Write debug log to internal cache and share via system share sheet.
-// Same method as the settings page exportBackup + Sharing.shareAsync.
-async function writeDebugLogToFile(log: string): Promise<string | null> {
-  try {
-    const { Paths, Directory, File } = await import("expo-file-system");
-    const { writeAsStringAsync } = await import("expo-file-system/legacy");
-
-    // Write to internal cache directory (works without permissions)
-    const cacheDir = new Directory(Paths.cache, "debug");
-    try {
-      await cacheDir.create({ intermediates: true });
-    } catch {}
-    const debugFile = new File(cacheDir, "upscale_debug.log");
-    const timestamp = new Date().toISOString();
-    const newEntry = `=== ${timestamp} ===\n${log}\n\n`;
-
-    // Read existing content and append
-    let existing = "";
-    try {
-      existing = await debugFile.text();
-    } catch {
-      // File doesn't exist yet
-    }
-
-    await writeAsStringAsync(debugFile.uri, existing + newEntry);
-    console.log(`[ICON_AI] Debug log written to ${debugFile.uri}`);
-
-    // Share via system share sheet so user can send the log
-    try {
-      const Sharing = await import("expo-sharing");
-      await Sharing.shareAsync(debugFile.uri, {
-        mimeType: "text/plain",
-        dialogTitle: "Share Upscale Debug Log",
-      });
-    } catch {}
-
-    return debugFile.uri;
-  } catch (err) {
-    console.warn("[ICON_AI] Failed to write debug log:", err);
-    return null;
-  }
-}
-
-/** Share the debug log file via the system share sheet */
-export async function shareDebugLog(): Promise<boolean> {
-  try {
-    const { Paths, Directory, File } = await import("expo-file-system");
-    const { getInfoAsync } = await import("expo-file-system/legacy");
-    const path = `${Paths.cache}/debug/upscale_debug.log`;
-    const info = await getInfoAsync(path);
-    if (!info.exists) {
-      console.warn("[ICON_AI] No debug log file to share");
-      return false;
-    }
-    const Sharing = await import("expo-sharing");
-    await Sharing.shareAsync(path, {
-      mimeType: "text/plain",
-      dialogTitle: "Share Upscale Debug Log",
-    });
-    return true;
-  } catch (err) {
-    console.warn("[ICON_AI] Failed to share debug log:", err);
-    return false;
-  }
-}
-
 export async function upscaleIconAi(
   base64: string,
   format: string,
@@ -493,9 +421,6 @@ export async function upscaleIconAi(
   quality: UpscaleQuality = "fast",
 ): Promise<{ base64: string; format: string }> {
   if (format === "svg") return { base64, format };
-
-  const dbg: string[] = [];
-  lastUpscaleDebug = "";
 
   // Get actual input dimensions
   const mime = mimeForFormat(format);
@@ -509,13 +434,8 @@ export async function upscaleIconAi(
     );
   }).catch(() => 32); // Default fallback
 
-  dbg.push(`inputSize=${inputSize}px`);
-  dbg.push(`format=${format}`);
-
   // Get target output based on device pixel density
   const targetOutput = getTargetOutputSize();
-  dbg.push(`targetOutput=${targetOutput}px`);
-  dbg.push(`quality=${quality}`);
 
   console.log(
     `[ICON_AI] Upscaling ${inputSize}px → target ${targetOutput}px (${quality})`,
@@ -525,25 +445,16 @@ export async function upscaleIconAi(
   const modelInfo = getModelForUpscale(inputSize, targetOutput, quality);
 
   if (!modelInfo) {
-    dbg.push(`NO MODEL FOUND -> bilinear fallback`);
-    lastUpscaleDebug = dbg.join("\n");
     console.log(
       `[ICON_AI] No ${quality} model found for ${inputSize}→${targetOutput}, using bilinear`,
     );
     return upscaleIconIfSmall(base64, format, force);
   }
 
-  dbg.push(`model=${modelInfo.modelFile}`);
-  dbg.push(`modelInput=${modelInfo.inputSize}x${modelInfo.inputSize}`);
-  dbg.push(`modelOutput=${modelInfo.outputSize}x${modelInfo.outputSize}`);
-
   const model = await loadModel(modelInfo.modelFile);
   if (!model) {
-    dbg.push(`MODEL LOAD FAILED -> bilinear fallback`);
-    lastUpscaleDebug = dbg.join("\n");
     return upscaleIconIfSmall(base64, format, force);
   }
-  dbg.push(`model loaded OK`);
 
   try {
     const { manipulateAsync, SaveFormat } =
@@ -559,13 +470,11 @@ export async function upscaleIconAi(
       [{ resize: { width: modelInfo.inputSize, height: modelInfo.inputSize } }],
       { compress: 1, format: SaveFormat.PNG },
     );
-    dbg.push(`resized to ${modelInfo.inputSize}x${modelInfo.inputSize}`);
 
     // Read the resized PNG and decode to get RGB pixels for the model.
     const inputB64 = await readAsStringAsync(bounded.uri, {
       encoding: EncodingType.Base64,
     });
-    dbg.push(`inputB64 len=${inputB64.length}`);
 
     // Decode PNG to get raw RGBA pixels.
     const decoded = UPNG.decode(
@@ -573,10 +482,6 @@ export async function upscaleIconAi(
     ) as any;
     const rgbaIn = new Uint8ClampedArray(
       decoded.data as unknown as ArrayBuffer,
-    );
-    dbg.push(`decoded RGBA len=${rgbaIn.length}`);
-    dbg.push(
-      `decoded first px: R=${rgbaIn[0]} G=${rgbaIn[1]} B=${rgbaIn[2]} A=${rgbaIn[3]}`,
     );
 
     // Extract RGB planes (model expects 3 channels, no alpha).
@@ -590,36 +495,12 @@ export async function upscaleIconAi(
       rgbIn[i * 3 + 2] = rgbaIn[srcP++] / 255;
       srcP++; // skip alpha
     }
-    dbg.push(
-      `rgbIn len=${rgbIn.length} first3=[${rgbIn[0]?.toFixed(3)},${rgbIn[1]?.toFixed(3)},${rgbIn[2]?.toFixed(3)}]`,
-    );
 
     // Run the selected super-resolution model
     const out: Float32Array[] = await model.runSync([rgbIn]);
-    dbg.push(`runSync returned ${out.length} tensors`);
     const outBytes = out[0];
-    dbg.push(`outBytes len=${outBytes?.length}`);
-    dbg.push(`outBytes type=${outBytes?.constructor?.name}`);
-
     const outW = modelInfo.outputSize;
     const outH = modelInfo.outputSize;
-    const expectedLen = outW * outH * 3;
-    dbg.push(`expected len=${expectedLen} (for ${outW}x${outH}x3)`);
-
-    if (outBytes) {
-      dbg.push(
-        `outBytes[0..5]=[${Array.from(outBytes.slice(0, 6))
-          .map((v) => (typeof v === "number" ? v.toFixed(4) : v))
-          .join(",")}]`,
-      );
-      const min = Math.min(...Array.from(outBytes.slice(0, 100)));
-      const max = Math.max(...Array.from(outBytes.slice(0, 100)));
-      dbg.push(
-        `outBytes range (first 100): [${min.toFixed(4)}, ${max.toFixed(4)}]`,
-      );
-    } else {
-      dbg.push(`outBytes is UNDEFINED/NULL`);
-    }
 
     // Allocate RGBA buffer for upng-js (expects 4 channels).
     // Model outputs float32 0-1, convert to uint8 0-255.
@@ -631,16 +512,9 @@ export async function upscaleIconAi(
       rgba[i * 4 + 2] = Math.round(outBytes[p++] * 255);
       rgba[i * 4 + 3] = 255;
     }
-    dbg.push(
-      `rgba first px: R=${rgba[0]} G=${rgba[1]} B=${rgba[2]} A=${rgba[3]}`,
-    );
-    dbg.push(
-      `rgba center px: R=${rgba[((outW * outH) / 2) * 4]} G=${rgba[((outW * outH) / 2) * 4 + 1]} B=${rgba[((outW * outH) / 2) * 4 + 2]}`,
-    );
 
     // Encode the upscaled RGBA back to a PNG
     const pngData = UPNG.encode([rgba.buffer as ArrayBuffer], outW, outH, 0);
-    dbg.push(`pngData len=${pngData.byteLength}`);
     const uint8 = new Uint8Array(pngData);
     let outB64 = "";
     const chunkSize = 8192;
@@ -649,21 +523,13 @@ export async function upscaleIconAi(
       outB64 += String.fromCharCode(...uint8.subarray(i, end));
     }
     const result = btoa(outB64);
-    dbg.push(`result b64 len=${result.length}`);
-    dbg.push(`result starts: ${result.substring(0, 50)}...`);
 
     await deleteAsync(bounded.uri, { idempotent: true }).catch(() => {});
-    dbg.push(`SUCCESS`);
-    lastUpscaleDebug = dbg.join("\n");
-    await writeDebugLogToFile(lastUpscaleDebug);
     console.log(
       `[ICON_AI] Upscaled ${inputSize}px → ${outW}x${outH}px using ${modelInfo.modelFile}`,
     );
     return { base64: result, format: "png" };
   } catch (err) {
-    dbg.push(`ERROR: ${err}`);
-    lastUpscaleDebug = dbg.join("\n");
-    await writeDebugLogToFile(lastUpscaleDebug);
     console.warn("[ICON_AI] model run failed, bilinear fallback:", err);
     return upscaleIconIfSmall(base64, format, true);
   }
