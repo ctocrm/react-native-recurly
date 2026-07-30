@@ -12,6 +12,7 @@ import {
   addCacheUpdateListener,
   addLoadingListener,
   isIconLoading,
+  notifyCacheUpdate,
 } from "@/src/services/iconLoadingRegistry";
 import {
   isLowResIcon,
@@ -379,6 +380,8 @@ const SubscriptionIconPickerModal = ({
       newFormat,
       icon.originalUrl,
     );
+    // Force immediate cache notification so cards re-render before picker closes
+    notifyCacheUpdate();
     posthog.capture(event, {
       subscription_name: subscriptionName,
       icon_key: iconKey,
