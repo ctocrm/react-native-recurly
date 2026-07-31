@@ -175,8 +175,14 @@ function findNearestInputSize(
   // Exact match
   if (sizes.includes(actualSize)) return actualSize;
 
-  // Find nearest smaller size
-  const candidates = sizes.filter((s) => s <= actualSize);
+  // CAP AT 64PX - 256px (and likely 128px/192px) models output constant gray
+  // July 16 baseline only had models up to 64px input and they worked.
+  // The 256px models added July 28 are severely under-parameterized:
+  // 40 epochs vs 150, 12 filters vs 3072, only 1 scale vs 6.
+  const cappedSize = Math.min(actualSize, 64);
+
+  // Find nearest smaller or equal (within cap)
+  const candidates = sizes.filter((s) => s <= cappedSize);
   if (candidates.length > 0) return Math.max(...candidates);
 
   // If icon is smaller than all supported, use smallest input size
@@ -501,6 +507,25 @@ export async function upscaleIconAi(
     const outBytes = out[0];
     const outW = modelInfo.outputSize;
     const outH = modelInfo.outputSize;
+
+    // Detect useless model output: if all values are nearly identical (low
+    // variance), the model is producing a constant gray patch instead of
+    // actual upscaled content. Fall back to bilinear in that case.
+    if (outBytes && outBytes.length > 100) {
+      let min = Infinity;
+      let max = -Infinity;
+      for (let i = 0; i < 100; i++) {
+        const v = outBytes[i];
+        if (v < min) min = v;
+        if (v > max) max = v;
+      }
+      if (max - min < 0.1) {
+        console.warn(
+          `[ICON_AI] Model output has insufficient variance (range=${(max - min).toFixed(4)}), falling back to bilinear`,
+        );
+        return upscaleIconIfSmall(base64, format, true);
+      }
+    }
 
     // Allocate RGBA buffer for upng-js (expects 4 channels).
     // Model outputs float32 0-1, convert to uint8 0-255.
