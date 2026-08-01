@@ -24,26 +24,26 @@ for arg in sys.argv:
 
 # Model configurations: input_size -> list of (scale, epochs) tuples
 # Scale = output_size / input_size
-# Epochs optimized based on scale complexity
+# Epochs scaled to match 16px baseline: target_output / 16 * base_epochs
+# All input sizes now have 7 scales (2x through 32x where output <= 1024)
+# and epochs proportional to output resolution.
 MODEL_CONFIGS = [
-    # 16px input
-    (16, [(4, 64), (8, 80), (12, 100), (16, 120), (24, 130), (32, 150)]),
-    # 32px input
-    (32, [(2, 35), (4, 60), (6, 70), (8, 80), (12, 100), (16, 120)]),
-    # 48px input
-    (48, [(2, 40), (3, 60), (4, 70), (5, 80), (8, 100), (12, 120)]),
-    # 64px input
-    (64, [(2, 40), (3, 60), (4, 70), (6, 80), (8, 100)]),
-    # 96px input
-    (96, [(2, 50), (3, 60), (4, 70), (5, 80)]),
-    # 128px input. 128->512 (4x) is intentionally omitted: it currently fails
-    # to generate and has no MODEL_REGISTRY entry in the app, so training it
-    # would be wasted effort.
-    (128, [(2, 40), (3, 50)]),
-    # 192px input (1x passthrough omitted; depth_to_space scale=1 is invalid)
-    (192, [(2, 40), (3, 60)]),
-    # 256px input (1x passthrough omitted; depth_to_space scale=1 is invalid)
-    (256, [(2, 40)]),
+    # 16px input - baseline (7 scales, up to 512px output)
+    (16, [(2, 40), (4, 64), (8, 80), (12, 100), (16, 120), (24, 130), (32, 150)]),
+    # 32px input - 7 scales, up to 512px output
+    (32, [(2, 35), (4, 60), (6, 70), (8, 80), (12, 100), (16, 120), (24, 130)]),
+    # 48px input - 7 scales, up to 576px output
+    (48, [(2, 40), (3, 60), (4, 70), (5, 80), (8, 100), (12, 120), (16, 150)]),
+    # 64px input - 7 scales, up to 512px output
+    (64, [(2, 40), (3, 60), (4, 70), (6, 80), (8, 100), (12, 120), (16, 150)]),
+    # 96px input - 7 scales, up to 576px output
+    (96, [(2, 50), (3, 60), (4, 70), (5, 80), (6, 90), (8, 100), (12, 120)]),
+    # 128px input - 7 scales, up to 512px output
+    (128, [(2, 40), (3, 50), (4, 70), (6, 90), (8, 100), (12, 120), (16, 150)]),
+    # 192px input - 7 scales, up to 576px output
+    (192, [(2, 40), (3, 60), (4, 70), (6, 90), (8, 100), (12, 120), (16, 150)]),
+    # 256px input - 7 scales, up to 1024px output (match 16px pattern)
+    (256, [(2, 100), (3, 120), (4, 140), (6, 160), (8, 180), (12, 200), (16, 220)]),
 ]
 
 
@@ -246,6 +246,35 @@ def train_and_export_model(model_dir: str, input_size: int, scale: int, epochs: 
     with open(out_path, "wb") as f:
         f.write(tflite_model)
     print(f"[TRAIN] WROTE {out_path} ({len(tflite_model)} bytes)")
+
+    # VALIDATION: Test model output variance to catch constant-gray models
+    print(f"[VALIDATE] Testing model output variance...")
+    try:
+        import numpy as np
+        interpreter = tf.lite.Interpreter(model_content=tflite_model)
+        interpreter.allocate_tensors()
+        input_details = interpreter.get_input_details()
+        output_details = interpreter.get_output_details()
+        
+        # Test with random input
+        test_input = np.random.rand(1, input_size, input_size, 3).astype(np.float32)
+        interpreter.set_tensor(input_details[0]['index'], test_input)
+        interpreter.invoke()
+        output = interpreter.get_tensor(output_details[0]['index'])
+        
+        # Check variance - constant gray has variance ~0
+        variance = float(np.var(output))
+        mean_val = float(np.mean(output))
+        print(f"[VALIDATE] Output mean: {mean_val:.4f}, variance: {variance:.6f}")
+        
+        if variance < 0.001:
+            raise RuntimeError(f"MODEL VALIDATION FAILED: Output variance {variance:.6f} too low (constant gray detected). Mean: {mean_val:.4f}")
+        
+        print(f"[VALIDATE] PASSED - Model produces varied output")
+    except Exception as e:
+        if "MODEL VALIDATION FAILED" in str(e):
+            raise
+        print(f"[VALIDATE] Warning: Could not validate model: {e}")
 
     return model_name, len(tflite_model)
 

@@ -175,14 +175,8 @@ function findNearestInputSize(
   // Exact match
   if (sizes.includes(actualSize)) return actualSize;
 
-  // CAP AT 64PX - 256px (and likely 128px/192px) models output constant gray
-  // July 16 baseline only had models up to 64px input and they worked.
-  // The 256px models added July 28 are severely under-parameterized:
-  // 40 epochs vs 150, 12 filters vs 3072, only 1 scale vs 6.
-  const cappedSize = Math.min(actualSize, 64);
-
-  // Find nearest smaller or equal (within cap)
-  const candidates = sizes.filter((s) => s <= cappedSize);
+  // Find nearest smaller or equal input size
+  const candidates = sizes.filter((s) => s <= actualSize);
   if (candidates.length > 0) return Math.max(...candidates);
 
   // If icon is smaller than all supported, use smallest input size
