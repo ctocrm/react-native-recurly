@@ -4,7 +4,7 @@
 
 ## Summary
 
-After fixing the model architecture issues (Catastrophe 1), the training pipeline failed due to **complete lack of environment version pinning** in the setup scripts. The system Python (3.14), CUDA (13.3), cuDNN (9.0), and TensorFlow (2.16 compiled for CUDA 12.5/cuDNN 9.3) were all mutually incompatible.
+After fixing the model architecture issues (Catastrophe 1), the training pipeline failed due to **complete lack of environment version pinning** in the setup scripts. The system Python (3.14), CUDA (13.3), cuDNN (9.0), and the pip-resolved "latest" TensorFlow (compiled for CUDA 12.5/cuDNN 9.3) were all mutually incompatible.
 
 ## Root Cause
 
@@ -23,7 +23,7 @@ After fixing the model architecture issues (Catastrophe 1), the training pipelin
 ERROR: Could not find a version that satisfies the requirement tensorflow
 ```
 
-**Cause:** TensorFlow doesn't support Python 3.14 (max 3.12 as of TF 2.16)
+**Cause:** TensorFlow doesn't support Python 3.14 (max 3.12).
 
 ### Attempt 2: GPU Training with CUDA 13.3 / cuDNN 9.0
 
@@ -32,7 +32,7 @@ Loaded runtime CuDNN library: 9.0.0 but source was compiled with: 9.3.0
 DNN library initialization failed
 ```
 
-**Cause:** TF 2.16 compiled with cuDNN 9.3, system has 9.0. CUDA 13.3 not supported by TF 2.16 (max 12.5).
+**Cause:** Latest TF compiled with cuDNN 9.3, system has 9.0. CUDA 13.3 not supported by TF (max 12.5).
 
 ### Attempt 3: Driver/Kernel Module Issues
 
@@ -47,10 +47,10 @@ modprobe: FATAL: Module nvidia not found in directory /lib/modules/6.12.88+deb13
 | Component      | Required        | System Had           | Compatible? |
 | -------------- | --------------- | -------------------- | ----------- |
 | Python         | 3.10-3.12       | 3.14                 | ❌          |
-| TensorFlow     | 2.16.x          | N/A (install failed) | -           |
-| CUDA           | 12.3-12.5       | 13.3                 | ❌          |
-| cuDNN          | 9.3+            | 9.0                  | ❌          |
-| NVIDIA Driver  | 545+            | 610.43               | ✅          |
+| TensorFlow     | pinned          | N/A (install failed) | -           |
+| CUDA           | 12.5 (bundled)  | 13.3                 | ❌          |
+| cuDNN          | 9.3 (bundled)   | 9.0                  | ❌          |
+| NVIDIA Driver  | 525+            | 610.43               | ✅          |
 | Kernel Headers | Matching kernel | Missing for 6.12.88  | ❌          |
 
 ## Code Changes That Were Correct (Not the Problem)
@@ -62,98 +62,68 @@ modprobe: FATAL: Module nvidia not found in directory /lib/modules/6.12.88+deb13
 5. ✅ Crawl-time upscaling already disabled in `iconUpscaler.ts`
 6. ✅ Model validation already exists in both training scripts
 
-## The Real Failure: Environment Setup Scripts
-
-### `requirements.txt` (Before Fix)
-
-```txt
-numpy
-tensorflow
-cairosvg
-pillow
-```
-
-**Problems:** No version pins, `tensorflow` pulls latest (may not match system CUDA), `numpy` pulls 2.x (incompatible with TF 2.16)
-
-### `train-setup.sh` (Before Fix)
-
-```bash
-python3 -m venv "$VENV_PATH"
-"$VENV_PYTHON" -m pip install -r "$REQUIREMENTS"
-```
-
-**Problems:** Uses whatever `python3` points to, no version check, no GPU/CPU variant selection
-
-## Required Fixes
-
-### 1. Pin Requirements for CPU Training (Guaranteed Works)
-
-```txt
-# requirements-cpu.txt
-numpy<2
-tensorflow-cpu==2.16.1
-cairosvg
-pillow
-```
-
-### 2. Pin Requirements for GPU Training (If Environment Fixed)
-
-```txt
-# requirements-gpu.txt
-numpy<2
-tensorflow[and-cuda]==2.16.1
-cairosvg
-pillow
-```
-
-Note: `tensorflow[and-cuda]` bundles CUDA 12.3 + cuDNN 9.3 - no system CUDA needed.
-
-### 3. Update `train-setup.sh` with Version Checks
-
-```bash
-#!/bin/bash
-# Require Python 3.11 or 3.12
-PYTHON_VERSION=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
-if [[ "$PYTHON_VERSION" != "3.11" && "$PYTHON_VERSION" != "3.12" ]]; then
-    echo "ERROR: Python 3.11 or 3.12 required, found $PYTHON_VERSION"
-    exit 1
-fi
-python3 -m venv "$VENV_PATH"
-"$VENV_PYTHON" -m pip install -r "$REQUIREMENTS"
-```
-
 ## Lessons Learned
 
 1. **Always pin versions** in requirements.txt - "latest" breaks when ecosystem shifts
 2. **Document required Python version** - TF has strict Python version bounds
 3. **Separate CPU/GPU requirements** - GPU needs matching CUDA/cuDNN stack
-4. **Test environment setup** in CI/CD, not just code
-5. **The model code was correct** - the failure was entirely in environment setup
+4. **Never depend on the system CUDA toolkit** - `tensorflow[and-cuda]` bundles it via pip
+5. **Test environment setup** in CI/CD, not just code
+6. **The model code was correct** - the failure was entirely in environment setup
 
-## Next Steps
+---
 
-1. Update `requirements.txt` with pinned versions for CPU training
-2. Update `train-setup.sh` with Python version check
-3. Run CPU training to verify model fixes work
-4. Optionally fix GPU environment separately
-d, found $PYTHON_VERSION"
-    exit 1
-fi
-python3 -m venv "$VENV_PATH"
-"$VENV_PYTHON" -m pip install -r "$REQUIREMENTS"
+## FIX IMPLEMENTED (2026-08-01)
+
+The setup is now fully self-contained via `npm run train:setup`. The only host
+requirement for GPU training is a working NVIDIA driver (>= 525). No system
+CUDA, no system cuDNN, no specific system Python needed.
+
+### Pinned Stack
+
+| Component  | Pinned Version                                                        |
+| ---------- | --------------------------------------------------------------------- |
+| TensorFlow | `tensorflow[and-cuda]==2.19.0` (GPU) / `tensorflow-cpu==2.19.0` (CPU) |
+| CUDA       | 12.5 — bundled as pip wheels by `[and-cuda]`                          |
+| cuDNN      | 9.3 — bundled as pip wheels by `[and-cuda]`                           |
+| numpy      | resolved by TF's own constraint (`>=1.26,<2.2`)                       |
+| Python     | 3.10-3.12 (auto-discovered, or standalone 3.12 via `uv`)              |
+| cairosvg   | 2.7.1                                                                 |
+| pillow     | 11.1.0                                                                |
+
+### Files Changed
+
+1. **`requirements-gpu.txt`** (new) — pinned `tensorflow[and-cuda]==2.19.0` stack
+2. **`requirements-cpu.txt`** (new) — pinned `tensorflow-cpu==2.19.0` stack
+3. **`requirements.txt`** — repurposed as pinned CPU fallback (no more unpinned deps)
+4. **`scripts/train-setup.sh`** — rewritten:
+   - `--gpu` / `--cpu` flags, default auto-detect via working `nvidia-smi`
+   - Finds `python3.12`/`python3.11`/`python3.10`; if none, bootstraps `uv`
+     (no root) and downloads a standalone Python 3.12
+   - Recreates `.venv` if it was built with an unsupported Python
+   - Post-install verification: TF import + GPU visibility + **matmul smoke
+     test on /GPU:0** (catches cuDNN init failures immediately, not after
+     an hour of rented GPU time)
+5. **`scripts/train.sh`** — preflight check before training: venv Python
+   version, TF import, and **aborts if a GPU is physically present but TF
+   can't see it** (prevents silently paying for a GPU while training on CPU)
+6. **`package.json`** — added `train:setup:gpu` and `train:setup:cpu`
+
+### Usage on a Fresh Rented GPU Instance
+
+```bash
+git clone <repo> && cd jsmastery
+npm run train:setup        # ~3-5 min; verifies GPU is usable before you train
+npm run train:models       # trains on GPU, aborts early if env is broken
 ```
 
-## Lessons Learned
+Notes:
 
-1. **Always pin versions** in requirements.txt - "latest" breaks when ecosystem shifts
-2. **Document required Python version** - TF has strict Python version bounds
-3. **Separate CPU/GPU requirements** - GPU needs matching CUDA/cuDNN stack
-4. **Test environment setup** in CI/CD, not just code
-5. **The model code was correct** - the failure was entirely in environment setup
-
-## Next Steps
-
-1. Update `requirements.txt` with pinned versions for CPU training
-2. Update `train-setup.sh` with Python version check
-3. Run CPU training to verify model fixes work
-4. Optionally fix GPU environment separately
+- GPU setup downloads ~3GB of CUDA/cuDNN pip wheels — expected, this is the
+  price of self-containment.
+- If `nvidia-smi` fails on the instance (broken driver/kernel module), setup
+  fails immediately with an actionable message instead of falling back to a
+  slow CPU install silently. Use `npm run train:setup:cpu` to explicitly
+  opt into CPU training.
+- On minimal Linux images, cairosvg may need `apt-get install -y libcairo2`
+  (the verification step tells you this).

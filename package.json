@@ -15,6 +15,8 @@
     "prebuild:android": "expo prebuild --clean --platform android",
     "prebuild:ios": "expo prebuild --clean --platform ios",
     "train:setup": "bash scripts/train-setup.sh",
+    "train:setup:gpu": "bash scripts/train-setup.sh --gpu",
+    "train:setup:cpu": "bash scripts/train-setup.sh --cpu",
     "train:registry": "node scripts/generate-model-registry.js",
     "train:map": "node scripts/generate-model-map.js",
     "train:models": "bash scripts/train.sh --both",

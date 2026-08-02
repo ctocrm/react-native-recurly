@@ -1,0 +1,7 @@
+# GPU training requirements — self-contained CUDA stack via pip.
+# tensorflow[and-cuda] bundles CUDA 12.5 + cuDNN 9.3 wheels; only a working
+# NVIDIA driver (>= 525) is required on the host. System CUDA/cuDNN is ignored.
+# Python 3.9-3.12 required (TF 2.19 does NOT support 3.13+).
+tensorflow[and-cuda]==2.19.0
+cairosvg==2.7.1
+pillow==11.1.0

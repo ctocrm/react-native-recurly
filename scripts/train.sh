@@ -48,9 +48,40 @@ done
 VENV_PYTHON="$PROJECT_ROOT/.venv/bin/python"
 if [ ! -f "$VENV_PYTHON" ]; then
     echo "[TRAIN] Error: Python virtual environment not found at $PROJECT_ROOT/.venv"
-    echo "[TRAIN] Run setup first: bash scripts/train-setup.sh"
+    echo "[TRAIN] Run setup first: npm run train:setup  (bash scripts/train-setup.sh)"
     exit 1
 fi
+
+# Preflight: verify the environment BEFORE launching multi-hour training.
+echo "[TRAIN] Preflight: verifying training environment..."
+"$VENV_PYTHON" - <<'EOF'
+import sys
+
+version = f"{sys.version_info.major}.{sys.version_info.minor}"
+if version not in ("3.10", "3.11", "3.12"):
+    print(f"[TRAIN] ERROR: venv Python {version} unsupported by TensorFlow (need 3.10-3.12).", file=sys.stderr)
+    print("[TRAIN] Re-run setup: npm run train:setup", file=sys.stderr)
+    sys.exit(1)
+
+try:
+    import tensorflow as tf
+except Exception as e:
+    print(f"[TRAIN] ERROR: TensorFlow import failed: {e}", file=sys.stderr)
+    print("[TRAIN] Re-run setup: npm run train:setup", file=sys.stderr)
+    sys.exit(1)
+
+gpus = tf.config.list_physical_devices("GPU")
+if gpus:
+    print(f"[TRAIN] TensorFlow {tf.__version__} — training on GPU: {[g.name for g in gpus]}")
+else:
+    import shutil
+    if shutil.which("nvidia-smi"):
+        print("[TRAIN] ERROR: An NVIDIA GPU is present but TensorFlow cannot see it.", file=sys.stderr)
+        print("[TRAIN] You would be paying for a GPU while training on CPU. Aborting.", file=sys.stderr)
+        print("[TRAIN] Fix: npm run train:setup:gpu   (installs tensorflow[and-cuda])", file=sys.stderr)
+        sys.exit(1)
+    print(f"[TRAIN] TensorFlow {tf.__version__} — no GPU detected, training on CPU.")
+EOF
 
 CMD_ARGS=()
 [ -n "$FORCE" ]      && CMD_ARGS+=("$FORCE")
