@@ -381,7 +381,6 @@ def train_and_export_model(model_dir: str, input_size: int, scale: int, epochs: 
     # VALIDATION: Test model output variance to catch constant-gray models
     print(f"[VALIDATE] Testing model output variance...")
     try:
-        import numpy as np
         interpreter = tf.lite.Interpreter(model_content=tflite_model)
         interpreter.allocate_tensors()
         input_details = interpreter.get_input_details()
