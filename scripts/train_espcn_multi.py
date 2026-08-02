@@ -25,25 +25,25 @@ for arg in sys.argv:
 # Model configurations: input_size -> list of (scale, epochs) tuples
 # Scale = output_size / input_size
 # Epochs scaled to match 16px baseline: target_output / 16 * base_epochs
-# All input sizes now have 7 scales (2x through 32x where output <= 1024)
-# and epochs proportional to output resolution.
+# Capped at 768px output max to fit RTX 4000 Ada (18GB VRAM).
+# 256px input gets proper epochs (150+) to fix constant-gray output.
 MODEL_CONFIGS = [
     # 16px input - baseline (7 scales, up to 512px output)
     (16, [(2, 40), (4, 64), (8, 80), (12, 100), (16, 120), (24, 130), (32, 150)]),
-    # 32px input - 7 scales, up to 512px output
+    # 32px input - 7 scales, up to 768px output
     (32, [(2, 35), (4, 60), (6, 70), (8, 80), (12, 100), (16, 120), (24, 130)]),
-    # 48px input - 7 scales, up to 576px output
+    # 48px input - 7 scales, up to 768px output
     (48, [(2, 40), (3, 60), (4, 70), (5, 80), (8, 100), (12, 120), (16, 150)]),
-    # 64px input - 7 scales, up to 512px output
-    (64, [(2, 40), (3, 60), (4, 70), (6, 80), (8, 100), (12, 120), (16, 150)]),
-    # 96px input - 7 scales, up to 576px output
-    (96, [(2, 50), (3, 60), (4, 70), (5, 80), (6, 90), (8, 100), (12, 120)]),
-    # 128px input - 7 scales, up to 512px output
-    (128, [(2, 40), (3, 50), (4, 70), (6, 90), (8, 100), (12, 120), (16, 150)]),
-    # 192px input - 7 scales, up to 576px output
-    (192, [(2, 40), (3, 60), (4, 70), (6, 90), (8, 100), (12, 120), (16, 150)]),
-    # 256px input - 7 scales, up to 1024px output (match 16px pattern)
-    (256, [(2, 100), (3, 120), (4, 140), (6, 160), (8, 180), (12, 200), (16, 220)]),
+    # 64px input - 6 scales, up to 768px output (drop 16x)
+    (64, [(2, 40), (3, 60), (4, 70), (6, 80), (8, 100), (12, 120)]),
+    # 96px input - 6 scales, up to 768px output (drop 12x)
+    (96, [(2, 50), (3, 60), (4, 70), (5, 80), (6, 90), (8, 100)]),
+    # 128px input - 4 scales, up to 768px output
+    (128, [(2, 40), (3, 50), (4, 70), (6, 90)]),
+    # 192px input - 3 scales, up to 768px output
+    (192, [(2, 40), (3, 60), (4, 70)]),
+    # 256px input - 2 scales, up to 768px output (proper epochs to fix constant-gray)
+    (256, [(2, 150), (3, 180)]),
 ]
 
 

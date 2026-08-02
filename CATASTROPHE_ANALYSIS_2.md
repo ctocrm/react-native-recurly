@@ -127,3 +127,49 @@ Notes:
   opt into CPU training.
 - On minimal Linux images, cairosvg may need `apt-get install -y libcairo2`
   (the verification step tells you this).
+
+---
+
+## ADDITIONAL FIX: MODEL CONFIGURATIONS (2026-08-02)
+
+**Problem:** The expanded `MODEL_CONFIGS` (commit 2252691) trained outputs up to 4096px
+(256px input × 16x scale), which OOM'd on RTX 4000 Ada (18GB VRAM) even at batch_size=32.
+The 256px input models also had severely undertrained epochs (40 vs 150 for 16px@32x),
+causing constant-gray output.
+
+**Solution:** Cap all outputs at 768px max, give 256px input proper epochs (150+).
+
+### Updated MODEL_CONFIGS (both ESPCN and FSRCNN)
+
+| Input Size | Scales            | Max Output | Notes                                                |
+| ---------- | ----------------- | ---------- | ---------------------------------------------------- |
+| 16px       | 2,4,8,12,16,24,32 | 512px      | Baseline unchanged                                   |
+| 32px       | 2,4,6,8,12,16,24  | 768px      | Full 7 scales                                        |
+| 48px       | 2,3,4,5,8,12,16   | 768px      | Full 7 scales                                        |
+| 64px       | 2,3,4,6,8,12      | 768px      | Drop 16x (1024px)                                    |
+| 96px       | 2,3,4,5,6,8       | 768px      | Drop 12x (1152px)                                    |
+| 128px      | 2,3,4,6           | 768px      | Drop 8x,12x,16x                                      |
+| 192px      | 2,3,4             | 768px      | Drop 6x,8x,12x,16x                                   |
+| 256px      | 2,3               | 768px      | **2 scales at 150/180 epochs** (fixes constant-gray) |
+
+**256px input now gets:**
+
+- 2x → 512px at 150 epochs (matches 16px@32x epochs)
+- 3x → 768px at 180 epochs
+
+**Files Changed:**
+
+- `scripts/train_espcn_multi.py` — MODEL_CONFIGS updated, comment reflects 768px cap
+- `scripts/train_fsrcnn_multi.py` — MODEL_CONFIGS updated, comment reflects 768px cap
+
+### Retraining Required
+
+```bash
+npm run train:setup        # ensures GPU env works
+npm run train:models:force # retrain all models with new configs
+npm run train:registry     # regenerate model_registry.json
+```
+
+The 256px models will now train with sufficient capacity (150+ epochs) instead of
+the broken 40-epoch configs, fixing the constant-gray output while staying within
+18GB VRAM limits.
