@@ -346,7 +346,7 @@ def train_and_export_model(model_dir: str, input_size: int, scale: int, epochs: 
     use_perceptual = not NO_PERCEPTUAL
     if not use_perceptual:
         print("[TRAIN] Perceptual loss disabled (--no-perceptual) — using MAE + MS-SSIM only")
-    model.compile(optimizer=optimizer, loss=make_combined_loss(output_size, use_perceptual=use_perceptual))
+    model.compile(optimizer=optimizer, loss=make_combined_loss(output_size, use_perceptual=use_perceptual), jit_compile=False)
     print(f"[TRAIN] Model params: {model.count_params()}")
     print(f"[TRAIN] MS-SSIM scales: {_ssim_scales_for(output_size)} (output {output_size}px)")
 
