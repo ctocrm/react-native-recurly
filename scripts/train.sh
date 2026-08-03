@@ -14,6 +14,9 @@
 
 set -euo pipefail
 
+# Belt-and-suspenders: disable XLA auto-jit to prevent MirrorPadGrad errors
+export TF_XLA_FLAGS=--tf_xla_auto_jit=0
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 

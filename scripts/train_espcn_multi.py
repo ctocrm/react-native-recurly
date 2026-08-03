@@ -10,6 +10,13 @@ from tensorflow.keras import layers, Model
 import urllib.request
 from io import BytesIO
 
+# Disable XLA globally to prevent MirrorPadGrad compile-time constant errors
+tf.config.optimizer.set_jit(False)
+
+# Use all available GPUs via MirroredStrategy
+strategy = tf.distribute.MirroredStrategy()
+print(f"[TRAIN] Using {strategy.num_replicas_in_sync} device(s)")
+
 FORCE = "--force" in sys.argv
 SPECIFIC_MODEL = None
 INPUT_SIZE = None
@@ -25,25 +32,25 @@ for arg in sys.argv:
 # Model configurations: input_size -> list of (scale, epochs) tuples
 # Scale = output_size / input_size
 # Epochs scaled to match 16px baseline: target_output / 16 * base_epochs
-# Capped at 768px output max to fit RTX 4000 Ada (18GB VRAM).
+# Capped at 576px output max (largest size used by the app).
 # 256px input gets proper epochs (150+) to fix constant-gray output.
 MODEL_CONFIGS = [
     # 16px input - baseline (7 scales, up to 512px output)
     (16, [(2, 40), (4, 64), (8, 80), (12, 100), (16, 120), (24, 130), (32, 150)]),
-    # 32px input - 7 scales, up to 768px output
-    (32, [(2, 35), (4, 60), (6, 70), (8, 80), (12, 100), (16, 120), (24, 130)]),
-    # 48px input - 7 scales, up to 768px output
-    (48, [(2, 40), (3, 60), (4, 70), (5, 80), (8, 100), (12, 120), (16, 150)]),
-    # 64px input - 6 scales, up to 768px output (drop 16x)
-    (64, [(2, 40), (3, 60), (4, 70), (6, 80), (8, 100), (12, 120)]),
-    # 96px input - 6 scales, up to 768px output (drop 12x)
-    (96, [(2, 50), (3, 60), (4, 70), (5, 80), (6, 90), (8, 100)]),
-    # 128px input - 4 scales, up to 768px output
-    (128, [(2, 40), (3, 50), (4, 70), (6, 90)]),
-    # 192px input - 3 scales, up to 768px output
-    (192, [(2, 40), (3, 60), (4, 70)]),
-    # 256px input - 2 scales, up to 768px output (proper epochs to fix constant-gray)
-    (256, [(2, 150), (3, 180)]),
+    # 32px input - 6 scales, up to 512px output
+    (32, [(2, 35), (4, 60), (6, 70), (8, 80), (12, 100), (16, 120)]),
+    # 48px input - 6 scales, up to 576px output
+    (48, [(2, 40), (3, 60), (4, 70), (5, 80), (8, 100), (12, 120)]),
+    # 64px input - 5 scales, up to 512px output
+    (64, [(2, 40), (3, 60), (4, 70), (6, 80), (8, 100)]),
+    # 96px input - 5 scales, up to 576px output
+    (96, [(2, 50), (3, 60), (4, 70), (5, 80), (6, 90)]),
+    # 128px input - 3 scales, up to 512px output
+    (128, [(2, 40), (3, 50), (4, 70)]),
+    # 192px input - 2 scales, up to 576px output
+    (192, [(2, 40), (3, 60)]),
+    # 256px input - 1 scale, up to 512px output (proper epochs to fix constant-gray)
+    (256, [(2, 150)]),
 ]
 
 
@@ -198,7 +205,6 @@ def generate_real_icon_data(n: int, target_size: int) -> np.ndarray:
     return hr_images
 
 
-
 def generate_training_data(input_size: int, scale: int, n: int = 1000):
     """Generate training data for a specific input/output size."""
     output_size = input_size * scale
@@ -227,14 +233,16 @@ def train_and_export_model(model_dir: str, input_size: int, scale: int, epochs: 
     print(f"\n{'='*50}")
     print(f"[TRAIN] Training {input_size}->{output_size} (scale {scale}x, {epochs} epochs)")
 
-    model = build_espcn(scale, input_size)
-    model.compile(optimizer="adam", loss="mae")
-    print(f"[TRAIN] Model params: {model.count_params()}")
+    with strategy.scope():
+        model = build_espcn(scale, input_size)
+        model.compile(optimizer="adam", loss="mae")
+        print(f"[TRAIN] Model params: {model.count_params()}")
 
-    lr, hr = generate_training_data(input_size, scale)
-    split = int(len(lr) * 0.9)
+        lr, hr = generate_training_data(input_size, scale)
+        split = int(len(lr) * 0.9)
 
-    model.fit(lr[:split], hr[:split], batch_size=32, epochs=epochs, verbose=2)
+        batch_size = 32 * strategy.num_replicas_in_sync
+        model.fit(lr[:split], hr[:split], batch_size=batch_size, epochs=epochs, verbose=2)
 
     converter = tf.lite.TFLiteConverter.from_keras_model(model)
     # Optimize for size

@@ -10,6 +10,13 @@ from tensorflow.keras import layers, Model
 import urllib.request
 from io import BytesIO
 
+# Disable XLA globally to prevent MirrorPadGrad compile-time constant errors
+tf.config.optimizer.set_jit(False)
+
+# Use all available GPUs via MirroredStrategy
+strategy = tf.distribute.MirroredStrategy()
+print(f"[TRAIN] Using {strategy.num_replicas_in_sync} device(s)")
+
 FORCE = "--force" in sys.argv
 NO_PERCEPTUAL = "--no-perceptual" in sys.argv
 SPECIFIC_MODEL = None
@@ -26,25 +33,25 @@ for arg in sys.argv:
 # Model configurations: input_size -> list of (scale, epochs) tuples
 # Scale = output_size / input_size
 # Epochs scaled to match 16px baseline: target_output / 16 * base_epochs
-# Capped at 768px output max to fit RTX 4000 Ada (18GB VRAM).
+# Capped at 576px output max (largest size used by the app).
 # 256px input gets proper epochs (150+) to fix constant-gray output.
 MODEL_CONFIGS = [
     # 16px input - baseline (7 scales, up to 512px output)
     (16, [(2, 80), (4, 120), (8, 150), (12, 180), (16, 200), (24, 220), (32, 250)]),
-    # 32px input - 7 scales, up to 768px output
-    (32, [(2, 80), (4, 120), (6, 140), (8, 160), (12, 180), (16, 200), (24, 220)]),
-    # 48px input - 7 scales, up to 768px output
-    (48, [(2, 80), (3, 100), (4, 120), (5, 140), (8, 160), (12, 180), (16, 250)]),
-    # 64px input - 6 scales, up to 768px output (drop 16x)
-    (64, [(2, 80), (3, 100), (4, 120), (6, 140), (8, 160), (12, 180)]),
-    # 96px input - 6 scales, up to 768px output (drop 12x)
-    (96, [(2, 80), (3, 100), (4, 120), (5, 140), (6, 150), (8, 160)]),
-    # 128px input - 4 scales, up to 768px output
-    (128, [(2, 80), (3, 100), (4, 120), (6, 140)]),
-    # 192px input - 3 scales, up to 768px output
-    (192, [(2, 80), (3, 100), (4, 120)]),
-    # 256px input - 2 scales, up to 768px output (proper epochs to fix constant-gray)
-    (256, [(2, 150), (3, 180)]),
+    # 32px input - 6 scales, up to 512px output
+    (32, [(2, 80), (4, 120), (6, 140), (8, 160), (12, 180), (16, 200)]),
+    # 48px input - 6 scales, up to 576px output
+    (48, [(2, 80), (3, 100), (4, 120), (5, 140), (8, 160), (12, 180)]),
+    # 64px input - 5 scales, up to 512px output
+    (64, [(2, 80), (3, 100), (4, 120), (6, 140), (8, 160)]),
+    # 96px input - 5 scales, up to 576px output
+    (96, [(2, 80), (3, 100), (4, 120), (5, 140), (6, 150)]),
+    # 128px input - 3 scales, up to 512px output
+    (128, [(2, 80), (3, 100), (4, 120)]),
+    # 192px input - 2 scales, up to 576px output
+    (192, [(2, 80), (3, 100)]),
+    # 256px input - 1 scale, up to 512px output (proper epochs to fix constant-gray)
+    (256, [(2, 150)]),
 ]
 
 # Icon sources for real training data
@@ -339,36 +346,40 @@ def train_and_export_model(model_dir: str, input_size: int, scale: int, epochs: 
     print(f"\n{'='*50}")
     print(f"[TRAIN] Training {input_size}->{output_size} (scale {scale}x, {epochs} epochs)")
 
-    model = build_fsrcnn(scale, input_size)
-    # A lower learning rate + gradient clipping keeps the combined loss (which
-    # includes a large-magnitude VGG perceptual term) from diverging to NaN.
-    optimizer = keras.optimizers.Adam(learning_rate=1e-4, clipnorm=1.0)
-    use_perceptual = not NO_PERCEPTUAL
-    if not use_perceptual:
-        print("[TRAIN] Perceptual loss disabled (--no-perceptual) — using MAE + MS-SSIM only")
-    model.compile(optimizer=optimizer, loss=make_combined_loss(output_size, use_perceptual=use_perceptual), jit_compile=False)
-    print(f"[TRAIN] Model params: {model.count_params()}")
-    print(f"[TRAIN] MS-SSIM scales: {_ssim_scales_for(output_size)} (output {output_size}px)")
+    with strategy.scope():
+        model = build_fsrcnn(scale, input_size)
+        # A lower learning rate + gradient clipping keeps the combined loss (which
+        # includes a large-magnitude VGG perceptual term) from diverging to NaN.
+        optimizer = keras.optimizers.Adam(learning_rate=1e-4, clipnorm=1.0)
+        use_perceptual = not NO_PERCEPTUAL
+        if not use_perceptual:
+            print("[TRAIN] Perceptual loss disabled (--no-perceptual) — using MAE + MS-SSIM only")
+        # Pre-create VGG inside scope so it's replicated across all GPUs
+        global VGG_FEATURES
+        if use_perceptual and VGG_FEATURES is None:
+            VGG_FEATURES = build_vgg_feature_extractor()
+            VGG_FEATURES.trainable = False
+        model.compile(optimizer=optimizer, loss=make_combined_loss(output_size, use_perceptual=use_perceptual), jit_compile=False)
+        print(f"[TRAIN] Model params: {model.count_params()}")
+        print(f"[TRAIN] MS-SSIM scales: {_ssim_scales_for(output_size)} (output {output_size}px)")
 
+        lr, hr = generate_training_data(input_size, scale)
+        # Shuffle lr/hr together (preserving pairing) so the tail-based
+        # validation_split below mixes real and synthetic samples instead of
+        # validating on a synthetic-only tail (real icons are generated first).
+        perm = np.random.default_rng(1234).permutation(len(lr))
+        lr, hr = lr[perm], hr[perm]
+        split = int(len(lr) * 0.9)
 
-
-    lr, hr = generate_training_data(input_size, scale)
-    # Shuffle lr/hr together (preserving pairing) so the tail-based
-    # validation_split below mixes real and synthetic samples instead of
-    # validating on a synthetic-only tail (real icons are generated first).
-    perm = np.random.default_rng(1234).permutation(len(lr))
-    lr, hr = lr[perm], hr[perm]
-    split = int(len(lr) * 0.9)
-
-    model.fit(
-
-        lr[:split],
-        hr[:split],
-        batch_size=16,
-        epochs=epochs,
-        verbose=2,
-        validation_split=0.1,
-    )
+        batch_size = 16 * strategy.num_replicas_in_sync
+        model.fit(
+            lr[:split],
+            hr[:split],
+            batch_size=batch_size,
+            epochs=epochs,
+            verbose=2,
+            validation_split=0.1,
+        )
 
     converter = tf.lite.TFLiteConverter.from_keras_model(model)
     converter.optimizations = [tf.lite.Optimize.DEFAULT]
