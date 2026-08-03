@@ -13,8 +13,13 @@ from io import BytesIO
 # Disable XLA globally to prevent MirrorPadGrad compile-time constant errors
 tf.config.optimizer.set_jit(False)
 
-# Use all available GPUs via MirroredStrategy
-strategy = tf.distribute.MirroredStrategy()
+# Use MirroredStrategy only when multiple GPUs are available;
+# with a single GPU the default strategy avoids MultiDeviceIterator overhead.
+_gpu_count = len(tf.config.list_physical_devices("GPU"))
+if _gpu_count > 1:
+    strategy = tf.distribute.MirroredStrategy()
+else:
+    strategy = tf.distribute.get_strategy()
 print(f"[TRAIN] Using {strategy.num_replicas_in_sync} device(s)")
 
 FORCE = "--force" in sys.argv

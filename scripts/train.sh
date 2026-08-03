@@ -17,6 +17,10 @@ set -euo pipefail
 # Belt-and-suspenders: disable XLA auto-jit to prevent MirrorPadGrad errors
 export TF_XLA_FLAGS=--tf_xla_auto_jit=0
 
+# Suppress TF startup warnings (cuFFT/cuDNN/cuBLAS factory registration, oneDNN)
+export TF_CPP_MIN_LOG_LEVEL=2
+export TF_ENABLE_ONEDNN_OPTS=0
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
