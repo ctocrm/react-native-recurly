@@ -9,7 +9,7 @@
  * reference a missing file: the build never fails on absent models, and newly
  * generated models are bundled automatically on the next build.
  *
- * Current contents: 32 fast (ESPCN) + 33 sharp (FSRCNN) = 65 models.
+ * Current contents: 35 fast (ESPCN) + 35 sharp (FSRCNN) = 70 models.
  */
 
 /* eslint-disable @typescript-eslint/no-require-imports */
@@ -17,9 +17,11 @@
 export const MODEL_MAP: Record<string, number> = {
   "espcn_128x_256x.tflite": require("../../assets/models/espcn_128x_256x.tflite"),
   "espcn_128x_384x.tflite": require("../../assets/models/espcn_128x_384x.tflite"),
+  "espcn_128x_512x.tflite": require("../../assets/models/espcn_128x_512x.tflite"),
   "espcn_16x_128x.tflite": require("../../assets/models/espcn_16x_128x.tflite"),
   "espcn_16x_192x.tflite": require("../../assets/models/espcn_16x_192x.tflite"),
   "espcn_16x_256x.tflite": require("../../assets/models/espcn_16x_256x.tflite"),
+  "espcn_16x_32x.tflite": require("../../assets/models/espcn_16x_32x.tflite"),
   "espcn_16x_384x.tflite": require("../../assets/models/espcn_16x_384x.tflite"),
   "espcn_16x_512x.tflite": require("../../assets/models/espcn_16x_512x.tflite"),
   "espcn_16x_64x.tflite": require("../../assets/models/espcn_16x_64x.tflite"),
@@ -47,12 +49,14 @@ export const MODEL_MAP: Record<string, number> = {
   "espcn_96x_288x.tflite": require("../../assets/models/espcn_96x_288x.tflite"),
   "espcn_96x_384x.tflite": require("../../assets/models/espcn_96x_384x.tflite"),
   "espcn_96x_480x.tflite": require("../../assets/models/espcn_96x_480x.tflite"),
+  "espcn_96x_576x.tflite": require("../../assets/models/espcn_96x_576x.tflite"),
   "fsrcnn_128x_256x.tflite": require("../../assets/models/fsrcnn_128x_256x.tflite"),
   "fsrcnn_128x_384x.tflite": require("../../assets/models/fsrcnn_128x_384x.tflite"),
   "fsrcnn_128x_512x.tflite": require("../../assets/models/fsrcnn_128x_512x.tflite"),
   "fsrcnn_16x_128x.tflite": require("../../assets/models/fsrcnn_16x_128x.tflite"),
   "fsrcnn_16x_192x.tflite": require("../../assets/models/fsrcnn_16x_192x.tflite"),
   "fsrcnn_16x_256x.tflite": require("../../assets/models/fsrcnn_16x_256x.tflite"),
+  "fsrcnn_16x_32x.tflite": require("../../assets/models/fsrcnn_16x_32x.tflite"),
   "fsrcnn_16x_384x.tflite": require("../../assets/models/fsrcnn_16x_384x.tflite"),
   "fsrcnn_16x_512x.tflite": require("../../assets/models/fsrcnn_16x_512x.tflite"),
   "fsrcnn_16x_64x.tflite": require("../../assets/models/fsrcnn_16x_64x.tflite"),
@@ -80,6 +84,7 @@ export const MODEL_MAP: Record<string, number> = {
   "fsrcnn_96x_288x.tflite": require("../../assets/models/fsrcnn_96x_288x.tflite"),
   "fsrcnn_96x_384x.tflite": require("../../assets/models/fsrcnn_96x_384x.tflite"),
   "fsrcnn_96x_480x.tflite": require("../../assets/models/fsrcnn_96x_480x.tflite"),
+  "fsrcnn_96x_576x.tflite": require("../../assets/models/fsrcnn_96x_576x.tflite"),
 };
 
 /** The set of model file names that are actually bundled. */
