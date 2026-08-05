@@ -79,29 +79,34 @@ TRAINING_BRANDS = [
 
 # ---- Perceptual + MS-SSIM Loss (ported from train_fsrcnn_multi.py) ----
 
-# Cache a single frozen VGG19 instance
-_VGG = None
+def build_vgg_feature_extractor():
+    """Build a lightweight VGG-based perceptual loss feature extractor."""
+    vgg = tf.keras.applications.VGG19(
+        include_top=False,
+        weights="imagenet",
+        input_shape=(None, None, 3),
+    )
+    # Use blocks 1-3 only for efficiency
+    outputs = [vgg.get_layer(f"block{i}_conv2").output for i in [1, 2, 3]]
+    return Model(vgg.input, outputs, name="vgg_features")
 
 
-def _get_vgg():
-    global _VGG
-    if _VGG is None:
-        vgg = tf.keras.applications.VGG19(include_top=False, weights="imagenet")
-        vgg.trainable = False
-        _VGG = vgg
-    return _VGG
+VGG_FEATURES = None
 
 
 def perceptual_loss(y_true, y_pred):
     """Perceptual loss using VGG19 features."""
-    vgg = _get_vgg()
+    global VGG_FEATURES
+    if VGG_FEATURES is None:
+        VGG_FEATURES = build_vgg_feature_extractor()
+        VGG_FEATURES.trainable = False
 
     # VGG expects 0-255 images run through preprocessing (RGB->BGR + ImageNet mean)
     y_true_255 = tf.keras.applications.vgg19.preprocess_input(y_true * 255.0)
     y_pred_255 = tf.keras.applications.vgg19.preprocess_input(y_pred * 255.0)
 
-    true_features = vgg(y_true_255)
-    pred_features = vgg(y_pred_255)
+    true_features = VGG_FEATURES(y_true_255)
+    pred_features = VGG_FEATURES(y_pred_255)
 
     loss = 0.0
     for tf_true, tf_pred in zip(true_features, pred_features):
@@ -307,14 +312,9 @@ def generate_real_icon_data(n: int, target_size: int) -> np.ndarray:
                 real_count += 1
                 continue
 
-        # Remaining: icon-like synthetic (not circles)
-        break
-
-    # Fill remaining with icon-like synthetics
-    remaining = n - real_count
-    if remaining > 0:
-        synth = generate_icon_like_synthetic(remaining, target_size, rng)
-        hr_images[real_count:] = synth
+        # Per-iteration synthetic fallback (icon-like, not circles)
+        # Don't break — continue trying real icons for remaining slots
+        hr_images[i] = generate_icon_like_synthetic(1, target_size, rng)[0]
 
     print(
         f"[TRAIN] Generated {n} images for size {target_size} "
@@ -322,7 +322,6 @@ def generate_real_icon_data(n: int, target_size: int) -> np.ndarray:
         f"{n - real_count} icon-like synthetic)"
     )
     return hr_images
-
 
 def generate_training_data(input_size: int, scale: int, n: int = 1000):
     """Generate training data for a specific input/output size."""
@@ -352,11 +351,11 @@ def train_and_export_model(model_dir: str, input_size: int, scale: int, epochs: 
         model = build_espcn(scale, input_size)
         
         # Pre-create VGG inside scope so it's replicated across GPUs
-        global _VGG
+        global VGG_FEATURES
         use_perceptual = not NO_PERCEPTUAL
-        if use_perceptual and _VGG is None:
-            _VGG = _get_vgg()
-            _VGG.trainable = False
+        if use_perceptual and VGG_FEATURES is None:
+            VGG_FEATURES = build_vgg_feature_extractor()
+            VGG_FEATURES.trainable = False
         
         optimizer = keras.optimizers.Adam(learning_rate=1e-4, clipnorm=1.0)
         model.compile(optimizer=optimizer, loss=make_combined_loss(output_size, use_perceptual=use_perceptual), jit_compile=False)

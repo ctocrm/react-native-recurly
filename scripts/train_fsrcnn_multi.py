@@ -360,14 +360,9 @@ def generate_real_icon_data(n: int, target_size: int) -> np.ndarray:
                 real_count += 1
                 continue
 
-        # Remaining: icon-like synthetic (not circles)
-        break
-
-    # Fill remaining with icon-like synthetics
-    remaining = n - real_count
-    if remaining > 0:
-        synth = generate_icon_like_synthetic(remaining, target_size, rng)
-        hr_images[real_count:] = synth
+        # Per-iteration synthetic fallback (icon-like, not circles)
+        # Don't break — continue trying real icons for remaining slots
+        hr_images[i] = generate_icon_like_synthetic(1, target_size, rng)[0]
 
     print(
         f"[TRAIN] Generated {n} images for size {target_size} "
