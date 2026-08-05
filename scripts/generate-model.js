@@ -66,19 +66,32 @@ function main() {
 
   const venvPython = path.join(__dirname, "..", ".venv", "bin", "python");
 
-  // Fail fast if virtual environment is not set up — no auto-setup logic.
+  // Self-healing: auto-run train-setup.sh if venv is missing
   if (!fs.existsSync(venvPython)) {
-    console.error(
-      "[MODEL] Python virtual environment not found at " +
-        path.join(__dirname, "..", ".venv") +
-        ".",
+    console.log(
+      "[MODEL] Python virtual environment not found, running setup...",
     );
-    console.error("");
-    console.error("[MODEL] Run the setup script first:");
-    console.error("  bash scripts/train-setup.sh");
-    console.error("");
-    console.error("[MODEL] Or via npm:");
-    console.error("  npm run train:setup");
+    try {
+      execFileSync("bash", ["scripts/train-setup.sh"], {
+        stdio: "inherit",
+        cwd: path.join(__dirname, ".."),
+      });
+      console.log("[MODEL] Setup completed, venv should now exist");
+    } catch (err) {
+      console.error("[MODEL] Failed to auto-setup venv:", err);
+      console.error("");
+      console.error("[MODEL] Run the setup script manually:");
+      console.error("  bash scripts/train-setup.sh");
+      console.error("");
+      console.error("[MODEL] Or via npm:");
+      console.error("  npm run train:setup");
+      process.exit(1);
+    }
+  }
+
+  // Verify venv exists after setup attempt
+  if (!fs.existsSync(venvPython)) {
+    console.error("[MODEL] Venv still not found after setup attempt");
     process.exit(1);
   }
 

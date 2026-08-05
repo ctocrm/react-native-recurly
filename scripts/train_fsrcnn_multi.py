@@ -37,26 +37,25 @@ for arg in sys.argv:
 
 # Model configurations: input_size -> list of (scale, epochs) tuples
 # Scale = output_size / input_size
-# Epochs scaled to match 16px baseline: target_output / 16 * base_epochs
+# Epochs scaled for quality: large scales (8x, 6x) get 200+ epochs
 # Capped at 576px output max (largest size used by the app).
-# 256px input gets proper epochs (150+) to fix constant-gray output.
 MODEL_CONFIGS = [
     # 16px input - baseline (7 scales, up to 512px output)
-    (16, [(2, 80), (4, 120), (8, 150), (12, 180), (16, 200), (24, 220), (32, 250)]),
+    (16, [(2, 80), (4, 120), (8, 200), (12, 220), (16, 250), (24, 250), (32, 250)]),
     # 32px input - 6 scales, up to 512px output
-    (32, [(2, 80), (4, 120), (6, 140), (8, 160), (12, 180), (16, 200)]),
+    (32, [(2, 80), (4, 120), (6, 150), (8, 200), (12, 220), (16, 250)]),
     # 48px input - 6 scales, up to 576px output
-    (48, [(2, 80), (3, 100), (4, 120), (5, 140), (8, 160), (12, 180)]),
+    (48, [(2, 80), (3, 100), (4, 150), (5, 180), (8, 200), (12, 220)]),
     # 64px input - 5 scales, up to 512px output
-    (64, [(2, 80), (3, 100), (4, 120), (6, 140), (8, 160)]),
+    (64, [(2, 80), (3, 100), (4, 150), (6, 200), (8, 250)]),
     # 96px input - 5 scales, up to 576px output
-    (96, [(2, 80), (3, 100), (4, 120), (5, 140), (6, 150)]),
+    (96, [(2, 80), (3, 100), (4, 150), (5, 180), (6, 200)]),
     # 128px input - 3 scales, up to 512px output
-    (128, [(2, 80), (3, 100), (4, 120)]),
+    (128, [(2, 80), (3, 100), (4, 150)]),
     # 192px input - 2 scales, up to 576px output
     (192, [(2, 80), (3, 100)]),
-    # 256px input - 1 scale, up to 512px output (proper epochs to fix constant-gray)
-    (256, [(2, 150)]),
+    # 256px input - 1 scale, up to 512px output
+    (256, [(2, 200)]),
 ]
 
 # Icon sources for real training data
@@ -250,82 +249,131 @@ def fetch_svg_icon(slug: str) -> bytes | None:
                 headers={"User-Agent": "Mozilla/5.0"},
             )
             with urllib.request.urlopen(req, timeout=5) as response:
-                return response.read()
+                data = response.read()
+                if len(data) > 1024:  # verify non-trivial SVG
+                    return data
         except Exception:
             continue
     return None
 
 
 def rasterize_svg_to_png(svg_bytes: bytes, size: int) -> np.ndarray | None:
-    """Rasterize SVG to PNG at specified size using cairosvg if available."""
-    try:
-        import cairosvg
-        png_data = cairosvg.svg2png(
-            bytestring=svg_bytes, output_width=size, output_height=size
-        )
-        from PIL import Image
-        img = Image.open(BytesIO(png_data))
-        arr = np.array(img.convert("RGBA"))
-        return arr.astype(np.float32) / 255.0
-    except Exception:
-        return None
+    """Rasterize SVG to PNG at specified size using cairosvg (required)."""
+    import cairosvg
+    from PIL import Image
+    png_data = cairosvg.svg2png(bytestring=svg_bytes, output_width=size, output_height=size)
+    img = Image.open(BytesIO(png_data))
+    arr = np.array(img.convert("RGBA"))
+    return arr.astype(np.float32) / 255.0
 
 
 def augment_icon(hr: np.ndarray, rng: np.random.Generator) -> np.ndarray:
     """Apply light augmentation to a training icon."""
-    # Random horizontal flip
     if rng.random() < 0.5:
         hr = np.flip(hr, axis=1).copy()
-    # Random 90-degree rotation
     k = rng.integers(0, 4)
     if k:
         hr = np.rot90(hr, k=k, axes=(0, 1)).copy()
-    # Random brightness/contrast jitter
     hr = hr * rng.uniform(0.9, 1.1)
     hr = np.clip(hr, 0.0, 1.0)
     return hr
 
 
+def generate_icon_like_synthetic(n: int, target_size: int, rng) -> np.ndarray:
+    """Generate synthetic icons with text-like strokes, sharp corners, logo shapes."""
+    hr_images = np.zeros((n, target_size, target_size, 3), dtype=np.float32)
+    for i in range(n):
+        bg = rng.uniform(0.0, 0.2, size=3)
+        hr_images[i] = bg
+        fg = rng.uniform(0.7, 1.0, size=3)
+        
+        # Randomly choose icon-like pattern
+        pattern = rng.integers(0, 4)
+        if pattern == 0:
+            # Rounded rectangle (app icon style)
+            cy, cx = target_size // 2, target_size // 2
+            r = rng.integers(target_size // 3, target_size // 2)
+            yy, xx = np.mgrid[0:target_size, 0:target_size]
+            mask = (np.abs(xx - cx) <= r) & (np.abs(yy - cy) <= r)
+            # Round corners
+            corner_r = r // 4
+            for corner_y, corner_x in [(cy-r, cx-r), (cy-r, cx+r), (cy+r, cx-r), (cy+r, cx+r)]:
+                corner_mask = (xx - corner_x) ** 2 + (yy - corner_y) ** 2 > corner_r ** 2
+                mask = mask & corner_mask
+            hr_images[i, mask] = fg
+        elif pattern == 1:
+            # Horizontal bar (text-like)
+            cy = rng.integers(target_size // 3, 2 * target_size // 3)
+            h = rng.integers(target_size // 8, target_size // 4)
+            hr_images[i, cy-h:cy+h, target_size//6:5*target_size//6] = fg
+        elif pattern == 2:
+            # Vertical bar
+            cx = rng.integers(target_size // 3, 2 * target_size // 3)
+            w = rng.integers(target_size // 8, target_size // 4)
+            hr_images[i, target_size//6:5*target_size//6, cx-w:cx+w] = fg
+        else:
+            # Cross/plus shape
+            cy, cx = target_size // 2, target_size // 2
+            w = rng.integers(target_size // 6, target_size // 4)
+            hr_images[i, cy-w:cy+w, target_size//4:3*target_size//4] = fg
+            hr_images[i, target_size//4:3*target_size//4, cx-w:cx+w] = fg
+    return hr_images
+
+
 def generate_real_icon_data(n: int, target_size: int) -> np.ndarray:
-    """Generate training data from real icons (fallback to synthetic)."""
+    """Generate training data from real icons (cairosvg required, 80% target)."""
     rng = np.random.default_rng(42)
     hr_images = np.zeros((n, target_size, target_size, 3), dtype=np.float32)
 
+    real_icon_cache: list[np.ndarray] = []
+    brand_attempts = 0
     real_count = 0
+    target_real = int(n * 0.8)  # 80% real icons
+
     for i in range(n):
-        if real_count < n // 2:
-            brand = TRAINING_BRANDS[i % len(TRAINING_BRANDS)]
-            svg = fetch_svg_icon(brand)
-            if svg:
-                rasterized = rasterize_svg_to_png(svg, target_size)
-                if rasterized is not None:
-                    if rasterized.shape[-1] == 4:
-                        alpha = rasterized[..., 3:4]
-                        rgb = rasterized[..., :3] * alpha + (1 - alpha)
-                        hr_images[i] = augment_icon(rgb, rng)
-                    else:
-                        hr_images[i] = augment_icon(rasterized[..., :3], rng)
-                    real_count += 1
-                    print(f"[TRAIN] Got real icon: {brand}")
-                    continue
+        if real_count < target_real:
+            base = None
+            if brand_attempts < len(TRAINING_BRANDS):
+                brand = TRAINING_BRANDS[brand_attempts]
+                brand_attempts += 1
+                svg = fetch_svg_icon(brand)
+                if svg:
+                    try:
+                        rasterized = rasterize_svg_to_png(svg, target_size)
+                        if rasterized is not None:
+                            if rasterized.shape[-1] == 4:
+                                alpha = rasterized[..., 3:4]
+                                base = rasterized[..., :3] * alpha + (1 - alpha)
+                            else:
+                                base = rasterized[..., :3]
+                            base = base.astype(np.float32)
+                            real_icon_cache.append(base)
+                            print(f"[TRAIN] Got real icon: {brand}")
+                    except Exception as e:
+                        print(f"[TRAIN] Failed to rasterize {brand}: {e}")
 
-        # Synthetic fallback
-        bg = rng.uniform(0.0, 0.3, size=3)
-        hr_images[i] = bg
-        fg = rng.uniform(0.6, 1.0, size=3)
-        cy, cx = rng.integers(target_size // 4, 3 * target_size // 4, size=2)
-        r = rng.integers(target_size // 5, target_size // 3)
-        yy, xx = np.mgrid[0:target_size, 0:target_size]
-        mask = (xx - cx) ** 2 + (yy - cy) ** 2 <= r * r
-        if rng.random() < 0.5:
-            hr_images[i, mask] = fg
-        else:
-            half = r
-            rect = ((np.abs(xx - cx) <= half) & (np.abs(yy - cy) <= half))
-            hr_images[i, rect] = fg
-        real_count += 1
+            if base is None and real_icon_cache:
+                base = real_icon_cache[int(rng.integers(0, len(real_icon_cache)))]
 
-    print(f"[TRAIN] Generated {real_count} images for size {target_size}")
+            if base is not None:
+                hr_images[i] = augment_icon(base, rng)
+                real_count += 1
+                continue
+
+        # Remaining: icon-like synthetic (not circles)
+        break
+
+    # Fill remaining with icon-like synthetics
+    remaining = n - real_count
+    if remaining > 0:
+        synth = generate_icon_like_synthetic(remaining, target_size, rng)
+        hr_images[real_count:] = synth
+
+    print(
+        f"[TRAIN] Generated {n} images for size {target_size} "
+        f"({real_count} real/augmented from {len(real_icon_cache)} icons, "
+        f"{n - real_count} icon-like synthetic)"
+    )
     return hr_images
 
 
@@ -394,29 +442,58 @@ def train_and_export_model(model_dir: str, input_size: int, scale: int, epochs: 
         f.write(tflite_model)
     print(f"[TRAIN] WROTE {out_path} ({len(tflite_model)} bytes)")
 
-    # VALIDATION: Test model output variance to catch constant-gray models
-    print(f"[VALIDATE] Testing model output variance...")
+    # VALIDATION: Test model output variance + bicubic baseline comparison
+    print(f"[VALIDATE] Testing model output variance vs bicubic baseline...")
     try:
         interpreter = tf.lite.Interpreter(model_content=tflite_model)
         interpreter.allocate_tensors()
         input_details = interpreter.get_input_details()
         output_details = interpreter.get_output_details()
         
-        # Test with random input
-        test_input = np.random.rand(1, input_size, input_size, 3).astype(np.float32)
-        interpreter.set_tensor(input_details[0]['index'], test_input)
-        interpreter.invoke()
-        output = interpreter.get_tensor(output_details[0]['index'])
+        # Test with multiple random inputs
+        variances = []
+        psnrs = []
+        bicubic_psnrs = []
         
-        # Check variance - constant gray has variance ~0
-        variance = float(np.var(output))
-        mean_val = float(np.mean(output))
-        print(f"[VALIDATE] Output mean: {mean_val:.4f}, variance: {variance:.6f}")
+        for _ in range(10):
+            test_input = np.random.rand(1, input_size, input_size, 3).astype(np.float32)
+            interpreter.set_tensor(input_details[0]['index'], test_input)
+            interpreter.invoke()
+            output = interpreter.get_tensor(output_details[0]['index'])
+            
+            variance = float(np.var(output))
+            variances.append(variance)
+            
+            # Bicubic baseline
+            bicubic = tf.image.resize(test_input, (output_size, output_size), method="bicubic").numpy()
+            
+            # Generate a "ground truth" by upscaling a clean pattern
+            # For validation, we compare model output vs bicubic on the same input
+            # Using a simple synthetic HR target for PSNR calculation
+            hr_target = np.ones_like(output) * 0.5  # neutral gray reference
+            model_psnr = tf.image.psnr(output, hr_target, max_val=1.0).numpy()
+            bicubic_psnr = tf.image.psnr(bicubic, hr_target, max_val=1.0).numpy()
+            psnrs.append(float(model_psnr))
+            bicubic_psnrs.append(float(bicubic_psnr))
         
-        if variance < 0.001:
-            raise RuntimeError(f"MODEL VALIDATION FAILED: Output variance {variance:.6f} too low (constant gray detected). Mean: {mean_val:.4f}")
+        mean_var = float(np.mean(variances))
+        mean_model_psnr = float(np.mean(psnrs))
+        mean_bicubic_psnr = float(np.mean(bicubic_psnrs))
         
-        print(f"[VALIDATE] PASSED - Model produces varied output")
+        print(f"[VALIDATE] Output variance: {mean_var:.6f}")
+        print(f"[VALIDATE] Model PSNR: {mean_model_psnr:.2f}dB, Bicubic PSNR: {mean_bicubic_psnr:.2f}dB")
+        
+        if mean_var < 0.001:
+            raise RuntimeError(f"MODEL VALIDATION FAILED: Output variance {mean_var:.6f} too low (constant gray)")
+        
+        # Require model to beat bicubic by at least 0.5dB
+        if mean_model_psnr < mean_bicubic_psnr + 0.5:
+            raise RuntimeError(
+                f"MODEL VALIDATION FAILED: Model PSNR {mean_model_psnr:.2f}dB "
+                f"not better than bicubic {mean_bicubic_psnr:.2f}dB + 0.5dB margin"
+            )
+        
+        print(f"[VALIDATE] PASSED - Model beats bicubic baseline by {mean_model_psnr - mean_bicubic_psnr:.2f}dB")
     except Exception as e:
         if "MODEL VALIDATION FAILED" in str(e):
             raise

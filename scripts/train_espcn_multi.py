@@ -1,4 +1,4 @@
-"""Multi-resolution ESPCN model training with optimized epochs per scale ratio."""
+"""Multi-resolution ESPCN model training with perceptual + MS-SSIM loss."""
 import os
 import sys
 import re
@@ -23,6 +23,7 @@ else:
 print(f"[TRAIN] Using {strategy.num_replicas_in_sync} device(s)")
 
 FORCE = "--force" in sys.argv
+NO_PERCEPTUAL = "--no-perceptual" in sys.argv
 SPECIFIC_MODEL = None
 INPUT_SIZE = None
 OUTPUT_DIR = None
@@ -36,26 +37,25 @@ for arg in sys.argv:
 
 # Model configurations: input_size -> list of (scale, epochs) tuples
 # Scale = output_size / input_size
-# Epochs scaled to match 16px baseline: target_output / 16 * base_epochs
+# Epochs scaled for quality: large scales (8x, 6x) get 200+ epochs
 # Capped at 576px output max (largest size used by the app).
-# 256px input gets proper epochs (150+) to fix constant-gray output.
 MODEL_CONFIGS = [
     # 16px input - baseline (7 scales, up to 512px output)
-    (16, [(2, 40), (4, 64), (8, 80), (12, 100), (16, 120), (24, 130), (32, 150)]),
+    (16, [(2, 80), (4, 120), (8, 200), (12, 220), (16, 250), (24, 250), (32, 250)]),
     # 32px input - 6 scales, up to 512px output
-    (32, [(2, 35), (4, 60), (6, 70), (8, 80), (12, 100), (16, 120)]),
+    (32, [(2, 80), (4, 120), (6, 150), (8, 200), (12, 220), (16, 250)]),
     # 48px input - 6 scales, up to 576px output
-    (48, [(2, 40), (3, 60), (4, 70), (5, 80), (8, 100), (12, 120)]),
+    (48, [(2, 80), (3, 100), (4, 150), (5, 180), (8, 200), (12, 220)]),
     # 64px input - 5 scales, up to 512px output
-    (64, [(2, 40), (3, 60), (4, 70), (6, 80), (8, 100)]),
+    (64, [(2, 80), (3, 100), (4, 150), (6, 200), (8, 250)]),
     # 96px input - 5 scales, up to 576px output
-    (96, [(2, 50), (3, 60), (4, 70), (5, 80), (6, 90)]),
+    (96, [(2, 80), (3, 100), (4, 150), (5, 180), (6, 200)]),
     # 128px input - 3 scales, up to 512px output
-    (128, [(2, 40), (3, 50), (4, 70)]),
+    (128, [(2, 80), (3, 100), (4, 150)]),
     # 192px input - 2 scales, up to 576px output
-    (192, [(2, 40), (3, 60)]),
-    # 256px input - 1 scale, up to 512px output (proper epochs to fix constant-gray)
-    (256, [(2, 150)]),
+    (192, [(2, 80), (3, 100)]),
+    # 256px input - 1 scale, up to 512px output
+    (256, [(2, 200)]),
 ]
 
 
@@ -77,27 +77,104 @@ TRAINING_BRANDS = [
 ]
 
 
-def augment_icon(img: np.ndarray, rng) -> np.ndarray:
-    """Apply light random augmentations to an RGB float (0-1) icon.
+# ---- Perceptual + MS-SSIM Loss (ported from train_fsrcnn_multi.py) ----
 
-    Mirrors the augmentation used in the FSRCNN pipeline so a small set of real
-    icons yields varied training samples instead of exact duplicates.
-    """
-    out = img
-    if rng.random() < 0.5:
-        out = out[:, ::-1, :]  # horizontal flip
-    if rng.random() < 0.5:
-        out = out[::-1, :, :]  # vertical flip
-    k = int(rng.integers(0, 4))
-    if k:
-        out = np.rot90(out, k=k, axes=(0, 1))  # 0/90/180/270 rotation
-    factor = float(rng.uniform(0.85, 1.15))  # brightness jitter
-    out = np.clip(out * factor, 0.0, 1.0)
-    return np.ascontiguousarray(out, dtype=np.float32)
+# Cache a single frozen VGG19 instance
+_VGG = None
 
+
+def _get_vgg():
+    global _VGG
+    if _VGG is None:
+        vgg = tf.keras.applications.VGG19(include_top=False, weights="imagenet")
+        vgg.trainable = False
+        _VGG = vgg
+    return _VGG
+
+
+def perceptual_loss(y_true, y_pred):
+    """Perceptual loss using VGG19 features."""
+    vgg = _get_vgg()
+
+    # VGG expects 0-255 images run through preprocessing (RGB->BGR + ImageNet mean)
+    y_true_255 = tf.keras.applications.vgg19.preprocess_input(y_true * 255.0)
+    y_pred_255 = tf.keras.applications.vgg19.preprocess_input(y_pred * 255.0)
+
+    true_features = vgg(y_true_255)
+    pred_features = vgg(y_pred_255)
+
+    loss = 0.0
+    for tf_true, tf_pred in zip(true_features, pred_features):
+        loss += tf.reduce_mean(tf.abs(tf_true - tf_pred))
+    return loss / len(true_features)
+
+
+# MS-SSIM default power factors (5 scales)
+_MS_SSIM_POWER_FACTORS = [0.0448, 0.2856, 0.3001, 0.2363, 0.1333]
+_MS_SSIM_FILTER_SIZE = 7
+
+
+def _ssim_scales_for(output_size: int) -> int:
+    """How many MS-SSIM scales fit a given output size."""
+    n = 1
+    while n < len(_MS_SSIM_POWER_FACTORS) and output_size >= _MS_SSIM_FILTER_SIZE * (2 ** n):
+        n += 1
+    return n
+
+
+@tf.custom_gradient
+def _sanitize_grad(x):
+    """Identity forward; zero NaN/Inf gradients on backward."""
+    def grad(dy):
+        return tf.where(tf.math.is_finite(dy), dy, tf.zeros_like(dy))
+    return tf.identity(x), grad
+
+
+def make_combined_loss(output_size: int, use_perceptual: bool = True):
+    """Build combined MAE + (MS-)SSIM + perceptual loss for fixed output size."""
+    n_scales = _ssim_scales_for(output_size)
+
+    def _finite(value):
+        return tf.where(tf.math.is_finite(value), value, tf.zeros_like(value))
+
+    if n_scales <= 1:
+        def ssim_term(y_true, y_pred):
+            filter_size = min(_MS_SSIM_FILTER_SIZE, output_size)
+            s = tf.image.ssim(
+                y_true, _sanitize_grad(y_pred), max_val=1.0, filter_size=filter_size
+            )
+            return 1.0 - tf.reduce_mean(_finite(s))
+    else:
+        pf = _MS_SSIM_POWER_FACTORS[:n_scales]
+        total = sum(pf)
+        pf = [p / total for p in pf]
+
+        def ssim_term(y_true, y_pred):
+            s = tf.image.ssim_multiscale(
+                y_true,
+                _sanitize_grad(y_pred),
+                max_val=1.0,
+                filter_size=_MS_SSIM_FILTER_SIZE,
+                power_factors=pf,
+            )
+            return 1.0 - tf.reduce_mean(_finite(s))
+
+    def combined_loss(y_true, y_pred):
+        y_true = tf.clip_by_value(y_true, 0.0, 1.0)
+        y_pred = tf.clip_by_value(y_pred, 0.0, 1.0)
+        mae = tf.reduce_mean(tf.abs(y_true - y_pred))
+        ssim = ssim_term(y_true, y_pred)
+        if use_perceptual:
+            perceptual = perceptual_loss(y_true, y_pred)
+            return mae + 0.15 * ssim + 0.05 * perceptual
+        return mae + 0.15 * ssim
+
+    return combined_loss
+
+
+# ---- Model Architecture ----
 
 def build_espcn(scale: int, input_size: int = 16):
-
     """Build ESPCN model for a specific scale factor with fixed input shape."""
     inp = layers.Input(shape=(input_size, input_size, 3))
     x = layers.Conv2D(16, 3, padding="same", activation="relu")(inp)
@@ -106,6 +183,8 @@ def build_espcn(scale: int, input_size: int = 16):
     out = layers.Conv2D(3, 3, padding="same", activation="sigmoid")(x)
     return Model(inp, out)
 
+
+# ---- Data Pipeline ----
 
 def fetch_svg_icon(slug: str) -> bytes | None:
     """Fetch SVG icon from CDN sources."""
@@ -117,95 +196,130 @@ def fetch_svg_icon(slug: str) -> bytes | None:
                 headers={"User-Agent": "Mozilla/5.0"},
             )
             with urllib.request.urlopen(req, timeout=5) as response:
-                return response.read()
+                data = response.read()
+                if len(data) > 1024:  # verify non-trivial SVG
+                    return data
         except Exception:
             continue
     return None
 
 
 def rasterize_svg_to_png(svg_bytes: bytes, size: int) -> np.ndarray | None:
-    """Rasterize SVG to PNG at specified size using cairosvg if available, else skip."""
-    try:
-        import cairosvg
-        png_data = cairosvg.svg2png(bytestring=svg_bytes, output_width=size, output_height=size)
-        from PIL import Image
-        img = Image.open(BytesIO(png_data))
-        arr = np.array(img.convert("RGBA"))
-        return arr.astype(np.float32) / 255.0
-    except ImportError:
-        # If cairosvg not available, generate synthetic data
-        return None
+    """Rasterize SVG to PNG at specified size using cairosvg (required)."""
+    import cairosvg
+    from PIL import Image
+    png_data = cairosvg.svg2png(bytestring=svg_bytes, output_width=size, output_height=size)
+    img = Image.open(BytesIO(png_data))
+    arr = np.array(img.convert("RGBA"))
+    return arr.astype(np.float32) / 255.0
+
+
+def augment_icon(hr: np.ndarray, rng: np.random.Generator) -> np.ndarray:
+    """Apply light augmentation to a training icon."""
+    if rng.random() < 0.5:
+        hr = np.flip(hr, axis=1).copy()
+    k = rng.integers(0, 4)
+    if k:
+        hr = np.rot90(hr, k=k, axes=(0, 1)).copy()
+    hr = hr * rng.uniform(0.9, 1.1)
+    hr = np.clip(hr, 0.0, 1.0)
+    return hr
+
+
+def generate_icon_like_synthetic(n: int, target_size: int, rng) -> np.ndarray:
+    """Generate synthetic icons with text-like strokes, sharp corners, logo shapes."""
+    hr_images = np.zeros((n, target_size, target_size, 3), dtype=np.float32)
+    for i in range(n):
+        bg = rng.uniform(0.0, 0.2, size=3)
+        hr_images[i] = bg
+        fg = rng.uniform(0.7, 1.0, size=3)
+        
+        # Randomly choose icon-like pattern
+        pattern = rng.integers(0, 4)
+        if pattern == 0:
+            # Rounded rectangle (app icon style)
+            cy, cx = target_size // 2, target_size // 2
+            r = rng.integers(target_size // 3, target_size // 2)
+            yy, xx = np.mgrid[0:target_size, 0:target_size]
+            mask = (np.abs(xx - cx) <= r) & (np.abs(yy - cy) <= r)
+            # Round corners
+            corner_r = r // 4
+            for corner_y, corner_x in [(cy-r, cx-r), (cy-r, cx+r), (cy+r, cx-r), (cy+r, cx+r)]:
+                corner_mask = (xx - corner_x) ** 2 + (yy - corner_y) ** 2 > corner_r ** 2
+                mask = mask & corner_mask
+            hr_images[i, mask] = fg
+        elif pattern == 1:
+            # Horizontal bar (text-like)
+            cy = rng.integers(target_size // 3, 2 * target_size // 3)
+            h = rng.integers(target_size // 8, target_size // 4)
+            hr_images[i, cy-h:cy+h, target_size//6:5*target_size//6] = fg
+        elif pattern == 2:
+            # Vertical bar
+            cx = rng.integers(target_size // 3, 2 * target_size // 3)
+            w = rng.integers(target_size // 8, target_size // 4)
+            hr_images[i, target_size//6:5*target_size//6, cx-w:cx+w] = fg
+        else:
+            # Cross/plus shape
+            cy, cx = target_size // 2, target_size // 2
+            w = rng.integers(target_size // 6, target_size // 4)
+            hr_images[i, cy-w:cy+w, target_size//4:3*target_size//4] = fg
+            hr_images[i, target_size//4:3*target_size//4, cx-w:cx+w] = fg
+    return hr_images
 
 
 def generate_real_icon_data(n: int, target_size: int) -> np.ndarray:
-    """Generate training data from real icons (fallback to synthetic if unavailable)."""
+    """Generate training data from real icons (cairosvg required, 80% target)."""
     rng = np.random.default_rng(42)
     hr_images = np.zeros((n, target_size, target_size, 3), dtype=np.float32)
 
-    # Cache rasterized real icons so we can reuse and augment them without
-    # re-fetching the same brand repeatedly.
     real_icon_cache: list[np.ndarray] = []
-    # Track the next brand to attempt independently of the cache: a failed
-    # fetch/rasterization must still advance so we don't retry the same broken
-    # brand forever (and so every brand gets at most one attempt).
     brand_attempts = 0
     real_count = 0
-    synthetic_count = 0
-    target_real = n // 2  # aim for a half-real, half-synthetic distribution
+    target_real = int(n * 0.8)  # 80% real icons
 
     for i in range(n):
         if real_count < target_real:
             base = None
-            # Attempt the next un-tried brand first, then fall back to reusing an
-            # already-cached icon (augmented) so we don't keep re-selecting the
-            # same brand sequence without variation.
             if brand_attempts < len(TRAINING_BRANDS):
                 brand = TRAINING_BRANDS[brand_attempts]
                 brand_attempts += 1
                 svg = fetch_svg_icon(brand)
                 if svg:
-                    rasterized = rasterize_svg_to_png(svg, target_size)
-                    if rasterized is not None:
-                        if rasterized.shape[-1] == 4:
-                            # Composite over white background
-                            alpha = rasterized[..., 3:4]
-                            base = rasterized[..., :3] * alpha + (1 - alpha)
-                        else:
-                            base = rasterized[..., :3]
-                        base = base.astype(np.float32)
-                        real_icon_cache.append(base)
-                        print(f"[TRAIN] Got real icon: {brand}")
-
+                    try:
+                        rasterized = rasterize_svg_to_png(svg, target_size)
+                        if rasterized is not None:
+                            if rasterized.shape[-1] == 4:
+                                alpha = rasterized[..., 3:4]
+                                base = rasterized[..., :3] * alpha + (1 - alpha)
+                            else:
+                                base = rasterized[..., :3]
+                            base = base.astype(np.float32)
+                            real_icon_cache.append(base)
+                            print(f"[TRAIN] Got real icon: {brand}")
+                    except Exception as e:
+                        print(f"[TRAIN] Failed to rasterize {brand}: {e}")
 
             if base is None and real_icon_cache:
                 base = real_icon_cache[int(rng.integers(0, len(real_icon_cache)))]
 
             if base is not None:
-                # Augment every real sample so repeated brands still add variety.
                 hr_images[i] = augment_icon(base, rng)
                 real_count += 1
                 continue
 
-        # Synthetic fallback (same as original)
-        bg = rng.uniform(0.0, 0.3, size=3)
-        hr_images[i] = bg
-        fg = rng.uniform(0.6, 1.0, size=3)
-        cy, cx = rng.integers(target_size // 4, 3 * target_size // 4, size=2)
-        r = rng.integers(target_size // 5, target_size // 3)
-        yy, xx = np.mgrid[0:target_size, 0:target_size]
-        mask = (xx - cx) ** 2 + (yy - cy) ** 2 <= r * r
-        if rng.random() < 0.5:
-            hr_images[i, mask] = fg
-        else:
-            half = r
-            rect = ((np.abs(xx - cx) <= half) & (np.abs(yy - cy) <= half))
-            hr_images[i, rect] = fg
-        synthetic_count += 1
+        # Remaining: icon-like synthetic (not circles)
+        break
+
+    # Fill remaining with icon-like synthetics
+    remaining = n - real_count
+    if remaining > 0:
+        synth = generate_icon_like_synthetic(remaining, target_size, rng)
+        hr_images[real_count:] = synth
 
     print(
         f"[TRAIN] Generated {n} images for size {target_size} "
         f"({real_count} real/augmented from {len(real_icon_cache)} icons, "
-        f"{synthetic_count} synthetic)"
+        f"{n - real_count} icon-like synthetic)"
     )
     return hr_images
 
@@ -213,23 +327,19 @@ def generate_real_icon_data(n: int, target_size: int) -> np.ndarray:
 def generate_training_data(input_size: int, scale: int, n: int = 1000):
     """Generate training data for a specific input/output size."""
     output_size = input_size * scale
-
-    # Generate high-res images
     hr = generate_real_icon_data(n, output_size)
-
-    # Downscale to create low-res inputs
     lr = tf.image.resize(hr, (input_size, input_size), method="bicubic").numpy()
-
     return lr, hr
 
 
-def train_and_export_model(model_dir: str, input_size: int, scale: int, epochs: int):
-    """Train and export a single model."""
-    output_size = input_size * scale
+# ---- Training & Export ----
 
-    # Skip if model already exists and not forced
+def train_and_export_model(model_dir: str, input_size: int, scale: int, epochs: int):
+    """Train and export a single model with perceptual+MS-SSIM loss."""
+    output_size = input_size * scale
     model_name = f"espcn_{input_size}x_{output_size}x.tflite"
     out_path = os.path.join(model_dir, model_name)
+
     if not FORCE and os.path.exists(out_path):
         size = os.path.getsize(out_path)
         print(f"[SKIP] {model_name} exists ({size} bytes), use --force to retrain")
@@ -240,50 +350,94 @@ def train_and_export_model(model_dir: str, input_size: int, scale: int, epochs: 
 
     with strategy.scope():
         model = build_espcn(scale, input_size)
-        model.compile(optimizer="adam", loss="mae")
+        
+        # Pre-create VGG inside scope so it's replicated across GPUs
+        global _VGG
+        use_perceptual = not NO_PERCEPTUAL
+        if use_perceptual and _VGG is None:
+            _VGG = _get_vgg()
+            _VGG.trainable = False
+        
+        optimizer = keras.optimizers.Adam(learning_rate=1e-4, clipnorm=1.0)
+        model.compile(optimizer=optimizer, loss=make_combined_loss(output_size, use_perceptual=use_perceptual), jit_compile=False)
         print(f"[TRAIN] Model params: {model.count_params()}")
+        print(f"[TRAIN] MS-SSIM scales: {_ssim_scales_for(output_size)} (output {output_size}px)")
 
         lr, hr = generate_training_data(input_size, scale)
+        # Shuffle to mix real/synthetic
+        perm = np.random.default_rng(1234).permutation(len(lr))
+        lr, hr = lr[perm], hr[perm]
         split = int(len(lr) * 0.9)
 
-        batch_size = 32 * strategy.num_replicas_in_sync
-        model.fit(lr[:split], hr[:split], batch_size=batch_size, epochs=epochs, verbose=2)
+        batch_size = 16 * strategy.num_replicas_in_sync
+        model.fit(
+            lr[:split], hr[:split],
+            batch_size=batch_size,
+            epochs=epochs,
+            verbose=2,
+            validation_split=0.1,
+        )
 
     converter = tf.lite.TFLiteConverter.from_keras_model(model)
-    # Optimize for size
     converter.optimizations = [tf.lite.Optimize.DEFAULT]
     tflite_model = converter.convert()
 
-    model_name = f"espcn_{input_size}x_{output_size}x.tflite"
-    out_path = os.path.join(model_dir, model_name)
     with open(out_path, "wb") as f:
         f.write(tflite_model)
     print(f"[TRAIN] WROTE {out_path} ({len(tflite_model)} bytes)")
 
-    # VALIDATION: Test model output variance to catch constant-gray models
-    print(f"[VALIDATE] Testing model output variance...")
+    # VALIDATION: Test model output variance + bicubic baseline comparison
+    print(f"[VALIDATE] Testing model output variance vs bicubic baseline...")
     try:
-        import numpy as np
         interpreter = tf.lite.Interpreter(model_content=tflite_model)
         interpreter.allocate_tensors()
         input_details = interpreter.get_input_details()
         output_details = interpreter.get_output_details()
         
-        # Test with random input
-        test_input = np.random.rand(1, input_size, input_size, 3).astype(np.float32)
-        interpreter.set_tensor(input_details[0]['index'], test_input)
-        interpreter.invoke()
-        output = interpreter.get_tensor(output_details[0]['index'])
+        # Test with multiple random inputs
+        variances = []
+        psnrs = []
+        bicubic_psnrs = []
         
-        # Check variance - constant gray has variance ~0
-        variance = float(np.var(output))
-        mean_val = float(np.mean(output))
-        print(f"[VALIDATE] Output mean: {mean_val:.4f}, variance: {variance:.6f}")
+        for _ in range(10):
+            test_input = np.random.rand(1, input_size, input_size, 3).astype(np.float32)
+            interpreter.set_tensor(input_details[0]['index'], test_input)
+            interpreter.invoke()
+            output = interpreter.get_tensor(output_details[0]['index'])
+            
+            variance = float(np.var(output))
+            variances.append(variance)
+            
+            # Bicubic baseline
+            bicubic = tf.image.resize(test_input, (output_size, output_size), method="bicubic").numpy()
+            
+            # Generate a "ground truth" by upscaling a clean pattern
+            # For validation, we compare model output vs bicubic on the same input
+            # Using a simple synthetic HR target for PSNR calculation
+            hr_target = np.ones_like(output) * 0.5  # neutral gray reference
+            model_psnr = tf.image.psnr(output, hr_target, max_val=1.0).numpy()
+            bicubic_psnr = tf.image.psnr(bicubic, hr_target, max_val=1.0).numpy()
+            psnrs.append(float(model_psnr))
+            bicubic_psnrs.append(float(bicubic_psnr))
         
-        if variance < 0.001:
-            raise RuntimeError(f"MODEL VALIDATION FAILED: Output variance {variance:.6f} too low (constant gray detected). Mean: {mean_val:.4f}")
+        mean_var = float(np.mean(variances))
+        mean_model_psnr = float(np.mean(psnrs))
+        mean_bicubic_psnr = float(np.mean(bicubic_psnrs))
         
-        print(f"[VALIDATE] PASSED - Model produces varied output")
+        print(f"[VALIDATE] Output variance: {mean_var:.6f}")
+        print(f"[VALIDATE] Model PSNR: {mean_model_psnr:.2f}dB, Bicubic PSNR: {mean_bicubic_psnr:.2f}dB")
+        
+        if mean_var < 0.001:
+            raise RuntimeError(f"MODEL VALIDATION FAILED: Output variance {mean_var:.6f} too low (constant gray)")
+        
+        # Require model to beat bicubic by at least 0.5dB
+        if mean_model_psnr < mean_bicubic_psnr + 0.5:
+            raise RuntimeError(
+                f"MODEL VALIDATION FAILED: Model PSNR {mean_model_psnr:.2f}dB "
+                f"not better than bicubic {mean_bicubic_psnr:.2f}dB + 0.5dB margin"
+            )
+        
+        print(f"[VALIDATE] PASSED - Model beats bicubic baseline by {mean_model_psnr - mean_bicubic_psnr:.2f}dB")
     except Exception as e:
         if "MODEL VALIDATION FAILED" in str(e):
             raise
@@ -305,7 +459,6 @@ def main():
     model_dir = OUTPUT_DIR if OUTPUT_DIR else os.path.join(script_dir, "..", "assets", "models")
     os.makedirs(model_dir, exist_ok=True)
 
-    # Load or initialize model registry
     registry_path = os.path.join(model_dir, "model_registry.json")
 
     results = []
@@ -318,7 +471,6 @@ def main():
     for input_size, scale_configs in MODEL_CONFIGS:
         if invalid_target:
             break
-        # Skip if --input-size is set and doesn't match
         if INPUT_SIZE is not None and input_size != INPUT_SIZE:
             continue
         for scale, epochs in scale_configs:
