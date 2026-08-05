@@ -463,14 +463,21 @@ def train_and_export_model(model_dir: str, input_size: int, scale: int, epochs: 
         input_details = interpreter.get_input_details()
         output_details = interpreter.get_output_details()
         
-        # Test with multiple random inputs
+        # Use validation data (last 10% of shuffled data) for proper PSNR comparison
+        val_lr = lr_data[split:]
+        val_hr = hr_data[split:]
+        # Use up to 10 validation samples
+        n_val = min(10, len(val_lr))
+        
         variances = []
         psnrs = []
         bicubic_psnrs = []
         
-        for _ in range(10):
-            test_input = np.random.rand(1, input_size, input_size, 3).astype(np.float32)
-            interpreter.set_tensor(input_details[0]['index'], test_input)
+        for i in range(n_val):
+            test_input = val_lr[i:i+1]
+            hr_target = val_hr[i:i+1]
+            
+            interpreter.set_tensor(input_details[0]['index'], test_input.astype(np.float32))
             interpreter.invoke()
             output = interpreter.get_tensor(output_details[0]['index'])
             
@@ -480,10 +487,7 @@ def train_and_export_model(model_dir: str, input_size: int, scale: int, epochs: 
             # Bicubic baseline
             bicubic = tf.image.resize(test_input, (output_size, output_size), method="bicubic").numpy()
             
-            # Generate a "ground truth" by upscaling a clean pattern
-            # For validation, we compare model output vs bicubic on the same input
-            # Using a simple synthetic HR target for PSNR calculation
-            hr_target = np.ones_like(output) * 0.5  # neutral gray reference
+            # PSNR against actual HR target (not constant gray)
             model_psnr = tf.image.psnr(output, hr_target, max_val=1.0).numpy()
             bicubic_psnr = tf.image.psnr(bicubic, hr_target, max_val=1.0).numpy()
             psnrs.append(float(model_psnr))
