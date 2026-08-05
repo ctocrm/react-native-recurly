@@ -177,7 +177,8 @@ def make_combined_loss(output_size: int, use_perceptual: bool = True):
         ssim = ssim_term(y_true, y_pred)
         if use_perceptual:
             perceptual = perceptual_loss(y_true, y_pred)
-            return mae + 0.15 * ssim + 0.05 * perceptual
+            # ESPCN is smaller (2K params vs FSRCNN's ~100K), reduce perceptual weight
+            return mae + 0.15 * ssim + 0.01 * perceptual
         return mae + 0.15 * ssim
 
     return combined_loss
