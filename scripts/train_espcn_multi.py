@@ -98,7 +98,7 @@ VGG_FEATURES = None
 
 
 def perceptual_loss(y_true, y_pred):
-    """Perceptual loss using VGG19 features."""
+    """Perceptual loss using VGG19 features (normalized by feature map size)."""
     global VGG_FEATURES
     if VGG_FEATURES is None:
         VGG_FEATURES = build_vgg_feature_extractor()
@@ -113,7 +113,10 @@ def perceptual_loss(y_true, y_pred):
 
     loss = 0.0
     for tf_true, tf_pred in zip(true_features, pred_features):
-        loss += tf.reduce_mean(tf.abs(tf_true - tf_pred))
+        # Normalize by number of elements in feature map to keep loss scale consistent
+        # across different VGG layers (block1_conv2: 64ch, block2_conv2: 128ch, block3_conv2: 256ch)
+        num_elements = tf.cast(tf.size(tf_true), tf.float32)
+        loss += tf.reduce_sum(tf.abs(tf_true - tf_pred)) / num_elements
     return loss / len(true_features)
 
 
