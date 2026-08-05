@@ -178,8 +178,8 @@ def make_combined_loss(output_size: int, use_perceptual: bool = True):
         ssim = ssim_term(y_true, y_pred)
         if use_perceptual:
             perceptual = perceptual_loss(y_true, y_pred)
-            # ESPCN is smaller (2K params vs FSRCNN's ~100K), reduce perceptual weight
-            return mae + 0.15 * ssim + 0.01 * perceptual
+            # Match FSRCNN perceptual weight for better feature learning at high scales
+            return mae + 0.15 * ssim + 0.05 * perceptual
         return mae + 0.15 * ssim
 
     return combined_loss
@@ -188,9 +188,23 @@ def make_combined_loss(output_size: int, use_perceptual: bool = True):
 # ---- Model Architecture ----
 
 def build_espcn(scale: int, input_size: int = 16):
-    """Build ESPCN model for a specific scale factor with fixed input shape."""
+    """Build ESPCN model for a specific scale factor with fixed input shape.
+    
+    Channel capacity scales with upscale factor:
+    - 2x-4x: 16 channels (baseline)
+    - 6x-8x: 32 channels
+    - 12x+: 48 channels (more capacity for complex upscaling)
+    """
+    # Scale internal channels with upscale factor for quality at high scales
+    if scale <= 4:
+        channels = 16
+    elif scale <= 8:
+        channels = 32
+    else:
+        channels = 48
+    
     inp = layers.Input(shape=(input_size, input_size, 3))
-    x = layers.Conv2D(16, 3, padding="same", activation="relu")(inp)
+    x = layers.Conv2D(channels, 3, padding="same", activation="relu")(inp)
     x = layers.Conv2D(scale * scale * 3, 3, padding="same")(x)
     x = layers.Lambda(lambda t: tf.nn.depth_to_space(t, scale))(x)
     out = layers.Conv2D(3, 3, padding="same", activation="sigmoid")(x)
