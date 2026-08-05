@@ -13,14 +13,17 @@ from io import BytesIO
 # Disable XLA globally to prevent MirrorPadGrad compile-time constant errors
 tf.config.optimizer.set_jit(False)
 
-# Use MirroredStrategy only when multiple GPUs are available;
+# Use MirroredStrategy only when multiple GPUs are available AND explicitly requested;
 # with a single GPU the default strategy avoids MultiDeviceIterator overhead.
 _gpu_count = len(tf.config.list_physical_devices("GPU"))
-if _gpu_count > 1:
+_use_multi_gpu = _gpu_count > 1 and os.environ.get("USE_MULTI_GPU", "true").lower() == "true"
+
+if _use_multi_gpu:
     strategy = tf.distribute.MirroredStrategy()
+    print(f"[TRAIN] Using MirroredStrategy with {strategy.num_replicas_in_sync} GPUs")
 else:
     strategy = tf.distribute.get_strategy()
-print(f"[TRAIN] Using {strategy.num_replicas_in_sync} device(s)")
+    print(f"[TRAIN] Using single device strategy")
 
 FORCE = "--force" in sys.argv
 NO_PERCEPTUAL = "--no-perceptual" in sys.argv
@@ -405,22 +408,36 @@ def train_and_export_model(model_dir: str, input_size: int, scale: int, epochs: 
         if use_perceptual and VGG_FEATURES is None:
             VGG_FEATURES = build_vgg_feature_extractor()
             VGG_FEATURES.trainable = False
+        # Dynamic batch size based on GPU memory and input size
+        def get_optimal_batch_size(input_size, num_replicas):
+            """Calculate optimal batch size based on GPU memory and input size."""
+            # RTX 4000 Ada 18GB: base batch per GPU
+            base_per_gpu = 8 if input_size >= 128 else 16 if input_size >= 64 else 32
+            return base_per_gpu * num_replicas
+        
+        batch_size = get_optimal_batch_size(input_size, strategy.num_replicas_in_sync)
+        
+        # Scale learning rate with batch size for stability
+        base_lr = 1e-4
+        lr = base_lr * (batch_size / 32)
+        
+        optimizer = keras.optimizers.Adam(learning_rate=lr, clipnorm=1.0)
         model.compile(optimizer=optimizer, loss=make_combined_loss(output_size, use_perceptual=use_perceptual), jit_compile=False)
         print(f"[TRAIN] Model params: {model.count_params()}")
         print(f"[TRAIN] MS-SSIM scales: {_ssim_scales_for(output_size)} (output {output_size}px)")
+        print(f"[TRAIN] Batch size: {batch_size} (per GPU: {batch_size // strategy.num_replicas_in_sync}), LR: {lr:.2e}")
 
-        lr, hr = generate_training_data(input_size, scale)
+        lr_data, hr_data = generate_training_data(input_size, scale)
         # Shuffle lr/hr together (preserving pairing) so the tail-based
         # validation_split below mixes real and synthetic samples instead of
         # validating on a synthetic-only tail (real icons are generated first).
-        perm = np.random.default_rng(1234).permutation(len(lr))
-        lr, hr = lr[perm], hr[perm]
-        split = int(len(lr) * 0.9)
+        perm = np.random.default_rng(1234).permutation(len(lr_data))
+        lr_data, hr_data = lr_data[perm], hr_data[perm]
+        split = int(len(lr_data) * 0.9)
 
-        batch_size = 16 * strategy.num_replicas_in_sync
         model.fit(
-            lr[:split],
-            hr[:split],
+            lr_data[:split],
+            hr_data[:split],
             batch_size=batch_size,
             epochs=epochs,
             verbose=2,
