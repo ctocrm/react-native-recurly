@@ -15,8 +15,9 @@ tf.config.optimizer.set_jit(False)
 
 # Use MirroredStrategy only when multiple GPUs are available AND explicitly requested;
 # with a single GPU the default strategy avoids MultiDeviceIterator overhead.
+# Default to FALSE due to NCCL instability on some setups.
 _gpu_count = len(tf.config.list_physical_devices("GPU"))
-_use_multi_gpu = _gpu_count > 1 and os.environ.get("USE_MULTI_GPU", "true").lower() == "true"
+_use_multi_gpu = _gpu_count > 1 and os.environ.get("USE_MULTI_GPU", "false").lower() == "true"
 
 if _use_multi_gpu:
     strategy = tf.distribute.MirroredStrategy()
@@ -362,14 +363,15 @@ def train_and_export_model(model_dir: str, input_size: int, scale: int, epochs: 
             VGG_FEATURES = build_vgg_feature_extractor()
             VGG_FEATURES.trainable = False
         
-        # Dynamic batch size based on GPU memory and input size
-        def get_optimal_batch_size(input_size, num_replicas):
-            """Calculate optimal batch size based on GPU memory and input size."""
+        # Dynamic batch size based on GPU memory and OUTPUT size (VGG processes output_size)
+        def get_optimal_batch_size(output_size, num_replicas):
+            """Calculate optimal batch size based on GPU memory and output size."""
             # RTX 4000 Ada 18GB: base batch per GPU
-            base_per_gpu = 8 if input_size >= 128 else 16 if input_size >= 64 else 32
+            # VGG processes output_size x output_size images
+            base_per_gpu = 4 if output_size >= 256 else 8 if output_size >= 128 else 16 if output_size >= 64 else 32
             return base_per_gpu * num_replicas
         
-        batch_size = get_optimal_batch_size(input_size, strategy.num_replicas_in_sync)
+        batch_size = get_optimal_batch_size(output_size, strategy.num_replicas_in_sync)
         
         # Scale learning rate with batch size for stability
         base_lr = 1e-4
