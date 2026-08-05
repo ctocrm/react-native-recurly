@@ -41,23 +41,23 @@ for arg in sys.argv:
 
 # Model configurations: input_size -> list of (scale, epochs) tuples
 # Scale = output_size / input_size
-# Epochs scaled for quality: large scales (8x, 6x) get 200+ epochs
+# Epochs scaled for quality: large scales (8x+) get 300+ epochs
 # Capped at 576px output max (largest size used by the app).
 MODEL_CONFIGS = [
     # 16px input - baseline (7 scales, up to 512px output)
-    (16, [(2, 80), (4, 120), (8, 200), (12, 220), (16, 250), (24, 250), (32, 250)]),
+    (16, [(2, 80), (4, 120), (8, 300), (12, 350), (16, 400), (24, 400), (32, 400)]),
     # 32px input - 6 scales, up to 512px output
-    (32, [(2, 80), (4, 120), (6, 150), (8, 200), (12, 220), (16, 250)]),
+    (32, [(2, 80), (4, 120), (6, 150), (8, 250), (12, 300), (16, 350)]),
     # 48px input - 6 scales, up to 576px output
-    (48, [(2, 80), (3, 100), (4, 150), (5, 180), (8, 200), (12, 220)]),
+    (48, [(2, 80), (3, 100), (4, 150), (5, 200), (8, 250), (12, 300)]),
     # 64px input - 5 scales, up to 512px output
-    (64, [(2, 80), (3, 100), (4, 150), (6, 200), (8, 250)]),
+    (64, [(2, 80), (3, 100), (4, 150), (6, 250), (8, 300)]),
     # 96px input - 5 scales, up to 576px output
-    (96, [(2, 80), (3, 100), (4, 150), (5, 180), (6, 200)]),
+    (96, [(2, 80), (3, 100), (4, 150), (5, 200), (6, 250)]),
     # 128px input - 3 scales, up to 512px output
-    (128, [(2, 80), (3, 100), (4, 150)]),
+    (128, [(2, 80), (3, 100), (4, 200)]),
     # 192px input - 2 scales, up to 576px output
-    (192, [(2, 80), (3, 100)]),
+    (192, [(2, 80), (3, 150)]),
     # 256px input - 1 scale, up to 512px output
     (256, [(2, 200)]),
 ]
@@ -417,7 +417,19 @@ def train_and_export_model(model_dir: str, input_size: int, scale: int, epochs: 
             """Calculate optimal batch size based on GPU memory and output size."""
             # RTX 4000 Ada 18GB: base batch per GPU
             # VGG processes output_size x output_size images
-            base_per_gpu = 4 if output_size >= 256 else 8 if output_size >= 128 else 16 if output_size >= 64 else 32
+            # 192x192 needs batch 4, 256x256 needs batch 2, 384+ needs batch 1
+            if output_size >= 384:
+                base_per_gpu = 1
+            elif output_size >= 256:
+                base_per_gpu = 2
+            elif output_size >= 192:
+                base_per_gpu = 4
+            elif output_size >= 128:
+                base_per_gpu = 8
+            elif output_size >= 64:
+                base_per_gpu = 16
+            else:
+                base_per_gpu = 32
             return base_per_gpu * num_replicas
         
         batch_size = get_optimal_batch_size(output_size, strategy.num_replicas_in_sync)
