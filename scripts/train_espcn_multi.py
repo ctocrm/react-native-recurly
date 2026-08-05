@@ -201,9 +201,7 @@ def fetch_svg_icon(slug: str) -> bytes | None:
                 headers={"User-Agent": "Mozilla/5.0"},
             )
             with urllib.request.urlopen(req, timeout=5) as response:
-                data = response.read()
-                if len(data) > 1024:  # verify non-trivial SVG
-                    return data
+                return response.read()
         except Exception:
             continue
     return None
