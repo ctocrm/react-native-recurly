@@ -142,6 +142,10 @@ def perceptual_loss(y_true, y_pred):
         VGG_FEATURES = build_vgg_feature_extractor()
         VGG_FEATURES.trainable = False
 
+    # mixed_float16: cast to fp32 before VGG / preprocess (labels are fp32)
+    y_true = tf.cast(y_true, tf.float32)
+    y_pred = tf.cast(y_pred, tf.float32)
+
     # VGG expects 0-255 images run through preprocessing (RGB->BGR + ImageNet mean)
     y_true_255 = tf.keras.applications.vgg19.preprocess_input(y_true * 255.0)
     y_pred_255 = tf.keras.applications.vgg19.preprocess_input(y_pred * 255.0)
@@ -209,6 +213,9 @@ def make_combined_loss(output_size: int, use_perceptual: bool = True):
             return 1.0 - tf.reduce_mean(_finite(s))
 
     def combined_loss(y_true, y_pred):
+        # mixed_float16: model preds are fp16, labels fp32 — unify before MAE/SSIM/VGG
+        y_true = tf.cast(y_true, tf.float32)
+        y_pred = tf.cast(y_pred, tf.float32)
         y_true = tf.clip_by_value(y_true, 0.0, 1.0)
         y_pred = tf.clip_by_value(y_pred, 0.0, 1.0)
         mae = tf.reduce_mean(tf.abs(y_true - y_pred))
@@ -254,7 +261,8 @@ def build_espcn(scale: int, input_size: int = 16):
     
     x = layers.Conv2D(scale * scale * 3, 3, padding="same")(x)
     x = layers.Lambda(lambda t: tf.nn.depth_to_space(t, scale))(x)
-    out = layers.Conv2D(3, 3, padding="same", activation="sigmoid")(x)
+    # float32 output layer required under mixed_float16 policy
+    out = layers.Conv2D(3, 3, padding="same", activation="sigmoid", dtype="float32")(x)
     return Model(inp, out)
 
 

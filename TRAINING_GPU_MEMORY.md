@@ -48,7 +48,24 @@ Design target in batch tables: fit **RTX 4000 Ada class (~16–20 GB)** with hea
 
 ---
 
-## What we fixed in code (this commit)
+## Follow-up: mixed_float16 dtype (VPS log after 44c2e27)
+
+With multi-GPU + `mixed_float16` re-enabled, perceptual jobs failed immediately:
+
+```text
+`x` and `y` must have the same dtype, got tf.float16 != tf.float32
+```
+
+Jobs with perceptual **disabled** (output ≥256) trained. Fix (app-compatible, train-only):
+
+- Cast `y_true`/`y_pred` to **float32** in `combined_loss` and `perceptual_loss`
+- Final Conv+sigmoid layers use **`dtype="float32"`** (Keras mixed-precision requirement)
+
+Same `.tflite` names/shapes for the React app.
+
+---
+
+## What we fixed in code (GPU memory commit)
 
 1. **`USE_MULTI_GPU` default `true`** when ≥2 GPUs (override `USE_MULTI_GPU=false`).
 2. **`set_memory_growth(True)`** on all GPUs so TF does not grab the whole card at import.
@@ -100,4 +117,3 @@ Once the shared recipe (real icons, normalized perceptual loss, validate vs real
 - `GARBAGE_REPORT.md` — full project chronology / waste inventory
 - `TRAINING_FIXES.md` / `TRAINING_FIX_DOCUMENTATION.md` — earlier quality fixes (still relevant)
 - `CATASTROPHE_ANALYSIS.md` — gray/black model era (historical)
-
