@@ -58,22 +58,15 @@ for arg in sys.argv:
 # Epochs scaled for quality: large scales (8x+) get 300+ epochs
 # Capped at 576px output max (largest size used by the app).
 MODEL_CONFIGS = [
-    # 16px input - baseline (7 scales, up to 512px output)
-    (16, [(2, 80), (4, 120), (8, 300), (12, 350), (16, 400), (24, 400), (32, 400)]),
-    # 32px input - 6 scales, up to 512px output
-    (32, [(2, 80), (4, 120), (6, 150), (8, 250), (12, 300), (16, 350)]),
-    # 48px input - 6 scales, up to 576px output
-    (48, [(2, 80), (3, 100), (4, 150), (5, 200), (8, 250), (12, 300)]),
-    # 64px input - 5 scales, up to 512px output
-    (64, [(2, 80), (3, 100), (4, 150), (6, 250), (8, 300)]),
-    # 96px input - 5 scales, up to 576px output
-    (96, [(2, 80), (3, 100), (4, 150), (5, 200), (6, 250)]),
-    # 128px input - 3 scales, up to 512px output
-    (128, [(2, 80), (3, 100), (4, 200)]),
-    # 192px input - 2 scales, up to 576px output
-    (192, [(2, 80), (3, 150)]),
-    # 256px input - 1 scale, up to 512px output
-    (256, [(2, 200)]),
+    # Match ESPCN post-16px quality recipe (more epochs on large-in / extreme scale)
+    (16, [(2, 80), (4, 120), (8, 300), (12, 350), (16, 400), (24, 450), (32, 550)]),
+    (32, [(2, 100), (4, 150), (6, 180), (8, 280), (12, 320), (16, 380)]),
+    (48, [(2, 120), (3, 140), (4, 180), (5, 220), (8, 280), (12, 320)]),
+    (64, [(2, 140), (3, 160), (4, 200), (6, 280), (8, 320)]),
+    (96, [(2, 250), (3, 250), (4, 280), (5, 300), (6, 320)]),
+    (128, [(2, 300), (3, 300), (4, 350)]),
+    (192, [(2, 350), (3, 350)]),
+    (256, [(2, 400)]),
 ]
 
 # Icon sources for real training data
@@ -266,27 +259,28 @@ def make_combined_loss(output_size: int, use_perceptual: bool = True):
 
 
 def build_fsrcnn(scale: int, input_size: int = 16, d: int = 32, s: int = 8, m: int = 3):
-    """Build FSRCNN model for a specific scale factor with fixed input shape."""
+    """Build FSRCNN for a fixed input shape.
+
+    Capacity scales with input size: large-in 2x/3x need more d/s/m to beat
+    strong bicubic (same failure mode as ESPCN post-16px).
+    """
+    if input_size >= 256:
+        d, s, m = max(d, 56), max(s, 16), max(m, 5)
+    elif input_size >= 128:
+        d, s, m = max(d, 48), max(s, 12), max(m, 4)
+    elif input_size >= 96:
+        d, s, m = max(d, 40), max(s, 12), max(m, 4)
+    elif input_size >= 64 and scale <= 3:
+        d, s, m = max(d, 36), max(s, 10), max(m, 3)
+
     inp = layers.Input(shape=(input_size, input_size, 3))
-
-    # Feature extraction
     x = layers.Conv2D(d, 5, padding="same", activation="relu")(inp)
-
-    # Shrinking
     x = layers.Conv2D(s, 1, padding="same", activation="relu")(x)
-
-    # Mapping layers
     for _ in range(m):
         x = layers.Conv2D(s, 3, padding="same", activation="relu")(x)
-
-    # Expanding
     x = layers.Conv2D(d, 1, padding="same", activation="relu")(x)
-
-    # Sub-pixel convolution
     x = layers.Conv2D(scale * scale * 3, 5, padding="same")(x)
     x = layers.Lambda(lambda t: tf.nn.depth_to_space(t, scale))(x)
-
-    # float32 output layer required under mixed_float16 policy
     out = layers.Conv2D(3, 5, padding="same", activation="sigmoid", dtype="float32")(x)
     return Model(inp, out)
 
@@ -449,9 +443,19 @@ def train_and_export_model(model_dir: str, input_size: int, scale: int, epochs: 
         tf.keras.mixed_precision.set_global_policy("float32")
 
         model = build_fsrcnn(scale, input_size)
-        use_perceptual = not NO_PERCEPTUAL and output_size < 256
+        # Same perceptual gate as ESPCN: keep VGG on large-in 2x/3x
+        if NO_PERCEPTUAL:
+            use_perceptual = False
+        elif output_size < 256:
+            use_perceptual = True
+        elif scale <= 2 and output_size <= 512:
+            use_perceptual = True
+        elif scale <= 3 and output_size <= 384:
+            use_perceptual = True
+        else:
+            use_perceptual = False
         if not use_perceptual:
-            print("[TRAIN] Perceptual loss disabled (--no-perceptual or high scale) — using MAE + MS-SSIM only")
+            print("[TRAIN] Perceptual loss disabled — using MAE + MS-SSIM only")
         global VGG_FEATURES
         if use_perceptual and VGG_FEATURES is None:
             VGG_FEATURES = build_vgg_feature_extractor()
@@ -464,7 +468,7 @@ def train_and_export_model(model_dir: str, input_size: int, scale: int, epochs: 
             elif output_size >= 384:
                 base_per_gpu = 1 if use_perceptual_loss else 2
             elif output_size >= 256:
-                base_per_gpu = 2 if use_perceptual_loss else 4
+                base_per_gpu = 1 if use_perceptual_loss else 4
             elif output_size >= 192:
                 base_per_gpu = 2 if use_perceptual_loss else 4
             elif output_size >= 128:
@@ -478,7 +482,9 @@ def train_and_export_model(model_dir: str, input_size: int, scale: int, epochs: 
         batch_size = get_optimal_batch_size(output_size, strategy.num_replicas_in_sync, use_perceptual)
 
         base_lr = 1e-4
-        lr = base_lr * (batch_size / 32)
+        lr = max(base_lr * (batch_size / 32.0), 5e-5)
+        if input_size >= 96 and scale <= 3:
+            lr = max(lr, 1e-4)
 
         optimizer = keras.optimizers.Adam(learning_rate=lr, clipnorm=1.0)
         model.compile(
@@ -489,7 +495,7 @@ def train_and_export_model(model_dir: str, input_size: int, scale: int, epochs: 
         print(f"[TRAIN] Model params: {model.count_params()}")
         print(f"[TRAIN] MS-SSIM scales: {_ssim_scales_for(output_size)} (output {output_size}px)")
         print(f"[TRAIN] Batch size: {batch_size} (per GPU: {batch_size // strategy.num_replicas_in_sync}), LR: {lr:.2e}")
-        print(f"[TRAIN] Mixed precision: disabled (float32), Perceptual loss: {'enabled' if use_perceptual else 'disabled (high scale)'}")
+        print(f"[TRAIN] Mixed precision: disabled (float32), Perceptual loss: {'enabled' if use_perceptual else 'disabled'}")
 
         lr_data, hr_data = generate_training_data(input_size, scale)
         # Shuffle lr/hr together (preserving pairing) so the tail-based
@@ -512,70 +518,68 @@ def train_and_export_model(model_dir: str, input_size: int, scale: int, epochs: 
     converter.optimizations = [tf.lite.Optimize.DEFAULT]
     tflite_model = converter.convert()
 
-    with open(out_path, "wb") as f:
-        f.write(tflite_model)
-    print(f"[TRAIN] WROTE {out_path} ({len(tflite_model)} bytes)")
-
-    # VALIDATION: Test model output variance + bicubic baseline comparison
+    # VALIDATION before write — never leave a losing .tflite in assets/models
     print(f"[VALIDATE] Testing model output variance vs bicubic baseline...")
     try:
         interpreter = tf.lite.Interpreter(model_content=tflite_model)
         interpreter.allocate_tensors()
         input_details = interpreter.get_input_details()
         output_details = interpreter.get_output_details()
-        
-        # Use validation data (last 10% of shuffled data) for proper PSNR comparison
+
         val_lr = lr_data[split:]
         val_hr = hr_data[split:]
-        # Use up to 10 validation samples
         n_val = min(10, len(val_lr))
-        
+
         variances = []
         psnrs = []
         bicubic_psnrs = []
-        
+
         for i in range(n_val):
             test_input = val_lr[i:i+1]
             hr_target = val_hr[i:i+1]
-            
+
             interpreter.set_tensor(input_details[0]['index'], test_input.astype(np.float32))
             interpreter.invoke()
             output = interpreter.get_tensor(output_details[0]['index'])
-            
+
             variance = float(np.var(output))
             variances.append(variance)
-            
-            # Bicubic baseline
+
             bicubic = tf.image.resize(test_input, (output_size, output_size), method="bicubic").numpy()
-            
-            # PSNR against actual HR target (not constant gray)
+
             model_psnr = tf.image.psnr(output, hr_target, max_val=1.0).numpy()
             bicubic_psnr = tf.image.psnr(bicubic, hr_target, max_val=1.0).numpy()
-            psnrs.append(float(model_psnr))
-            bicubic_psnrs.append(float(bicubic_psnr))
-        
+            psnrs.append(float(np.asarray(model_psnr).reshape(-1)[0]))
+            bicubic_psnrs.append(float(np.asarray(bicubic_psnr).reshape(-1)[0]))
+
         mean_var = float(np.mean(variances))
         mean_model_psnr = float(np.mean(psnrs))
         mean_bicubic_psnr = float(np.mean(bicubic_psnrs))
-        
+
         print(f"[VALIDATE] Output variance: {mean_var:.6f}")
         print(f"[VALIDATE] Model PSNR: {mean_model_psnr:.2f}dB, Bicubic PSNR: {mean_bicubic_psnr:.2f}dB")
-        
+
         if mean_var < 0.001:
             raise RuntimeError(f"MODEL VALIDATION FAILED: Output variance {mean_var:.6f} too low (constant gray)")
-        
-        # Model must beat bicubic (any positive margin passes)
+
         if mean_model_psnr <= mean_bicubic_psnr + 1e-6:
             raise RuntimeError(
                 f"MODEL VALIDATION FAILED: Model PSNR {mean_model_psnr:.2f}dB "
                 f"not better than bicubic {mean_bicubic_psnr:.2f}dB"
             )
-        
+
         print(f"[VALIDATE] PASSED - Model beats bicubic baseline by {mean_model_psnr - mean_bicubic_psnr:.2f}dB")
     except Exception as e:
         if "MODEL VALIDATION FAILED" in str(e):
+            if os.path.exists(out_path):
+                os.remove(out_path)
+                print(f"[VALIDATE] Removed failed artifact {out_path}")
             raise
         print(f"[VALIDATE] Warning: Could not validate model: {e}")
+
+    with open(out_path, "wb") as f:
+        f.write(tflite_model)
+    print(f"[TRAIN] WROTE {out_path} ({len(tflite_model)} bytes)")
 
     return model_name, len(tflite_model)
 
