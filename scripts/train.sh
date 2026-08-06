@@ -11,6 +11,12 @@
 #   bash scripts/train.sh --both --force --input-size 32  # force both, 32px input
 #   bash scripts/train.sh --fast                          # fast only
 #   bash scripts/train.sh --sharp --force --model 16_64   # sharp force, specific model
+#
+# GPU / memory env (see TRAINING_GPU_MEMORY.md):
+#   USE_MULTI_GPU=true|false   default true when 2+ GPUs (data-parallel; peak VRAM ≈ 1 card)
+#   TRAIN_ISOLATE=true|false   default true — one subprocess per model (frees VRAM on exit)
+#   Resume failed only: omit --force so existing .tflite files are skipped
+#   Example single model: bash scripts/train.sh --fast --model 48_240
 
 set -euo pipefail
 
@@ -20,6 +26,10 @@ export TF_XLA_FLAGS=--tf_xla_auto_jit=0
 # Suppress TF startup warnings (cuFFT/cuDNN/cuBLAS factory registration, oneDNN)
 export TF_CPP_MIN_LOG_LEVEL=2
 export TF_ENABLE_ONEDNN_OPTS=0
+
+# Defaults for multi-GPU + isolation (trainers also default these if unset)
+export USE_MULTI_GPU="${USE_MULTI_GPU:-true}"
+export TRAIN_ISOLATE="${TRAIN_ISOLATE:-true}"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"

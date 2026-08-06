@@ -3,6 +3,8 @@ import os
 import sys
 import re
 import json
+import gc
+import subprocess
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
@@ -13,18 +15,30 @@ from io import BytesIO
 # Disable XLA globally to prevent MirrorPadGrad compile-time constant errors
 tf.config.optimizer.set_jit(False)
 
-# Use MirroredStrategy only when multiple GPUs are available AND explicitly requested;
-# with a single GPU the default strategy avoids MultiDeviceIterator overhead.
-# Default to FALSE due to NCCL instability on some setups.
-_gpu_count = len(tf.config.list_physical_devices("GPU"))
-_use_multi_gpu = _gpu_count > 1 and os.environ.get("USE_MULTI_GPU", "false").lower() == "true"
+# Grow VRAM as needed so one model does not reserve an entire card forever.
+_gpus = tf.config.list_physical_devices("GPU")
+for _gpu in _gpus:
+    try:
+        tf.config.experimental.set_memory_growth(_gpu, True)
+    except Exception as exc:
+        print(f"[TRAIN] Warning: memory growth not set on {_gpu}: {exc}")
+
+# Data-parallel multi-GPU (MirroredStrategy): each card holds a full replica;
+# peak VRAM ≈ one card, not N× pooled. Default ON when 2+ GPUs are visible.
+# Override: USE_MULTI_GPU=false
+_gpu_count = len(_gpus)
+_use_multi_gpu = _gpu_count > 1 and os.environ.get("USE_MULTI_GPU", "true").lower() == "true"
 
 if _use_multi_gpu:
     strategy = tf.distribute.MirroredStrategy()
     print(f"[TRAIN] Using MirroredStrategy with {strategy.num_replicas_in_sync} GPUs")
 else:
     strategy = tf.distribute.get_strategy()
-    print(f"[TRAIN] Using single device strategy")
+    print(
+        f"[TRAIN] Using single device strategy "
+        f"({_gpu_count} GPU(s) visible; multi-GPU default on when count>1, "
+        f"USE_MULTI_GPU={os.environ.get('USE_MULTI_GPU', 'true')})"
+    )
 
 FORCE = "--force" in sys.argv
 NO_PERCEPTUAL = "--no-perceptual" in sys.argv
@@ -96,6 +110,29 @@ def build_vgg_feature_extractor():
 
 
 VGG_FEATURES = None
+
+
+def release_gpu_memory(label: str = "") -> None:
+    """Drop Keras graphs and VGG so the next model does not OOM on a full card.
+
+    Peak VRAM is one training step on one card (~20GB RTX 4000 Ada), not the
+    sum of all models in the matrix. Without this, sequential trains leak until
+    RESOURCE_EXHAUSTED / 'Dst tensor is not initialized'.
+    """
+    global VGG_FEATURES
+    VGG_FEATURES = None
+    try:
+        tf.keras.backend.clear_session()
+    except Exception:
+        pass
+    gc.collect()
+    try:
+        # Reset policy; next train() re-enables mixed_float16 inside strategy.scope()
+        tf.keras.mixed_precision.set_global_policy("float32")
+    except Exception:
+        pass
+    if label:
+        print(f"[TRAIN] Released GPU memory after {label}")
 
 
 def perceptual_loss(y_true, y_pred):
@@ -190,21 +227,31 @@ def make_combined_loss(output_size: int, use_perceptual: bool = True):
 def build_espcn(scale: int, input_size: int = 16):
     """Build ESPCN model for a specific scale factor with fixed input shape.
     
-    Channel capacity scales with upscale factor:
-    - 2x-4x: 16 channels (baseline)
-    - 6x-8x: 32 channels
-    - 12x+: 48 channels (more capacity for complex upscaling)
+    Channel capacity and depth scale with upscale factor:
+    - 2x-4x: 16 channels, 0 mapping layers (baseline ESPCN)
+    - 6x-8x: 32 channels, 0 mapping layers
+    - 12x+: 64 channels, 2 mapping layers with residuals (hybrid)
+    - 16x+: 80 channels, 2 mapping layers with residuals (hybrid)
     """
-    # Scale internal channels with upscale factor for quality at high scales
+    # Scale internal channels and mapping layers with upscale factor
     if scale <= 4:
-        channels = 16
+        channels, mapping_layers = 16, 0
     elif scale <= 8:
-        channels = 32
-    else:
-        channels = 48
+        channels, mapping_layers = 32, 0
+    elif scale <= 12:
+        channels, mapping_layers = 64, 2
+    else:  # 16x+
+        channels, mapping_layers = 80, 2
     
     inp = layers.Input(shape=(input_size, input_size, 3))
     x = layers.Conv2D(channels, 3, padding="same", activation="relu")(inp)
+    
+    # Mapping layers with residual connections for high scales (12x+)
+    for _ in range(mapping_layers):
+        residual = x
+        x = layers.Conv2D(channels, 3, padding="same", activation="relu")(x)
+        x = layers.Add()([x, residual])
+    
     x = layers.Conv2D(scale * scale * 3, 3, padding="same")(x)
     x = layers.Lambda(lambda t: tf.nn.depth_to_space(t, scale))(x)
     out = layers.Conv2D(3, 3, padding="same", activation="sigmoid")(x)
@@ -368,36 +415,44 @@ def train_and_export_model(model_dir: str, input_size: int, scale: int, epochs: 
     print(f"[TRAIN] Training {input_size}->{output_size} (scale {scale}x, {epochs} epochs)")
 
     with strategy.scope():
+        # Enable mixed precision for memory efficiency on large models
+        tf.keras.mixed_precision.set_global_policy('mixed_float16')
+        
         model = build_espcn(scale, input_size)
         
         # Pre-create VGG inside scope so it's replicated across GPUs
         global VGG_FEATURES
-        use_perceptual = not NO_PERCEPTUAL
+        # Disable perceptual loss for very high scales (>=256 output) to save VRAM
+        # VGG19 feature extractor consumes significant memory at high resolutions
+        use_perceptual = not NO_PERCEPTUAL and output_size < 256
         if use_perceptual and VGG_FEATURES is None:
             VGG_FEATURES = build_vgg_feature_extractor()
             VGG_FEATURES.trainable = False
         
         # Dynamic batch size based on GPU memory and OUTPUT size (VGG processes output_size)
-        def get_optimal_batch_size(output_size, num_replicas):
+        def get_optimal_batch_size(output_size, num_replicas, use_perceptual_loss):
             """Calculate optimal batch size based on GPU memory and output size."""
             # RTX 4000 Ada 18GB: base batch per GPU
             # VGG processes output_size x output_size images
-            # 192x192 needs batch 4, 256x256 needs batch 2, 384+ needs batch 1
-            if output_size >= 384:
+            # With mixed_float16 and no perceptual loss for high scales, we can go slightly higher
+            if output_size >= 512:
                 base_per_gpu = 1
+            elif output_size >= 384:
+                base_per_gpu = 1 if use_perceptual_loss else 2
             elif output_size >= 256:
-                base_per_gpu = 2
+                base_per_gpu = 2 if use_perceptual_loss else 4
             elif output_size >= 192:
-                base_per_gpu = 4
+                # VGG@192–240 was OOM at batch 4 on RTX 4000 Ada 20GB (see matrix log)
+                base_per_gpu = 2 if use_perceptual_loss else 4
             elif output_size >= 128:
-                base_per_gpu = 8
+                base_per_gpu = 4 if use_perceptual_loss else 8
             elif output_size >= 64:
                 base_per_gpu = 16
             else:
                 base_per_gpu = 32
             return base_per_gpu * num_replicas
         
-        batch_size = get_optimal_batch_size(output_size, strategy.num_replicas_in_sync)
+        batch_size = get_optimal_batch_size(output_size, strategy.num_replicas_in_sync, use_perceptual)
         
         # Scale learning rate with batch size for stability
         base_lr = 1e-4
@@ -408,6 +463,7 @@ def train_and_export_model(model_dir: str, input_size: int, scale: int, epochs: 
         print(f"[TRAIN] Model params: {model.count_params()}")
         print(f"[TRAIN] MS-SSIM scales: {_ssim_scales_for(output_size)} (output {output_size}px)")
         print(f"[TRAIN] Batch size: {batch_size} (per GPU: {batch_size // strategy.num_replicas_in_sync}), LR: {lr:.2e}")
+        print(f"[TRAIN] Mixed precision: enabled, Perceptual loss: {'enabled' if use_perceptual else 'disabled (high scale)'}")
 
         lr_data, hr_data = generate_training_data(input_size, scale)
         # Shuffle to mix real/synthetic
@@ -466,8 +522,9 @@ def train_and_export_model(model_dir: str, input_size: int, scale: int, epochs: 
             # PSNR against actual HR target (not constant gray)
             model_psnr = tf.image.psnr(output, hr_target, max_val=1.0).numpy()
             bicubic_psnr = tf.image.psnr(bicubic, hr_target, max_val=1.0).numpy()
-            psnrs.append(float(model_psnr))
-            bicubic_psnrs.append(float(bicubic_psnr))
+            # tf.image.psnr returns tensor with batch dimension, extract scalar
+            psnrs.append(float(model_psnr.item()))
+            bicubic_psnrs.append(float(bicubic_psnr.item()))
         
         mean_var = float(np.mean(variances))
         mean_model_psnr = float(np.mean(psnrs))
@@ -503,23 +560,13 @@ def parse_specific_model(spec: str):
     return None
 
 
-def main():
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    model_dir = OUTPUT_DIR if OUTPUT_DIR else os.path.join(script_dir, "..", "assets", "models")
-    os.makedirs(model_dir, exist_ok=True)
-
-    registry_path = os.path.join(model_dir, "model_registry.json")
-
-    results = []
-    matched_configs = 0
-    failures = 0
-
+def _collect_jobs():
+    """Return list of (input_size, scale, epochs) matching CLI filters."""
     target = parse_specific_model(SPECIFIC_MODEL) if SPECIFIC_MODEL else None
-    invalid_target = SPECIFIC_MODEL is not None and target is None
-
+    if SPECIFIC_MODEL is not None and target is None:
+        return None  # invalid
+    jobs = []
     for input_size, scale_configs in MODEL_CONFIGS:
-        if invalid_target:
-            break
         if INPUT_SIZE is not None and input_size != INPUT_SIZE:
             continue
         for scale, epochs in scale_configs:
@@ -527,27 +574,86 @@ def main():
                 t_in, t_out = target
                 if input_size != t_in or input_size * scale != t_out:
                     continue
-            matched_configs += 1
-            try:
-                model_name, size = train_and_export_model(model_dir, input_size, scale, epochs)
-                results.append({
-                    "input_size": input_size,
-                    "scale": scale,
-                    "output_size": input_size * scale,
-                    "epochs": epochs,
-                    "file": model_name,
-                    "size_bytes": size
-                })
-            except Exception as e:
-                print(f"[ERROR] Failed to train {input_size}->{input_size*scale}: {e}")
-                failures += 1
+            jobs.append((input_size, scale, epochs))
+    return jobs
 
-    if matched_configs == 0:
+
+def _run_jobs_in_subprocesses(jobs, script_path: str) -> int:
+    """One OS process per model so process exit frees all VRAM (most reliable)."""
+    failures = 0
+    ok = 0
+    for input_size, scale, epochs in jobs:
+        out = input_size * scale
+        cmd = [sys.executable, "-u", script_path, f"--model={input_size}_{out}"]
+        if FORCE:
+            cmd.append("--force")
+        if NO_PERCEPTUAL:
+            cmd.append("--no-perceptual")
+        if OUTPUT_DIR:
+            cmd.append(f"--output-dir={OUTPUT_DIR}")
+        env = os.environ.copy()
+        env["TRAIN_WORKER"] = "1"
+        print(f"\n[TRAIN] Subprocess isolate {input_size}->{out} (scale {scale}x, {epochs} ep)")
+        print(f"[TRAIN] cmd: {' '.join(cmd)}")
+        rc = subprocess.run(cmd, env=env).returncode
+        if rc != 0:
+            print(f"[ERROR] Subprocess failed {input_size}->{out} exit={rc}")
+            failures += 1
+        else:
+            ok += 1
+    print(f"\n{'='*50}")
+    print(f"[TRAIN] Subprocess matrix done: {ok} ok, {failures} failed, {len(jobs)} jobs")
+    print(f"[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry")
+    return failures
+
+
+def main():
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    script_path = os.path.abspath(__file__)
+    model_dir = OUTPUT_DIR if OUTPUT_DIR else os.path.join(script_dir, "..", "assets", "models")
+    os.makedirs(model_dir, exist_ok=True)
+
+    jobs = _collect_jobs()
+    if jobs is None:
         print("[ERROR] No model configuration matched the requested filters")
-        failures += 1
+        raise SystemExit(1)
+    if not jobs:
+        print("[ERROR] No model configuration matched the requested filters")
+        raise SystemExit(1)
+
+    # Parent matrix run: isolate each model in a fresh process (default).
+    # TRAIN_ISOLATE=false → in-process loop with release_gpu_memory between jobs.
+    # TRAIN_WORKER=1 → we are already a child; train in-process.
+    isolate = os.environ.get("TRAIN_ISOLATE", "true").lower() == "true"
+    is_worker = os.environ.get("TRAIN_WORKER", "").lower() in ("1", "true", "yes")
+    if isolate and not is_worker and len(jobs) > 1:
+        failures = _run_jobs_in_subprocesses(jobs, script_path)
+        if failures:
+            raise SystemExit(1)
+        return
+
+    results = []
+    failures = 0
+    for input_size, scale, epochs in jobs:
+        label = f"{input_size}->{input_size * scale}"
+        try:
+            model_name, size = train_and_export_model(model_dir, input_size, scale, epochs)
+            results.append({
+                "input_size": input_size,
+                "scale": scale,
+                "output_size": input_size * scale,
+                "epochs": epochs,
+                "file": model_name,
+                "size_bytes": size,
+            })
+        except Exception as e:
+            print(f"[ERROR] Failed to train {label}: {e}")
+            failures += 1
+        finally:
+            release_gpu_memory(label)
 
     print(f"\n{'='*50}")
-    print(f"[TRAIN] Generated {len(results)} models this run")
+    print(f"[TRAIN] Generated {len(results)} models this run ({failures} failures)")
     print(f"[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry")
 
     if failures:
