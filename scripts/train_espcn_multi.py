@@ -155,11 +155,13 @@ def perceptual_loss(y_true, y_pred):
 
     loss = 0.0
     for tf_true, tf_pred in zip(true_features, pred_features):
-        # Normalize by number of elements in feature map to keep loss scale consistent
-        # across different VGG layers (block1_conv2: 64ch, block2_conv2: 128ch, block3_conv2: 256ch)
+        # Force fp32 — VGG under mixed policy can emit fp16 features; dividing by
+        # float32 num_elements then raises: float16 != float32
+        tf_true = tf.cast(tf_true, tf.float32)
+        tf_pred = tf.cast(tf_pred, tf.float32)
         num_elements = tf.cast(tf.size(tf_true), tf.float32)
         loss += tf.reduce_sum(tf.abs(tf_true - tf_pred)) / num_elements
-    return loss / len(true_features)
+    return loss / float(len(true_features))
 
 
 # MS-SSIM default power factors (5 scales)
@@ -423,26 +425,23 @@ def train_and_export_model(model_dir: str, input_size: int, scale: int, epochs: 
     print(f"[TRAIN] Training {input_size}->{output_size} (scale {scale}x, {epochs} epochs)")
 
     with strategy.scope():
-        # Enable mixed precision for memory efficiency on large models
-        tf.keras.mixed_precision.set_global_policy('mixed_float16')
-        
+        # float32 only — mixed_float16 caused fp16/fp32 mismatches in SSIM/VGG/loss
+        # under MirroredStrategy (known-good VPS run was float32).
+        tf.keras.mixed_precision.set_global_policy("float32")
+
         model = build_espcn(scale, input_size)
-        
+
         # Pre-create VGG inside scope so it's replicated across GPUs
         global VGG_FEATURES
         # Disable perceptual loss for very high scales (>=256 output) to save VRAM
-        # VGG19 feature extractor consumes significant memory at high resolutions
         use_perceptual = not NO_PERCEPTUAL and output_size < 256
         if use_perceptual and VGG_FEATURES is None:
             VGG_FEATURES = build_vgg_feature_extractor()
             VGG_FEATURES.trainable = False
-        
-        # Dynamic batch size based on GPU memory and OUTPUT size (VGG processes output_size)
+
         def get_optimal_batch_size(output_size, num_replicas, use_perceptual_loss):
             """Calculate optimal batch size based on GPU memory and output size."""
-            # RTX 4000 Ada 18GB: base batch per GPU
-            # VGG processes output_size x output_size images
-            # With mixed_float16 and no perceptual loss for high scales, we can go slightly higher
+            # RTX 4000 Ada ~20GB: base batch per GPU (VGG uses HR output_size)
             if output_size >= 512:
                 base_per_gpu = 1
             elif output_size >= 384:
@@ -450,7 +449,6 @@ def train_and_export_model(model_dir: str, input_size: int, scale: int, epochs: 
             elif output_size >= 256:
                 base_per_gpu = 2 if use_perceptual_loss else 4
             elif output_size >= 192:
-                # VGG@192–240 was OOM at batch 4 on RTX 4000 Ada 20GB (see matrix log)
                 base_per_gpu = 2 if use_perceptual_loss else 4
             elif output_size >= 128:
                 base_per_gpu = 4 if use_perceptual_loss else 8
@@ -459,19 +457,22 @@ def train_and_export_model(model_dir: str, input_size: int, scale: int, epochs: 
             else:
                 base_per_gpu = 32
             return base_per_gpu * num_replicas
-        
+
         batch_size = get_optimal_batch_size(output_size, strategy.num_replicas_in_sync, use_perceptual)
-        
-        # Scale learning rate with batch size for stability
+
         base_lr = 1e-4
         lr = base_lr * (batch_size / 32)
-        
+
         optimizer = keras.optimizers.Adam(learning_rate=lr, clipnorm=1.0)
-        model.compile(optimizer=optimizer, loss=make_combined_loss(output_size, use_perceptual=use_perceptual), jit_compile=False)
+        model.compile(
+            optimizer=optimizer,
+            loss=make_combined_loss(output_size, use_perceptual=use_perceptual),
+            jit_compile=False,
+        )
         print(f"[TRAIN] Model params: {model.count_params()}")
         print(f"[TRAIN] MS-SSIM scales: {_ssim_scales_for(output_size)} (output {output_size}px)")
         print(f"[TRAIN] Batch size: {batch_size} (per GPU: {batch_size // strategy.num_replicas_in_sync}), LR: {lr:.2e}")
-        print(f"[TRAIN] Mixed precision: enabled, Perceptual loss: {'enabled' if use_perceptual else 'disabled (high scale)'}")
+        print(f"[TRAIN] Mixed precision: disabled (float32), Perceptual loss: {'enabled' if use_perceptual else 'disabled (high scale)'}")
 
         lr_data, hr_data = generate_training_data(input_size, scale)
         # Shuffle to mix real/synthetic
