@@ -444,9 +444,8 @@ def train_and_export_model(model_dir: str, input_size: int, scale: int, epochs: 
             use_perceptual = False
         elif output_size < 256:
             use_perceptual = True
-        elif scale <= 2 and output_size <= 512:
-            use_perceptual = True
-        elif scale <= 3 and output_size <= 384:
+        elif scale <= 3 and output_size <= 576:
+            # large-in 2x/3x including 192→576 (failed without VGG)
             use_perceptual = True
         else:
             use_perceptual = False
