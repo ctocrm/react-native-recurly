@@ -333,7 +333,6 @@ case "$CMD" in
             echo "[EMULATOR] ----- emulator output (buffered) -----" >&2
             cat "$EMULATOR_LOG" 2>/dev/null >&2 || true
             echo "[EMULATOR] ---------------------------------------" >&2
-            rm -f "$EMULATOR_LOG"
             exit 1
         fi
         echo "[EMULATOR] Emulator process started (pid $EMULATOR_BG_PID)."
@@ -355,7 +354,6 @@ case "$CMD" in
             cat "$EMULATOR_LOG" 2>/dev/null || true
             echo "[EMULATOR] ----------------------------------------"
         fi
-        rm -f "$EMULATOR_LOG"
         ;;
     stop)
         echo "[EMULATOR] Stopping..."

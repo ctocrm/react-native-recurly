@@ -1,68 +1,48 @@
-# Task Progress - Fix Findings - COMPLETE
+# Icon Search/Crawl System - Fix Plan
 
-## settings.tsx
+## P1 - Critical Issues
 
-- [x] Fix handleSync to show feedback for success+!synced case
-- [x] Replace prompt() with TextInput for server URL editing
+### [ ] Fix web search returning 0 results (searchEngines.ts)
+- [ ] Add comprehensive error logging to each search function
+- [ ] Test each search engine individually with detailed logging
+- [ ] Prioritize DuckDuckGo (most likely to work in React Native)
+- [ ] Add fallback to DuckDuckGo's HTML/lite version
+- [ ] Handle CORS/blocking issues gracefully
 
-## package.json
+### [ ] Fix queue always empty (iconBackgroundCrawler.ts, database.ts)
+- [ ] Add logging to enqueueIconScrape to confirm it writes to DB
+- [ ] Add small delay between enqueue and process to ensure DB write completes
+- [ ] Or change approach: pass URLs directly to processIconQueue instead of using queue table
+- [ ] Fix the startup flow in SubscriptionContext to properly call processIconQueue
 
-- [x] expo-auth-session kept since OAuth connect flow is now wired up
+## P2 - High Priority Issues
 
-## services/database.ts
+### [ ] Fix library CDN search (iconScraper.ts)
+- [ ] Check findAllIconSources function
+- [ ] Add logging for each CDN source queried
+- [ ] Fix nameToSlug to handle edge cases (trailing dashes, spaces, etc.)
+- [ ] Add more CDN sources if needed
+- [ ] Try multiple slug variations
 
-- [x] Fix updateSyncMetadata to allow clearing fields (using "key in updates" pattern + null/undefined as clear signals)
-- [x] Fix computeDatabaseHash to read bytes using base64 encoding (preserves binary data)
+### [ ] Fix spider (htmlIconExtractor.ts)
+- [ ] Add logging for HTML received from each URL
+- [ ] Check if HTML parsing correctly extracts icon links
+- [ ] Test with known websites
 
-## CloudSyncContext.tsx
+## P3 - Medium Priority Issues
 
-- [x] Fix serverUrl persistence in sync metadata (stored in remoteFileId for owncloud/nextcloud)
-- [x] Replace hardcoded "current_user" with actual Clerk user ID (via useUser())
-- [x] Fix connect flow to perform actual OAuth (added handleConnectProvider with expo-auth-session/WebBrowser)
-- [x] Memoize loadSyncMetadata with useCallback, add to deps arrays, remove redundant call in initializeProvider
+### [ ] Add background crawler for old URLs (iconBackgroundCrawler.ts, SubscriptionContext.tsx)
+- [ ] Add setInterval in SubscriptionContext that runs every 30-60 minutes
+- [ ] Pick random old URLs from crawled_urls table
+- [ ] Re-download and update if content changed
+- [ ] Use getOldCrawledUrls function (already added to database.ts)
 
-## CloudSyncService.ts
+### [ ] Show library icons in collection immediately (iconBackgroundCrawler.ts)
+- [ ] After findIconUrls saves URLs to crawl_results, immediately trigger a fetch for those URLs
+- [ ] Don't wait for queue — fetch the first batch immediately
+- [ ] Queue handles the rest
 
-- [x] Fix sync decision logic branching (independent checks for localUnchanged, remoteUnchanged)
-- [x] Fix getRemoteHash auth guard to await this.provider.isAuthenticated() (not the function reference)
-- [x] Make performMerge atomic with transaction (wrapped in db.withTransactionAsync)
-
-## DropboxStorage.ts
-
-- [x] Fix downloadFile race condition (wrap FileReader in Promise and await it)
-- [x] Fix API host to use DROPBOX_CONTENT_BASE for upload/download content endpoints
-
-## GoogleDriveStorage.ts
-
-- [x] Fix downloadFile race condition (wrap FileReader in Promise and await it)
-- [x] Fix upload to request fields=id,modifiedTime,size from API
-
-## OneDriveStorage.ts
-
-- [x] Fix downloadFile race condition (wrap FileReader in Promise and await it)
-
-## OwnCloudNextcloudStorage.ts
-
-- [x] Fix downloadFile race condition (wrap FileReader in Promise and await it)
-- [x] Fix getRemotePath to fail fast when user_id missing (throws Error instead of defaulting to "user")
-
-## types.ts
-
-- [x] Add findBackupFile to CloudStorageProvider interface
-- [x] Add implements CloudStorageProvider to all 4 storage provider classes (compile-time check)
-
-## Icon Picker Feature
-
-- [x] `src/services/iconScraper.ts` - Add `findAllIconSources()` to collect ALL discovered icons (simple-icons + tabler)
-- [x] `src/services/iconBackgroundCrawler.ts` - Refactor to save each discovered icon to `icon_crawl_results` before selecting best
-- [x] `src/services/iconLoadingRegistry.ts` - Add `addCacheUpdateListener` and `notifyCacheUpdate` for real-time updates
-- [x] `services/database.ts` - Update `setCachedIcon` to notify cache listeners on update
-- [x] `src/hooks/useCachedIcon.ts` - Add cache update listener to re-fetch icon when changed
-- [x] `src/components/SubscriptionIconPickerModal.tsx` - Create new modal with grid display and action buttons
-  - "Use" button selects icon and updates cache
-  - "✕" (Wrong icon) and "⚠" (Broken icon) report to PostHog with source/fallback_tier
-  - "Use Default Icon" button resets to plus icon
-  - "Search for Icon Online" button triggers background crawl for new icons
-- [x] `components/SubscriptionCard.tsx` - Add `onIconLongPress` prop with touch position detection
-- [x] `app/(tabs)/subscriptions.tsx` - Wire up icon picker state management with `handleIconLongPress`
-- [x] `app/(tabs)/index.tsx` - Integrate icon picker into home page "All Subscriptions" section
+## Testing
+- [ ] Run TypeScript check: npx tsc --noEmit
+- [ ] Run lint check: npm run lint
+- [ ] Test the search functionality manually

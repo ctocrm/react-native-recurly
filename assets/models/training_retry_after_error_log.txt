@@ -1,0 +1,1600 @@
+
+> jsmastery@1.0.0 train:models
+> bash scripts/train.sh --both
+
+[TRAIN] Preflight: verifying training environment...
+[TRAIN] TensorFlow 2.19.0 — training on GPU: ['/physical_device:GPU:0', '/physical_device:GPU:1']
+
+==========================================
+[TRAIN] Training fast models...
+==========================================
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] espcn_16x_32x.tflite exists (6576 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 16->32
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] espcn_16x_64x.tflite exists (12336 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 16->64
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] espcn_16x_128x.tflite exists (64816 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 16->128
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] espcn_16x_192x.tflite exists (338488 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 16->192
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] espcn_16x_256x.tflite exists (690664 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 16->256
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] espcn_16x_384x.tflite exists (1397224 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 16->384
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] espcn_16x_512x.tflite exists (2386408 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 16->512
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] espcn_32x_64x.tflite exists (6576 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 32->64
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] espcn_32x_128x.tflite exists (12336 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 32->128
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] espcn_32x_192x.tflite exists (39280 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 32->192
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] espcn_32x_256x.tflite exists (64816 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 32->256
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] espcn_32x_384x.tflite exists (338488 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 32->384
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] espcn_32x_512x.tflite exists (690664 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 32->512
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] espcn_48x_96x.tflite exists (6576 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 48->96
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] espcn_48x_144x.tflite exists (8976 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 48->144
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] espcn_48x_192x.tflite exists (12336 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 48->192
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] espcn_48x_240x.tflite exists (29248 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 48->240
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] espcn_48x_384x.tflite exists (64816 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 48->384
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] espcn_48x_576x.tflite exists (338488 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 48->576
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] espcn_64x_128x.tflite exists (6576 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 64->128
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] espcn_64x_192x.tflite exists (8976 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 64->192
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] espcn_64x_256x.tflite exists (12336 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 64->256
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] espcn_64x_384x.tflite exists (39280 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 64->384
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] espcn_64x_512x.tflite exists (64816 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 64->512
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] espcn_96x_192x.tflite exists (20480 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 96->192
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] espcn_96x_288x.tflite exists (25048 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 96->288
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] espcn_96x_384x.tflite exists (31424 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 96->384
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] espcn_96x_480x.tflite exists (39640 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 96->480
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] espcn_96x_576x.tflite exists (49664 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 96->576
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] espcn_128x_256x.tflite exists (54664 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 128->256
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] espcn_128x_384x.tflite exists (61376 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 128->384
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] espcn_128x_512x.tflite exists (70792 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 128->512
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] espcn_192x_384x.tflite exists (54664 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 192->384
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] espcn_192x_576x.tflite exists (61376 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 192->576
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] espcn_256x_512x.tflite exists (89848 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 256->512
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+
+[TRAIN] Subprocess isolate 16->32 (scale 2x, 80 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_espcn_multi.py --model=16_32
+
+[TRAIN] Subprocess isolate 16->64 (scale 4x, 120 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_espcn_multi.py --model=16_64
+
+[TRAIN] Subprocess isolate 16->128 (scale 8x, 300 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_espcn_multi.py --model=16_128
+
+[TRAIN] Subprocess isolate 16->192 (scale 12x, 350 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_espcn_multi.py --model=16_192
+
+[TRAIN] Subprocess isolate 16->256 (scale 16x, 400 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_espcn_multi.py --model=16_256
+
+[TRAIN] Subprocess isolate 16->384 (scale 24x, 450 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_espcn_multi.py --model=16_384
+
+[TRAIN] Subprocess isolate 16->512 (scale 32x, 550 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_espcn_multi.py --model=16_512
+
+[TRAIN] Subprocess isolate 32->64 (scale 2x, 100 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_espcn_multi.py --model=32_64
+
+[TRAIN] Subprocess isolate 32->128 (scale 4x, 150 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_espcn_multi.py --model=32_128
+
+[TRAIN] Subprocess isolate 32->192 (scale 6x, 180 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_espcn_multi.py --model=32_192
+
+[TRAIN] Subprocess isolate 32->256 (scale 8x, 280 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_espcn_multi.py --model=32_256
+
+[TRAIN] Subprocess isolate 32->384 (scale 12x, 320 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_espcn_multi.py --model=32_384
+
+[TRAIN] Subprocess isolate 32->512 (scale 16x, 380 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_espcn_multi.py --model=32_512
+
+[TRAIN] Subprocess isolate 48->96 (scale 2x, 120 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_espcn_multi.py --model=48_96
+
+[TRAIN] Subprocess isolate 48->144 (scale 3x, 140 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_espcn_multi.py --model=48_144
+
+[TRAIN] Subprocess isolate 48->192 (scale 4x, 180 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_espcn_multi.py --model=48_192
+
+[TRAIN] Subprocess isolate 48->240 (scale 5x, 220 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_espcn_multi.py --model=48_240
+
+[TRAIN] Subprocess isolate 48->384 (scale 8x, 280 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_espcn_multi.py --model=48_384
+
+[TRAIN] Subprocess isolate 48->576 (scale 12x, 320 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_espcn_multi.py --model=48_576
+
+[TRAIN] Subprocess isolate 64->128 (scale 2x, 140 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_espcn_multi.py --model=64_128
+
+[TRAIN] Subprocess isolate 64->192 (scale 3x, 160 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_espcn_multi.py --model=64_192
+
+[TRAIN] Subprocess isolate 64->256 (scale 4x, 200 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_espcn_multi.py --model=64_256
+
+[TRAIN] Subprocess isolate 64->384 (scale 6x, 280 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_espcn_multi.py --model=64_384
+
+[TRAIN] Subprocess isolate 64->512 (scale 8x, 320 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_espcn_multi.py --model=64_512
+
+[TRAIN] Subprocess isolate 96->192 (scale 2x, 250 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_espcn_multi.py --model=96_192
+
+[TRAIN] Subprocess isolate 96->288 (scale 3x, 250 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_espcn_multi.py --model=96_288
+
+[TRAIN] Subprocess isolate 96->384 (scale 4x, 280 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_espcn_multi.py --model=96_384
+
+[TRAIN] Subprocess isolate 96->480 (scale 5x, 300 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_espcn_multi.py --model=96_480
+
+[TRAIN] Subprocess isolate 96->576 (scale 6x, 320 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_espcn_multi.py --model=96_576
+
+[TRAIN] Subprocess isolate 128->256 (scale 2x, 300 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_espcn_multi.py --model=128_256
+
+[TRAIN] Subprocess isolate 128->384 (scale 3x, 300 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_espcn_multi.py --model=128_384
+
+[TRAIN] Subprocess isolate 128->512 (scale 4x, 350 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_espcn_multi.py --model=128_512
+
+[TRAIN] Subprocess isolate 192->384 (scale 2x, 350 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_espcn_multi.py --model=192_384
+
+[TRAIN] Subprocess isolate 192->576 (scale 3x, 350 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_espcn_multi.py --model=192_576
+
+[TRAIN] Subprocess isolate 256->512 (scale 2x, 400 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_espcn_multi.py --model=256_512
+
+==================================================
+[TRAIN] Subprocess matrix done: 35 ok, 0 failed, 35 jobs
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+
+==========================================
+[TRAIN] Training sharp models...
+==========================================
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] fsrcnn_16x_32x.tflite exists (27656 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 16->32
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] fsrcnn_16x_64x.tflite exists (57032 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 16->64
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] fsrcnn_16x_128x.tflite exists (174536 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 16->128
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] fsrcnn_16x_192x.tflite exists (370376 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 16->192
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] fsrcnn_16x_256x.tflite exists (644552 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 16->256
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] fsrcnn_16x_384x.tflite exists (1427912 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 16->384
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] fsrcnn_16x_512x.tflite exists (2524616 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 16->512
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] fsrcnn_32x_64x.tflite exists (27656 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 32->64
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] fsrcnn_32x_128x.tflite exists (57032 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 32->128
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] fsrcnn_32x_192x.tflite exists (105992 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 32->192
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] fsrcnn_32x_256x.tflite exists (174536 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 32->256
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] fsrcnn_32x_384x.tflite exists (370376 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 32->384
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] fsrcnn_32x_512x.tflite exists (644552 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 32->512
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] fsrcnn_48x_96x.tflite exists (27656 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 48->96
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] fsrcnn_48x_144x.tflite exists (39896 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 48->144
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] fsrcnn_48x_192x.tflite exists (57032 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 48->192
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] fsrcnn_48x_240x.tflite exists (79064 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 48->240
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] fsrcnn_48x_384x.tflite exists (174536 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 48->384
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] fsrcnn_48x_576x.tflite exists (370376 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 48->576
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] fsrcnn_64x_128x.tflite exists (33984 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 64->128
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] fsrcnn_64x_192x.tflite exists (47728 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 64->192
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] fsrcnn_64x_256x.tflite exists (57032 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 64->256
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] fsrcnn_64x_384x.tflite exists (105992 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 64->384
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] fsrcnn_64x_512x.tflite exists (174536 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 64->512
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] fsrcnn_96x_192x.tflite exists (32120 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 96->192
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] fsrcnn_96x_288x.tflite exists (47360 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 96->288
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] fsrcnn_96x_384x.tflite exists (68696 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 96->384
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] fsrcnn_96x_480x.tflite exists (96128 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 96->480
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] fsrcnn_96x_576x.tflite exists (129656 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 96->576
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] fsrcnn_128x_256x.tflite exists (36048 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 128->256
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] fsrcnn_128x_384x.tflite exists (54288 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 128->384
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] fsrcnn_128x_512x.tflite exists (79824 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 128->512
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] fsrcnn_192x_384x.tflite exists (36048 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 192->384
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+[SKIP] fsrcnn_192x_576x.tflite exists (54288 bytes), use --force to retrain
+[TRAIN] Released GPU memory after 192->576
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+
+==================================================
+[TRAIN] Training 256->512 (scale 2x, 400 epochs)
+[TRAIN] Model params: 34760
+[TRAIN] MS-SSIM scales: 5 (output 512px)
+[TRAIN] Batch size: 2 (per GPU: 1), LR: 1.00e-04
+[TRAIN] Mixed precision: disabled (float32), Perceptual loss: enabled
+[TRAIN] Got real icon: netflix
+[TRAIN] Got real icon: spotify
+[TRAIN] Got real icon: github
+[TRAIN] Got real icon: figma
+[TRAIN] Got real icon: notion
+[TRAIN] Got real icon: dropbox
+[TRAIN] Got real icon: google
+[TRAIN] Got real icon: microsoft
+[TRAIN] Got real icon: apple
+[TRAIN] Got real icon: amazon
+[TRAIN] Got real icon: hulu
+[TRAIN] Got real icon: youtube
+[TRAIN] Got real icon: twitter
+[TRAIN] Got real icon: instagram
+[TRAIN] Got real icon: linkedin
+[TRAIN] Got real icon: facebook
+[TRAIN] Got real icon: slack
+[TRAIN] Got real icon: discord
+[TRAIN] Got real icon: zoom
+[TRAIN] Got real icon: shopify
+[TRAIN] Got real icon: stripe
+[TRAIN] Got real icon: paypal
+[TRAIN] Got real icon: airbnb
+[TRAIN] Got real icon: uber
+[TRAIN] Got real icon: lyft
+[TRAIN] Got real icon: adobe
+[TRAIN] Got real icon: canva
+[TRAIN] Got real icon: openai
+[TRAIN] Got real icon: claude
+[TRAIN] Got real icon: medium
+[TRAIN] Generated 1000 images for size 512 (800 real/augmented from 30 icons, 200 icon-like synthetic)
+Epoch 1/400
+405/405 - 24s - 60ms/step - loss: 7.0941 - val_loss: 5.0605
+Epoch 2/400
+405/405 - 15s - 38ms/step - loss: 1.9923 - val_loss: 1.5646
+Epoch 3/400
+405/405 - 15s - 38ms/step - loss: 1.3842 - val_loss: 1.2604
+Epoch 4/400
+405/405 - 15s - 38ms/step - loss: 1.3186 - val_loss: 1.3007
+Epoch 5/400
+405/405 - 15s - 38ms/step - loss: 1.2834 - val_loss: 1.2145
+Epoch 6/400
+405/405 - 15s - 38ms/step - loss: 1.2524 - val_loss: 1.1849
+Epoch 7/400
+405/405 - 15s - 38ms/step - loss: 1.2338 - val_loss: 1.1570
+Epoch 8/400
+405/405 - 15s - 38ms/step - loss: 1.2204 - val_loss: 1.1922
+Epoch 9/400
+405/405 - 15s - 38ms/step - loss: 1.2105 - val_loss: 1.1349
+Epoch 10/400
+405/405 - 15s - 38ms/step - loss: 1.2041 - val_loss: 1.1489
+Epoch 11/400
+405/405 - 15s - 38ms/step - loss: 1.2124 - val_loss: 1.1350
+Epoch 12/400
+405/405 - 15s - 38ms/step - loss: 1.2165 - val_loss: 1.1566
+Epoch 13/400
+405/405 - 16s - 39ms/step - loss: 1.2233 - val_loss: 1.1343
+Epoch 14/400
+405/405 - 15s - 38ms/step - loss: 1.2058 - val_loss: 1.1379
+Epoch 15/400
+405/405 - 15s - 38ms/step - loss: 1.2116 - val_loss: 1.1448
+Epoch 16/400
+405/405 - 15s - 38ms/step - loss: 1.2025 - val_loss: 1.1294
+Epoch 17/400
+405/405 - 15s - 38ms/step - loss: 1.2005 - val_loss: 1.1087
+Epoch 18/400
+405/405 - 15s - 38ms/step - loss: 1.2097 - val_loss: 1.1775
+Epoch 19/400
+405/405 - 15s - 38ms/step - loss: 1.2082 - val_loss: 1.1369
+Epoch 20/400
+405/405 - 15s - 38ms/step - loss: 1.1947 - val_loss: 1.1367
+Epoch 21/400
+405/405 - 15s - 38ms/step - loss: 1.2288 - val_loss: 1.2829
+Epoch 22/400
+405/405 - 15s - 38ms/step - loss: 1.2328 - val_loss: 1.1131
+Epoch 23/400
+405/405 - 15s - 38ms/step - loss: 1.2647 - val_loss: 1.0998
+Epoch 24/400
+405/405 - 15s - 38ms/step - loss: 1.2250 - val_loss: 1.0993
+Epoch 25/400
+405/405 - 15s - 38ms/step - loss: 1.2197 - val_loss: 1.1227
+Epoch 26/400
+405/405 - 15s - 38ms/step - loss: 1.2467 - val_loss: 1.1350
+Epoch 27/400
+405/405 - 15s - 38ms/step - loss: 1.2124 - val_loss: 1.0769
+Epoch 28/400
+405/405 - 15s - 38ms/step - loss: 1.1945 - val_loss: 1.0737
+Epoch 29/400
+405/405 - 16s - 39ms/step - loss: 1.1834 - val_loss: 1.1033
+Epoch 30/400
+405/405 - 15s - 38ms/step - loss: 1.1932 - val_loss: 1.0773
+Epoch 31/400
+405/405 - 15s - 38ms/step - loss: 1.2961 - val_loss: 1.1984
+Epoch 32/400
+405/405 - 15s - 38ms/step - loss: 1.2095 - val_loss: 1.1925
+Epoch 33/400
+405/405 - 15s - 38ms/step - loss: 1.2733 - val_loss: 1.1629
+Epoch 34/400
+405/405 - 15s - 38ms/step - loss: 1.2709 - val_loss: 1.1388
+Epoch 35/400
+405/405 - 15s - 38ms/step - loss: 1.2424 - val_loss: 1.0795
+Epoch 36/400
+405/405 - 15s - 38ms/step - loss: 1.1954 - val_loss: 1.1645
+Epoch 37/400
+405/405 - 15s - 38ms/step - loss: 1.3481 - val_loss: 1.1231
+Epoch 38/400
+405/405 - 15s - 38ms/step - loss: 1.2569 - val_loss: 1.1953
+Epoch 39/400
+405/405 - 15s - 38ms/step - loss: 1.2441 - val_loss: 1.1113
+Epoch 40/400
+405/405 - 15s - 38ms/step - loss: 1.2674 - val_loss: 1.3185
+Epoch 41/400
+405/405 - 15s - 38ms/step - loss: 1.2464 - val_loss: 1.1990
+Epoch 42/400
+405/405 - 15s - 38ms/step - loss: 1.4560 - val_loss: 1.1389
+Epoch 43/400
+405/405 - 15s - 38ms/step - loss: 1.2264 - val_loss: 1.3171
+Epoch 44/400
+405/405 - 15s - 38ms/step - loss: 1.3062 - val_loss: 1.2277
+Epoch 45/400
+405/405 - 16s - 39ms/step - loss: 1.3040 - val_loss: 1.1167
+Epoch 46/400
+405/405 - 15s - 38ms/step - loss: 1.2770 - val_loss: 1.1034
+Epoch 47/400
+405/405 - 15s - 38ms/step - loss: 1.1662 - val_loss: 1.0926
+Epoch 48/400
+405/405 - 15s - 38ms/step - loss: 1.1740 - val_loss: 1.0981
+Epoch 49/400
+405/405 - 15s - 38ms/step - loss: 1.1515 - val_loss: 1.0754
+Epoch 50/400
+405/405 - 15s - 38ms/step - loss: 1.1468 - val_loss: 1.0692
+Epoch 51/400
+405/405 - 15s - 38ms/step - loss: 1.1301 - val_loss: 1.1052
+Epoch 52/400
+405/405 - 15s - 38ms/step - loss: 1.1231 - val_loss: 1.0765
+Epoch 53/400
+405/405 - 15s - 38ms/step - loss: 1.1175 - val_loss: 1.0611
+Epoch 54/400
+405/405 - 15s - 38ms/step - loss: 1.1142 - val_loss: 1.0392
+Epoch 55/400
+405/405 - 15s - 38ms/step - loss: 1.1077 - val_loss: 1.0546
+Epoch 56/400
+405/405 - 15s - 38ms/step - loss: 1.1011 - val_loss: 1.0494
+Epoch 57/400
+405/405 - 15s - 38ms/step - loss: 1.0991 - val_loss: 1.0572
+Epoch 58/400
+405/405 - 15s - 38ms/step - loss: 1.0901 - val_loss: 1.0372
+Epoch 59/400
+405/405 - 15s - 38ms/step - loss: 1.0867 - val_loss: 1.0307
+Epoch 60/400
+405/405 - 15s - 38ms/step - loss: 1.0802 - val_loss: 1.0451
+Epoch 61/400
+405/405 - 16s - 39ms/step - loss: 1.0844 - val_loss: 1.0811
+Epoch 62/400
+405/405 - 15s - 38ms/step - loss: 1.0929 - val_loss: 1.0885
+Epoch 63/400
+405/405 - 15s - 38ms/step - loss: 1.0758 - val_loss: 1.0402
+Epoch 64/400
+405/405 - 15s - 38ms/step - loss: 1.0657 - val_loss: 1.0145
+Epoch 65/400
+405/405 - 15s - 38ms/step - loss: 1.0662 - val_loss: 1.0641
+Epoch 66/400
+405/405 - 15s - 38ms/step - loss: 1.0743 - val_loss: 1.0607
+Epoch 67/400
+405/405 - 15s - 38ms/step - loss: 1.0853 - val_loss: 1.0657
+Epoch 68/400
+405/405 - 15s - 38ms/step - loss: 1.0593 - val_loss: 1.0116
+Epoch 69/400
+405/405 - 15s - 38ms/step - loss: 1.0544 - val_loss: 1.0036
+Epoch 70/400
+405/405 - 15s - 38ms/step - loss: 1.0505 - val_loss: 0.9967
+Epoch 71/400
+405/405 - 15s - 38ms/step - loss: 1.0745 - val_loss: 1.0210
+Epoch 72/400
+405/405 - 15s - 38ms/step - loss: 1.0545 - val_loss: 1.0169
+Epoch 73/400
+405/405 - 15s - 38ms/step - loss: 1.0589 - val_loss: 1.0012
+Epoch 74/400
+405/405 - 15s - 38ms/step - loss: 1.0455 - val_loss: 1.0132
+Epoch 75/400
+405/405 - 15s - 38ms/step - loss: 1.0717 - val_loss: 1.0284
+Epoch 76/400
+405/405 - 15s - 38ms/step - loss: 1.0488 - val_loss: 0.9853
+Epoch 77/400
+405/405 - 16s - 39ms/step - loss: 1.0547 - val_loss: 1.0053
+Epoch 78/400
+405/405 - 15s - 38ms/step - loss: 1.0476 - val_loss: 1.0574
+Epoch 79/400
+405/405 - 15s - 38ms/step - loss: 1.0586 - val_loss: 1.0089
+Epoch 80/400
+405/405 - 15s - 38ms/step - loss: 1.0552 - val_loss: 0.9977
+Epoch 81/400
+405/405 - 15s - 38ms/step - loss: 1.0441 - val_loss: 1.0144
+Epoch 82/400
+405/405 - 15s - 38ms/step - loss: 1.0515 - val_loss: 0.9807
+Epoch 83/400
+405/405 - 15s - 38ms/step - loss: 1.0425 - val_loss: 0.9951
+Epoch 84/400
+405/405 - 15s - 38ms/step - loss: 1.0571 - val_loss: 0.9873
+Epoch 85/400
+405/405 - 15s - 38ms/step - loss: 1.0474 - val_loss: 1.0215
+Epoch 86/400
+405/405 - 15s - 38ms/step - loss: 1.0445 - val_loss: 1.0005
+Epoch 87/400
+405/405 - 15s - 38ms/step - loss: 1.0492 - val_loss: 0.9776
+Epoch 88/400
+405/405 - 15s - 38ms/step - loss: 1.0517 - val_loss: 0.9956
+Epoch 89/400
+405/405 - 15s - 38ms/step - loss: 1.0400 - val_loss: 0.9838
+Epoch 90/400
+405/405 - 15s - 38ms/step - loss: 1.0339 - val_loss: 1.0117
+Epoch 91/400
+405/405 - 15s - 38ms/step - loss: 1.0364 - val_loss: 0.9913
+Epoch 92/400
+405/405 - 15s - 38ms/step - loss: 1.0316 - val_loss: 0.9690
+Epoch 93/400
+405/405 - 16s - 39ms/step - loss: 1.0238 - val_loss: 0.9857
+Epoch 94/400
+405/405 - 15s - 38ms/step - loss: 1.0405 - val_loss: 0.9866
+Epoch 95/400
+405/405 - 15s - 38ms/step - loss: 1.0413 - val_loss: 0.9893
+Epoch 96/400
+405/405 - 15s - 38ms/step - loss: 1.0288 - val_loss: 1.0690
+Epoch 97/400
+405/405 - 15s - 38ms/step - loss: 1.0293 - val_loss: 0.9612
+Epoch 98/400
+405/405 - 15s - 38ms/step - loss: 1.0429 - val_loss: 1.0568
+Epoch 99/400
+405/405 - 15s - 38ms/step - loss: 1.0258 - val_loss: 0.9716
+Epoch 100/400
+405/405 - 15s - 38ms/step - loss: 1.0489 - val_loss: 1.0223
+Epoch 101/400
+405/405 - 15s - 38ms/step - loss: 1.0347 - val_loss: 0.9664
+Epoch 102/400
+405/405 - 15s - 38ms/step - loss: 1.0251 - val_loss: 0.9627
+Epoch 103/400
+405/405 - 15s - 38ms/step - loss: 1.0774 - val_loss: 1.0125
+Epoch 104/400
+405/405 - 15s - 38ms/step - loss: 1.0236 - val_loss: 0.9484
+Epoch 105/400
+405/405 - 15s - 38ms/step - loss: 1.0121 - val_loss: 0.9784
+Epoch 106/400
+405/405 - 15s - 38ms/step - loss: 1.0140 - val_loss: 0.9841
+Epoch 107/400
+405/405 - 15s - 38ms/step - loss: 1.0159 - val_loss: 0.9502
+Epoch 108/400
+405/405 - 15s - 38ms/step - loss: 1.0082 - val_loss: 1.1095
+Epoch 109/400
+405/405 - 16s - 39ms/step - loss: 1.0155 - val_loss: 0.9923
+Epoch 110/400
+405/405 - 15s - 38ms/step - loss: 1.0286 - val_loss: 0.9538
+Epoch 111/400
+405/405 - 15s - 38ms/step - loss: 1.0232 - val_loss: 0.9584
+Epoch 112/400
+405/405 - 15s - 38ms/step - loss: 1.0614 - val_loss: 0.9682
+Epoch 113/400
+405/405 - 15s - 38ms/step - loss: 1.0059 - val_loss: 0.9511
+Epoch 114/400
+405/405 - 15s - 38ms/step - loss: 1.0106 - val_loss: 0.9687
+Epoch 115/400
+405/405 - 15s - 38ms/step - loss: 1.0029 - val_loss: 0.9488
+Epoch 116/400
+405/405 - 15s - 38ms/step - loss: 0.9980 - val_loss: 0.9908
+Epoch 117/400
+405/405 - 15s - 38ms/step - loss: 1.0559 - val_loss: 1.0885
+Epoch 118/400
+405/405 - 15s - 38ms/step - loss: 1.0035 - val_loss: 0.9570
+Epoch 119/400
+405/405 - 15s - 38ms/step - loss: 1.0069 - val_loss: 0.9436
+Epoch 120/400
+405/405 - 15s - 38ms/step - loss: 0.9964 - val_loss: 0.9654
+Epoch 121/400
+405/405 - 15s - 38ms/step - loss: 1.0239 - val_loss: 0.9670
+Epoch 122/400
+405/405 - 15s - 38ms/step - loss: 1.0213 - val_loss: 0.9645
+Epoch 123/400
+405/405 - 15s - 38ms/step - loss: 0.9882 - val_loss: 0.9490
+Epoch 124/400
+405/405 - 15s - 38ms/step - loss: 0.9892 - val_loss: 0.9484
+Epoch 125/400
+405/405 - 16s - 39ms/step - loss: 0.9884 - val_loss: 0.9327
+Epoch 126/400
+405/405 - 15s - 38ms/step - loss: 0.9845 - val_loss: 0.9308
+Epoch 127/400
+405/405 - 15s - 38ms/step - loss: 0.9811 - val_loss: 0.9711
+Epoch 128/400
+405/405 - 15s - 38ms/step - loss: 0.9849 - val_loss: 0.9238
+Epoch 129/400
+405/405 - 15s - 38ms/step - loss: 0.9811 - val_loss: 0.9618
+Epoch 130/400
+405/405 - 15s - 38ms/step - loss: 0.9925 - val_loss: 0.9988
+Epoch 131/400
+405/405 - 15s - 38ms/step - loss: 0.9775 - val_loss: 0.9413
+Epoch 132/400
+405/405 - 15s - 38ms/step - loss: 0.9685 - val_loss: 0.9218
+Epoch 133/400
+405/405 - 15s - 38ms/step - loss: 0.9687 - val_loss: 0.9288
+Epoch 134/400
+405/405 - 15s - 38ms/step - loss: 0.9731 - val_loss: 0.9274
+Epoch 135/400
+405/405 - 15s - 38ms/step - loss: 0.9713 - val_loss: 0.9161
+Epoch 136/400
+405/405 - 15s - 38ms/step - loss: 0.9650 - val_loss: 0.9225
+Epoch 137/400
+405/405 - 15s - 38ms/step - loss: 0.9701 - val_loss: 0.9196
+Epoch 138/400
+405/405 - 15s - 38ms/step - loss: 0.9643 - val_loss: 0.9170
+Epoch 139/400
+405/405 - 15s - 38ms/step - loss: 0.9715 - val_loss: 0.9496
+Epoch 140/400
+405/405 - 15s - 38ms/step - loss: 0.9610 - val_loss: 0.9191
+Epoch 141/400
+405/405 - 16s - 39ms/step - loss: 0.9608 - val_loss: 0.9240
+Epoch 142/400
+405/405 - 15s - 38ms/step - loss: 0.9499 - val_loss: 0.9299
+Epoch 143/400
+405/405 - 15s - 38ms/step - loss: 0.9630 - val_loss: 0.9303
+Epoch 144/400
+405/405 - 15s - 38ms/step - loss: 0.9571 - val_loss: 0.9252
+Epoch 145/400
+405/405 - 15s - 38ms/step - loss: 0.9516 - val_loss: 0.9309
+Epoch 146/400
+405/405 - 15s - 38ms/step - loss: 0.9668 - val_loss: 0.9307
+Epoch 147/400
+405/405 - 15s - 38ms/step - loss: 0.9627 - val_loss: 0.9555
+Epoch 148/400
+405/405 - 15s - 38ms/step - loss: 0.9531 - val_loss: 0.9399
+Epoch 149/400
+405/405 - 15s - 38ms/step - loss: 0.9539 - val_loss: 0.9103
+Epoch 150/400
+405/405 - 15s - 38ms/step - loss: 0.9590 - val_loss: 0.9237
+Epoch 151/400
+405/405 - 15s - 38ms/step - loss: 0.9443 - val_loss: 0.9458
+Epoch 152/400
+405/405 - 15s - 38ms/step - loss: 0.9513 - val_loss: 0.9302
+Epoch 153/400
+405/405 - 15s - 38ms/step - loss: 0.9572 - val_loss: 0.9132
+Epoch 154/400
+405/405 - 15s - 38ms/step - loss: 0.9711 - val_loss: 0.9653
+Epoch 155/400
+405/405 - 15s - 38ms/step - loss: 0.9893 - val_loss: 0.9364
+Epoch 156/400
+405/405 - 15s - 38ms/step - loss: 0.9802 - val_loss: 0.9784
+Epoch 157/400
+405/405 - 16s - 39ms/step - loss: 0.9602 - val_loss: 0.9258
+Epoch 158/400
+405/405 - 15s - 38ms/step - loss: 0.9900 - val_loss: 1.0188
+Epoch 159/400
+405/405 - 15s - 38ms/step - loss: 0.9641 - val_loss: 0.9699
+Epoch 160/400
+405/405 - 15s - 38ms/step - loss: 0.9646 - val_loss: 0.9019
+Epoch 161/400
+405/405 - 15s - 38ms/step - loss: 0.9560 - val_loss: 0.9052
+Epoch 162/400
+405/405 - 15s - 38ms/step - loss: 0.9590 - val_loss: 0.9147
+Epoch 163/400
+405/405 - 15s - 38ms/step - loss: 0.9509 - val_loss: 0.9042
+Epoch 164/400
+405/405 - 15s - 38ms/step - loss: 0.9501 - val_loss: 0.9016
+Epoch 165/400
+405/405 - 15s - 38ms/step - loss: 0.9362 - val_loss: 0.9240
+Epoch 166/400
+405/405 - 15s - 38ms/step - loss: 0.9421 - val_loss: 0.9135
+Epoch 167/400
+405/405 - 15s - 38ms/step - loss: 0.9428 - val_loss: 0.8987
+Epoch 168/400
+405/405 - 15s - 38ms/step - loss: 0.9417 - val_loss: 0.9044
+Epoch 169/400
+405/405 - 15s - 38ms/step - loss: 0.9328 - val_loss: 0.8946
+Epoch 170/400
+405/405 - 15s - 38ms/step - loss: 0.9400 - val_loss: 0.9167
+Epoch 171/400
+405/405 - 15s - 38ms/step - loss: 0.9383 - val_loss: 0.8891
+Epoch 172/400
+405/405 - 15s - 38ms/step - loss: 0.9388 - val_loss: 0.9308
+Epoch 173/400
+405/405 - 16s - 39ms/step - loss: 0.9377 - val_loss: 0.8921
+Epoch 174/400
+405/405 - 15s - 38ms/step - loss: 0.9348 - val_loss: 0.9056
+Epoch 175/400
+405/405 - 15s - 38ms/step - loss: 0.9356 - val_loss: 0.9084
+Epoch 176/400
+405/405 - 15s - 38ms/step - loss: 0.9424 - val_loss: 0.9142
+Epoch 177/400
+405/405 - 15s - 38ms/step - loss: 0.9332 - val_loss: 0.9254
+Epoch 178/400
+405/405 - 15s - 38ms/step - loss: 0.9303 - val_loss: 0.8961
+Epoch 179/400
+405/405 - 15s - 38ms/step - loss: 0.9346 - val_loss: 0.9051
+Epoch 180/400
+405/405 - 15s - 38ms/step - loss: 0.9218 - val_loss: 0.9138
+Epoch 181/400
+405/405 - 15s - 38ms/step - loss: 0.9322 - val_loss: 0.9677
+Epoch 182/400
+405/405 - 15s - 38ms/step - loss: 0.9294 - val_loss: 0.8906
+Epoch 183/400
+405/405 - 15s - 38ms/step - loss: 0.9913 - val_loss: 1.2653
+Epoch 184/400
+405/405 - 15s - 38ms/step - loss: 0.9504 - val_loss: 0.9153
+Epoch 185/400
+405/405 - 15s - 38ms/step - loss: 0.9424 - val_loss: 0.8978
+Epoch 186/400
+405/405 - 15s - 38ms/step - loss: 0.9309 - val_loss: 0.8931
+Epoch 187/400
+405/405 - 15s - 38ms/step - loss: 0.9582 - val_loss: 0.8848
+Epoch 188/400
+405/405 - 15s - 38ms/step - loss: 0.9272 - val_loss: 0.8876
+Epoch 189/400
+405/405 - 16s - 39ms/step - loss: 0.9553 - val_loss: 0.9009
+Epoch 190/400
+405/405 - 15s - 38ms/step - loss: 0.9389 - val_loss: 0.9018
+Epoch 191/400
+405/405 - 15s - 38ms/step - loss: 0.9482 - val_loss: 0.8863
+Epoch 192/400
+405/405 - 15s - 38ms/step - loss: 0.9518 - val_loss: 0.9063
+Epoch 193/400
+405/405 - 15s - 38ms/step - loss: 0.9526 - val_loss: 0.9191
+Epoch 194/400
+405/405 - 15s - 38ms/step - loss: 0.9766 - val_loss: 0.9058
+Epoch 195/400
+405/405 - 15s - 38ms/step - loss: 0.9423 - val_loss: 0.9035
+Epoch 196/400
+405/405 - 15s - 38ms/step - loss: 0.9704 - val_loss: 1.0233
+Epoch 197/400
+405/405 - 15s - 38ms/step - loss: 0.9572 - val_loss: 0.8956
+Epoch 198/400
+405/405 - 15s - 38ms/step - loss: 0.9315 - val_loss: 0.9141
+Epoch 199/400
+405/405 - 15s - 38ms/step - loss: 0.9492 - val_loss: 0.8765
+Epoch 200/400
+405/405 - 15s - 38ms/step - loss: 0.9340 - val_loss: 0.8924
+Epoch 201/400
+405/405 - 15s - 38ms/step - loss: 0.9321 - val_loss: 0.8680
+Epoch 202/400
+405/405 - 15s - 38ms/step - loss: 0.9401 - val_loss: 0.8718
+Epoch 203/400
+405/405 - 15s - 38ms/step - loss: 0.9823 - val_loss: 0.9649
+Epoch 204/400
+405/405 - 15s - 38ms/step - loss: 0.9298 - val_loss: 0.8895
+Epoch 205/400
+405/405 - 16s - 39ms/step - loss: 1.0233 - val_loss: 0.8858
+Epoch 206/400
+405/405 - 15s - 38ms/step - loss: 0.9167 - val_loss: 0.8656
+Epoch 207/400
+405/405 - 15s - 38ms/step - loss: 0.9100 - val_loss: 0.8646
+Epoch 208/400
+405/405 - 15s - 38ms/step - loss: 0.9068 - val_loss: 0.8768
+Epoch 209/400
+405/405 - 15s - 38ms/step - loss: 0.9173 - val_loss: 0.8923
+Epoch 210/400
+405/405 - 15s - 38ms/step - loss: 0.9233 - val_loss: 1.0266
+Epoch 211/400
+405/405 - 15s - 38ms/step - loss: 0.9270 - val_loss: 1.0692
+Epoch 212/400
+405/405 - 15s - 38ms/step - loss: 0.9111 - val_loss: 0.9834
+Epoch 213/400
+405/405 - 15s - 38ms/step - loss: 0.9025 - val_loss: 0.9223
+Epoch 214/400
+405/405 - 15s - 38ms/step - loss: 0.9611 - val_loss: 0.9286
+Epoch 215/400
+405/405 - 15s - 38ms/step - loss: 0.9086 - val_loss: 0.8588
+Epoch 216/400
+405/405 - 15s - 38ms/step - loss: 0.9182 - val_loss: 0.8755
+Epoch 217/400
+405/405 - 15s - 38ms/step - loss: 0.9248 - val_loss: 0.8952
+Epoch 218/400
+405/405 - 15s - 38ms/step - loss: 0.9028 - val_loss: 0.8897
+Epoch 219/400
+405/405 - 15s - 38ms/step - loss: 0.9015 - val_loss: 0.9169
+Epoch 220/400
+405/405 - 15s - 38ms/step - loss: 0.9101 - val_loss: 0.8580
+Epoch 221/400
+405/405 - 16s - 39ms/step - loss: 0.8984 - val_loss: 0.8646
+Epoch 222/400
+405/405 - 15s - 38ms/step - loss: 0.9014 - val_loss: 0.8562
+Epoch 223/400
+405/405 - 15s - 38ms/step - loss: 0.8984 - val_loss: 0.8921
+Epoch 224/400
+405/405 - 15s - 38ms/step - loss: 0.9079 - val_loss: 0.8745
+Epoch 225/400
+405/405 - 15s - 38ms/step - loss: 0.8974 - val_loss: 0.8538
+Epoch 226/400
+405/405 - 15s - 38ms/step - loss: 0.8942 - val_loss: 0.8983
+Epoch 227/400
+405/405 - 15s - 38ms/step - loss: 0.8992 - val_loss: 0.8789
+Epoch 228/400
+405/405 - 15s - 38ms/step - loss: 0.8877 - val_loss: 1.0085
+Epoch 229/400
+405/405 - 15s - 38ms/step - loss: 0.9071 - val_loss: 0.8958
+Epoch 230/400
+405/405 - 15s - 38ms/step - loss: 0.9024 - val_loss: 0.8861
+Epoch 231/400
+405/405 - 15s - 38ms/step - loss: 0.9085 - val_loss: 0.8724
+Epoch 232/400
+405/405 - 15s - 38ms/step - loss: 0.8802 - val_loss: 0.8481
+Epoch 233/400
+405/405 - 15s - 38ms/step - loss: 0.8938 - val_loss: 0.8811
+Epoch 234/400
+405/405 - 15s - 38ms/step - loss: 0.8885 - val_loss: 0.8797
+Epoch 235/400
+405/405 - 15s - 38ms/step - loss: 0.8949 - val_loss: 0.8653
+Epoch 236/400
+405/405 - 15s - 38ms/step - loss: 0.8770 - val_loss: 0.8749
+Epoch 237/400
+405/405 - 16s - 39ms/step - loss: 0.8769 - val_loss: 0.8980
+Epoch 238/400
+405/405 - 15s - 38ms/step - loss: 0.8728 - val_loss: 0.9417
+Epoch 239/400
+405/405 - 15s - 38ms/step - loss: 0.8787 - val_loss: 0.8881
+Epoch 240/400
+405/405 - 15s - 38ms/step - loss: 0.8757 - val_loss: 0.8408
+Epoch 241/400
+405/405 - 15s - 38ms/step - loss: 0.8688 - val_loss: 0.8516
+Epoch 242/400
+405/405 - 15s - 38ms/step - loss: 0.8625 - val_loss: 0.8535
+Epoch 243/400
+405/405 - 15s - 38ms/step - loss: 0.8606 - val_loss: 0.8594
+Epoch 244/400
+405/405 - 15s - 38ms/step - loss: 0.8596 - val_loss: 0.8242
+Epoch 245/400
+405/405 - 15s - 38ms/step - loss: 0.8643 - val_loss: 0.8561
+Epoch 246/400
+405/405 - 15s - 38ms/step - loss: 0.8750 - val_loss: 0.8648
+Epoch 247/400
+405/405 - 15s - 38ms/step - loss: 0.8576 - val_loss: 0.8195
+Epoch 248/400
+405/405 - 15s - 38ms/step - loss: 0.8476 - val_loss: 0.8352
+Epoch 249/400
+405/405 - 15s - 38ms/step - loss: 0.8411 - val_loss: 0.8012
+Epoch 250/400
+405/405 - 15s - 38ms/step - loss: 0.8513 - val_loss: 0.8295
+Epoch 251/400
+405/405 - 15s - 38ms/step - loss: 0.8674 - val_loss: 0.8319
+Epoch 252/400
+405/405 - 15s - 38ms/step - loss: 0.8246 - val_loss: 0.8239
+Epoch 253/400
+405/405 - 16s - 39ms/step - loss: 0.8410 - val_loss: 0.8024
+Epoch 254/400
+405/405 - 15s - 38ms/step - loss: 0.8314 - val_loss: 0.7827
+Epoch 255/400
+405/405 - 16s - 38ms/step - loss: 0.8389 - val_loss: 0.8064
+Epoch 256/400
+405/405 - 15s - 38ms/step - loss: 0.8282 - val_loss: 0.8253
+Epoch 257/400
+405/405 - 15s - 38ms/step - loss: 0.8312 - val_loss: 0.7988
+Epoch 258/400
+405/405 - 15s - 38ms/step - loss: 0.8345 - val_loss: 0.9486
+Epoch 259/400
+405/405 - 15s - 38ms/step - loss: 0.8354 - val_loss: 0.8612
+Epoch 260/400
+405/405 - 15s - 38ms/step - loss: 0.8373 - val_loss: 0.7770
+Epoch 261/400
+405/405 - 15s - 38ms/step - loss: 0.8142 - val_loss: 0.8002
+Epoch 262/400
+405/405 - 15s - 38ms/step - loss: 0.8276 - val_loss: 0.8318
+Epoch 263/400
+405/405 - 15s - 38ms/step - loss: 0.8246 - val_loss: 0.8116
+Epoch 264/400
+405/405 - 15s - 38ms/step - loss: 0.8133 - val_loss: 0.8049
+Epoch 265/400
+405/405 - 15s - 38ms/step - loss: 0.8223 - val_loss: 0.8337
+Epoch 266/400
+405/405 - 15s - 38ms/step - loss: 0.8211 - val_loss: 0.8085
+Epoch 267/400
+405/405 - 15s - 38ms/step - loss: 0.8295 - val_loss: 0.7946
+Epoch 268/400
+405/405 - 15s - 38ms/step - loss: 0.8075 - val_loss: 0.7934
+Epoch 269/400
+405/405 - 16s - 39ms/step - loss: 0.8191 - val_loss: 0.8001
+Epoch 270/400
+405/405 - 15s - 38ms/step - loss: 0.8041 - val_loss: 0.7890
+Epoch 271/400
+405/405 - 15s - 38ms/step - loss: 0.8050 - val_loss: 0.8424
+Epoch 272/400
+405/405 - 15s - 38ms/step - loss: 0.8063 - val_loss: 0.7719
+Epoch 273/400
+405/405 - 15s - 38ms/step - loss: 0.8068 - val_loss: 0.7650
+Epoch 274/400
+405/405 - 15s - 38ms/step - loss: 0.7996 - val_loss: 0.7860
+Epoch 275/400
+405/405 - 15s - 38ms/step - loss: 0.8069 - val_loss: 0.7584
+Epoch 276/400
+405/405 - 15s - 38ms/step - loss: 0.8085 - val_loss: 0.7757
+Epoch 277/400
+405/405 - 15s - 38ms/step - loss: 0.8330 - val_loss: 0.8194
+Epoch 278/400
+405/405 - 15s - 38ms/step - loss: 0.8017 - val_loss: 0.7705
+Epoch 279/400
+405/405 - 15s - 38ms/step - loss: 0.7997 - val_loss: 0.7813
+Epoch 280/400
+405/405 - 15s - 38ms/step - loss: 0.8095 - val_loss: 0.7959
+Epoch 281/400
+405/405 - 15s - 38ms/step - loss: 0.8047 - val_loss: 0.7805
+Epoch 282/400
+405/405 - 15s - 38ms/step - loss: 0.8090 - val_loss: 0.7972
+Epoch 283/400
+405/405 - 15s - 38ms/step - loss: 0.8250 - val_loss: 0.7956
+Epoch 284/400
+405/405 - 15s - 38ms/step - loss: 0.8006 - val_loss: 0.7754
+Epoch 285/400
+405/405 - 16s - 39ms/step - loss: 0.7870 - val_loss: 0.7834
+Epoch 286/400
+405/405 - 15s - 38ms/step - loss: 0.8055 - val_loss: 0.7717
+Epoch 287/400
+405/405 - 15s - 38ms/step - loss: 0.7942 - val_loss: 0.7497
+Epoch 288/400
+405/405 - 15s - 38ms/step - loss: 0.8038 - val_loss: 0.7546
+Epoch 289/400
+405/405 - 15s - 38ms/step - loss: 0.7979 - val_loss: 0.7953
+Epoch 290/400
+405/405 - 15s - 38ms/step - loss: 0.7831 - val_loss: 0.7573
+Epoch 291/400
+405/405 - 15s - 38ms/step - loss: 0.7960 - val_loss: 0.7473
+Epoch 292/400
+405/405 - 15s - 38ms/step - loss: 0.7994 - val_loss: 0.7753
+Epoch 293/400
+405/405 - 15s - 38ms/step - loss: 0.7989 - val_loss: 0.9469
+Epoch 294/400
+405/405 - 15s - 38ms/step - loss: 0.8082 - val_loss: 0.7773
+Epoch 295/400
+405/405 - 15s - 38ms/step - loss: 0.7849 - val_loss: 0.7552
+Epoch 296/400
+405/405 - 15s - 38ms/step - loss: 0.7949 - val_loss: 0.7612
+Epoch 297/400
+405/405 - 15s - 38ms/step - loss: 0.8023 - val_loss: 0.8251
+Epoch 298/400
+405/405 - 15s - 38ms/step - loss: 0.7996 - val_loss: 0.7541
+Epoch 299/400
+405/405 - 15s - 38ms/step - loss: 0.8040 - val_loss: 0.7584
+Epoch 300/400
+405/405 - 15s - 38ms/step - loss: 0.7958 - val_loss: 0.8507
+Epoch 301/400
+405/405 - 16s - 39ms/step - loss: 0.8421 - val_loss: 0.7395
+Epoch 302/400
+405/405 - 15s - 38ms/step - loss: 0.7962 - val_loss: 0.7524
+Epoch 303/400
+405/405 - 15s - 38ms/step - loss: 0.7918 - val_loss: 0.7563
+Epoch 304/400
+405/405 - 16s - 38ms/step - loss: 0.7853 - val_loss: 0.8937
+Epoch 305/400
+405/405 - 15s - 38ms/step - loss: 0.7836 - val_loss: 0.7776
+Epoch 306/400
+405/405 - 15s - 38ms/step - loss: 0.7887 - val_loss: 0.7692
+Epoch 307/400
+405/405 - 15s - 38ms/step - loss: 0.7837 - val_loss: 0.7888
+Epoch 308/400
+405/405 - 15s - 38ms/step - loss: 0.7969 - val_loss: 0.7767
+Epoch 309/400
+405/405 - 15s - 38ms/step - loss: 0.7714 - val_loss: 0.7784
+Epoch 310/400
+405/405 - 15s - 38ms/step - loss: 0.7750 - val_loss: 0.7893
+Epoch 311/400
+405/405 - 15s - 38ms/step - loss: 0.7962 - val_loss: 0.7722
+Epoch 312/400
+405/405 - 15s - 38ms/step - loss: 0.7830 - val_loss: 0.7526
+Epoch 313/400
+405/405 - 15s - 38ms/step - loss: 0.7810 - val_loss: 0.7503
+Epoch 314/400
+405/405 - 15s - 38ms/step - loss: 0.7944 - val_loss: 0.7332
+Epoch 315/400
+405/405 - 15s - 38ms/step - loss: 0.7928 - val_loss: 0.7626
+Epoch 316/400
+405/405 - 15s - 38ms/step - loss: 0.7876 - val_loss: 0.7696
+Epoch 317/400
+405/405 - 16s - 39ms/step - loss: 0.8092 - val_loss: 0.7429
+Epoch 318/400
+405/405 - 15s - 38ms/step - loss: 0.7883 - val_loss: 0.7850
+Epoch 319/400
+405/405 - 15s - 38ms/step - loss: 0.7970 - val_loss: 0.8145
+Epoch 320/400
+405/405 - 15s - 38ms/step - loss: 0.7914 - val_loss: 0.7619
+Epoch 321/400
+405/405 - 15s - 38ms/step - loss: 0.7851 - val_loss: 0.7705
+Epoch 322/400
+405/405 - 15s - 38ms/step - loss: 0.7847 - val_loss: 0.7619
+Epoch 323/400
+405/405 - 15s - 38ms/step - loss: 0.7954 - val_loss: 0.7770
+Epoch 324/400
+405/405 - 15s - 38ms/step - loss: 0.7780 - val_loss: 0.8371
+Epoch 325/400
+405/405 - 15s - 38ms/step - loss: 0.7833 - val_loss: 0.7358
+Epoch 326/400
+405/405 - 15s - 38ms/step - loss: 0.7980 - val_loss: 0.7511
+Epoch 327/400
+405/405 - 15s - 38ms/step - loss: 0.7976 - val_loss: 0.8691
+Epoch 328/400
+405/405 - 15s - 38ms/step - loss: 0.8180 - val_loss: 0.8954
+Epoch 329/400
+405/405 - 15s - 38ms/step - loss: 0.8773 - val_loss: 0.8109
+Epoch 330/400
+405/405 - 15s - 38ms/step - loss: 0.8289 - val_loss: 0.8343
+Epoch 331/400
+405/405 - 15s - 38ms/step - loss: 0.8169 - val_loss: 0.7625
+Epoch 332/400
+405/405 - 15s - 38ms/step - loss: 0.8324 - val_loss: 0.7616
+Epoch 333/400
+405/405 - 16s - 39ms/step - loss: 0.8637 - val_loss: 0.8657
+Epoch 334/400
+405/405 - 15s - 38ms/step - loss: 0.8088 - val_loss: 0.8520
+Epoch 335/400
+405/405 - 16s - 38ms/step - loss: 0.7901 - val_loss: 0.8234
+Epoch 336/400
+405/405 - 15s - 38ms/step - loss: 0.8090 - val_loss: 0.7972
+Epoch 337/400
+405/405 - 15s - 38ms/step - loss: 0.8132 - val_loss: 0.7889
+Epoch 338/400
+405/405 - 15s - 38ms/step - loss: 0.8152 - val_loss: 0.7723
+Epoch 339/400
+405/405 - 15s - 38ms/step - loss: 0.7988 - val_loss: 0.7645
+Epoch 340/400
+405/405 - 15s - 38ms/step - loss: 0.7878 - val_loss: 0.7608
+Epoch 341/400
+405/405 - 15s - 38ms/step - loss: 0.7943 - val_loss: 0.8514
+Epoch 342/400
+405/405 - 15s - 38ms/step - loss: 0.8409 - val_loss: 0.8940
+Epoch 343/400
+405/405 - 15s - 38ms/step - loss: 0.8082 - val_loss: 0.7862
+Epoch 344/400
+405/405 - 15s - 38ms/step - loss: 0.8312 - val_loss: 0.7801
+Epoch 345/400
+405/405 - 15s - 38ms/step - loss: 0.8105 - val_loss: 0.8286
+Epoch 346/400
+405/405 - 15s - 38ms/step - loss: 0.8008 - val_loss: 0.9471
+Epoch 347/400
+405/405 - 15s - 38ms/step - loss: 0.8252 - val_loss: 0.8176
+Epoch 348/400
+405/405 - 15s - 38ms/step - loss: 0.8121 - val_loss: 0.8364
+Epoch 349/400
+405/405 - 16s - 39ms/step - loss: 0.7929 - val_loss: 0.8198
+Epoch 350/400
+405/405 - 16s - 38ms/step - loss: 0.7678 - val_loss: 0.8618
+Epoch 351/400
+405/405 - 15s - 38ms/step - loss: 0.7820 - val_loss: 0.7396
+Epoch 352/400
+405/405 - 15s - 38ms/step - loss: 0.7808 - val_loss: 0.7936
+Epoch 353/400
+405/405 - 15s - 38ms/step - loss: 0.7884 - val_loss: 0.8055
+Epoch 354/400
+405/405 - 15s - 38ms/step - loss: 0.7842 - val_loss: 0.8134
+Epoch 355/400
+405/405 - 15s - 38ms/step - loss: 0.7817 - val_loss: 0.7392
+Epoch 356/400
+405/405 - 15s - 38ms/step - loss: 0.7724 - val_loss: 0.7873
+Epoch 357/400
+405/405 - 15s - 38ms/step - loss: 0.7871 - val_loss: 0.7660
+Epoch 358/400
+405/405 - 15s - 38ms/step - loss: 0.7643 - val_loss: 0.7332
+Epoch 359/400
+405/405 - 15s - 38ms/step - loss: 0.7948 - val_loss: 0.7903
+Epoch 360/400
+405/405 - 15s - 38ms/step - loss: 0.7679 - val_loss: 0.8156
+Epoch 361/400
+405/405 - 15s - 38ms/step - loss: 0.7815 - val_loss: 0.7358
+Epoch 362/400
+405/405 - 15s - 38ms/step - loss: 0.7668 - val_loss: 0.7565
+Epoch 363/400
+405/405 - 15s - 38ms/step - loss: 0.7925 - val_loss: 0.8141
+Epoch 364/400
+405/405 - 15s - 38ms/step - loss: 0.7763 - val_loss: 0.7383
+Epoch 365/400
+405/405 - 16s - 39ms/step - loss: 0.7746 - val_loss: 0.7528
+Epoch 366/400
+405/405 - 15s - 38ms/step - loss: 0.7847 - val_loss: 0.7307
+Epoch 367/400
+405/405 - 15s - 38ms/step - loss: 0.7709 - val_loss: 0.7429
+Epoch 368/400
+405/405 - 16s - 38ms/step - loss: 0.7581 - val_loss: 0.7308
+Epoch 369/400
+405/405 - 15s - 38ms/step - loss: 0.7722 - val_loss: 0.7856
+Epoch 370/400
+405/405 - 15s - 38ms/step - loss: 0.7643 - val_loss: 0.7597
+Epoch 371/400
+405/405 - 15s - 38ms/step - loss: 0.7712 - val_loss: 0.7415
+Epoch 372/400
+405/405 - 15s - 38ms/step - loss: 0.7803 - val_loss: 0.7860
+Epoch 373/400
+405/405 - 15s - 38ms/step - loss: 0.7713 - val_loss: 0.7529
+Epoch 374/400
+405/405 - 15s - 38ms/step - loss: 0.7534 - val_loss: 0.7238
+Epoch 375/400
+405/405 - 15s - 38ms/step - loss: 0.7703 - val_loss: 0.7268
+Epoch 376/400
+405/405 - 15s - 38ms/step - loss: 0.7605 - val_loss: 0.8408
+Epoch 377/400
+405/405 - 15s - 38ms/step - loss: 0.7853 - val_loss: 0.7528
+Epoch 378/400
+405/405 - 15s - 38ms/step - loss: 0.7682 - val_loss: 0.8734
+Epoch 379/400
+405/405 - 15s - 38ms/step - loss: 0.7768 - val_loss: 0.7516
+Epoch 380/400
+405/405 - 15s - 38ms/step - loss: 0.7922 - val_loss: 0.7593
+Epoch 381/400
+405/405 - 16s - 39ms/step - loss: 0.7684 - val_loss: 0.7438
+Epoch 382/400
+405/405 - 15s - 38ms/step - loss: 0.7561 - val_loss: 0.7563
+Epoch 383/400
+405/405 - 15s - 38ms/step - loss: 0.7770 - val_loss: 0.7632
+Epoch 384/400
+405/405 - 16s - 38ms/step - loss: 0.7751 - val_loss: 0.8000
+Epoch 385/400
+405/405 - 15s - 38ms/step - loss: 0.7579 - val_loss: 0.7447
+Epoch 386/400
+405/405 - 15s - 38ms/step - loss: 0.7543 - val_loss: 0.7485
+Epoch 387/400
+405/405 - 15s - 38ms/step - loss: 0.7497 - val_loss: 0.7272
+Epoch 388/400
+405/405 - 15s - 38ms/step - loss: 0.7474 - val_loss: 0.7317
+Epoch 389/400
+405/405 - 15s - 38ms/step - loss: 0.7444 - val_loss: 0.7628
+Epoch 390/400
+405/405 - 15s - 38ms/step - loss: 0.7501 - val_loss: 0.7223
+Epoch 391/400
+405/405 - 15s - 38ms/step - loss: 0.7506 - val_loss: 0.7321
+Epoch 392/400
+405/405 - 15s - 38ms/step - loss: 0.7545 - val_loss: 0.7396
+Epoch 393/400
+405/405 - 15s - 38ms/step - loss: 0.7543 - val_loss: 0.7417
+Epoch 394/400
+405/405 - 15s - 38ms/step - loss: 0.7754 - val_loss: 0.7205
+Epoch 395/400
+405/405 - 15s - 38ms/step - loss: 0.7551 - val_loss: 0.7264
+Epoch 396/400
+405/405 - 15s - 38ms/step - loss: 0.7662 - val_loss: 1.2167
+Epoch 397/400
+405/405 - 16s - 39ms/step - loss: 0.7653 - val_loss: 0.7464
+Epoch 398/400
+405/405 - 15s - 38ms/step - loss: 0.7440 - val_loss: 0.7055
+Epoch 399/400
+405/405 - 15s - 38ms/step - loss: 0.7531 - val_loss: 0.7282
+Epoch 400/400
+405/405 - 15s - 38ms/step - loss: 0.7576 - val_loss: 0.7169
+Saved artifact at '/tmp/tmpbppghpx5'. The following endpoints are available:
+
+* Endpoint 'serve'
+  args_0 (POSITIONAL_ONLY): TensorSpec(shape=(None, 256, 256, 3), dtype=tf.float32, name='keras_tensor')
+Output Type:
+  TensorSpec(shape=(None, 512, 512, 3), dtype=tf.float32, name=None)
+Captures:
+  138877171381840: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  138877171384144: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  138877171383760: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  138877171382032: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  138877171382416: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  138877171383376: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  138877171680080: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  138877171681808: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  138877171679312: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  138877171682768: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  138877171682384: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  138877171683920: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  138877171680848: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  138877171684688: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  138877171683536: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  138877171685840: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  138877171686416: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  138877171687952: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  138877171688336: TensorSpec(shape=(), dtype=tf.resource, name=None)
+  138877171689872: TensorSpec(shape=(), dtype=tf.resource, name=None)
+[VALIDATE] Testing model output variance vs bicubic baseline...
+[VALIDATE] Output variance: 0.222956
+[VALIDATE] Model PSNR: 31.42dB, Bicubic PSNR: 30.76dB
+[VALIDATE] PASSED - Model beats bicubic baseline by 0.66dB
+[TRAIN] WROTE /root/jsmastering/scripts/../assets/models/fsrcnn_256x_512x.tflite (49112 bytes)
+[TRAIN] Released GPU memory after 256->512
+
+==================================================
+[TRAIN] Generated 1 models this run (0 failures)
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+[TRAIN] Using MirroredStrategy with 2 GPUs
+
+[TRAIN] Subprocess isolate 16->32 (scale 2x, 80 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_fsrcnn_multi.py --model=16_32
+
+[TRAIN] Subprocess isolate 16->64 (scale 4x, 120 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_fsrcnn_multi.py --model=16_64
+
+[TRAIN] Subprocess isolate 16->128 (scale 8x, 300 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_fsrcnn_multi.py --model=16_128
+
+[TRAIN] Subprocess isolate 16->192 (scale 12x, 350 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_fsrcnn_multi.py --model=16_192
+
+[TRAIN] Subprocess isolate 16->256 (scale 16x, 400 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_fsrcnn_multi.py --model=16_256
+
+[TRAIN] Subprocess isolate 16->384 (scale 24x, 450 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_fsrcnn_multi.py --model=16_384
+
+[TRAIN] Subprocess isolate 16->512 (scale 32x, 550 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_fsrcnn_multi.py --model=16_512
+
+[TRAIN] Subprocess isolate 32->64 (scale 2x, 100 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_fsrcnn_multi.py --model=32_64
+
+[TRAIN] Subprocess isolate 32->128 (scale 4x, 150 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_fsrcnn_multi.py --model=32_128
+
+[TRAIN] Subprocess isolate 32->192 (scale 6x, 180 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_fsrcnn_multi.py --model=32_192
+
+[TRAIN] Subprocess isolate 32->256 (scale 8x, 280 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_fsrcnn_multi.py --model=32_256
+
+[TRAIN] Subprocess isolate 32->384 (scale 12x, 320 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_fsrcnn_multi.py --model=32_384
+
+[TRAIN] Subprocess isolate 32->512 (scale 16x, 380 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_fsrcnn_multi.py --model=32_512
+
+[TRAIN] Subprocess isolate 48->96 (scale 2x, 120 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_fsrcnn_multi.py --model=48_96
+
+[TRAIN] Subprocess isolate 48->144 (scale 3x, 140 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_fsrcnn_multi.py --model=48_144
+
+[TRAIN] Subprocess isolate 48->192 (scale 4x, 180 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_fsrcnn_multi.py --model=48_192
+
+[TRAIN] Subprocess isolate 48->240 (scale 5x, 220 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_fsrcnn_multi.py --model=48_240
+
+[TRAIN] Subprocess isolate 48->384 (scale 8x, 280 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_fsrcnn_multi.py --model=48_384
+
+[TRAIN] Subprocess isolate 48->576 (scale 12x, 320 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_fsrcnn_multi.py --model=48_576
+
+[TRAIN] Subprocess isolate 64->128 (scale 2x, 140 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_fsrcnn_multi.py --model=64_128
+
+[TRAIN] Subprocess isolate 64->192 (scale 3x, 160 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_fsrcnn_multi.py --model=64_192
+
+[TRAIN] Subprocess isolate 64->256 (scale 4x, 200 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_fsrcnn_multi.py --model=64_256
+
+[TRAIN] Subprocess isolate 64->384 (scale 6x, 280 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_fsrcnn_multi.py --model=64_384
+
+[TRAIN] Subprocess isolate 64->512 (scale 8x, 320 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_fsrcnn_multi.py --model=64_512
+
+[TRAIN] Subprocess isolate 96->192 (scale 2x, 250 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_fsrcnn_multi.py --model=96_192
+
+[TRAIN] Subprocess isolate 96->288 (scale 3x, 250 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_fsrcnn_multi.py --model=96_288
+
+[TRAIN] Subprocess isolate 96->384 (scale 4x, 280 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_fsrcnn_multi.py --model=96_384
+
+[TRAIN] Subprocess isolate 96->480 (scale 5x, 300 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_fsrcnn_multi.py --model=96_480
+
+[TRAIN] Subprocess isolate 96->576 (scale 6x, 320 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_fsrcnn_multi.py --model=96_576
+
+[TRAIN] Subprocess isolate 128->256 (scale 2x, 300 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_fsrcnn_multi.py --model=128_256
+
+[TRAIN] Subprocess isolate 128->384 (scale 3x, 300 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_fsrcnn_multi.py --model=128_384
+
+[TRAIN] Subprocess isolate 128->512 (scale 4x, 350 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_fsrcnn_multi.py --model=128_512
+
+[TRAIN] Subprocess isolate 192->384 (scale 2x, 350 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_fsrcnn_multi.py --model=192_384
+
+[TRAIN] Subprocess isolate 192->576 (scale 3x, 350 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_fsrcnn_multi.py --model=192_576
+
+[TRAIN] Subprocess isolate 256->512 (scale 2x, 400 ep)
+[TRAIN] cmd: /root/jsmastering/.venv/bin/python -u /root/jsmastering/scripts/train_fsrcnn_multi.py --model=256_512
+
+==================================================
+[TRAIN] Subprocess matrix done: 35 ok, 0 failed, 35 jobs
+[TRAIN] Run `node scripts/generate-model-registry.js` to update the registry
+
+==========================================
+[TRAIN] Regenerating model registry...
+==========================================
+[REGISTRY] Wrote /root/jsmastering/assets/models/model_registry.json (35 espcn + 35 fsrcnn = 70 models, total ~15291KB)
+
+[TRAIN] Done.

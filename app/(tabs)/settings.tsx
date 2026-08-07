@@ -1,96 +1,46 @@
 import images from "@/constants/images";
-import ConfirmModal from "@/src/components/ConfirmModal";
 import ConflictResolutionModal from "@/src/components/ConflictResolutionModal";
-import UserSettingsModal from "@/src/components/UserSettingsModal";
 import { useCloudSync } from "@/src/context/CloudSyncContext";
 import { useDatabase } from "@/src/context/DatabaseProvider";
-import { useIconCache } from "@/src/context/IconCacheContext";
 import { useSubscriptions } from "@/src/context/SubscriptionContext";
 import { useClerk, useUser } from "@clerk/expo";
-import FontAwesome6 from "@expo/vector-icons/FontAwesome6";
 import * as DocumentPicker from "expo-document-picker";
 import * as Sharing from "expo-sharing";
 import { styled } from "nativewind";
 import { usePostHog } from "posthog-react-native";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   Image,
-  Platform,
   Pressable,
   ScrollView,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import { SafeAreaView as RNSafeAreaView } from "react-native-safe-area-context";
 import {
-  clearCrawlHistory,
-  clearIconCache,
   executeImportActions,
   executeNonConflictingImport,
   exportBackup,
-  getIconCacheStats,
   importBackup,
-  type IconCacheStats,
   type ImportScanResult,
 } from "../../services/database";
 
 const SafeAreaView = styled(RNSafeAreaView);
 
-// Cloud Sync Providers - ordered by platform (computed once at module scope)
-const getOrderedProviders = () => {
-  const providers = [
-    { id: "google_drive", label: "Google Drive", icon: "google" as const },
-    { id: "onedrive", label: "OneDrive", icon: "microsoft" as const },
-    { id: "dropbox", label: "Dropbox", icon: "dropbox" as const },
-    { id: "icloud", label: "iCloud", icon: "apple" as const },
-    { id: "owncloud", label: "ownCloud", icon: "cloud" as const },
-    { id: "nextcloud", label: "Nextcloud", icon: "cloud" as const },
-  ];
-
-  if (Platform.OS === "ios") {
-    return [
-      providers.find((p) => p.id === "icloud")!,
-      providers.find((p) => p.id === "google_drive")!,
-      providers.find((p) => p.id === "onedrive")!,
-      providers.find((p) => p.id === "dropbox")!,
-      providers.find((p) => p.id === "owncloud")!,
-      providers.find((p) => p.id === "nextcloud")!,
-    ];
-  }
-
-  // Android and other platforms - google drive first, then icloud
-  return [
-    providers.find((p) => p.id === "google_drive")!,
-    providers.find((p) => p.id === "icloud")!,
-    providers.find((p) => p.id === "onedrive")!,
-    providers.find((p) => p.id === "dropbox")!,
-    providers.find((p) => p.id === "owncloud")!,
-    providers.find((p) => p.id === "nextcloud")!,
-  ];
-};
-
-type ClearTarget = "iconCache" | "crawlHistory" | null;
-
 const Settings = () => {
   const { signOut } = useClerk();
   const { user } = useUser();
-
-  // State for user settings modal
-  const [userSettingsVisible, setUserSettingsVisible] = useState(false);
   const posthog = usePostHog();
   const { isReady } = useDatabase();
   const { refreshSubscriptions } = useSubscriptions();
-  const { clearCache } = useIconCache();
   const {
     syncMetadata,
     isInitialized,
     isSyncing,
     lastSyncResult,
     initializeProvider,
-    connectProvider,
     authenticate,
     disconnect,
     sync,
@@ -110,12 +60,7 @@ const Settings = () => {
   } | null>(null);
   const [importUri, setImportUri] = useState<string | null>(null);
   const [selectedProvider, setSelectedProvider] = useState<
-    | "google_drive"
-    | "onedrive"
-    | "dropbox"
-    | "owncloud"
-    | "nextcloud"
-    | "icloud"
+    "google_drive" | "onedrive" | "dropbox" | "owncloud" | "nextcloud"
   >("google_drive");
   const [owncloudServerUrl, setOwncloudServerUrl] = useState("");
 
@@ -132,34 +77,6 @@ const Settings = () => {
       status?: string;
     }[]
   >([]);
-
-  // Cache & crawl data management
-  const [cacheStats, setCacheStats] = useState<IconCacheStats>({
-    iconCache: 0,
-    crawlResults: 0,
-    crawlQueue: 0,
-    crawledUrls: 0,
-  });
-  const [confirmTarget, setConfirmTarget] = useState<ClearTarget>(null);
-  const [clearing, setClearing] = useState(false);
-
-  // Compute ordered providers once using useMemo
-  const orderedProviders = useMemo(() => getOrderedProviders(), []);
-
-  // Load cache / crawl statistics so the UI can show live counts.
-  const loadStats = useCallback(async () => {
-    if (!isReady) return;
-    try {
-      const stats = await getIconCacheStats();
-      setCacheStats(stats);
-    } catch (error) {
-      console.error("Failed to load cache stats:", error);
-    }
-  }, [isReady]);
-
-  useEffect(() => {
-    loadStats();
-  }, [loadStats]);
 
   // ---------------------------------------------------------------------------
   // Sign Out
@@ -356,50 +273,6 @@ const Settings = () => {
   };
 
   // ---------------------------------------------------------------------------
-  // Cache & Crawl Data
-  // ---------------------------------------------------------------------------
-
-  const confirmConfig: Record<
-    Exclude<ClearTarget, null>,
-    { title: string; message: string; event: string }
-  > = {
-    iconCache: {
-      title: "Clear Icon Cache",
-      message: `This removes all ${cacheStats.iconCache} cached icon(s), ${cacheStats.crawlResults} crawl candidate(s) and ${cacheStats.crawlQueue} queued fetch(es). Crawled URLs are preserved, so previously crawled icons may not be re-downloaded.`,
-      event: "settings_clear_icon_cache",
-    },
-    crawlHistory: {
-      title: "Clear Spider / Crawl History",
-      message: `This clears the ${cacheStats.crawledUrls} crawled URL(s) used for deduplication and resets all rate-limit cooldowns, so re-spidering starts fresh with repeatable behaviour.`,
-      event: "settings_clear_crawl_history",
-    },
-  };
-
-  const handleConfirmClear = async () => {
-    const target = confirmTarget;
-    setConfirmTarget(null);
-    if (!target || !isReady) return;
-
-    setClearing(true);
-    try {
-      if (target === "iconCache") {
-        await clearIconCache();
-        clearCache(); // empty the in-memory cache map too
-        posthog.capture("settings_clear_icon_cache");
-      } else {
-        await clearCrawlHistory();
-        posthog.capture("settings_clear_crawl_history");
-      }
-      await loadStats();
-    } catch (error) {
-      console.error("Failed to clear data:", error);
-      Alert.alert("Error", "Failed to clear data");
-    } finally {
-      setClearing(false);
-    }
-  };
-
-  // ---------------------------------------------------------------------------
   // Cloud Sync
   // ---------------------------------------------------------------------------
 
@@ -412,11 +285,13 @@ const Settings = () => {
       ) {
         config.serverUrl = owncloudServerUrl;
       }
-      // connectProvider performs both initialization and OAuth in one call
-      const authResult = await connectProvider(
+      await initializeProvider(
         selectedProvider,
         config.serverUrl ? config : undefined,
       );
+
+      // Trigger authentication flow
+      const authResult = await authenticate();
       if (authResult) {
         Alert.alert("Success", "Cloud provider connected successfully");
         posthog.capture("cloud_provider_connected", {
@@ -467,17 +342,9 @@ const Settings = () => {
           result.message || "Your data has been synchronized successfully",
         );
         posthog.capture("cloud_sync_completed");
-      } else if (result.success && !result.synced) {
-        // Sync succeeded but no changes were needed
-        Alert.alert(
-          "No Changes",
-          result.message || "Your data is already up to date",
-        );
       } else if (!result.success) {
         Alert.alert("Sync Failed", result.error || "Unknown error occurred");
-        if (result.error) {
-          posthog.capture("cloud_sync_failed", { error: result.error });
-        }
+        posthog.capture("cloud_sync_failed", { error: result.error ?? "Unknown error" });
       }
     } catch (error) {
       console.error("Sync failed:", error);
@@ -509,9 +376,10 @@ const Settings = () => {
   return (
     <SafeAreaView className="flex-1 bg-background">
       <ScrollView
-        className="flex-1 p-5"
+        contentContainerClassName="p-5 pb-25"
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         showsVerticalScrollIndicator={false}
-        contentContainerClassName="pb-25"
       >
         <Text className="text-3xl font-sans-bold text-primary mb-6">
           Settings
@@ -519,39 +387,23 @@ const Settings = () => {
 
         {/* User Profile Section */}
         <View className="auth-card mb-5">
-          <View className="flex-row items-center justify-between mb-4">
-            <View className="flex-row items-center gap-4">
-              <Image
-                source={user?.imageUrl ? { uri: user.imageUrl } : images.avatar}
-                className="size-16 rounded-full"
-              />
-              <View className="flex-1">
-                <Text className="text-lg font-sans-bold text-primary">
-                  {displayName}
-                </Text>
-                {email && (
-                  <Text className="text-sm font-sans-medium text-muted-foreground">
-                    {email}
-                  </Text>
-                )}
-              </View>
-            </View>
-            <Pressable
-              className="rounded-xl bg-accent/10 px-4 py-2"
-              onPress={() => setUserSettingsVisible(true)}
-            >
-              <Text className="text-sm font-sans-semibold text-accent">
-                Edit Profile
+          <View className="flex-row items-center gap-4 mb-4">
+            <Image
+              source={user?.imageUrl ? { uri: user.imageUrl } : images.avatar}
+              className="size-16 rounded-full"
+            />
+            <View className="flex-1">
+              <Text className="text-lg font-sans-bold text-primary">
+                {displayName}
               </Text>
-            </Pressable>
+              {email && (
+                <Text className="text-sm font-sans-medium text-muted-foreground">
+                  {email}
+                </Text>
+              )}
+            </View>
           </View>
         </View>
-
-        {/* User Settings Modal */}
-        <UserSettingsModal
-          visible={userSettingsVisible}
-          onClose={() => setUserSettingsVisible(false)}
-        />
 
         {/* Account Section */}
         <View className="auth-card mb-5">
@@ -586,39 +438,6 @@ const Settings = () => {
           </View>
         </View>
 
-        {/* Cache & Crawl Data Section */}
-        <View className="auth-card mb-5">
-          <Text className="text-base font-sans-semibold text-primary mb-3">
-            Cache & Crawl Data
-          </Text>
-          <Text className="text-xs font-sans-medium text-muted-foreground mb-3">
-            Clear cached icon data or spider/crawl history to reset crawlers and
-            make re-searching repeatable.
-          </Text>
-
-          <Pressable
-            className={`auth-button bg-destructive mb-3 ${clearing || !isReady ? "opacity-50" : ""}`}
-            onPress={() => setConfirmTarget("iconCache")}
-            disabled={clearing || !isReady}
-          >
-            <Text className="auth-button-text text-white">
-              Clear Icon Cache
-              {cacheStats.iconCache > 0 ? ` (${cacheStats.iconCache})` : ""}
-            </Text>
-          </Pressable>
-
-          <Pressable
-            className={`auth-button bg-destructive ${clearing || !isReady ? "opacity-50" : ""}`}
-            onPress={() => setConfirmTarget("crawlHistory")}
-            disabled={clearing || !isReady}
-          >
-            <Text className="auth-button-text text-white">
-              Clear Spider / Crawl History
-              {cacheStats.crawledUrls > 0 ? ` (${cacheStats.crawledUrls})` : ""}
-            </Text>
-          </Pressable>
-        </View>
-
         {/* Cloud Sync Section */}
         <View className="auth-card mb-5">
           <Text className="text-base font-sans-semibold text-primary mb-3">
@@ -647,12 +466,8 @@ const Settings = () => {
               {lastSyncResult && (
                 <View className="rounded-xl border border-border bg-card p-3 mb-3">
                   <Text className="text-xs font-sans-medium text-muted-foreground">
-                    Last sync:{" "}
-                    {lastSyncResult.success ? (
-                      "Success"
-                    ) : (
-                      <>{`Failed${lastSyncResult.error ? ` - ${lastSyncResult.error}` : ""}`}</>
-                    )}
+                    Last sync: {lastSyncResult.success ? "Success" : "Failed"}
+                    {lastSyncResult.error && ` - ${lastSyncResult.error}`}
                   </Text>
                 </View>
               )}
@@ -671,9 +486,7 @@ const Settings = () => {
                       </Text>
                     </View>
                   ) : (
-                    <Text className="auth-button-text text-white">
-                      Sync Now
-                    </Text>
+                    <Text className="auth-button-text text-white">Sync Now</Text>
                   )}
                 </Pressable>
 
@@ -681,9 +494,7 @@ const Settings = () => {
                   className="auth-button bg-destructive"
                   onPress={handleDisconnectProvider}
                 >
-                  <Text className="auth-button-text text-white">
-                    Disconnect
-                  </Text>
+                  <Text className="auth-button-text text-white">Disconnect</Text>
                 </Pressable>
               </View>
             </>
@@ -691,15 +502,21 @@ const Settings = () => {
             // Not connected state
             <>
               <Text className="text-sm font-sans-medium text-muted-foreground mb-3">
-                Connect your preferred cloud storage provider to enable
-                automatic sync
+                Connect your preferred cloud storage provider to enable automatic
+                sync
               </Text>
 
               <View className="gap-2 mb-3">
-                {orderedProviders.map((provider) => (
+                {[
+                  { id: "google_drive", label: "Google Drive" },
+                  { id: "onedrive", label: "OneDrive" },
+                  { id: "dropbox", label: "Dropbox" },
+                  { id: "owncloud", label: "ownCloud" },
+                  { id: "nextcloud", label: "Nextcloud" },
+                ].map((provider) => (
                   <Pressable
                     key={provider.id}
-                    className={`flex-row items-center gap-3 p-3 rounded-xl border ${
+                    className={`flex-row items-center gap-3 p-3 rounded-xl border $\{
                       selectedProvider === provider.id
                         ? "border-primary bg-primary/10"
                         : "border-border bg-card"
@@ -707,7 +524,7 @@ const Settings = () => {
                     onPress={() => setSelectedProvider(provider.id as any)}
                   >
                     <View
-                      className={`size-5 rounded-full border-2 items-center justify-center ${
+                      className={`size-5 rounded-full border-2 items-center justify-center $\{
                         selectedProvider === provider.id
                           ? "border-primary bg-primary"
                           : "border-muted-foreground"
@@ -717,13 +534,6 @@ const Settings = () => {
                         <Text className="text-white text-xs">✓</Text>
                       )}
                     </View>
-                    <FontAwesome6
-                      name={provider.icon}
-                      size={20}
-                      color="#6B7280"
-                      iconStyle={provider.icon === "cloud" ? "solid" : "brand"}
-                      style={{ width: 24 }}
-                    />
                     <Text className="text-sm font-sans-medium text-primary">
                       {provider.label}
                     </Text>
@@ -737,16 +547,23 @@ const Settings = () => {
                   <Text className="text-sm font-sans-medium text-muted-foreground mb-2">
                     Server URL
                   </Text>
-                  <TextInput
-                    className="rounded-xl border border-border bg-card p-3 text-sm font-sans-medium text-primary"
-                    placeholder="Enter your ownCloud/Nextcloud server URL"
-                    placeholderTextColor="#9CA3AF"
-                    value={owncloudServerUrl}
-                    onChangeText={setOwncloudServerUrl}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    keyboardType="url"
-                  />
+                  <Pressable
+                    className="rounded-xl border border-border bg-card p-3"
+                    onPress={() => {
+                      // In a real app, you'd use a proper input here
+                      const url = prompt(
+                        "Enter your ownCloud/Nextcloud server URL:",
+                        owncloudServerUrl,
+                      );
+                      if (url !== null) {
+                        setOwncloudServerUrl(url);
+                      }
+                    }}
+                  >
+                    <Text className="text-sm font-sans-medium text-primary">
+                      {owncloudServerUrl || "Tap to enter server URL"}
+                    </Text>
+                  </Pressable>
                 </View>
               )}
 
@@ -775,9 +592,7 @@ const Settings = () => {
             {exporting ? (
               <View className="flex-row items-center justify-center gap-2">
                 <ActivityIndicator size="small" color="white" />
-                <Text className="auth-button-text text-white">
-                  Exporting...
-                </Text>
+                <Text className="auth-button-text text-white">Exporting...</Text>
               </View>
             ) : (
               <Text className="auth-button-text text-white">Export Backup</Text>
@@ -839,9 +654,7 @@ const Settings = () => {
                   className="mt-2 rounded-xl bg-accent px-6 py-2"
                   onPress={resetImport}
                 >
-                  <Text className="text-sm font-sans-bold text-white">
-                    Done
-                  </Text>
+                  <Text className="text-sm font-sans-bold text-white">Done</Text>
                 </Pressable>
               </View>
             </View>
@@ -849,32 +662,18 @@ const Settings = () => {
         </View>
 
         {/* Sign Out Button */}
-        <Pressable
-          className="auth-button bg-destructive mt-2"
-          onPress={handleSignOut}
-        >
+        <Pressable className="auth-button bg-destructive" onPress={handleSignOut}>
           <Text className="auth-button-text text-white">Sign Out</Text>
         </Pressable>
+
+        {/* Conflict Resolution Modal */}
+        <ConflictResolutionModal
+          visible={conflictModalVisible}
+          conflicts={conflictRows}
+          onResolve={handleConflictResolve}
+          onCancel={handleConflictCancel}
+        />
       </ScrollView>
-
-      {/* Conflict Resolution Modal */}
-      <ConflictResolutionModal
-        visible={conflictModalVisible}
-        conflicts={conflictRows}
-        onResolve={handleConflictResolve}
-        onCancel={handleConflictCancel}
-      />
-
-      {/* Clear data confirmation modal */}
-      <ConfirmModal
-        visible={confirmTarget !== null}
-        title={confirmTarget ? confirmConfig[confirmTarget].title : ""}
-        message={confirmTarget ? confirmConfig[confirmTarget].message : ""}
-        confirmLabel={clearing ? "Clearing..." : "Clear"}
-        destructive
-        onConfirm={handleConfirmClear}
-        onCancel={() => setConfirmTarget(null)}
-      />
     </SafeAreaView>
   );
 };

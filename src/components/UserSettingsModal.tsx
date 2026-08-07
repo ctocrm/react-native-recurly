@@ -6,6 +6,7 @@ import { readAsStringAsync } from "expo-file-system/legacy";
 import React, { useEffect, useState } from "react";
 import {
   Alert,
+  ActivityIndicator,
   Image,
   Modal,
   Pressable,
@@ -31,6 +32,7 @@ const UserSettingsModal = ({ visible, onClose }: UserSettingsModalProps) => {
   const [lastName, setLastName] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
   const [saving, setSaving] = useState(false);
+  const [importingAvatar, setImportingAvatar] = useState(false);
 
   // Sync form state when user changes
   useEffect(() => {
@@ -51,13 +53,19 @@ const UserSettingsModal = ({ visible, onClose }: UserSettingsModalProps) => {
   const handleSaveProfile = async () => {
     if (saving) return;
 
+    // Validate required fields
+    if (!firstName.trim() && !lastName.trim() && !avatarUrl) {
+      Alert.alert("Error", "Please enter at least a first name, last name, or select an avatar.");
+      return;
+    }
+
     setSaving(true);
     try {
       // Update Clerk user
-      if (firstName || lastName) {
+      if (firstName.trim() || lastName.trim()) {
         await user?.update({
-          firstName: firstName || undefined,
-          lastName: lastName || undefined,
+          firstName: firstName.trim() || undefined,
+          lastName: lastName.trim() || undefined,
         });
       }
 
@@ -67,21 +75,23 @@ const UserSettingsModal = ({ visible, onClose }: UserSettingsModalProps) => {
           await user?.setProfileImage({ file: avatarUrl });
         } catch (profileImageError) {
           console.error("Failed to update profile image:", profileImageError);
+          Alert.alert("Warning", "Profile updated but failed to update avatar. Please try again.");
         }
       }
 
       // Store in SQLite preferences for offline/local access
-      if (firstName) {
-        await setPreference("user_first_name", firstName);
+      if (firstName.trim()) {
+        await setPreference("user_first_name", firstName.trim());
       }
-      if (lastName) {
-        await setPreference("user_last_name", lastName);
+      if (lastName.trim()) {
+        await setPreference("user_last_name", lastName.trim());
       }
       if (avatarUrl) {
         await setPreference("user_avatar_url", avatarUrl);
       }
 
       setEditMode(false);
+      Alert.alert("Success", "Profile updated successfully!");
     } catch (error) {
       console.error("Failed to update profile:", error);
       Alert.alert("Error", "Failed to update profile. Please try again.");
@@ -91,6 +101,7 @@ const UserSettingsModal = ({ visible, onClose }: UserSettingsModalProps) => {
   };
 
   const handleImportAvatar = async () => {
+    setImportingAvatar(true);
     try {
       const result = await DocumentPicker.getDocumentAsync({
         type: "image/*",
@@ -121,6 +132,22 @@ const UserSettingsModal = ({ visible, onClose }: UserSettingsModalProps) => {
     } catch (error) {
       console.error("Failed to import avatar:", error);
       Alert.alert("Error", "Failed to import image. Please try again.");
+    } finally {
+      setImportingAvatar(false);
+    }
+  };
+
+  const handleRemoveAvatar = async () => {
+    try {
+      // Remove avatar from Clerk
+      await user?.setProfileImage({ file: null });
+      setAvatarUrl("");
+      // Clear from local storage
+      await setPreference("user_avatar_url", "");
+      Alert.alert("Success", "Avatar removed successfully!");
+    } catch (error) {
+      console.error("Failed to remove avatar:", error);
+      Alert.alert("Error", "Failed to remove avatar. Please try again.");
     }
   };
 
@@ -183,14 +210,27 @@ const UserSettingsModal = ({ visible, onClose }: UserSettingsModalProps) => {
                     onChangeText={setLastName}
                     autoCapitalize="words"
                   />
-                  <Pressable
-                    className="auth-button bg-primary mb-2"
-                    onPress={handleImportAvatar}
-                  >
-                    <Text className="auth-button-text text-white">
-                      Import Avatar
-                    </Text>
-                  </Pressable>
+                  <View className="flex-row gap-2 mb-2">
+                    <Pressable
+                      className="auth-button bg-primary flex-1"
+                      onPress={handleImportAvatar}
+                      disabled={importingAvatar}
+                    >
+                      <Text className="auth-button-text text-white">
+                        {importingAvatar ? "Importing..." : "Import Avatar"}
+                      </Text>
+                    </Pressable>
+                    {avatarUrl && (
+                      <Pressable
+                        className="auth-button bg-destructive flex-1"
+                        onPress={handleRemoveAvatar}
+                      >
+                        <Text className="auth-button-text text-white">
+                          Remove
+                        </Text>
+                      </Pressable>
+                    )}
+                  </View>
                 </>
               ) : (
                 <>
@@ -222,7 +262,14 @@ const UserSettingsModal = ({ visible, onClose }: UserSettingsModalProps) => {
               disabled={saving}
             >
               <Text className="auth-button-text text-primary">
-                {saving ? "Saving..." : "Save Profile"}
+                {saving ? (
+                  <>
+                    <ActivityIndicator size="small" color="#fff" style={{ marginRight: 8 }} />
+                    Saving...
+                  </>
+                ) : (
+                  "Save Profile"
+                )}
               </Text>
             </Pressable>
           )}
