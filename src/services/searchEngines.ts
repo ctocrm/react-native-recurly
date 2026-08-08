@@ -37,7 +37,9 @@ async function fetchWithTimeout(
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      console.log(`[SEARCH] Fetching: ${url} (attempt ${attempt + 1}/${MAX_RETRIES + 1})`);
+      console.log(
+        `[SEARCH] Fetching: ${url} (attempt ${attempt + 1}/${MAX_RETRIES + 1})`,
+      );
       const response = await fetch(url, {
         ...options,
         signal: controller.signal,
@@ -49,11 +51,15 @@ async function fetchWithTimeout(
           "Accept-Language": "en-US,en;q=0.9",
         },
       });
-      console.log(`[SEARCH] Response: ${response.status} ${response.statusText} for ${url}`);
+      console.log(
+        `[SEARCH] Response: ${response.status} ${response.statusText} for ${url}`,
+      );
       if (response.ok) return response;
       console.log(`[SEARCH] Non-OK response: ${response.status} for ${url}`);
     } catch (err: any) {
-      console.log(`[SEARCH] Fetch error (attempt ${attempt + 1}): ${err.name} - ${err.message} for ${url}`);
+      console.log(
+        `[SEARCH] Fetch error (attempt ${attempt + 1}): ${err.name} - ${err.message} for ${url}`,
+      );
     } finally {
       clearTimeout(timer);
     }
@@ -453,4 +459,126 @@ export async function searchAllSources(
   });
 
   return sorted.slice(0, 50);
+}
+
+/**
+ * Find website URLs worth spidering for brand icons.
+ * Prefer WebView DDG results (JS-rendered); fall back to domain guesses
+ * and lightweight HTML link extraction so TIER 3 never crashes when the
+ * WebView bridge is unavailable.
+ */
+export async function searchForLinksToSpider(brand: string): Promise<string[]> {
+  const links: string[] = [];
+  const seen = new Set<string>();
+
+  const push = (raw: string | null | undefined) => {
+    if (!raw) return;
+    let url = raw.trim();
+    if (!url) return;
+    if (url.startsWith("//")) url = `https:${url}`;
+    if (!/^https?:\/\//i.test(url)) return;
+    try {
+      const u = new URL(url);
+      // Drop search engines / social noise
+      const host = u.hostname.replace(/^www\./, "").toLowerCase();
+      if (
+        host.includes("google.") ||
+        host.includes("bing.") ||
+        host.includes("duckduckgo.") ||
+        host.includes("yandex.") ||
+        host.includes("facebook.") ||
+        host.includes("twitter.") ||
+        host.includes("instagram.") ||
+        host.includes("linkedin.") ||
+        host.includes("youtube.")
+      ) {
+        return;
+      }
+      // Prefer origin homepage for spidering
+      const origin = u.origin;
+      if (!seen.has(origin)) {
+        seen.add(origin);
+        links.push(origin);
+      }
+      if (!seen.has(url) && url !== origin) {
+        seen.add(url);
+        links.push(url);
+      }
+    } catch {
+      // ignore invalid URLs
+    }
+  };
+
+  // 1) WebView-based DuckDuckGo (best on device when HiddenSearchWebView is mounted)
+  try {
+    const { searchForLinksWithWebView } =
+      await import("@/src/services/webViewSearchEngine");
+    const wvLinks = await searchForLinksWithWebView(brand);
+    console.log(
+      `[SEARCH] searchForLinksToSpider: WebView returned ${wvLinks.length} links`,
+    );
+    for (const l of wvLinks) push(l);
+  } catch (e) {
+    console.log(
+      "[SEARCH] searchForLinksToSpider: WebView path failed:",
+      e instanceof Error ? e.message : e,
+    );
+  }
+
+  // 2) Deterministic domain guesses from brand slug
+  const slug = brand
+    .toLowerCase()
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/g, "");
+  const hyphenSlug = brand
+    .toLowerCase()
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+  const guesses = new Set<string>();
+  if (slug.length >= 2) {
+    guesses.add(`https://www.${slug}.com`);
+    guesses.add(`https://${slug}.com`);
+  }
+  if (hyphenSlug.length >= 2 && hyphenSlug !== slug) {
+    guesses.add(`https://www.${hyphenSlug}.com`);
+    guesses.add(`https://${hyphenSlug}.com`);
+  }
+  // Common retail / brand TLDs
+  if (slug.length >= 2) {
+    guesses.add(`https://www.${slug}.ca`);
+    guesses.add(`https://www.${slug}.net`);
+    guesses.add(`https://www.${slug}.org`);
+  }
+  for (const g of guesses) push(g);
+
+  // 3) Lightweight Google web HTML scrape for result links (best-effort)
+  if (links.length < 5) {
+    try {
+      const q = encodeURIComponent(`${brand} official site`);
+      const htmlUrl = `https://www.google.com/search?q=${q}&hl=en&num=10`;
+      const res = await fetchWithTimeout(htmlUrl, {
+        headers: { Accept: "text/html" },
+      });
+      if (res) {
+        const html = await res.text();
+        const hrefRe = /href="(https?:\/\/[^"]+)"/g;
+        let m: RegExpExecArray | null;
+        while ((m = hrefRe.exec(html)) !== null) {
+          push(m[1]);
+          if (links.length >= 30) break;
+        }
+      }
+    } catch (e) {
+      console.log(
+        "[SEARCH] searchForLinksToSpider: Google HTML fallback failed:",
+        e instanceof Error ? e.message : e,
+      );
+    }
+  }
+
+  console.log(
+    `[SEARCH] searchForLinksToSpider("${brand}"): ${links.length} unique URLs`,
+  );
+  return links.slice(0, 40);
 }

@@ -1,4 +1,8 @@
-"""Multi-resolution FSRCNN model training with perceptual + MS-SSIM loss."""
+"""Multi-resolution FSRCNN: residual SR + edge loss + favicon degradations.
+
+Strategy (see TRAINING_FIXES.md): prefer 2x/4x cascade rungs, L1+Sobel edge+
+SSIM, degradation-aware LR, higher capacity on 2x. Float TFLite only.
+"""
 import os
 import sys
 import re
@@ -42,6 +46,10 @@ else:
 
 FORCE = "--force" in sys.argv
 NO_PERCEPTUAL = "--no-perceptual" in sys.argv
+# Default ON: edge/Sobel loss for sharper logos (research + user quality bar).
+USE_EDGE_LOSS = "--no-edge" not in sys.argv
+# Prefer cascade 2x rungs only (16-32-64-128-192 path).
+CASCADE_RUNGS = "--cascade-rungs" in sys.argv
 SPECIFIC_MODEL = None
 INPUT_SIZE = None
 OUTPUT_DIR = None
@@ -67,6 +75,16 @@ MODEL_CONFIGS = [
     (128, [(2, 300), (3, 300), (4, 350)]),
     (192, [(2, 350), (3, 350)]),
     (256, [(2, 400)]),
+]
+
+# Cascade POC path: strong 2x rungs only (waifu2x / LapSRN / ProSR practice).
+# 16→32→64→128→192 covers 12x via four 2x hops; optional 192→384 later.
+CASCADE_MODEL_CONFIGS = [
+    # Pure 2x progressive path → 256 (16*2^4). 192 is not a 2x boundary from 16.
+    (16, [(2, 120)]),    # 16→32
+    (32, [(2, 140)]),    # 32→64
+    (64, [(2, 160)]),    # 64→128
+    (128, [(2, 200)]),   # 128→256
 ]
 
 # Icon sources for real training data
@@ -190,13 +208,50 @@ def _sanitize_grad(x):
     return tf.identity(x), grad
 
 
-def make_combined_loss(output_size: int, use_perceptual: bool = True):
+def sobel_edge_loss(y_true, y_pred):
+    """L1 on Sobel gradients — mild structure term (NOT primary loss).
 
-    """Build a combined MAE + (MS-)SSIM + perceptual loss for a fixed output size.
+    POC v1 used edge_weight=0.35 + heavy degradations + 4-hop cascade →
+    washed Ace red→gray and invented black hand-drawn strokes. Keep edge
+    *light* so residual MAE still owns color/identity.
+    """
+    y_true = tf.cast(y_true, tf.float32)
+    y_pred = tf.cast(y_pred, tf.float32)
+    t = tf.reduce_mean(y_true, axis=-1, keepdims=True)
+    p = tf.reduce_mean(y_pred, axis=-1, keepdims=True)
+    te = tf.image.sobel_edges(t)
+    pe = tf.image.sobel_edges(p)
+    return tf.reduce_mean(tf.abs(te - pe))
 
-    The SSIM term adapts to the output resolution: multiscale SSIM when the
-    image is large enough, single-scale SSIM otherwise. This keeps the loss
-    numerically valid for every model in the matrix (smallest output is 64px).
+
+def color_preserve_loss(y_true, y_pred):
+    """Penalize global + local chroma drift (stops red→gray wash)."""
+    y_true = tf.cast(y_true, tf.float32)
+    y_pred = tf.cast(y_pred, tf.float32)
+    # Global mean RGB must match (Ace red field)
+    mean_l1 = tf.reduce_mean(tf.abs(
+        tf.reduce_mean(y_true, axis=[1, 2]) - tf.reduce_mean(y_pred, axis=[1, 2])
+    ))
+    # Low-pass color (blur) — structure of hues without high-freq scribble pressure
+    k = 5
+    # depthwise avg pool approx via avg_pool on each channel
+    tb = tf.nn.avg_pool2d(y_true, ksize=k, strides=1, padding="SAME")
+    pb = tf.nn.avg_pool2d(y_pred, ksize=k, strides=1, padding="SAME")
+    blur_l1 = tf.reduce_mean(tf.abs(tb - pb))
+    return mean_l1 + blur_l1
+
+
+def make_combined_loss(
+    output_size: int,
+    use_perceptual: bool = True,
+    use_edge: bool = True,
+    edge_weight: float = 0.08,
+    color_weight: float = 0.25,
+):
+    """MAE-first residual loss + light edge + color preserve + optional SSIM/VGG.
+
+    POC v1 failure: edge 0.35 dominated → scribble edges, gray wash, cascade
+    compounded. MAE + color_preserve must dominate; edge is a small bonus.
     """
     n_scales = _ssim_scales_for(output_size)
 
@@ -248,10 +303,13 @@ def make_combined_loss(output_size: int, use_perceptual: bool = True):
         y_pred = tf.clip_by_value(y_pred, 0.0, 1.0)
         mae = tf.reduce_mean(tf.abs(y_true - y_pred))
         ssim = ssim_term(y_true, y_pred)
+        # MAE owns identity; color_preserve stops red→gray; edge is mild only
+        loss = mae + 0.10 * ssim + color_weight * color_preserve_loss(y_true, y_pred)
+        if use_edge:
+            loss = loss + edge_weight * sobel_edge_loss(y_true, y_pred)
         if use_perceptual:
-            perceptual = perceptual_loss(y_true, y_pred)
-            return mae + 0.15 * ssim + 0.05 * perceptual
-        return mae + 0.15 * ssim
+            loss = loss + 0.02 * perceptual_loss(y_true, y_pred)
+        return loss
 
     return combined_loss
 
@@ -259,11 +317,16 @@ def make_combined_loss(output_size: int, use_perceptual: bool = True):
 
 
 def build_fsrcnn(scale: int, input_size: int = 16, d: int = 32, s: int = 8, m: int = 3):
-    """Build FSRCNN for a fixed input shape.
+    """Build residual FSRCNN for a fixed input shape.
 
-    Capacity scales with input size: large-in 2x/3x need more d/s/m to beat
-    strong bicubic (same failure mode as ESPCN post-16px).
+    Capacity scales with input size and favors 2x cascade rungs (research:
+    progressive 2x needs enough d/s/m to recover edges, not tiny d=32).
     """
+    # Mild capacity bump for 2x (v1 d=64/m=8 + heavy edge → scribble; keep modest)
+    if scale == 2:
+        d, s, m = max(d, 48), max(s, 12), max(m, 5)
+    elif scale == 4:
+        d, s, m = max(d, 40), max(s, 12), max(m, 4)
     if input_size >= 256:
         d, s, m = max(d, 56), max(s, 16), max(m, 5)
     elif input_size >= 128:
@@ -273,15 +336,46 @@ def build_fsrcnn(scale: int, input_size: int = 16, d: int = 32, s: int = 8, m: i
     elif input_size >= 64 and scale <= 3:
         d, s, m = max(d, 36), max(s, 10), max(m, 3)
 
+    out_h = input_size * scale
+    out_w = input_size * scale
     inp = layers.Input(shape=(input_size, input_size, 3))
     x = layers.Conv2D(d, 5, padding="same", activation="relu")(inp)
     x = layers.Conv2D(s, 1, padding="same", activation="relu")(x)
     for _ in range(m):
         x = layers.Conv2D(s, 3, padding="same", activation="relu")(x)
     x = layers.Conv2D(d, 1, padding="same", activation="relu")(x)
-    x = layers.Conv2D(scale * scale * 3, 5, padding="same")(x)
-    x = layers.Lambda(lambda t: tf.nn.depth_to_space(t, scale))(x)
-    out = layers.Conv2D(3, 5, padding="same", activation="sigmoid", dtype="float32")(x)
+    # Correct residual SR (VDSR-style with FSRCNN body):
+    #   out = bilinear(LR) + depth_to_space(zero_init_conv(features))
+    # Zero-init the SUB-PIXEL conv so residual≡0 at start → out≡bilinear
+    # (PSNR floor ~bicubic, color anchored). Prior bug: random sub-pixel
+    # conv + zero head *after* depth_to_space → body learned garbage HR,
+    # PSNR 20.88 vs bicubic 27.40. Bilinear = TFLite builtin (not bicubic/Flex).
+    x = layers.Conv2D(
+        scale * scale * 3,
+        5,
+        padding="same",
+        dtype="float32",
+        kernel_initializer="zeros",
+        bias_initializer="zeros",
+        name="subpixel_residual",
+    )(x)
+    residual = layers.Lambda(
+        lambda t: tf.nn.depth_to_space(t, scale),
+        output_shape=lambda s: (s[0], s[1] * scale, s[2] * scale, 3),
+        name="depth_to_space",
+    )(x)
+    base = layers.Lambda(
+        lambda t: tf.image.resize(t, [out_h, out_w], method="bilinear"),
+        output_shape=lambda s: (s[0], out_h, out_w, 3),
+        name="bilinear_up",
+    )(inp)
+    out = layers.Add(dtype="float32", name="residual_add")([base, residual])
+    out = layers.Lambda(
+        lambda t: tf.clip_by_value(t, 0.0, 1.0),
+        output_shape=lambda s: s,
+        name="clip01",
+        dtype="float32",
+    )(out)
     return Model(inp, out)
 
 
@@ -324,13 +418,31 @@ def augment_icon(hr: np.ndarray, rng: np.random.Generator) -> np.ndarray:
 
 
 def generate_icon_like_synthetic(n: int, target_size: int, rng) -> np.ndarray:
-    """Generate synthetic icons with text-like strokes, sharp corners, logo shapes."""
+    """Generate synthetic icons with text-like strokes, sharp corners, logo shapes.
+
+    ~20% of samples are solid / near-solid color fields so the residual head
+    learns to leave pure hues alone (matches the R/G/B color gate).
+    """
     hr_images = np.zeros((n, target_size, target_size, 3), dtype=np.float32)
     for i in range(n):
+        # Solid / near-solid color fields (hue preservation)
+        if rng.random() < 0.2:
+            mode = int(rng.integers(0, 4))
+            if mode == 0:
+                c = np.array([1.0, 0.1, 0.1], dtype=np.float32)
+            elif mode == 1:
+                c = np.array([0.1, 1.0, 0.1], dtype=np.float32)
+            elif mode == 2:
+                c = np.array([0.1, 0.1, 1.0], dtype=np.float32)
+            else:
+                c = rng.uniform(0.15, 0.95, size=3).astype(np.float32)
+            hr_images[i] = c
+            continue
+
         bg = rng.uniform(0.0, 0.2, size=3)
         hr_images[i] = bg
         fg = rng.uniform(0.7, 1.0, size=3)
-        
+
         # Randomly choose icon-like pattern
         pattern = rng.integers(0, 4)
         if pattern == 0:
@@ -416,11 +528,60 @@ def generate_real_icon_data(n: int, target_size: int) -> np.ndarray:
     return hr_images
 
 
+def _degrade_to_lr(hr_batch: np.ndarray, input_size: int, rng: np.random.Generator) -> np.ndarray:
+    """Mild LR synthesis for icons.
+
+    POC v1 used aggressive blur+JPEG+random kernels → model learned to
+    *hallucinate* strokes on clean favicons (Ace looked hand-drawn/black).
+    Default: mostly clean bicubic (matches app LR path); light JPEG only.
+    """
+    from PIL import Image
+
+    n = hr_batch.shape[0]
+    lr = np.zeros((n, input_size, input_size, 3), dtype=np.float32)
+    for i in range(n):
+        img = hr_batch[i]
+        # 80% clean bicubic (app-like); 20% alternate kernel
+        method = "bicubic" if rng.random() < 0.80 else str(
+            rng.choice(["area", "bilinear"])
+        )
+        small = tf.image.resize(img, (input_size, input_size), method=method).numpy()
+        # Light JPEG only, high quality — rare
+        if rng.random() < 0.20:
+            q = int(rng.integers(75, 95))
+            pil = Image.fromarray(
+                np.clip(small * 255.0, 0, 255).astype(np.uint8), mode="RGB"
+            )
+            buf = BytesIO()
+            pil.save(buf, format="JPEG", quality=q)
+            buf.seek(0)
+            small = np.asarray(Image.open(buf).convert("RGB"), dtype=np.float32) / 255.0
+        lr[i] = np.clip(small, 0.0, 1.0).astype(np.float32)
+    return lr
+
+
 def generate_training_data(input_size: int, scale: int, n: int = 1000):
     """Generate training data for a specific input/output size."""
     output_size = input_size * scale
     hr = generate_real_icon_data(n, output_size)
-    lr = tf.image.resize(hr, (input_size, input_size), method="bicubic").numpy()
+    # Explicit solid R/G/B (+ random solids) so hue gate is in the train distribution.
+    n_solid = max(60, n // 10)
+    solids = np.zeros((n_solid, output_size, output_size, 3), dtype=np.float32)
+    rng = np.random.default_rng(99)
+    for i in range(n_solid):
+        mode = i % 4
+        if mode == 0:
+            c = (1.0, 0.1, 0.1)
+        elif mode == 1:
+            c = (0.1, 1.0, 0.1)
+        elif mode == 2:
+            c = (0.1, 0.1, 1.0)
+        else:
+            c = tuple(float(x) for x in rng.uniform(0.15, 0.95, size=3))
+        solids[i, ..., 0], solids[i, ..., 1], solids[i, ..., 2] = c
+    hr = np.concatenate([hr, solids], axis=0)
+    # Favicon-like degradations (not clean bicubic-only)
+    lr = _degrade_to_lr(hr, input_size, np.random.default_rng(7))
     return lr, hr
 
 
@@ -444,7 +605,9 @@ def train_and_export_model(model_dir: str, input_size: int, scale: int, epochs: 
 
         model = build_fsrcnn(scale, input_size)
         # Same perceptual gate as ESPCN: keep VGG on large-in 2x/3x
-        if NO_PERCEPTUAL:
+        # Cascade POC: edge loss carries sharpness; skip VGG unless explicitly wanted
+        # (VGG alone previously yielded soft "slightly > bicubic" icons).
+        if NO_PERCEPTUAL or CASCADE_RUNGS:
             use_perceptual = False
         elif output_size < 256:
             use_perceptual = True
@@ -489,13 +652,22 @@ def train_and_export_model(model_dir: str, input_size: int, scale: int, epochs: 
         optimizer = keras.optimizers.Adam(learning_rate=lr, clipnorm=1.0)
         model.compile(
             optimizer=optimizer,
-            loss=make_combined_loss(output_size, use_perceptual=use_perceptual),
+            loss=make_combined_loss(
+                output_size,
+                use_perceptual=use_perceptual,
+                use_edge=USE_EDGE_LOSS,
+            ),
             jit_compile=False,
         )
         print(f"[TRAIN] Model params: {model.count_params()}")
         print(f"[TRAIN] MS-SSIM scales: {_ssim_scales_for(output_size)} (output {output_size}px)")
         print(f"[TRAIN] Batch size: {batch_size} (per GPU: {batch_size // strategy.num_replicas_in_sync}), LR: {lr:.2e}")
-        print(f"[TRAIN] Mixed precision: disabled (float32), Perceptual loss: {'enabled' if use_perceptual else 'disabled'}")
+        print(
+            f"[TRAIN] Mixed precision: disabled (float32), "
+            f"Perceptual: {'on' if use_perceptual else 'off'}, "
+            f"Edge/Sobel: {'on' if USE_EDGE_LOSS else 'off'} (w=0.08), "
+            f"ColorPreserve: on (w=0.25)"
+        )
 
         lr_data, hr_data = generate_training_data(input_size, scale)
         # Shuffle lr/hr together (preserving pairing) so the tail-based
@@ -514,8 +686,47 @@ def train_and_export_model(model_dir: str, input_size: int, scale: int, epochs: 
             validation_split=0.1,
         )
 
+    # Color-preservation gate (NOT Ace-specific): solid R/G/B patches must keep
+    # channel dominance after upscale. Catches wash-to-white/gray that still
+    # "beats bicubic" on icon PSNR. Ace remains the human visual POC only.
+    def _color_patches(size: int) -> list[tuple[str, np.ndarray, int]]:
+        hi, lo = 1.0, 0.1
+        specs = [("R", 0, (hi, lo, lo)), ("G", 1, (lo, hi, lo)), ("B", 2, (lo, lo, hi))]
+        out = []
+        for name, dom, rgb in specs:
+            p = np.zeros((1, size, size, 3), dtype=np.float32)
+            p[..., 0], p[..., 1], p[..., 2] = rgb
+            out.append((name, p, dom))
+        return out
+
+    def _assert_color_ok(label: str, mean_rgb: np.ndarray, dom: int, name: str) -> None:
+        # Dominant channel high and clearly above the other two.
+        if (
+            mean_rgb[dom] < 0.55
+            or mean_rgb[dom] < mean_rgb[(dom + 1) % 3] + 0.2
+            or mean_rgb[dom] < mean_rgb[(dom + 2) % 3] + 0.2
+        ):
+            raise RuntimeError(
+                f"MODEL VALIDATION FAILED: {label} lost {name} color "
+                f"(mean RGB={mean_rgb.tolist()}) — general hue collapse, not Ace-specific"
+            )
+
+    for name, patch, dom in _color_patches(input_size):
+        pred = np.asarray(model.predict(patch, verbose=0), dtype=np.float32)[0]
+        m = pred.mean(axis=(0, 1))
+        print(
+            f"[VALIDATE] Keras {name}-square mean RGB=({m[0]:.3f},{m[1]:.3f},{m[2]:.3f})"
+        )
+        _assert_color_ok("Keras", m, dom, name)
+
+    # Checkpoint Keras BEFORE convert so export failures never erase trained weights.
+    keras_path = out_path.replace(".tflite", ".keras")
+    model.save(keras_path)
+    print(f"[TRAIN] Saved Keras checkpoint {keras_path}")
+
+    # Float TFLite only. Optimize.DEFAULT does dynamic-range weight quant and
+    # destroyed color/shape on icon SR (POC: red→gray). Do not re-enable.
     converter = tf.lite.TFLiteConverter.from_keras_model(model)
-    converter.optimizations = [tf.lite.Optimize.DEFAULT]
     tflite_model = converter.convert()
 
     # VALIDATION before write — never leave a losing .tflite in assets/models
@@ -528,15 +739,26 @@ def train_and_export_model(model_dir: str, input_size: int, scale: int, epochs: 
 
         val_lr = lr_data[split:]
         val_hr = hr_data[split:]
-        n_val = min(10, len(val_lr))
-
+        # PSNR gate must IGNORE near-perfect bicubic cases (solids/flats).
+        # On solids bicubic hits ~140dB; any tiny residual → ~60dB and the
+        # *mean* falsely fails a model that beats bicubic on real icons
+        # (+0.96dB, 67% win rate on bicubic_psnr<40). Color gate covers solids.
         variances = []
         psnrs = []
         bicubic_psnrs = []
+        n_skipped_easy = 0
 
-        for i in range(n_val):
-            test_input = val_lr[i:i+1]
-            hr_target = val_hr[i:i+1]
+        for i in range(len(val_hr)):
+            test_input = val_lr[i : i + 1]
+            hr_target = val_hr[i : i + 1]
+            bicubic = tf.image.resize(test_input, (output_size, output_size), method="bicubic").numpy()
+            bicubic_psnr = float(
+                np.asarray(tf.image.psnr(bicubic, hr_target, max_val=1.0).numpy()).reshape(-1)[0]
+            )
+            # Skip flats/solids where bicubic is near-exact (not a real SR task)
+            if bicubic_psnr >= 40.0:
+                n_skipped_easy += 1
+                continue
 
             interpreter.set_tensor(input_details[0]['index'], test_input.astype(np.float32))
             interpreter.invoke()
@@ -544,20 +766,32 @@ def train_and_export_model(model_dir: str, input_size: int, scale: int, epochs: 
 
             variance = float(np.var(output))
             variances.append(variance)
+            model_psnr = float(
+                np.asarray(tf.image.psnr(output, hr_target, max_val=1.0).numpy()).reshape(-1)[0]
+            )
+            psnrs.append(model_psnr)
+            bicubic_psnrs.append(bicubic_psnr)
 
-            bicubic = tf.image.resize(test_input, (output_size, output_size), method="bicubic").numpy()
-
-            model_psnr = tf.image.psnr(output, hr_target, max_val=1.0).numpy()
-            bicubic_psnr = tf.image.psnr(bicubic, hr_target, max_val=1.0).numpy()
-            psnrs.append(float(np.asarray(model_psnr).reshape(-1)[0]))
-            bicubic_psnrs.append(float(np.asarray(bicubic_psnr).reshape(-1)[0]))
+        if len(psnrs) < 5:
+            raise RuntimeError(
+                f"MODEL VALIDATION FAILED: only {len(psnrs)} hard val samples "
+                f"(need >=5); check training data"
+            )
 
         mean_var = float(np.mean(variances))
         mean_model_psnr = float(np.mean(psnrs))
         mean_bicubic_psnr = float(np.mean(bicubic_psnrs))
+        win_rate = float(np.mean([m > b for m, b in zip(psnrs, bicubic_psnrs)]))
 
+        print(
+            f"[VALIDATE] PSNR on {len(psnrs)} hard val samples "
+            f"(skipped {n_skipped_easy} easy/solid where bicubic>=40dB)"
+        )
         print(f"[VALIDATE] Output variance: {mean_var:.6f}")
-        print(f"[VALIDATE] Model PSNR: {mean_model_psnr:.2f}dB, Bicubic PSNR: {mean_bicubic_psnr:.2f}dB")
+        print(
+            f"[VALIDATE] Model PSNR: {mean_model_psnr:.2f}dB, Bicubic PSNR: {mean_bicubic_psnr:.2f}dB "
+            f"(delta {mean_model_psnr - mean_bicubic_psnr:+.2f}dB, win_rate {win_rate:.0%})"
+        )
 
         if mean_var < 0.001:
             raise RuntimeError(f"MODEL VALIDATION FAILED: Output variance {mean_var:.6f} too low (constant gray)")
@@ -565,10 +799,22 @@ def train_and_export_model(model_dir: str, input_size: int, scale: int, epochs: 
         if mean_model_psnr <= mean_bicubic_psnr + 1e-6:
             raise RuntimeError(
                 f"MODEL VALIDATION FAILED: Model PSNR {mean_model_psnr:.2f}dB "
-                f"not better than bicubic {mean_bicubic_psnr:.2f}dB"
+                f"not better than bicubic {mean_bicubic_psnr:.2f}dB "
+                f"(hard samples only, bicubic<40dB)"
             )
 
-        print(f"[VALIDATE] PASSED - Model beats bicubic baseline by {mean_model_psnr - mean_bicubic_psnr:.2f}dB")
+        # TFLite multi-color gate (same R/G/B patches as Keras)
+        for name, patch, dom in _color_patches(input_size):
+            interpreter.set_tensor(input_details[0]["index"], patch.astype(np.float32))
+            interpreter.invoke()
+            tflite_out = interpreter.get_tensor(output_details[0]["index"])[0]
+            tm = tflite_out.mean(axis=(0, 1))
+            print(
+                f"[VALIDATE] TFLite {name}-square mean RGB=({tm[0]:.3f},{tm[1]:.3f},{tm[2]:.3f})"
+            )
+            _assert_color_ok("TFLite", tm, dom, name)
+
+        print(f"[VALIDATE] PASSED - Model beats bicubic baseline by {mean_model_psnr - mean_bicubic_psnr:.2f}dB + RGB color OK")
     except Exception as e:
         if "MODEL VALIDATION FAILED" in str(e):
             if os.path.exists(out_path):
@@ -597,8 +843,11 @@ def _collect_jobs():
     target = parse_specific_model(SPECIFIC_MODEL) if SPECIFIC_MODEL else None
     if SPECIFIC_MODEL is not None and target is None:
         return None
+    configs = CASCADE_MODEL_CONFIGS if CASCADE_RUNGS else MODEL_CONFIGS
+    if CASCADE_RUNGS:
+        print("[TRAIN] --cascade-rungs: training 2x progressive path only")
     jobs = []
-    for input_size, scale_configs in MODEL_CONFIGS:
+    for input_size, scale_configs in configs:
         if INPUT_SIZE is not None and input_size != INPUT_SIZE:
             continue
         for scale, epochs in scale_configs:
@@ -621,6 +870,10 @@ def _run_jobs_in_subprocesses(jobs, script_path: str) -> int:
             cmd.append("--force")
         if NO_PERCEPTUAL:
             cmd.append("--no-perceptual")
+        if not USE_EDGE_LOSS:
+            cmd.append("--no-edge")
+        if CASCADE_RUNGS:
+            cmd.append("--cascade-rungs")
         if OUTPUT_DIR:
             cmd.append(f"--output-dir={OUTPUT_DIR}")
         env = os.environ.copy()

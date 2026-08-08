@@ -476,44 +476,104 @@ export async function upscaleIconAi(
       encoding: EncodingType.Base64,
     });
 
-    // Decode PNG to get raw RGBA pixels.
-    const decoded = UPNG.decode(
-      Uint8Array.from(atob(inputB64), (c) => c.charCodeAt(0)).buffer,
-    ) as any;
-    const rgbaIn = new Uint8ClampedArray(
-      decoded.data as unknown as ArrayBuffer,
-    );
+    // Decode PNG → RGBA8. UPNG.decode() only returns metadata + compressed
+    // frames; pixel bytes come from UPNG.toRGBA8(img)[0]. Using decoded.data
+    // directly fed zeros into the model (range=0 → silent bilinear fallback).
+    const pngBytes = Uint8Array.from(atob(inputB64), (c) => c.charCodeAt(0));
+    const decoded = UPNG.decode(pngBytes.buffer) as {
+      width: number;
+      height: number;
+    };
+    const frames = UPNG.toRGBA8(decoded as any) as ArrayBuffer[];
+    if (!frames?.length) {
+      console.warn("[ICON_AI] UPNG.toRGBA8 returned no frames, bilinear");
+      return upscaleIconIfSmall(base64, format, true);
+    }
+    const rgbaIn = new Uint8ClampedArray(frames[0]);
+    const pxCount = decoded.width * decoded.height;
+    if (rgbaIn.length < pxCount * 4) {
+      console.warn(
+        `[ICON_AI] RGBA buffer too small (${rgbaIn.length} < ${pxCount * 4}), bilinear`,
+      );
+      return upscaleIconIfSmall(base64, format, true);
+    }
 
-    // Extract RGB planes (model expects 3 channels, no alpha).
-    const rgbIn = new Float32Array(
-      modelInfo.inputSize * modelInfo.inputSize * 3,
-    );
+    // Match training domain (train_espcn/fsrcnn_multi.py):
+    //   base = rgb * alpha + (1 - alpha)   // composite onto white
+    // Models never saw raw premultiplied-black holes under transparency.
+    // Prefer the decoded dimensions; fall back to model input size.
+    const inW = decoded.width || modelInfo.inputSize;
+    const inH = decoded.height || modelInfo.inputSize;
+    const rgbIn = new Float32Array(inW * inH * 3);
+    // Keep source alpha so we can NN-restore it on the SR output.
+    const alphaIn = new Float32Array(inW * inH);
     let srcP = 0;
-    for (let i = 0; i < modelInfo.inputSize * modelInfo.inputSize; i++) {
-      rgbIn[i * 3] = rgbaIn[srcP++] / 255;
-      rgbIn[i * 3 + 1] = rgbaIn[srcP++] / 255;
-      rgbIn[i * 3 + 2] = rgbaIn[srcP++] / 255;
-      srcP++; // skip alpha
+    let inMin = 1;
+    let inMax = 0;
+    let alphaMin = 1;
+    let alphaMax = 0;
+    for (let i = 0; i < inW * inH; i++) {
+      const r = rgbaIn[srcP++] / 255;
+      const g = rgbaIn[srcP++] / 255;
+      const b = rgbaIn[srcP++] / 255;
+      const a = rgbaIn[srcP++] / 255;
+      alphaIn[i] = a;
+      if (a < alphaMin) alphaMin = a;
+      if (a > alphaMax) alphaMax = a;
+      // White composite (same formula as training rasterize path)
+      const cr = r * a + (1 - a);
+      const cg = g * a + (1 - a);
+      const cb = b * a + (1 - a);
+      rgbIn[i * 3] = cr;
+      rgbIn[i * 3 + 1] = cg;
+      rgbIn[i * 3 + 2] = cb;
+      if (cr < inMin) inMin = cr;
+      if (cg < inMin) inMin = cg;
+      if (cb < inMin) inMin = cb;
+      if (cr > inMax) inMax = cr;
+      if (cg > inMax) inMax = cg;
+      if (cb > inMax) inMax = cb;
+    }
+    console.log(
+      `[ICON_AI] input ${inW}x${inH} white-comp rgb range=${(inMax - inMin).toFixed(3)} alpha=[${alphaMin.toFixed(2)},${alphaMax.toFixed(2)}] len=${rgbIn.length} modelIn=${modelInfo.inputSize}`,
+    );
+    if (inMax - inMin < 1e-6) {
+      console.warn("[ICON_AI] input image is constant, bilinear");
+      return upscaleIconIfSmall(base64, format, true);
     }
 
     // Run the selected super-resolution model
     const out: Float32Array[] = await model.runSync([rgbIn]);
-    const outBytes = out[0];
+    const outBytes = out?.[0];
     const outW = modelInfo.outputSize;
     const outH = modelInfo.outputSize;
+    const expectedOut = outW * outH * 3;
+
+    if (!outBytes || outBytes.length < expectedOut) {
+      console.warn(
+        `[ICON_AI] unexpected output length ${outBytes?.length ?? 0} (expected ${expectedOut}), bilinear`,
+      );
+      return upscaleIconIfSmall(base64, format, true);
+    }
 
     // Detect useless model output: if all values are nearly identical (low
     // variance), the model is producing a constant gray patch instead of
     // actual upscaled content. Fall back to bilinear in that case.
-    if (outBytes && outBytes.length > 100) {
+    // Sample across the full buffer (not just the first 100 floats, which can
+    // be a single flat edge of a valid image).
+    {
       let min = Infinity;
       let max = -Infinity;
-      for (let i = 0; i < 100; i++) {
+      const step = Math.max(1, Math.floor(outBytes.length / 256));
+      for (let i = 0; i < outBytes.length; i += step) {
         const v = outBytes[i];
         if (v < min) min = v;
         if (v > max) max = v;
       }
-      if (max - min < 0.1) {
+      console.log(
+        `[ICON_AI] output len=${outBytes.length} range=${(max - min).toFixed(4)} sample min/max`,
+      );
+      if (max - min < 0.05) {
         console.warn(
           `[ICON_AI] Model output has insufficient variance (range=${(max - min).toFixed(4)}), falling back to bilinear`,
         );
@@ -521,15 +581,48 @@ export async function upscaleIconAi(
       }
     }
 
+    // NN-upscale alpha from LR → HR (models are RGB-only; alpha is geometry).
+    const scaleX = outW / inW;
+    const scaleY = outH / inH;
+    const hasTransparency = alphaMin < 0.999;
+
     // Allocate RGBA buffer for upng-js (expects 4 channels).
-    // Model outputs float32 0-1, convert to uint8 0-255.
+    // Model outputs float32 0-1 on white-composited RGB. If the source had
+    // transparency, un-composite roughly via restored alpha so holes stay
+    // transparent instead of solid white.
     const rgba = new Uint8Array(outW * outH * 4);
     let p = 0;
-    for (let i = 0; i < outW * outH; i++) {
-      rgba[i * 4] = Math.round(outBytes[p++] * 255);
-      rgba[i * 4 + 1] = Math.round(outBytes[p++] * 255);
-      rgba[i * 4 + 2] = Math.round(outBytes[p++] * 255);
-      rgba[i * 4 + 3] = 255;
+    for (let y = 0; y < outH; y++) {
+      const sy = Math.min(inH - 1, Math.floor(y / scaleY));
+      for (let x = 0; x < outW; x++) {
+        const sx = Math.min(inW - 1, Math.floor(x / scaleX));
+        const a = hasTransparency ? alphaIn[sy * inW + sx] : 1;
+        let r = outBytes[p++];
+        let g = outBytes[p++];
+        let b = outBytes[p++];
+        // Clamp model output
+        r = r < 0 ? 0 : r > 1 ? 1 : r;
+        g = g < 0 ? 0 : g > 1 ? 1 : g;
+        b = b < 0 ? 0 : b > 1 ? 1 : b;
+        if (hasTransparency && a > 1e-3 && a < 0.999) {
+          // Invert white composite: rgb = (comp - (1-a)) / a
+          r = (r - (1 - a)) / a;
+          g = (g - (1 - a)) / a;
+          b = (b - (1 - a)) / a;
+          r = r < 0 ? 0 : r > 1 ? 1 : r;
+          g = g < 0 ? 0 : g > 1 ? 1 : g;
+          b = b < 0 ? 0 : b > 1 ? 1 : b;
+        } else if (hasTransparency && a <= 1e-3) {
+          r = 0;
+          g = 0;
+          b = 0;
+        }
+        const i = (y * outW + x) * 4;
+        rgba[i] = Math.round(r * 255);
+        rgba[i + 1] = Math.round(g * 255);
+        rgba[i + 2] = Math.round(b * 255);
+        rgba[i + 3] = Math.round(a * 255);
+      }
     }
 
     // Encode the upscaled RGBA back to a PNG
