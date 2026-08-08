@@ -6,7 +6,10 @@
  *   (determined by device pixel density), and quality mode.
  * - Two quality modes are supported:
  *     - `fast`: small ESPCN models (lower quality, fastest inference).
- *     - `sharp`: FSRCNN models trained with MAE + MS-SSIM + VGG perceptual loss.
+ *     - `sharp`: FSRCNN residual models (MAE + color preserve + light edge).
+ * - After the model runs, output is blended with bilinear (brand-safe lerp):
+ *     out = (1-t)*bilin + t*clamp(model)  with t≈0.25 (between 80/20 and 70/30).
+ *   Keeps stroke weight / branding from bilin; model only adds a little snap.
  * - If the native module or model is unavailable, it transparently falls back to
  *   the existing bilinear `upscaleIconIfSmall` so the button always works.
  * - `isLowResIcon` detects icons small enough to benefit from upscaling.
@@ -312,6 +315,77 @@ export function getModelForUpscale(
  * TurboModuleRegistry.getEnforcing(...) which crashes if the native module
  * isn't linked (e.g. Expo Go), so we must avoid loading the JS module at all.
  */
+/**
+ * Brand-safe hybrid (Ace POC 2026-08-08): bilin owns stroke mass; model is a
+ * mild residual. User preferred lerp 80/20–70/30 over full clamp (thinned letters).
+ * See TRAINING_FIXES.md / scripts/poc_hybrid_composite.py.
+ */
+const BRAND_SAFE_LERP_T = 0.25; // between 80/20 and 70/30
+const BRAND_SAFE_MAX_DARKEN = 0.12;
+const BRAND_SAFE_MAX_BRIGHTEN = 0.35;
+
+/** Bilinear upsample RGB float32 planar [H*W*3] in 0..1. */
+function bilinearUpsampleRgb(
+  src: Float32Array,
+  inW: number,
+  inH: number,
+  outW: number,
+  outH: number,
+): Float32Array {
+  const dst = new Float32Array(outW * outH * 3);
+  const scaleX = inW / outW;
+  const scaleY = inH / outH;
+  for (let y = 0; y < outH; y++) {
+    const fy = (y + 0.5) * scaleY - 0.5;
+    const y0 = Math.max(0, Math.min(inH - 1, Math.floor(fy)));
+    const y1 = Math.min(inH - 1, y0 + 1);
+    const wy = Math.min(1, Math.max(0, fy - y0));
+    for (let x = 0; x < outW; x++) {
+      const fx = (x + 0.5) * scaleX - 0.5;
+      const x0 = Math.max(0, Math.min(inW - 1, Math.floor(fx)));
+      const x1 = Math.min(inW - 1, x0 + 1);
+      const wx = Math.min(1, Math.max(0, fx - x0));
+      const i00 = (y0 * inW + x0) * 3;
+      const i01 = (y0 * inW + x1) * 3;
+      const i10 = (y1 * inW + x0) * 3;
+      const i11 = (y1 * inW + x1) * 3;
+      const o = (y * outW + x) * 3;
+      for (let c = 0; c < 3; c++) {
+        const v0 = src[i00 + c] * (1 - wx) + src[i01 + c] * wx;
+        const v1 = src[i10 + c] * (1 - wx) + src[i11 + c] * wx;
+        dst[o + c] = v0 * (1 - wy) + v1 * wy;
+      }
+    }
+  }
+  return dst;
+}
+
+/**
+ * out = (1-t)*bilin + t*(bilin + clamp(model-bilin))
+ *     = bilin + t*clamp(residual)
+ * Preserves brand mass; limits how much the model can carve letter fill.
+ */
+function brandSafeHybridRgb(
+  bilin: Float32Array,
+  modelOut: Float32Array,
+  t: number = BRAND_SAFE_LERP_T,
+  maxDarken: number = BRAND_SAFE_MAX_DARKEN,
+  maxBrighten: number = BRAND_SAFE_MAX_BRIGHTEN,
+): Float32Array {
+  const n = Math.min(bilin.length, modelOut.length);
+  const out = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    let r = modelOut[i] - bilin[i];
+    if (r < -maxDarken) r = -maxDarken;
+    if (r > maxBrighten) r = maxBrighten;
+    let v = bilin[i] + t * r;
+    if (v < 0) v = 0;
+    else if (v > 1) v = 1;
+    out[i] = v;
+  }
+  return out;
+}
+
 function tfliteModuleExists(): boolean {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -581,15 +655,22 @@ export async function upscaleIconAi(
       }
     }
 
+    // Brand-safe hybrid: bilin stroke mass + mild clamped model residual.
+    // (User POC: full model thins letters; lerp ~25% keeps Ace branding.)
+    const bilinRgb = bilinearUpsampleRgb(rgbIn, inW, inH, outW, outH);
+    const hybridRgb = brandSafeHybridRgb(bilinRgb, outBytes);
+    console.log(
+      `[ICON_AI] brand-safe hybrid t=${BRAND_SAFE_LERP_T} (bilin + clamped residual)`,
+    );
+
     // NN-upscale alpha from LR → HR (models are RGB-only; alpha is geometry).
     const scaleX = outW / inW;
     const scaleY = outH / inH;
     const hasTransparency = alphaMin < 0.999;
 
     // Allocate RGBA buffer for upng-js (expects 4 channels).
-    // Model outputs float32 0-1 on white-composited RGB. If the source had
-    // transparency, un-composite roughly via restored alpha so holes stay
-    // transparent instead of solid white.
+    // Hybrid is white-composited RGB. If the source had transparency,
+    // un-composite via restored alpha so holes stay transparent.
     const rgba = new Uint8Array(outW * outH * 4);
     let p = 0;
     for (let y = 0; y < outH; y++) {
@@ -597,9 +678,9 @@ export async function upscaleIconAi(
       for (let x = 0; x < outW; x++) {
         const sx = Math.min(inW - 1, Math.floor(x / scaleX));
         const a = hasTransparency ? alphaIn[sy * inW + sx] : 1;
-        let r = outBytes[p++];
-        let g = outBytes[p++];
-        let b = outBytes[p++];
+        let r = hybridRgb[p++];
+        let g = hybridRgb[p++];
+        let b = hybridRgb[p++];
         // Clamp model output
         r = r < 0 ? 0 : r > 1 ? 1 : r;
         g = g < 0 ? 0 : g > 1 ? 1 : g;
@@ -638,7 +719,7 @@ export async function upscaleIconAi(
 
     await deleteAsync(bounded.uri, { idempotent: true }).catch(() => {});
     console.log(
-      `[ICON_AI] Upscaled ${inputSize}px → ${outW}x${outH}px using ${modelInfo.modelFile}`,
+      `[ICON_AI] Upscaled ${inputSize}px → ${outW}x${outH}px using ${modelInfo.modelFile} + brand-safe hybrid`,
     );
     return { base64: result, format: "png" };
   } catch (err) {

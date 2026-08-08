@@ -1,6 +1,8 @@
-"""Multi-resolution FSRCNN: residual SR + edge loss + favicon degradations.
+"""Multi-resolution FSRCNN: brand-safe residual SR (bilin base).
 
-Strategy (see TRAINING_FIXES.md): prefer 2x/4x cascade rungs, L1+Sobel edge+
+Strategy (see TRAINING_FIXES.md): MAE + color + stroke-mass + light edge;
+mild LR degradations; app applies bilin lerp hybrid at inference. Prefer 2x/4x +
+L1+Sobel edge+
 SSIM, degradation-aware LR, higher capacity on 2x. Float TFLite only.
 """
 import os
@@ -228,17 +230,37 @@ def color_preserve_loss(y_true, y_pred):
     """Penalize global + local chroma drift (stops red→gray wash)."""
     y_true = tf.cast(y_true, tf.float32)
     y_pred = tf.cast(y_pred, tf.float32)
-    # Global mean RGB must match (Ace red field)
     mean_l1 = tf.reduce_mean(tf.abs(
         tf.reduce_mean(y_true, axis=[1, 2]) - tf.reduce_mean(y_pred, axis=[1, 2])
     ))
-    # Low-pass color (blur) — structure of hues without high-freq scribble pressure
     k = 5
-    # depthwise avg pool approx via avg_pool on each channel
     tb = tf.nn.avg_pool2d(y_true, ksize=k, strides=1, padding="SAME")
     pb = tf.nn.avg_pool2d(y_pred, ksize=k, strides=1, padding="SAME")
     blur_l1 = tf.reduce_mean(tf.abs(tb - pb))
     return mean_l1 + blur_l1
+
+
+def stroke_mass_loss(y_true, y_pred):
+    """Keep logo stroke weight / ink area (anti-thin branding loss).
+
+    User: hybrids thinned Ace letters vs bilin. Match low-pass luminance and
+    soft ink mass so residual cannot skeletonize brand marks.
+    """
+    y_true = tf.cast(y_true, tf.float32)
+    y_pred = tf.cast(y_pred, tf.float32)
+    # Luma
+    lt = 0.299 * y_true[..., 0:1] + 0.587 * y_true[..., 1:2] + 0.114 * y_true[..., 2:3]
+    lp = 0.299 * y_pred[..., 0:1] + 0.587 * y_pred[..., 1:2] + 0.114 * y_pred[..., 2:3]
+    # Heavy low-pass = stroke mass / blob shape
+    k = 7
+    lt_b = tf.nn.avg_pool2d(lt, ksize=k, strides=1, padding="SAME")
+    lp_b = tf.nn.avg_pool2d(lp, ksize=k, strides=1, padding="SAME")
+    mass_l1 = tf.reduce_mean(tf.abs(lt_b - lp_b))
+    # Soft ink amount (distance from white)
+    ink_t = tf.reduce_mean(1.0 - lt_b)
+    ink_p = tf.reduce_mean(1.0 - lp_b)
+    area = tf.abs(ink_t - ink_p)
+    return mass_l1 + 0.5 * area
 
 
 def make_combined_loss(
@@ -247,11 +269,12 @@ def make_combined_loss(
     use_edge: bool = True,
     edge_weight: float = 0.08,
     color_weight: float = 0.25,
+    mass_weight: float = 0.20,
 ):
-    """MAE-first residual loss + light edge + color preserve + optional SSIM/VGG.
+    """MAE-first residual + color + stroke-mass + light edge (+ optional VGG).
 
-    POC v1 failure: edge 0.35 dominated → scribble edges, gray wash, cascade
-    compounded. MAE + color_preserve must dominate; edge is a small bonus.
+    Brand-safe training (2026-08): bilin residual base; do not thin strokes.
+    App inference also lerps bilin+model (t≈0.25). See TRAINING_FIXES.md.
     """
     n_scales = _ssim_scales_for(output_size)
 
@@ -303,8 +326,13 @@ def make_combined_loss(
         y_pred = tf.clip_by_value(y_pred, 0.0, 1.0)
         mae = tf.reduce_mean(tf.abs(y_true - y_pred))
         ssim = ssim_term(y_true, y_pred)
-        # MAE owns identity; color_preserve stops red→gray; edge is mild only
-        loss = mae + 0.10 * ssim + color_weight * color_preserve_loss(y_true, y_pred)
+        # MAE + color + stroke mass own branding; edge is mild only
+        loss = (
+            mae
+            + 0.10 * ssim
+            + color_weight * color_preserve_loss(y_true, y_pred)
+            + mass_weight * stroke_mass_loss(y_true, y_pred)
+        )
         if use_edge:
             loss = loss + edge_weight * sobel_edge_loss(y_true, y_pred)
         if use_perceptual:
@@ -666,7 +694,7 @@ def train_and_export_model(model_dir: str, input_size: int, scale: int, epochs: 
             f"[TRAIN] Mixed precision: disabled (float32), "
             f"Perceptual: {'on' if use_perceptual else 'off'}, "
             f"Edge/Sobel: {'on' if USE_EDGE_LOSS else 'off'} (w=0.08), "
-            f"ColorPreserve: on (w=0.25)"
+            f"ColorPreserve: on (w=0.25), StrokeMass: on (w=0.20)"
         )
 
         lr_data, hr_data = generate_training_data(input_size, scale)

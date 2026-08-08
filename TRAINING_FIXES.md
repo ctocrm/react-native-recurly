@@ -118,154 +118,281 @@ User quality bar (Aug 2026): **~30–50% better perceived quality** than current
 
 1. **Cascade 2× (and some 4×)** for extreme targets — not monolithic 16→512.
 2. **Edge/gradient loss** + L1 (+ light SSIM); full GAN last (brand hallucination risk).
-3. **Degradation-aware LR** (JPEG, random resize kernels), not only clean bicubic of SVG.
-4. **Stronger residual capacity** on hops that matter.
-5. **Prefer larger favicon/SVG** in product — biggest free win.
-6. **16→512 one-shot** ≈ same mush, more pixels — poor ROI until cascade works.
-7. Matching SVG HR from true 16×16 is **not** fully recoverable — cascade closes the gap, not magic.
+
+
+3. **Degradation-matched training** (mild JPEG / resize) — not pure bicubic-only LR.
+4. Prefer **larger source icons** at crawl (SVG / apple-touch) over any SR miracle from 16px.
+
+**Caveat (learned same day):** cascade + **heavy** edge (w=0.35) + heavy degradations + multi-hop
+compounding **failed brand identity** on Ace (gray wash, thinned/scribbled letters). Research still
+favors progressive 2× for *sharpness metrics*; for *logos* we freeze **bilin-first hybrid + mild
+training** first. Cascade routing stays on the **backburner**.
 
 ---
 
-## Current strategy (post-research) — implement & POC
+## Era F — Cascade → hybrid → brand-safe freeze (2026-08-08)
 
-```
-P0  Prefer largest source / SVG in app (product)
-P1  Strong 2× (+ some 4×) models + cascade inference
-    e.g. 16→32→64→128→256 (optional →512)
-P2  Loss: L1 + Sobel/gradient edge + light SSIM; residual zero-init kept
-P3  Favicon-like degradations when building LR from HR
-P4  Higher capacity residual on 2× rungs
-P5  Hard-sample PSNR gate + RGB color gate (keep)
-P6  Optional light perceptual later; GAN only if still soft and colors locked
-```
+Single intensive session on Ace Hardware favicon (live 16×16 + Simple Icons SVG). Goal: close the
+gap from “slightly better than bilin” toward user bar (~30–50% perceived). Outcome: **brand-safe
+path frozen in app + trainers**; full matrix retrain in flight via `npm run train:models:force`.
 
-### POC plan (this iteration)
+### F1 — Cascade POC (metric win, visual brand fail)
 
-1. Train **2× cascade rungs** with edge loss + degradations + higher capacity:  
-   `16→32`, `32→64`, `64→128`, `128→256` (pure 2×; 192 is not on the 2× lattice from 16).
-2. POC script: **cascade** Ace favicon through chain; contact sheet vs bilinear vs old one-shot 16→192.
-3. Human judge: is it clearly sharper (30%+ feel)?
+**Train recipe (cascade v1, VPS 2× RTX 4000 Ada):**
 
-### Not doing first
+- Residual FSRCNN, 2× hops: 16→32 → 32→64 → 64→128 → 128→256
+- Sobel edge **w=0.35**, L1, light SSIM, **no VGG** on cascade rungs
+- Heavy-ish favicon degradations (JPEG / random resize)
+- Higher 2× capacity (d=64, s=16, m=8)
 
-- Full matrix retrain of all extreme one-shots
-- Monolithic 16→512 as quality bet
-- Heavy Real-ESRGAN GAN on-device without distill
-
----
-
-## Validation rules (do not regress)
-
-1. **Hard-sample PSNR:** mean over val where bicubic PSNR < 40 dB; model must beat bicubic.
-2. **Variance:** mean output var ≥ 0.001 (not constant gray).
-3. **Color gate:** solid R, G, B patches keep channel dominance (Keras + TFLite).
-4. **Float TFLite only** — no `Optimize.DEFAULT`.
-5. **Human POC:** Ace contact sheet; model path = `05_model_alpha_restored` / cascade sheet — **not** `ace_hr_from_svg`.
-
----
-
-## How to run
-
-```bash
-# 2× cascade rungs only (sharp path POC)
-python scripts/train_fsrcnn_multi.py --cascade-rungs --force
-
-# Single hop
-python scripts/train_fsrcnn_multi.py --model=16_32 --force
-
-# Cascade POC (Ace favicon)
-python scripts/poc_upscale_smoke.py --cascade --out poc_out_cascade
-
-# Full matrix (later)
-bash scripts/train.sh --sharp --force
-```
-
-VPS (when SSH key authorized): host historically `root@172.238.35.154` (Linode/Akamai GPU).  
-Local machine often has **no** TF/GPU — train on VPS.
-
----
-
-## Key lessons (compressed)
-
-1. Perceptual loss must be normalized by feature-map size.
-2. Validate on real HR; hard-sample gate for solids.
-3. Residual: zero-init **before** depth_to_space + bilinear base.
-4. Quantization kills icon color.
-5. MAE-only residual = correct but **soft** — need edge loss + cascade for “looks sharp.”
-6. Large scale factors → progressive 2×/4× (research + waifu2x + Real-ESRGAN practice).
-7. Train degradations must look like favicons.
-8. More output pixels ≠ more quality if the method is still soft.
-9. Stop paying GPU until the recipe is proven on a small POC.
-
----
-
-
----
-
-
-### Cascade POC v1 — FAILED visual (2026-08-08)
-
-User: _"Old is 1000 better… mostly black… Ace written by hand… lost the plot."_
-
-| Metric | LR / old one-shot | Cascade v1 final |
-| ------ | ----------------- | ---------------- |
-| mean RGB | ~[0.98, 0.82, 0.84] (red OK) | ~[0.88, 0.87, 0.87] (**gray wash**) |
-| dark% | 0% | **11.7%** (invented black) |
-| Per-hop dark% | — | 0→5→10→11→12% (compounds) |
-
-**Cause:** edge_weight=0.35 + aggressive JPEG/blur degradations + high capacity + 4-hop cascade. PSNR gate passed (sharp scribbles match edges) while **brand identity died**.
-
-**v2 fix:** MAE-first, color_preserve w=0.25, edge w=0.08, mild degradations (80% bicubic), modest capacity, retrain cascade.
-
-
-## Cascade POC results (2026-08-08, VPS 2× RTX 4000 Ada)
-
-**Recipe:** residual FSRCNN + Sobel edge loss (w=0.35) + L1 + light SSIM + favicon degradations (JPEG/random resize); no VGG on cascade rungs; higher 2× capacity (d=64,s=16,m=8).
-
-| Hop | Hard-sample Δ vs bicubic | Win rate | Status |
-| --- | ------------------------ | -------- | ------ |
+| Hop | Hard-sample Δ vs bicubic | Win rate | Gate |
+| --- | ------------------------ | -------- | ---- |
 | 16→32 | **+2.39 dB** | 79% | PASSED + RGB OK |
 | 32→64 | **+4.10 dB** | 93% | PASSED + RGB OK |
 | 64→128 | **+5.22 dB** | — | PASSED + RGB OK |
 | 128→256 | **+7.36 dB** | — | PASSED + RGB OK |
 
-**Inference POC:** Ace favicon 16×16 → cascade 16→32→64→128→256
+**Artifacts:** `assets/models_cascade/*.tflite`, `poc_out_cascade/`, `poc_cascade_contact.png`,
+`poc_cascade_vs_oneshot.png`.
 
-- Artifacts (local): `poc_out_cascade/` , `poc_cascade_vs_oneshot.png`
-- Judge: `00_contact_sheet.png` (LR \| bilinear \| cascade \| alpha) and `05_model_alpha_restored.png`
-- Compare to old soft one-shot: `poc_out/05_model_alpha_restored.png` vs cascade sheet
+**User visual (Ace):** cascade looked **worse for branding** than bilin / one-shot:
 
-Models on disk: `assets/models_cascade/*.tflite` (not yet swapped into app `assets/models/`).
+- Red field washed toward gray
+- Letter strokes thinned / “hand-drawn” black edges (edge loss dominating)
+- Multi-hop **compounded** errors (each hop fed the previous’s mistakes)
 
+**Lesson:** PSNR/win-rate ≠ brand OK. Heavy edge + cascade is the wrong default for logos.
 
+---
 
-### Hybrid bilin + one-shot composite (2026-08-08)
+### F2 — Diagnosis & training rollback (same day)
 
-User observation: bilin fuller/blurrier; one-shot sharper/thinner. Proposed layering
-one-shot on bilin and cutting bilin halo — implemented as inference POC (no retrain).
+| Cascade v1 choice | Problem | Brand-safe fix |
+| ----------------- | ------- | -------------- |
+| edge_weight **0.35** | Scribble edges, skeletonize fill | **0.08** mild Sobel |
+| Heavy multi-hop degrade | Model invents junk structure | **Mild** LR: ~80% bicubic, rare light JPEG |
+| d=64 / m=8 on 2× | Overfit edge noise | Modest capacity |
+| Cascade as primary path | Error compounds | Prefer single hop + hybrid; cascade **backburner** |
+| MAE alone | Soft but identity OK | Keep MAE **primary** |
+| — | Red→gray | **`color_preserve_loss`** (global mean + blur L1) |
+| — | Thin strokes vs bilin | **`stroke_mass_loss`** (low-pass luma + ink area) |
+
+---
+
+### F3 — Hybrid bilin + model (inference POC, no retrain)
+
+**User insight:** bilin = fuller / blurrier (keeps stroke mass); model = sharper / thinner
+(carves letter fill). Want model **on top of** bilin without destroying brand weight.
 
 Script: `scripts/poc_hybrid_composite.py`  
-Artifacts: `poc_out_hybrid/`
+Artifacts: `poc_out_hybrid/`, `poc_hybrid_contact.png`
 
-| Variant | Idea |
-| ------- | ---- |
-| A freq | lowpass(bilin) + highpass(model) |
-| B mask | model silhouette + bilin hole fill; bg outside mask |
-| C clamp | bilin + clamp(model−bilin) (limit fill carve) |
-| combo | A then B |
+| Variant | Formula / idea | Ace note |
+| ------- | -------------- | -------- |
+| A freq | lowpass(bilin) + highpass(model) | Can look odd / halo |
+| B mask | model silhouette + bilin hole fill | Silhouette can thin |
+| C clamp | bilin + clamp(model−bilin) | Better; still thins if α=1 |
+| combo | A then B | Mixed |
+| cascade×hybrid | hybrid each 2× hop | Color OK; still not brand-best |
 
-Also **hybrid cascade from 16px** (×2 hops): each hop bilin+model→hybrid→next, using cascade v2 models. Color stays near bilin (no v1 gray wash); dark% ~0–1%.
+Also compared **one-shot** `fsrcnn_16x_192` vs cascade hybrids.
 
-Judge: `poc_out_hybrid/00_contact_single_hop.png`, `00_contact_cascade_hybrid.png`.
+---
 
+### F4 — Brand-safe grid (user pick)
+
+Extended POC: `poc_out_hybrid_brand/`, sheets `poc_brand_safe_picks.png`, `poc_brand_safe_full.png`.
+
+| Candidate | Idea | User |
+| --------- | ---- | ---- |
+| bilin alone | Brand mass reference | Full weight, soft |
+| clamp α=1 (full residual clamp) | bilin + clamp(Δ) | **Thins letters** |
+| clamp α=0.25…0.45, small darken | Mild residual | Better than full clamp |
+| edge-only residual | Highpass model only | Mixed |
+| **lerp 80/20 bilin** | 0.8·bilin + 0.2·clamp_full | **Preferred band** |
+| **lerp 70/30 bilin** | 0.7·bilin + 0.3·clamp_full | **Preferred band** |
+| lerp 60/40 | More model | More thin risk |
+
+**User:** variants “pretty much the same”; pick between **80/20 and 70/30**; freeze bilin-first.
+
+**App freeze:** midpoint **t = 0.25** (75/25 equivalent via residual form):
+
+```text
+out = bilin + t * clamp(model − bilin, −max_darken, +max_brighten)
+t = 0.25
+max_darken = 0.12
+max_brighten = 0.35
+```
+
+Equivalent to: `out = (1−t)·bilin + t·(bilin + clamp(Δ))`.
+
+---
+
+### F5 — Wired into production code
+
+#### App — `src/services/iconProcessing.ts`
+
+After successful TFLite `runSync`:
+
+1. White-composite LR RGB (match training domain) — already present
+2. Run model → `outBytes`
+3. **NEW:** `bilinRgb = bilinearUpsampleRgb(rgbIn → outSize)`
+4. **NEW:** `hybridRgb = brandSafeHybridRgb(bilinRgb, outBytes)`
+5. NN-restore alpha; encode PNG
+
+Constants:
+
+- `BRAND_SAFE_LERP_T = 0.25`
+- `BRAND_SAFE_MAX_DARKEN = 0.12`
+- `BRAND_SAFE_MAX_BRIGHTEN = 0.35`
+
+Log line: `[ICON_AI] brand-safe hybrid t=0.25 (bilin + clamped residual)`.
+
+Works on **existing** tflites immediately (no retrain required for hybrid). Retrain improves the
+residual so less “fight” against bilin.
+
+#### Training — production trainers
+
+| Script | Role |
+| ------ | ---- |
+| `scripts/train_fsrcnn_multi.py` | FSRCNN **sharp** production |
+| `scripts/train_espcn_multi.py` | ESPCN **fast** production |
+| `scripts/train_fsrcnn.py` | **Redirect** → `train_fsrcnn_multi.py` |
+| `scripts/train_espcn_fast.py` | **Redirect** → `train_espcn_multi.py` |
+| `scripts/train_espcn_perceptual.py` | **Redirect** → `train_espcn_multi.py` |
+| `scripts/train.sh` + `npm run train:*` | Unchanged entry; calls multi trainers |
+
+**Shared loss (both multi trainers):**
+
+```text
+loss = MAE
+     + 0.10 * (MS-)SSIM
+     + 0.25 * color_preserve_loss   # mean RGB + 5×5 blur L1
+     + 0.20 * stroke_mass_loss      # 7×7 low-pass luma + ink area (anti-thin)
+     + 0.08 * sobel_edge_loss       # mild; --no-edge to disable
+     + 0.02 * VGG perceptual        # only when gate enables it
+```
+
+**Architecture (unchanged correct residual):**
+
+```text
+out = bilinear_upsample(LR) + depth_to_space(zero_init_subpixel_conv(body(LR)))
+```
+
+**LR degradation (mild / brand-safe):**
+
+- ~80% bicubic resize HR→LR
+- else area/bilinear
+- ~20% light JPEG q∈[75,95]
+- **Not** the cascade-v1 heavy multi-hop junk
+
+**Validation gates (still on):** hard-sample PSNR vs bicubic; solid R/G/B color gate; float TFLite only.
+
+---
+
+### F6 — How to train / ship (operator)
+
+```bash
+# VPS / GPU box — full matrix overwrite with brand-safe recipe
+npm run train:models:force          # both fast+sharp
+# or:
+npm run train:models:sharp:force
+npm run train:models:fast:force
+
+# Resume (skip existing tflites):
+npm run train:models
+```
+
+Healthy log markers:
+
+- `ColorPreserve` / `StrokeMass` / `Edge: on (w=0.08)`
+- `[VALIDATE] PASSED` + RGB OK
+- `[TRAIN] WROTE ...tflite`
+
+After copy to laptop `assets/models/`:
+
+```bash
+npm run train:map                   # or generate-model-map
+# rebuild + install APK as usual
+```
+
+Emulator / device check:
+
+1. Log shows model file **and** `brand-safe hybrid t=0.25`
+2. Ace (and a few logos): stroke weight ≈ bilin, slightly crisper, brand still reads
+3. Not silent bilin-only fallback when model exists
+
+**Freeze criteria:** mechanical OK + user visual OK → stop SR churn → open backburner.
+
+---
+
+### F7 — POC artifact index (this session)
+
+| Path | What |
+| ---- | ---- |
+| `poc_out/` | Early one-shot Ace (soft > bilin) |
+| `poc_out_svg/` | SVG-derived LR/HR contact |
+| `poc_out_cascade/` | Cascade v1 hops contact |
+| `poc_cascade_contact.png` / `poc_cascade_vs_oneshot.png` | Cascade vs one-shot |
+| `poc_out_hybrid/` | Hybrid variants A/B/C/combo + cascade hybrid |
+| `poc_hybrid_contact.png` | Hybrid contact |
+| `poc_out_hybrid_brand/` | Brand-safe grid (lerp / clamp / edge-only) |
+| `poc_brand_safe_picks.png` / `poc_brand_safe_full.png` | User pick sheets |
+| `assets/models_cascade/` | Cascade tflites (not app default) |
+| `scripts/poc_upscale_smoke.py` | Desktop smoke vs app path |
+| `scripts/poc_hybrid_composite.py` | Hybrid / brand-safe grids |
+
+---
+
+### F8 — Backburner (after freeze)
+
+1. **App cascade / multi-hop routing** using 2× matrix (only if brand-safe hybrid still not enough)
+2. **Prefer larger crawl sources** (apple-touch, SVG, og:image) — highest brand ROI
+3. Optional: expose lerp `t` in settings (debug)
+4. Optional: drop unused extreme one-shot scales from bundle once routing is smart
+5. GAN / Real-ESRGAN-class — last resort (hallucination risk on trademarks)
+
+---
+
+## Current frozen strategy (summary)
+
+| Layer | Choice |
+| ----- | ------ |
+| **Inference** | TFLite SR → **bilin + 0.25·clamp(residual)** → alpha restore |
+| **Train arch** | Residual FSRCNN/ESPCN, bilin base, zero-init subpixel |
+| **Train loss** | MAE-first + color_preserve + stroke_mass + mild edge + light SSIM/VGG |
+| **Train LR** | Mild degrade (bicubic-heavy, rare light JPEG) |
+| **Export** | Float32 TFLite, no quant |
+| **Entry** | `npm run train:models:force` |
+| **Not default** | Cascade hops, edge w=0.35, heavy degrade, full model residual |
+
+---
 
 ## Changelog
 
-| Date       | Change                                                                        |
-| ---------- | ----------------------------------------------------------------------------- |
-| 2026-08-05 | Initial TRAINING_FIXES (5 commits, loss/val/OOM)                              |
-| 2026-08-06 | GPU memory / isolate / multi-GPU notes → TRAINING_GPU_MEMORY.md               |
-| 2026-08-07 | Residual FSRCNN fix; hard-sample PSNR gate; Ace POC slightly > bicubic        |
-| 2026-08-08 | Research dump; cascade + edge loss + degradations strategy; methods inventory |
-| 2026-08-08 | Cascade POC trained on VPS: all 4 hops PASS (+2.4…+7.4 dB); Ace contact sheet ready |
+| Date | Change |
+| ---- | ------ |
+| 2026-08-05 | Initial TRAINING_FIXES (5 commits, loss/val/OOM) |
+| 2026-08-06 | GPU memory / isolate / multi-GPU → TRAINING_GPU_MEMORY.md |
+| 2026-08-07 | Residual FSRCNN fix; hard-sample PSNR gate; Ace POC slightly > bicubic |
+| 2026-08-08 | Research dump; cascade + edge + degradations strategy drafted |
+| 2026-08-08 | Cascade POC on VPS: hops PASS (+2.4…+7.4 dB); Ace **brand fail** (gray/thin) |
+| 2026-08-08 | Hybrid bilin+model POC (freq/mask/clamp/combo); cascade×hybrid |
+| 2026-08-08 | Brand-safe grid; user prefers lerp **80/20–70/30**; freeze **t=0.25** |
+| 2026-08-08 | App: `brandSafeHybridRgb` in `iconProcessing.ts` |
+| 2026-08-08 | Trainers: color_preserve + stroke_mass + mild edge; ESPCN aligned; legacy redirects |
+| 2026-08-08 | Full matrix retrain via `npm run train:models:force` (in progress) |
+| 2026-08-08 | This doc: Era F full session write-up |
 
+---
+
+## Quick links
+
+| Doc / path | Topic |
+| ---------- | ----- |
+| `TRAINING_FIX_DOCUMENTATION.md` | Early Aug quality commits |
+| `TRAINING_GPU_MEMORY.md` | VRAM, multi-GPU, isolate |
+| `GARBAGE_REPORT.md` | Project autopsy |
+| `CATASTROPHE_ANALYSIS*.md` | Gray/black era |
+| `AI_UPSCALING_IMPLEMENTATION.md` | App AI upscale overview |
+| `package.json` `train:*` | npm train entrypoints |

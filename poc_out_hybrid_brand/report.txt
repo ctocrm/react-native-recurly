@@ -1,0 +1,17 @@
+source: https://www.acehardware.com/favicon.ico
+bilinear: meanRGB=(0.980,0.821,0.845) dark%=0.0 var=0.0499
+oneshot: meanRGB=(0.980,0.822,0.845) dark%=0.0 var=0.0505
+hybrid_freq: meanRGB=(0.981,0.822,0.846) dark%=0.0 var=0.0497
+hybrid_mask: meanRGB=(0.980,0.823,0.846) dark%=0.0 var=0.0506
+hybrid_clamp: meanRGB=(0.980,0.822,0.845) dark%=0.0 var=0.0505
+hybrid_combo: meanRGB=(0.980,0.823,0.846) dark%=0.0 var=0.0507
+Bilinear (brand ref): meanRGB=(0.980,0.821,0.845) dark%=0.0 var=0.0499
+Clamp α1 (thin?): meanRGB=(0.980,0.822,0.845) dark%=0.0 var=0.0505
+Clamp α0.35 d0.03: meanRGB=(0.980,0.821,0.845) dark%=0.0 var=0.0499
+Clamp α0.25 d0.02: meanRGB=(0.980,0.821,0.845) dark%=0.0 var=0.0498
+Clamp α0.45 d0.05: meanRGB=(0.980,0.822,0.845) dark%=0.0 var=0.0500
+Edge-only α0.40: meanRGB=(0.980,0.821,0.845) dark%=0.0 var=0.0499
+Edge-only α0.28: meanRGB=(0.980,0.821,0.845) dark%=0.0 var=0.0499
+Lerp 70/30 bilin: meanRGB=(0.980,0.821,0.845) dark%=0.0 var=0.0500
+Lerp 80/20 bilin: meanRGB=(0.980,0.821,0.845) dark%=0.0 var=0.0500
+Lerp 60/40 bilin: meanRGB=(0.980,0.821,0.845) dark%=0.0 var=0.0501

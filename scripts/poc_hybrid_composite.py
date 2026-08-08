@@ -172,11 +172,51 @@ def hybrid_residual_clamp(
     model: np.ndarray,
     max_darken: float = 0.12,
     max_brighten: float = 0.35,
+    alpha: float = 1.0,
 ) -> np.ndarray:
-    """C: bilin + clamped residual — stop model from carving letter fill."""
+    """C: bilin + α * clamped residual.
+
+    Brand-safe: keep α low and max_darken tiny so stroke weight stays bilin-like.
+    """
     r = model - bilin
     r = np.clip(r, -max_darken, max_brighten)
-    return np.clip(bilin + r, 0.0, 1.0)
+    return np.clip(bilin + float(alpha) * r, 0.0, 1.0)
+
+
+def edge_strength_map(rgb: np.ndarray, blur_r: float = 0.8) -> np.ndarray:
+    """Soft edge mask 0..1 from luminance gradient (protect letter interiors)."""
+    lum = _luma(rgb).astype(np.float32)
+    # Sobel-ish via finite differences
+    gy = np.zeros_like(lum)
+    gx = np.zeros_like(lum)
+    gy[1:, :] = np.abs(lum[1:, :] - lum[:-1, :])
+    gx[:, 1:] = np.abs(lum[:, 1:] - lum[:, :-1])
+    g = gx + gy
+    g = g / (np.percentile(g, 95) + 1e-6)
+    g = np.clip(g, 0.0, 1.0)
+    # slight blur so mask isn't 1px noisy
+    im = Image.fromarray((g * 255).astype(np.uint8), mode="L")
+    im = im.filter(ImageFilter.GaussianBlur(radius=blur_r))
+    return np.asarray(im).astype(np.float32) / 255.0
+
+
+def hybrid_edge_only(
+    bilin: np.ndarray,
+    model: np.ndarray,
+    alpha: float = 0.4,
+    max_darken: float = 0.04,
+    max_brighten: float = 0.2,
+) -> np.ndarray:
+    """Residual only near edges — interiors stay pure bilin (brand mass)."""
+    r = np.clip(model - bilin, -max_darken, max_brighten)
+    e = edge_strength_map(bilin)[..., None]
+    return np.clip(bilin + float(alpha) * r * e, 0.0, 1.0)
+
+
+def hybrid_lerp(bilin: np.ndarray, other: np.ndarray, t: float) -> np.ndarray:
+    """Global brand lock: mostly bilin, a little hybrid/model."""
+    t = float(t)
+    return np.clip((1.0 - t) * bilin + t * other, 0.0, 1.0)
 
 
 def hybrid_combo(bilin: np.ndarray, model: np.ndarray) -> np.ndarray:
@@ -338,6 +378,51 @@ def main() -> int:
             ("Hyb A+B combo", h_combo),
         ],
         out_dir / "00_contact_single_hop.png",
+        tile=args.out_size,
+    )
+
+    # --- Brand-safe grid: bilin owns mass; model only a little snap ---
+    # User: clamp best but letters thinner / lost branding vs bilin.
+    b_clamp_full = hybrid_residual_clamp(bilin, model, max_darken=0.12, max_brighten=0.35, alpha=1.0)
+    b_a35_d03 = hybrid_residual_clamp(bilin, model, max_darken=0.03, max_brighten=0.20, alpha=0.35)
+    b_a25_d02 = hybrid_residual_clamp(bilin, model, max_darken=0.02, max_brighten=0.18, alpha=0.25)
+    b_a45_d05 = hybrid_residual_clamp(bilin, model, max_darken=0.05, max_brighten=0.22, alpha=0.45)
+    b_edge = hybrid_edge_only(bilin, model, alpha=0.40, max_darken=0.04, max_brighten=0.20)
+    b_edge_soft = hybrid_edge_only(bilin, model, alpha=0.28, max_darken=0.025, max_brighten=0.15)
+    b_lerp30 = hybrid_lerp(bilin, b_clamp_full, 0.30)
+    b_lerp20 = hybrid_lerp(bilin, b_clamp_full, 0.20)
+    b_lerp40 = hybrid_lerp(bilin, b_clamp_full, 0.40)
+
+    brand_tiles = [
+        ("Bilinear (brand ref)", bilin),
+        ("Clamp α1 (thin?)", b_clamp_full),
+        ("Clamp α0.35 d0.03", b_a35_d03),
+        ("Clamp α0.25 d0.02", b_a25_d02),
+        ("Clamp α0.45 d0.05", b_a45_d05),
+        ("Edge-only α0.40", b_edge),
+        ("Edge-only α0.28", b_edge_soft),
+        ("Lerp 70/30 bilin", b_lerp30),
+        ("Lerp 80/20 bilin", b_lerp20),
+        ("Lerp 60/40 bilin", b_lerp40),
+    ]
+    for lab, arr in brand_tiles:
+        slug = lab.lower().replace(" ", "_").replace("(", "").replace(")", "").replace("?", "").replace("/", "_")
+        save_rgb(out_dir / f"brand_{slug}.png", arr)
+        lines.append(stats(lab, arr))
+
+    label_sheet(brand_tiles, out_dir / "00_contact_brand_safe.png", tile=args.out_size)
+    # Compact "pick me" sheet: bilin | thin clamp | best candidates
+    label_sheet(
+        [
+            ("Bilinear REF", bilin),
+            ("Old clamp α1", b_clamp_full),
+            ("α0.35 d0.03", b_a35_d03),
+            ("α0.25 d0.02", b_a25_d02),
+            ("Edge α0.28", b_edge_soft),
+            ("Lerp 80/20", b_lerp20),
+            ("Lerp 70/30", b_lerp30),
+        ],
+        out_dir / "00_contact_brand_picks.png",
         tile=args.out_size,
     )
 

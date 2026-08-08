@@ -1,4 +1,8 @@
-"""Multi-resolution ESPCN model training with perceptual + MS-SSIM loss."""
+"""Multi-resolution ESPCN: brand-safe residual SR (aligned with FSRCNN).
+
+MAE + color preserve + stroke-mass + light edge; mild LR degradations.
+App applies bilin lerp hybrid at inference. See TRAINING_FIXES.md.
+"""
 import os
 import sys
 import re
@@ -42,6 +46,7 @@ else:
 
 FORCE = "--force" in sys.argv
 NO_PERCEPTUAL = "--no-perceptual" in sys.argv
+USE_EDGE_LOSS = "--no-edge" not in sys.argv
 SPECIFIC_MODEL = None
 INPUT_SIZE = None
 OUTPUT_DIR = None
@@ -182,8 +187,51 @@ def _sanitize_grad(x):
     return tf.identity(x), grad
 
 
-def make_combined_loss(output_size: int, use_perceptual: bool = True):
-    """Build combined MAE + (MS-)SSIM + perceptual loss for fixed output size."""
+def sobel_edge_loss(y_true, y_pred):
+    """Mild Sobel L1 — brand-safe (heavy edge thinned Ace / gray wash)."""
+    y_true = tf.cast(y_true, tf.float32)
+    y_pred = tf.cast(y_pred, tf.float32)
+    t = tf.reduce_mean(y_true, axis=-1, keepdims=True)
+    p = tf.reduce_mean(y_pred, axis=-1, keepdims=True)
+    return tf.reduce_mean(tf.abs(tf.image.sobel_edges(t) - tf.image.sobel_edges(p)))
+
+
+def color_preserve_loss(y_true, y_pred):
+    y_true = tf.cast(y_true, tf.float32)
+    y_pred = tf.cast(y_pred, tf.float32)
+    mean_l1 = tf.reduce_mean(tf.abs(
+        tf.reduce_mean(y_true, axis=[1, 2]) - tf.reduce_mean(y_pred, axis=[1, 2])
+    ))
+    tb = tf.nn.avg_pool2d(y_true, ksize=5, strides=1, padding="SAME")
+    pb = tf.nn.avg_pool2d(y_pred, ksize=5, strides=1, padding="SAME")
+    return mean_l1 + tf.reduce_mean(tf.abs(tb - pb))
+
+
+def stroke_mass_loss(y_true, y_pred):
+    """Anti-thin: keep low-pass luma / ink mass (brand stroke weight)."""
+    y_true = tf.cast(y_true, tf.float32)
+    y_pred = tf.cast(y_pred, tf.float32)
+    lt = 0.299 * y_true[..., 0:1] + 0.587 * y_true[..., 1:2] + 0.114 * y_true[..., 2:3]
+    lp = 0.299 * y_pred[..., 0:1] + 0.587 * y_pred[..., 1:2] + 0.114 * y_pred[..., 2:3]
+    lt_b = tf.nn.avg_pool2d(lt, ksize=7, strides=1, padding="SAME")
+    lp_b = tf.nn.avg_pool2d(lp, ksize=7, strides=1, padding="SAME")
+    mass_l1 = tf.reduce_mean(tf.abs(lt_b - lp_b))
+    area = tf.abs(tf.reduce_mean(1.0 - lt_b) - tf.reduce_mean(1.0 - lp_b))
+    return mass_l1 + 0.5 * area
+
+
+def make_combined_loss(
+    output_size: int,
+    use_perceptual: bool = True,
+    use_edge: bool = True,
+    edge_weight: float = 0.08,
+    color_weight: float = 0.25,
+    mass_weight: float = 0.20,
+):
+    """Brand-safe: MAE + color + stroke-mass + light edge (+ optional VGG).
+
+    Aligned with train_fsrcnn_multi.py / app bilin-lerp hybrid. See TRAINING_FIXES.md.
+    """
     n_scales = _ssim_scales_for(output_size)
 
     def _finite(value):
@@ -212,18 +260,23 @@ def make_combined_loss(output_size: int, use_perceptual: bool = True):
             return 1.0 - tf.reduce_mean(_finite(s))
 
     def combined_loss(y_true, y_pred):
-        # mixed_float16: model preds are fp16, labels fp32 — unify before MAE/SSIM/VGG
         y_true = tf.cast(y_true, tf.float32)
         y_pred = tf.cast(y_pred, tf.float32)
         y_true = tf.clip_by_value(y_true, 0.0, 1.0)
         y_pred = tf.clip_by_value(y_pred, 0.0, 1.0)
         mae = tf.reduce_mean(tf.abs(y_true - y_pred))
         ssim = ssim_term(y_true, y_pred)
+        loss = (
+            mae
+            + 0.10 * ssim
+            + color_weight * color_preserve_loss(y_true, y_pred)
+            + mass_weight * stroke_mass_loss(y_true, y_pred)
+        )
+        if use_edge and USE_EDGE_LOSS:
+            loss = loss + edge_weight * sobel_edge_loss(y_true, y_pred)
         if use_perceptual:
-            perceptual = perceptual_loss(y_true, y_pred)
-            # Match FSRCNN perceptual weight for better feature learning at high scales
-            return mae + 0.15 * ssim + 0.05 * perceptual
-        return mae + 0.15 * ssim
+            loss = loss + 0.02 * perceptual_loss(y_true, y_pred)
+        return loss
 
     return combined_loss
 
@@ -430,6 +483,29 @@ def generate_real_icon_data(n: int, target_size: int) -> np.ndarray:
     )
     return hr_images
 
+
+def _degrade_to_lr(hr_batch: np.ndarray, input_size: int, rng: np.random.Generator) -> np.ndarray:
+    """Mild LR (brand-safe): mostly clean bicubic; rare light JPEG. Matches FSRCNN."""
+    from PIL import Image
+    from io import BytesIO
+
+    n = hr_batch.shape[0]
+    lr = np.zeros((n, input_size, input_size, 3), dtype=np.float32)
+    for i in range(n):
+        img = hr_batch[i]
+        method = "bicubic" if rng.random() < 0.80 else str(rng.choice(["area", "bilinear"]))
+        small = tf.image.resize(img, (input_size, input_size), method=method).numpy()
+        if rng.random() < 0.20:
+            q = int(rng.integers(75, 95))
+            pil = Image.fromarray(np.clip(small * 255.0, 0, 255).astype(np.uint8), mode="RGB")
+            buf = BytesIO()
+            pil.save(buf, format="JPEG", quality=q)
+            buf.seek(0)
+            small = np.asarray(Image.open(buf).convert("RGB"), dtype=np.float32) / 255.0
+        lr[i] = np.clip(small, 0.0, 1.0).astype(np.float32)
+    return lr
+
+
 def generate_training_data(input_size: int, scale: int, n: int = 1000):
     """Generate training data for a specific input/output size."""
     output_size = input_size * scale
@@ -449,7 +525,7 @@ def generate_training_data(input_size: int, scale: int, n: int = 1000):
             c = tuple(float(x) for x in rng.uniform(0.15, 0.95, size=3))
         solids[i, ..., 0], solids[i, ..., 1], solids[i, ..., 2] = c
     hr = np.concatenate([hr, solids], axis=0)
-    lr = tf.image.resize(hr, (input_size, input_size), method="bicubic").numpy()
+    lr = _degrade_to_lr(hr, input_size, np.random.default_rng(7))
     return lr, hr
 
 
@@ -525,13 +601,14 @@ def train_and_export_model(model_dir: str, input_size: int, scale: int, epochs: 
         optimizer = keras.optimizers.Adam(learning_rate=lr, clipnorm=1.0)
         model.compile(
             optimizer=optimizer,
-            loss=make_combined_loss(output_size, use_perceptual=use_perceptual),
+            loss=make_combined_loss(output_size, use_perceptual=use_perceptual, use_edge=USE_EDGE_LOSS),
             jit_compile=False,
         )
         print(f"[TRAIN] Model params: {model.count_params()}")
         print(f"[TRAIN] MS-SSIM scales: {_ssim_scales_for(output_size)} (output {output_size}px)")
         print(f"[TRAIN] Batch size: {batch_size} (per GPU: {batch_size // strategy.num_replicas_in_sync}), LR: {lr:.2e}")
-        print(f"[TRAIN] Mixed precision: disabled (float32), Perceptual loss: {'enabled' if use_perceptual else 'disabled'}")
+        print(f"[TRAIN] Mixed precision: disabled (float32), Perceptual: {'on' if use_perceptual else 'off'}, "
+              f"Edge: {'on' if USE_EDGE_LOSS else 'off'} (w=0.08), ColorPreserve+StrokeMass: on")
 
         lr_data, hr_data = generate_training_data(input_size, scale)
         # Shuffle to mix real/synthetic
