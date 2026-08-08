@@ -121,13 +121,32 @@ run_trainer() {
     "$VENV_PYTHON" "$script_path" "${CMD_ARGS[@]}"
 }
 
+# Do not abort sharp when fast has partial failures (set -e would skip FSRCNN).
+TRAIN_RC=0
 case "$QUALITY" in
     both)
+        set +e
         run_trainer "fast"
+        FAST_RC=$?
+        set -e
+        if [ "$FAST_RC" -ne 0 ]; then
+            echo "[TRAIN] Fast finished with failures (rc=$FAST_RC) — still running sharp"
+            TRAIN_RC=$FAST_RC
+        fi
+        set +e
         run_trainer "sharp"
+        SHARP_RC=$?
+        set -e
+        if [ "$SHARP_RC" -ne 0 ]; then
+            echo "[TRAIN] Sharp finished with failures (rc=$SHARP_RC)"
+            TRAIN_RC=$SHARP_RC
+        fi
         ;;
     fast|sharp)
+        set +e
         run_trainer "$QUALITY"
+        TRAIN_RC=$?
+        set -e
         ;;
 esac
 
@@ -140,3 +159,8 @@ node "$SCRIPT_DIR/generate-model-registry.js"
 
 echo ""
 echo "[TRAIN] Done."
+
+if [ "${TRAIN_RC:-0}" -ne 0 ]; then
+    echo "[TRAIN] Done with failures (rc=$TRAIN_RC)."
+    exit "$TRAIN_RC"
+fi

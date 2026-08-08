@@ -46,7 +46,10 @@ else:
 
 FORCE = "--force" in sys.argv
 NO_PERCEPTUAL = "--no-perceptual" in sys.argv
-USE_EDGE_LOSS = "--no-edge" not in sys.argv
+# Default OFF: tf.image.sobel_edges → MirrorPad crashes multi-GPU on many sizes
+# (brand-safe reintro regression). App hybrid + color/stroke_mass do not need it.
+# Opt-in only: --edge
+USE_EDGE_LOSS = "--edge" in sys.argv
 SPECIFIC_MODEL = None
 INPUT_SIZE = None
 OUTPUT_DIR = None
@@ -785,6 +788,8 @@ def _run_jobs_in_subprocesses(jobs, script_path: str) -> int:
             cmd.append("--force")
         if NO_PERCEPTUAL:
             cmd.append("--no-perceptual")
+        if USE_EDGE_LOSS:
+            cmd.append("--edge")
         if OUTPUT_DIR:
             cmd.append(f"--output-dir={OUTPUT_DIR}")
         env = os.environ.copy()

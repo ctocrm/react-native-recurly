@@ -49,7 +49,9 @@ else:
 FORCE = "--force" in sys.argv
 NO_PERCEPTUAL = "--no-perceptual" in sys.argv
 # Default ON: edge/Sobel loss for sharper logos (research + user quality bar).
-USE_EDGE_LOSS = "--no-edge" not in sys.argv
+# Default OFF: sobel_edges/MirrorPad multi-GPU crashes (see ESPCN full-matrix log).
+# Opt-in: --edge. Keep --no-edge as no-op for old cmds.
+USE_EDGE_LOSS = "--edge" in sys.argv
 # Prefer cascade 2x rungs only (16-32-64-128-192 path).
 CASCADE_RUNGS = "--cascade-rungs" in sys.argv
 SPECIFIC_MODEL = None
@@ -898,8 +900,8 @@ def _run_jobs_in_subprocesses(jobs, script_path: str) -> int:
             cmd.append("--force")
         if NO_PERCEPTUAL:
             cmd.append("--no-perceptual")
-        if not USE_EDGE_LOSS:
-            cmd.append("--no-edge")
+        if USE_EDGE_LOSS:
+            cmd.append("--edge")
         if CASCADE_RUNGS:
             cmd.append("--cascade-rungs")
         if OUTPUT_DIR:
