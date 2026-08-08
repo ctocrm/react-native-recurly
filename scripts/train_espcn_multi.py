@@ -1,7 +1,7 @@
 """Multi-resolution ESPCN: brand-safe residual SR (aligned with FSRCNN).
 
 MAE + color preserve + stroke-mass + light edge; mild LR degradations.
-App applies bilin lerp hybrid at inference. See TRAINING_FIXES.md.
+App applies bilin lerp hybrid at inference. See AI_UPSCALING.md.
 """
 import os
 import sys
@@ -230,7 +230,7 @@ def make_combined_loss(
 ):
     """Brand-safe: MAE + color + stroke-mass + light edge (+ optional VGG).
 
-    Aligned with train_fsrcnn_multi.py / app bilin-lerp hybrid. See TRAINING_FIXES.md.
+    Aligned with train_fsrcnn_multi.py / app bilin-lerp hybrid. See AI_UPSCALING.md.
     """
     n_scales = _ssim_scales_for(output_size)
 

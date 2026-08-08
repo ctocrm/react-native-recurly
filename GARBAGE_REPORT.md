@@ -1,5 +1,7 @@
 # GARBAGE REPORT — jsmastery / react-native-recurly
 
+
+> **Doc update 2026-08-08:** `TRAINING_FIXES.md`, `TRAINING_FIX_DOCUMENTATION.md`, `TRAINING_GPU_MEMORY.md`, and `AI_UPSCALING_IMPLEMENTATION.md` were **merged** into [`AI_UPSCALING.md`](./AI_UPSCALING.md). Old filenames are stubs. Historical complaints below about dual sources of truth for those four files are **resolved** by that merge; CATASTROPHE_* / this report remain separate.
 **Generated:** 2026-08-05  
 **Sources:** 88 Cline sessions (2026-06-24 → 2026-08-05), 1 Claude Code session, 182 git commits (2026-06-16 → 2026-08-05), full docs + codebase + training scripts + on-disk artifacts.
 

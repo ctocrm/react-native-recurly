@@ -1,6 +1,6 @@
 """Multi-resolution FSRCNN: brand-safe residual SR (bilin base).
 
-Strategy (see TRAINING_FIXES.md): MAE + color + stroke-mass + light edge;
+Strategy (see AI_UPSCALING.md): MAE + color + stroke-mass + light edge;
 mild LR degradations; app applies bilin lerp hybrid at inference. Prefer 2x/4x +
 L1+Sobel edge+
 SSIM, degradation-aware LR, higher capacity on 2x. Float TFLite only.
@@ -274,7 +274,7 @@ def make_combined_loss(
     """MAE-first residual + color + stroke-mass + light edge (+ optional VGG).
 
     Brand-safe training (2026-08): bilin residual base; do not thin strokes.
-    App inference also lerps bilin+model (t≈0.25). See TRAINING_FIXES.md.
+    App inference also lerps bilin+model (t≈0.25). See AI_UPSCALING.md.
     """
     n_scales = _ssim_scales_for(output_size)
 

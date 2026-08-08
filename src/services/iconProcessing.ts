@@ -318,7 +318,7 @@ export function getModelForUpscale(
 /**
  * Brand-safe hybrid (Ace POC 2026-08-08): bilin owns stroke mass; model is a
  * mild residual. User preferred lerp 80/20–70/30 over full clamp (thinned letters).
- * See TRAINING_FIXES.md / scripts/poc_hybrid_composite.py.
+ * See AI_UPSCALING.md / scripts/poc_hybrid_composite.py.
  */
 const BRAND_SAFE_LERP_T = 0.25; // between 80/20 and 70/30
 const BRAND_SAFE_MAX_DARKEN = 0.12;

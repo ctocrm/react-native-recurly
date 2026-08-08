@@ -2,7 +2,7 @@
 """DEPRECATED — redirects to brand-safe multi trainer `train_espcn_multi.py`.
 
 Production: MAE + color preserve + stroke-mass + light edge; residual bilin base.
-App inference: bilin lerp hybrid t≈0.25. See TRAINING_FIXES.md.
+App inference: bilin lerp hybrid t≈0.25. See AI_UPSCALING.md.
 """
 from __future__ import annotations
 
