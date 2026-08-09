@@ -1,0 +1,4476 @@
+=== package.json ===
+{
+  "name": "jsmastery",
+  "main": "expo-router/entry",
+  "version": "1.0.0",
+  "scripts": {
+    "local:start": "./scripts/build-android.sh --arch x86_64 --dev --watch",
+    "local:start:cache": "./scripts/build-android.sh --arch x86_64 --dev --watch --cache",
+    "start": "expo start",
+    "reset-project": "node ./scripts/reset-project.js",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "web": "expo start --web",
+    "lint": "expo lint",
+    "generate-model-map": "node scripts/generate-model-map.js",
+    "prebuild:android": "expo prebuild --clean --platform android",
+    "prebuild:ios": "expo prebuild --clean --platform ios",
+    "train:setup": "bash scripts/train-setup.sh",
+    "train:setup:gpu": "bash scripts/train-setup.sh --gpu",
+    "train:setup:cpu": "bash scripts/train-setup.sh --cpu",
+    "train:registry": "node scripts/generate-model-registry.js",
+    "train:map": "node scripts/generate-model-map.js",
+    "train:models": "bash scripts/train.sh --both",
+    "train:models:force": "bash scripts/train.sh --both --force",
+    "train:models:input-size": "bash scripts/train.sh --both --input-size",
+    "train:models:force:input-size": "bash scripts/train.sh --both --force --input-size",
+    "train:models:model": "bash scripts/train.sh --both --model",
+    "train:models:force:model": "bash scripts/train.sh --both --force --model",
+    "train:models:fast": "bash scripts/train.sh --fast",
+    "train:models:fast:force": "bash scripts/train.sh --fast --force",
+    "train:models:fast:input-size": "bash scripts/train.sh --fast --input-size",
+    "train:models:fast:force:input-size": "bash scripts/train.sh --fast --force --input-size",
+    "train:models:fast:model": "bash scripts/train.sh --fast --model",
+    "train:models:fast:force:model": "bash scripts/train.sh --fast --force --model",
+    "train:models:sharp": "bash scripts/train.sh --sharp",
+    "train:models:sharp:force": "bash scripts/train.sh --sharp --force",
+    "train:models:sharp:input-size": "bash scripts/train.sh --sharp --input-size",
+    "train:models:sharp:force:input-size": "bash scripts/train.sh --sharp --force --input-size",
+    "train:models:sharp:model": "bash scripts/train.sh --sharp --model",
+    "train:models:sharp:force:model": "bash scripts/train.sh --sharp --force --model",
+    "build:android": "./scripts/build-android.sh",
+    "build:android:watch": "./scripts/build-android.sh --watch",
+    "build:android:dev": "./scripts/build-android.sh --dev",
+    "build:android:dev:cache": "./scripts/build-android.sh --dev --cache",
+    "build:android:dev:watch": "./scripts/build-android.sh --dev --watch",
+    "build:android:dev:watch:cache": "./scripts/build-android.sh --dev --watch --cache",
+    "build:android:all": "./scripts/build-android.sh --arch all",
+    "build:android:arm64-v8a": "./scripts/build-android.sh --arch arm64-v8a --install",
+    "build:android:arm64-v8a:cache": "./scripts/build-android.sh --arch arm64-v8a --install --cache",
+    "build:android:x86_64": "./scripts/build-android.sh --arch x86_64 --install",
+    "build:android:x86_64:cache": "./scripts/build-android.sh --arch x86_64 --install --cache",
+    "build:android:armeabi-v7a": "./scripts/build-android.sh --arch armeabi-v7a --install",
+    "build:android:armeabi-v7a:cache": "./scripts/build-android.sh --arch armeabi-v7a --install --cache",
+    "build:android:x86": "./scripts/build-android.sh --arch x86 --install",
+    "build:android:x86:cache": "./scripts/build-android.sh --arch x86 --install --cache",
+    "build:android:watch:all": "./scripts/build-android.sh --watch --arch all",
+    "build:android:watch:arm64-v8a": "./scripts/build-android.sh --watch --arch arm64-v8a",
+    "build:android:watch:x86_64": "./scripts/build-android.sh --watch --arch x86_64",
+    "build:android:watch:armeabi-v7a": "./scripts/build-android.sh --watch --arch armeabi-v7a",
+    "build:android:watch:x86": "./scripts/build-android.sh --watch --arch x86",
+    "build:android:dev:all": "./scripts/build-android.sh --dev --arch all",
+    "build:android:dev:all:cache": "./scripts/build-android.sh --dev --arch all --cache",
+    "build:android:dev:arm64-v8a": "./scripts/build-android.sh --dev --arch arm64-v8a",
+    "build:android:dev:arm64-v8a:cache": "./scripts/build-android.sh --dev --arch arm64-v8a --cache",
+    "build:android:dev:x86_64": "./scripts/build-android.sh --dev --arch x86_64",
+    "build:android:dev:x86_64:cache": "./scripts/build-android.sh --dev --arch x86_64 --cache",
+    "build:android:dev:armeabi-v7a": "./scripts/build-android.sh --dev --arch armeabi-v7a",
+    "build:android:dev:armeabi-v7a:cache": "./scripts/build-android.sh --dev --arch armeabi-v7a --cache",
+    "build:android:dev:x86": "./scripts/build-android.sh --dev --arch x86",
+    "build:android:dev:x86:cache": "./scripts/build-android.sh --dev --arch x86 --cache",
+    "build:android:watch:install:arm64-v8a": "./scripts/build-android.sh --watch --arch arm64-v8a --install",
+    "build:android:watch:install:x86_6
+
+=== APP TSX FILES ===
+
+--- app/(auth)/_layout.tsx (178 chars) ---
+import "@/global.css";
+import { Stack } from "expo-router";
+
+const RootLayout = () => {
+  return <Stack screenOptions={{ headerShown: false }} />;
+};
+
+export default RootLayout;
+
+
+--- app/(auth)/signIn.tsx (13893 chars) ---
+import { useAuth, useSignIn } from "@clerk/expo";
+import { Link, useRouter, type Href } from "expo-router";
+import { styled } from "nativewind";
+import { usePostHog } from "posthog-react-native";
+import { useEffect, useRef, useState } from "react";
+import {
+  Keyboard,
+  KeyboardAvoidingView,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
+import {
+  SafeAreaView as RNSafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
+
+const SafeAreaView = styled(RNSafeAreaView);
+
+const SignIn = () => {
+  const { signIn, errors, fetchStatus } = useSignIn();
+  const { isSignedIn, signOut } = useAuth();
+  const router = useRouter();
+  const posthog = usePostHog();
+  const scrollRef = useRef<ScrollView>(null);
+  const insets = useSafeAreaInsets();
+
+  const [emailAddress, setEmailAddress] = useState("");
+  const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
+
+  // Validation states
+  const [emailTouched, setEmailTouched] = useState(false);
+  const [passwordTouched, setPasswordTouched] = useState(false);
+
+  useEffect(() => {
+    const sub = Keyboard.addListener("keyboardDidShow", () => {
+      scrollRef.current?.scrollToEnd({ animated: true });
+    });
+    return () => sub.remove();
+  }, []);
+
+  // Client-side validation
+  const emailValid =
+    emailAddress.length === 0 ||
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailAddress);
+  const passwordValid = password.length > 0;
+  const formValid =
+    emailAddress.length > 0 && password.length > 0 && emailValid;
+
+  const handleSubmit = async () => {
+    if (!formValid) return;
+
+    // If already signed in, redirect to the main app
+    if (isSignedIn) {
+      router.replace("/(tabs)" as Href);
+      return;
+    }
+
+    posthog.capture("sign_in_form_submitted");
+
+    const { error } = await signIn.password({
+      emailAddress,
+      password,
+    });
+
+    if (error) {
+      // Handle "already signed in" error — Clerk's local state is out of sync
+      // with the backend. Sign out first, then retry the sign-in.
+      if (
+        error.code === "api_response_error" &&
+        error.message === "You're already signed in."
+      ) {
+        await signOut();
+        // Retry sign-in after clearing the stale session
+        const retryResult = await signIn.password({
+          emailAddress,
+          password,
+        });
+        if (retryResult.error) {
+          console.error("Sign-in failed after session reset", {
+            code: retryResult.error.code,
+            message: retryResult.error.message,
+          });
+          return;
+        }
+        // Fall through to handle the successful sign-in below
+      } else {
+        console.error("Sign-in failed", {
+          code: error.code,
+          message: error.message,
+        });
+        posthog.capture("user_sign_in_failed", {
+          error_code: error.code,
+          error_message: error.message,
+        });
+        return;
+      }
+    }
+
+    if (signIn.status === "complete") {
+      await signIn.finalize({
+        navigate: ({ session, decorateUrl }) => {
+          if (session?.currentTask) {
+            console.log(session?.currentTask);
+            return;
+          }
+
+          posthog.identify(emailAddress, {
+            $set: { email: emailAddress },
+            $set_once: { first_sign_in_date: new Date().toISOString() },
+          });
+          posthog.capture("user_signed_in");
+
+          const url = decorateUrl("/(tabs)");
+          if (url.startsWith("http")) {
+            // Only use window.location on web platform
+            if (typeof window !== "undefined" && window.location) {
+              window.location.href = url;
+            } else {
+              // On native, just use router navigation
+              router.replace("/(tabs)" as Href);
+            }
+          } else {
+            router.replace(url as Href);
+          }
+        },
+      });
+    } else if (signIn.status === "needs_second_factor") {
+      console.log("Sign-in needs second factor
+...[trunc]
+
+--- app/(auth)/signUp.tsx (12807 chars) ---
+import { useSignUp } from "@clerk/expo";
+import { Link, useRouter, type Href } from "expo-router";
+import { styled } from "nativewind";
+import { usePostHog } from "posthog-react-native";
+import { useEffect, useRef, useState } from "react";
+import {
+  Keyboard,
+  KeyboardAvoidingView,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
+import {
+  SafeAreaView as RNSafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
+
+const SafeAreaView = styled(RNSafeAreaView);
+
+const SignUp = () => {
+  const { signUp, errors, fetchStatus } = useSignUp();
+  const router = useRouter();
+  const posthog = usePostHog();
+  const scrollRef = useRef<ScrollView>(null);
+  const insets = useSafeAreaInsets();
+
+  const [emailAddress, setEmailAddress] = useState("");
+  const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
+
+  // Validation states
+  const [emailTouched, setEmailTouched] = useState(false);
+  const [passwordTouched, setPasswordTouched] = useState(false);
+
+  useEffect(() => {
+    const sub = Keyboard.addListener("keyboardDidShow", () => {
+      scrollRef.current?.scrollToEnd({ animated: true });
+    });
+    return () => sub.remove();
+  }, []);
+
+  // Client-side validation
+  const emailValid =
+    emailAddress.length === 0 ||
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailAddress);
+  const passwordValid = password.length === 0 || password.length >= 8;
+  const formValid =
+    emailAddress.length > 0 && password.length >= 8 && emailValid;
+
+  const handleSubmit = async () => {
+    if (!formValid) return;
+
+    posthog.capture("sign_up_form_submitted");
+
+    const { error } = await signUp.password({
+      emailAddress,
+      password,
+    });
+
+    if (error) {
+      console.error("Sign-up failed", {
+        code: error.code,
+        message: error.message,
+      });
+      posthog.capture("user_sign_up_failed", {
+        error_code: error.code,
+        error_message: error.message,
+      });
+      return;
+    }
+
+    // Send verification email
+    if (!error) {
+      await signUp.verifications.sendEmailCode();
+      posthog.capture("sign_up_email_verification_sent");
+    }
+  };
+
+  const handleVerify = async () => {
+    const { error } = await signUp.verifications.verifyEmailCode({
+      code,
+    });
+
+    if (error) {
+      console.error("Email verification failed", {
+        code: error.code,
+        message: error.message,
+      });
+      posthog.capture("sign_up_verification_failed", {
+        error_code: error.code,
+        error_message: error.message,
+      });
+      return;
+    }
+
+    if (signUp.status === "complete") {
+      await signUp.finalize({
+        navigate: ({ session, decorateUrl }) => {
+          if (session?.currentTask) {
+            console.log(session?.currentTask);
+            return;
+          }
+
+          posthog.identify(emailAddress, {
+            $set: { email: emailAddress },
+            $set_once: { sign_up_date: new Date().toISOString() },
+          });
+          posthog.capture("user_signed_up");
+
+          const url = decorateUrl("/(tabs)");
+          if (url.startsWith("http")) {
+            // Only use window.location on web platform
+            if (typeof window !== "undefined" && window.location) {
+              window.location.href = url;
+            } else {
+              // On native, just use router navigation
+              router.replace("/(tabs)" as Href);
+            }
+          } else {
+            router.replace(url as Href);
+          }
+        },
+      });
+    } else {
+      console.error("Sign-up attempt not complete", {
+        status: signUp.status,
+      });
+    }
+  };
+
+  // Don't show anything if sign-up is complete
+  if (signUp.status === "complete") {
+    return null;
+  }
+
+  // Show verification screen if email needs verification
+  if (
+    signUp.status === "missing_requirements" &&
+    signUp.unverifiedFields.includes("email_address") &&
+    signUp.missingFields.length === 0
+  ) {
+    return (
+      <SafeAreaView
+      
+...[trunc]
+
+--- app/(tabs)/_layout.tsx (3597 chars) ---
+import { tabs } from "@/constants/data";
+import { colors, components } from "@/constants/theme";
+import HiddenSearchWebView from "@/src/components/HiddenSearchWebView";
+import { posthog } from "@/src/config/posthog";
+import { CloudSyncProvider } from "@/src/context/CloudSyncContext";
+import { DatabaseProvider } from "@/src/context/DatabaseProvider";
+import { SubscriptionProvider } from "@/src/context/SubscriptionContext";
+
+import { useAuth, useUser } from "@clerk/expo";
+import clsx from "clsx";
+import { Redirect, Tabs } from "expo-router";
+import { useEffect, useRef } from "react";
+import { ActivityIndicator, Image, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+const tabBar = components.tabBar;
+
+interface TabIconProps {
+  focused: boolean;
+  icon: any; // Static imports return number (require) or ImageSourcePropType
+}
+
+const TabIcon = ({ focused, icon }: TabIconProps) => {
+  return (
+    <View className={clsx("tabs-pill", focused && "tabs-active")}>
+      <Image source={icon} resizeMode="contain" className="tabs-glyph" />
+    </View>
+  );
+};
+
+const TabLayout = () => {
+  const { isSignedIn, isLoaded } = useAuth();
+  const { user } = useUser();
+  const insets = useSafeAreaInsets();
+  const hasIdentified = useRef(false);
+
+  // Identify returning users whose session is restored from Clerk's token cache
+  useEffect(() => {
+    if (isLoaded && isSignedIn && user && !hasIdentified.current) {
+      const email = user.primaryEmailAddress?.emailAddress;
+      if (email) {
+        posthog.identify(email, {
+          $set: { email, name: user.fullName },
+          $set_once: { first_seen_date: new Date().toISOString() },
+        });
+        hasIdentified.current = true;
+      }
+    }
+  }, [isLoaded, isSignedIn, user]);
+
+  if (!isLoaded) {
+    return (
+      <View className="flex-1 items-center justify-center bg-white">
+        <ActivityIndicator />
+      </View>
+    );
+  }
+
+  if (!isSignedIn) {
+    return <Redirect href={"/(auth)/signIn"} />;
+  }
+
+  return (
+    <DatabaseProvider>
+      <SubscriptionProvider>
+        <CloudSyncProvider>
+          {/* Hidden WebView for background scraping - bypasses anti-bot measures */}
+          <HiddenSearchWebView />
+          <Tabs
+            screenOptions={{
+              headerShown: false,
+              tabBarShowLabel: false,
+              tabBarStyle: {
+                position: "absolute",
+                bottom: Math.max(insets.bottom, tabBar.horizontalInset),
+                height: tabBar.height,
+                marginHorizontal: tabBar.horizontalInset,
+                borderRadius: tabBar.radius,
+                backgroundColor: colors.primary,
+                borderTopWidth: 0,
+                elevation: 0,
+              },
+              tabBarItemStyle: {
+                paddingVertical: tabBar.height / 2 - tabBar.iconFrame / 1.6,
+              },
+              tabBarIconStyle: {
+                width: tabBar.iconFrame,
+                height: tabBar.iconFrame,
+                alignItems: "center",
+              },
+            }}
+          >
+            {tabs.map((tab) => (
+              <Tabs.Screen
+                key={tab.name}
+                name={tab.name}
+                options={{
+                  title: tab.title,
+                  tabBarIcon: ({ focused }) => (
+                    <TabIcon focused={focused} icon={tab.icon} />
+                  ),
+                }}
+              />
+            ))}
+          </Tabs>
+        </CloudSyncProvider>
+      </SubscriptionProvider>
+    </DatabaseProvider>
+  );
+};
+
+export default TabLayout;
+
+
+--- app/(tabs)/index.tsx (10769 chars) ---
+import ListHeading from "@/components/ListHeading";
+import SubscriptionCard from "@/components/SubscriptionCard";
+import UpcomingSubscriptionCard from "@/components/UpcomingSubscriptionCard";
+import { icons } from "@/constants/icons";
+import images from "@/constants/images";
+import "@/global.css";
+import { formatCurrency } from "@/lib/utils";
+import CreateSubscriptionModal from "@/src/components/CreateSubscriptionModal";
+import EditSubscriptionModal from "@/src/components/EditSubscriptionModal";
+import SubscriptionIconPickerModal from "@/src/components/SubscriptionIconPickerModal";
+import SubscriptionStatsModal from "@/src/components/SubscriptionStatsModal";
+import UserSettingsModal from "@/src/components/UserSettingsModal";
+import { useSubscriptions } from "@/src/context/SubscriptionContext";
+import { useUser } from "@clerk/expo";
+import dayjs from "dayjs";
+import { useRouter } from "expo-router";
+import { styled } from "nativewind";
+import { usePostHog } from "posthog-react-native";
+import { useMemo, useState } from "react";
+import { FlatList, Image, Pressable, Text, View } from "react-native";
+import { SafeAreaView as RNSafeAreaView } from "react-native-safe-area-context";
+
+const SafeAreaView = styled(RNSafeAreaView);
+
+const App = () => {
+  const router = useRouter();
+  const { user } = useUser();
+  const posthog = usePostHog();
+  const [expandedSubscriptionId, setExpandedSubscriptionId] = useState<
+    string | null
+  >(null);
+  const {
+    subscriptions,
+    addSubscription,
+    updateSubscription,
+    deleteSubscription,
+    updateSubscriptionStatus,
+    getUpcomingSubscriptions,
+  } = useSubscriptions();
+  const [modalVisible, setModalVisible] = useState(false);
+  const [editingSubscription, setEditingSubscription] =
+    useState<Subscription | null>(null);
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [statsModalSubscription, setStatsModalSubscription] =
+    useState<Subscription | null>(null);
+  const [statsModalVisible, setStatsModalVisible] = useState(false);
+  const [userSettingsVisible, setUserSettingsVisible] = useState(false);
+
+  // Icon picker state
+  const [iconPickerSubscription, setIconPickerSubscription] =
+    useState<Subscription | null>(null);
+  const [iconPickerVisible, setIconPickerVisible] = useState(false);
+
+  const displayName =
+    user?.firstName ||
+    user?.fullName ||
+    user?.emailAddresses[0]?.emailAddress ||
+    "User";
+
+  const upcomingSubscriptions = useMemo(
+    () => getUpcomingSubscriptions(7),
+    [getUpcomingSubscriptions],
+  );
+
+  const handleAddSubscriptionTap = () => {
+    posthog.capture("home_add_subscription_tapped");
+    setModalVisible(true);
+  };
+
+  const handleUpcomingSubscriptionTap = (item: UpcomingSubscription) => {
+    posthog.capture("home_upcoming_subscription_tapped", {
+      subscription_id: item.id,
+      subscription_name: item.name,
+      price: item.price,
+      days_left: item.daysLeft,
+    });
+  };
+
+  const handleViewAllUpcoming = () => {
+    posthog.capture("home_view_all_upcoming_tapped");
+    router.push("/(tabs)/subscriptions?filter=upcoming");
+  };
+
+  const handleViewAllSubscriptionsTap = () => {
+    posthog.capture("home_view_all_tapped");
+    router.push("/(tabs)/subscriptions");
+  };
+
+  const handleCreateSubscription = async (subscription: Subscription) => {
+    await addSubscription(subscription);
+  };
+
+  const handleEdit = (sub: Subscription) => {
+    setEditingSubscription(sub);
+    setEditModalVisible(true);
+  };
+
+  const handleSaveEdit = (id: string, data: Partial<Subscription>) => {
+    updateSubscription(id, data);
+  };
+
+  const handleDelete = (sub: Subscription) => {
+    deleteSubscription(sub.id);
+  };
+
+  const handleStatusChange = (
+    sub: Subscription,
+    status: "active" | "paused" | "cancelled",
+  ) => {
+    updateSubscriptionStatus(sub.id, status);
+  };
+
+  const handleViewStats = (sub: Subscription) => {
+    setStatsModalSubscription(sub);
+    setStatsModalVisible(true);
+  };
+
+  // Icon picker handlers
+  co
+...[trunc]
+
+--- app/(tabs)/insights.tsx (12227 chars) ---
+import { icons } from "@/constants/icons";
+import { formatCurrency } from "@/lib/utils";
+import { useSubscriptions } from "@/src/context/SubscriptionContext";
+import { styled } from "nativewind";
+import { usePostHog } from "posthog-react-native";
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  FlatList,
+  Image,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
+import { SafeAreaView as RNSafeAreaView } from "react-native-safe-area-context";
+
+const SafeAreaView = styled(RNSafeAreaView);
+
+const MONTHS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+
+const PERIODS = [
+  "This Month",
+  "Last 3 Months",
+  "Last 6 Months",
+  "Year",
+] as const;
+type Period = (typeof PERIODS)[number];
+
+const categoryIcons: Record<string, any> = {
+  Design: icons.adobe,
+  "Developer Tools": icons.github,
+  "AI Tools": icons.claude,
+};
+
+const categoryColors: Record<string, string> = {
+  Design: "#ff8c42",
+  "Developer Tools": "#e8def8",
+  "AI Tools": "#b8d4e3",
+  Entertainment: "#f5c542",
+  Productivity: "#8fd1bd",
+  Cloud: "#b8e8d0",
+  Music: "#d4a8e8",
+  Other: "#c4c4c4",
+};
+
+const Insights = () => {
+  const posthog = usePostHog();
+  const { subscriptions } = useSubscriptions();
+  const [selectedPeriod, setSelectedPeriod] = useState<Period>("This Month");
+
+  useEffect(() => {
+    posthog.capture("insights_viewed");
+  }, [posthog]);
+
+  // Calculate total monthly spend and category breakdown
+  const { totalMonthlySpend, categoryBreakdown, monthlyChartData } =
+    useMemo(() => {
+      // Filter active subscriptions — exclude cancelled and paused
+      const activeSubs = subscriptions.filter(
+        (s) => s.status !== "cancelled" && s.status !== "paused",
+      );
+
+      let total = 0;
+      const categoryTotals: Record<
+        string,
+        { total: number; count: number; subscriptions: Subscription[] }
+      > = {};
+
+      activeSubs.forEach((sub) => {
+        let monthlyAmount = sub.price;
+        // Normalize to monthly
+        if (sub.billing === "Yearly" || sub.frequency === "Yearly") {
+          monthlyAmount = sub.price / 12;
+        } else if (sub.billing === "Weekly" || sub.frequency === "Weekly") {
+          monthlyAmount = sub.price * 4.33;
+        }
+
+        total += monthlyAmount;
+
+        const category = sub.category || "Other";
+        if (!categoryTotals[category]) {
+          categoryTotals[category] = {
+            total: 0,
+            count: 0,
+            subscriptions: [],
+          };
+        }
+        categoryTotals[category].total += monthlyAmount;
+        categoryTotals[category].count += 1;
+        categoryTotals[category].subscriptions.push(sub);
+      });
+
+      // Sort categories by total spend descending
+      const sortedCategories = Object.entries(categoryTotals)
+        .map(([name, data]) => ({
+          name,
+          total: data.total,
+          count: data.count,
+          subscriptions: data.subscriptions,
+        }))
+        .sort((a, b) => b.total - a.total);
+
+      // Generate estimated monthly chart data as a run-rate projection
+      const currentMonth = new Date().getMonth();
+      const monthsToShow =
+        selectedPeriod === "This Month"
+          ? 1
+          : selectedPeriod === "Last 3 Months"
+            ? 3
+            : selectedPeriod === "Last 6 Months"
+              ? 6
+              : 12;
+
+      const chartData: { label: string; amount: number; estimated: boolean }[] =
+        [];
+      for (let i = monthsToShow - 1; i >= 0; i--) {
+        const monthIndex = (((currentMonth - i) % 12) + 12) % 12;
+        chartData.push({
+          label: MONTHS[monthIndex],
+          amount: total,
+          estimated: i > 0, // past months are estimated, current month is actual run-rate
+        });
+      }
+
+      return {
+        totalMonthlySpend: total,
+        categoryBreakdown: sortedCategories,
+        monthlyChartData: chartData,
+      };
+    }, [subscriptions, selectedPeriod]);
+
+  const max
+...[trunc]
+
+--- app/(tabs)/settings.tsx (23321 chars) ---
+import images from "@/constants/images";
+import ConflictResolutionModal from "@/src/components/ConflictResolutionModal";
+import { useCloudSync } from "@/src/context/CloudSyncContext";
+import { useDatabase } from "@/src/context/DatabaseProvider";
+import { useSubscriptions } from "@/src/context/SubscriptionContext";
+import { useClerk, useUser } from "@clerk/expo";
+import * as DocumentPicker from "expo-document-picker";
+import * as Sharing from "expo-sharing";
+import { styled } from "nativewind";
+import { usePostHog } from "posthog-react-native";
+import { useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
+import { SafeAreaView as RNSafeAreaView } from "react-native-safe-area-context";
+import {
+  executeImportActions,
+  executeNonConflictingImport,
+  exportBackup,
+  importBackup,
+  type ImportScanResult,
+} from "../../services/database";
+
+const SafeAreaView = styled(RNSafeAreaView);
+
+const Settings = () => {
+  const { signOut } = useClerk();
+  const { user } = useUser();
+  const posthog = usePostHog();
+  const { isReady } = useDatabase();
+  const { refreshSubscriptions } = useSubscriptions();
+  const {
+    syncMetadata,
+    isInitialized,
+    isSyncing,
+    lastSyncResult,
+    initializeProvider,
+    authenticate,
+    disconnect,
+    sync,
+    toggleSync,
+  } = useCloudSync();
+
+  const [exporting, setExporting] = useState(false);
+  const [importStep, setImportStep] = useState<
+    "idle" | "selecting" | "scanning" | "resolving" | "importing" | "done"
+  >("idle");
+  const [importResult, setImportResult] = useState<{
+    totalRows: number;
+    conflictingIds: string[];
+    conflictingRows: Record<string, any>[];
+    merged?: number;
+    duplicated?: number;
+  } | null>(null);
+  const [importUri, setImportUri] = useState<string | null>(null);
+  const [selectedProvider, setSelectedProvider] = useState<
+    "google_drive" | "onedrive" | "dropbox" | "owncloud" | "nextcloud"
+  >("google_drive");
+  const [owncloudServerUrl, setOwncloudServerUrl] = useState("");
+
+  // State for the conflict resolution modal
+  const [conflictModalVisible, setConflictModalVisible] = useState(false);
+  const [conflictRows, setConflictRows] = useState<
+    {
+      id: string;
+      name: string;
+      price: number;
+      plan?: string;
+      category?: string;
+      billing?: string;
+      status?: string;
+    }[]
+  >([]);
+
+  // ---------------------------------------------------------------------------
+  // Sign Out
+  // ---------------------------------------------------------------------------
+
+  const handleSignOut = async () => {
+    posthog.capture("user_signed_out");
+    try {
+      await signOut();
+      posthog.reset();
+    } catch (error) {
+      console.error("Sign-out failed:", error);
+    }
+  };
+
+  // ---------------------------------------------------------------------------
+  // Export
+  // ---------------------------------------------------------------------------
+
+  const handleExport = async () => {
+    if (!isReady) return;
+    setExporting(true);
+    posthog.capture("settings_export_started");
+
+    try {
+      const tempPath = await exportBackup();
+      await Sharing.shareAsync(tempPath, {
+        mimeType: "application/octet-stream",
+        dialogTitle: "Save Encrypted Database Backup",
+      });
+      posthog.capture("settings_export_completed");
+    } catch (error) {
+      console.error("Export failed:", error);
+      posthog.capture("settings_export_failed", {
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  // ---------------------------------------------------------------------------
+  // Import
+  // ---------------------------------------------------------------------------
+
+  const handleImport = async () => {
+    if (!isReady) return;
+    setImportStep("selecting");
+    setImportResult(null);
+    setImportUri(null);
+    setConflictRows([]);
+    posthog.
+...[trunc]
+
+--- app/(tabs)/subscriptions.tsx (9694 chars) ---
+import ListHeading from "@/components/ListHeading";
+import SubscriptionCard from "@/components/SubscriptionCard";
+import "@/global.css";
+import EditSubscriptionModal from "@/src/components/EditSubscriptionModal";
+import SubscriptionIconPickerModal from "@/src/components/SubscriptionIconPickerModal";
+import SubscriptionStatsModal from "@/src/components/SubscriptionStatsModal";
+import { useSubscriptions } from "@/src/context/SubscriptionContext";
+import clsx from "clsx";
+import { useLocalSearchParams } from "expo-router";
+import { styled } from "nativewind";
+import { usePostHog } from "posthog-react-native";
+import React, { useEffect, useMemo, useState } from "react";
+import { FlatList, Pressable, Text, TextInput, View } from "react-native";
+import { SafeAreaView as RNSafeAreaView } from "react-native-safe-area-context";
+
+const SafeAreaView = styled(RNSafeAreaView);
+
+const FILTER_OPTIONS = ["All", "Upcoming"] as const;
+
+const Subscriptions = () => {
+  const posthog = usePostHog();
+  const { filter: initialFilter } = useLocalSearchParams<{ filter?: string }>();
+  const {
+    subscriptions,
+    updateSubscription,
+    deleteSubscription,
+    updateSubscriptionStatus,
+    getUpcomingSubscriptions,
+    refreshSubscriptions,
+  } = useSubscriptions();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [expandedSubscriptionId, setExpandedSubscriptionId] = useState<
+    string | null
+  >(null);
+  const [activeFilter, setActiveFilter] = useState<string>(
+    initialFilter === "upcoming" ? "Upcoming" : "All",
+  );
+  const [editingSubscription, setEditingSubscription] =
+    useState<Subscription | null>(null);
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [statsModalSubscription, setStatsModalSubscription] =
+    useState<Subscription | null>(null);
+  const [statsModalVisible, setStatsModalVisible] = useState(false);
+
+  // Icon picker state
+  const [iconPickerSubscription, setIconPickerSubscription] =
+    useState<Subscription | null>(null);
+  const [iconPickerVisible, setIconPickerVisible] = useState(false);
+
+  useEffect(() => {
+    posthog.capture("subscriptions_viewed");
+  }, [posthog]);
+
+  // If navigated with filter=upcoming, switch to Upcoming filter
+  useEffect(() => {
+    if (initialFilter === "upcoming") {
+      setActiveFilter("Upcoming");
+    }
+  }, [initialFilter]);
+
+  const upcomingIds = useMemo(() => {
+    const upcoming = getUpcomingSubscriptions(7);
+    return new Set(upcoming.map((u) => u.id));
+  }, [getUpcomingSubscriptions]);
+
+  const filteredSubscriptions = useMemo(() => {
+    let filtered = subscriptions;
+
+    // Apply filter
+    if (activeFilter === "Upcoming") {
+      filtered = filtered.filter((sub) => upcomingIds.has(sub.id));
+    }
+
+    // Apply search
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter((sub) => {
+        const searchableFields = [
+          sub.name,
+          sub.category,
+          sub.plan,
+          sub.paymentMethod,
+        ];
+        return searchableFields.some(
+          (field) => field && field.toLowerCase().includes(query),
+        );
+      });
+    }
+
+    return filtered;
+  }, [searchQuery, subscriptions, activeFilter, upcomingIds]);
+
+  const handleSearchChange = (text: string) => {
+    setSearchQuery(text);
+  };
+
+  useEffect(() => {
+    if (searchQuery.trim()) {
+      posthog.capture("subscriptions_search", {
+        query_length: searchQuery.trim().length,
+        results_count: filteredSubscriptions.length,
+      });
+    }
+  }, [searchQuery, filteredSubscriptions.length, posthog]);
+
+  const handleEdit = (sub: Subscription) => {
+    setEditingSubscription(sub);
+    setEditModalVisible(true);
+  };
+
+  const handleSaveEdit = (id: string, data: Partial<Subscription>) => {
+    updateSubscription(id, data);
+  };
+
+  const handleDelete = (sub: Subscription) => {
+    deleteSubscription(sub.id);
+  };
+
+  const handleStatusChange = (
+    sub: Subscription,
+    status: "active" | "paused" | "c
+...[trunc]
+
+--- app/_layout.tsx (2210 chars) ---
+import { ClerkProvider } from "@clerk/expo";
+import { tokenCache } from "@clerk/expo/token-cache";
+import { useFonts } from "expo-font";
+import {
+  SplashScreen,
+  Stack,
+  useGlobalSearchParams,
+  usePathname,
+} from "expo-router";
+import { PostHogProvider } from "posthog-react-native";
+import React, { useEffect, useRef } from "react";
+import { posthog } from "../src/config/posthog";
+import { IconCacheProvider } from "../src/context/IconCacheContext";
+
+SplashScreen.preventAutoHideAsync();
+
+const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
+
+if (!publishableKey) {
+  throw new Error("Add you Clerk Publishable key to the .env file");
+}
+
+const RootLayout = () => {
+  const pathname = usePathname();
+  const params = useGlobalSearchParams();
+  const previousPathname = useRef<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (previousPathname.current !== pathname) {
+      posthog.screen(pathname, {
+        previous_screen: previousPathname.current ?? null,
+        ...params,
+      });
+      previousPathname.current = pathname;
+    }
+  }, [pathname, params]);
+
+  const [fontsLoaded] = useFonts({
+    "sans-regular": require("../assets/fonts/PlusJakartaSans-Regular.ttf"),
+    "sans-bold": require("../assets/fonts/PlusJakartaSans-Bold.ttf"),
+    "sans-medium": require("../assets/fonts/PlusJakartaSans-Medium.ttf"),
+    "sans-semibold": require("../assets/fonts/PlusJakartaSans-SemiBold.ttf"),
+    "sans-extrabold": require("../assets/fonts/PlusJakartaSans-ExtraBold.ttf"),
+    "sans-light": require("../assets/fonts/PlusJakartaSans-Light.ttf"),
+  });
+
+  useEffect(() => {
+    if (fontsLoaded) SplashScreen.hideAsync();
+  }, [fontsLoaded]);
+
+  if (!fontsLoaded) return null;
+
+  return (
+    <PostHogProvider
+      client={posthog}
+      autocapture={{
+        captureScreens: false,
+        captureTouches: true,
+        propsToCapture: ["testID"],
+        maxElementsCaptured: 20,
+      }}
+    >
+      <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
+        <IconCacheProvider>
+          <Stack screenOptions={{ headerShown: false }} />
+        </IconCacheProvider>
+      </ClerkProvider>
+    </PostHogProvider>
+  );
+};
+
+export default RootLayout;
+
+
+--- app/onboarding.tsx (377 chars) ---
+import React, { useEffect } from "react";
+import { Text, View } from "react-native";
+import { usePostHog } from "posthog-react-native";
+
+const Onboarding = () => {
+  const posthog = usePostHog();
+
+  useEffect(() => {
+    posthog.capture("onboarding_viewed");
+  }, [posthog]);
+
+  return (
+    <View>
+      <Text>Onboarding</Text>
+    </View>
+  );
+};
+
+export default Onboarding;
+
+
+--- app/subscriptions/[id].tsx (624 chars) ---
+import { Link, useLocalSearchParams } from "expo-router";
+import React, { useEffect } from "react";
+import { Text, View } from "react-native";
+import { usePostHog } from "posthog-react-native";
+
+const SubscriptionsDetails = () => {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const posthog = usePostHog();
+
+  useEffect(() => {
+    if (id) {
+      posthog.capture("subscription_detail_viewed", { subscription_id: id });
+    }
+  }, [id, posthog]);
+
+  return (
+    <View>
+      <Text>SubscriptionsDetails: {id}</Text>
+      <Link href="/">Go back</Link>
+    </View>
+  );
+};
+
+export default SubscriptionsDetails;
+
+
+=== COMPONENTS ===
+
+--- ListHeading.tsx (489 chars) ---
+import React from "react";
+import { Text, TouchableOpacity, View } from "react-native";
+
+const ListHeading = ({ title, onViewAll }: ListHeadingProps) => {
+  return (
+    <View className="list-head">
+      <Text className="list-title">{title}</Text>
+      {onViewAll && (
+        <TouchableOpacity className="list-action" onPress={onViewAll}>
+          <Text className="list-action-text">View all</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+};
+
+export default ListHeading;
+
+
+--- SubscriptionCard.tsx (7073 chars) ---
+import {
+  formatCurrency,
+  formatStatusLabel,
+  formatSubscriptionDateTime,
+} from "@/lib/utils";
+import { useCachedIcon } from "@/src/hooks/useCachedIcon";
+import clsx from "clsx";
+import React, { useState } from "react";
+import { ActivityIndicator, Image, Pressable, Text, View } from "react-native";
+import SubscriptionCardMenu from "./SubscriptionCardMenu";
+
+interface SubscriptionCardProps {
+  id: string;
+  icon: any;
+  icon_key?: string;
+  name: string;
+  price: number;
+  currency?: string;
+  billing: string;
+  category?: string;
+  plan?: string;
+  renewalDate?: string;
+  status?: string;
+  paymentMethod?: string;
+  startDate?: string;
+  expanded: boolean;
+  color?: string;
+  onPress: () => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
+  onMarkActive?: () => void;
+  onMarkPaused?: () => void;
+  onMarkCancelled?: () => void;
+  onViewStats?: () => void;
+  onIconLongPress?: () => void;
+}
+
+const SubscriptionCard = ({
+  id,
+  name,
+  price,
+  currency,
+  icon,
+  icon_key,
+  billing,
+  color,
+  category,
+  plan,
+  renewalDate,
+  expanded,
+  paymentMethod,
+  startDate,
+  status,
+  onPress,
+  onEdit,
+  onDelete,
+  onMarkActive,
+  onMarkPaused,
+  onMarkCancelled,
+  onViewStats,
+  onIconLongPress,
+}: SubscriptionCardProps) => {
+  const [menuVisible, setMenuVisible] = useState(false);
+  const { status: iconStatus, iconUri } = useCachedIcon(icon_key);
+
+  // Determine which icon to display
+  // Priority: cached web icon > static icon asset from subscription
+  const renderIcon = () => {
+    // Loading state (crawl in progress)
+    if (iconStatus === "loading") {
+      return (
+        <View className="size-16 items-center justify-center rounded-xl border-2 border-border bg-card">
+          <ActivityIndicator size="small" />
+        </View>
+      );
+    }
+
+    // Cached icon from web crawl (take priority)
+    if (iconStatus === "cached" && iconUri) {
+      return (
+        <Image
+          source={{ uri: iconUri }}
+          className="size-16 rounded-xl"
+          resizeMode="contain"
+        />
+      );
+    }
+
+    // No cached icon available - use the static icon asset
+    // This is either the brand icon or the "plus" default icon set at creation time
+    return <Image source={icon} className="size-16 rounded-xl" />;
+  };
+
+  return (
+    <>
+      <Pressable
+        onPress={onPress}
+        className={clsx("sub-card", expanded ? "sub-card-expanded" : "bg-card")}
+        style={!expanded && color ? { backgroundColor: color } : undefined}
+      >
+        <View className="sub-head">
+          <View className="sub-main">
+            <View className="relative">
+              {/* Icon */}
+              {renderIcon()}
+              {/* Transparent overlay for icon long press detection */}
+              <Pressable
+                onLongPress={onIconLongPress}
+                delayLongPress={300}
+                className="absolute left-0 top-0 size-16"
+                style={{ backgroundColor: "transparent" }}
+              />
+            </View>
+      
+
+--- SubscriptionCardMenu.tsx (5250 chars) ---
+import clsx from "clsx";
+import React, { useEffect } from "react";
+import {
+  ActionSheetIOS,
+  Alert,
+  Modal,
+  Platform,
+  Pressable,
+  Text,
+  View,
+} from "react-native";
+
+interface SubscriptionCardMenuProps {
+  visible: boolean;
+  onClose: () => void;
+  status?: string;
+  onEdit: () => void;
+  onMarkActive: () => void;
+  onMarkPaused: () => void;
+  onMarkCancelled: () => void;
+  onDelete: () => void;
+  onViewStats: () => void;
+}
+
+const SubscriptionCardMenu = ({
+  visible,
+  onClose,
+  status,
+  onEdit,
+  onMarkActive,
+  onMarkPaused,
+  onMarkCancelled,
+  onDelete,
+  onViewStats,
+}: SubscriptionCardMenuProps) => {
+  const handleDelete = () => {
+    Alert.alert(
+      "Delete Subscription",
+      "Are you sure you want to delete this subscription? This action cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => {
+            onDelete();
+            onClose();
+          },
+        },
+      ],
+    );
+  };
+
+  const showActionSheet = () => {
+    const options: string[] = ["View Stats", "Edit"];
+
+    if (status === "cancelled" || status === "paused") {
+      options.push("Mark as Active");
+    }
+    if (status !== "paused") {
+      options.push("Mark as Paused");
+    }
+    if (status !== "cancelled") {
+      options.push("Mark as Canceled");
+    }
+
+    options.push("Delete");
+    const destructiveIndex = options.length - 1;
+    options.push("Cancel");
+    const cancelIndex = options.length - 1;
+
+    ActionSheetIOS.showActionSheetWithOptions(
+      {
+        options,
+        cancelButtonIndex: cancelIndex,
+        destructiveButtonIndex: destructiveIndex,
+      },
+      (buttonIndex) => {
+        if (buttonIndex === cancelIndex) {
+          onClose();
+          return;
+        }
+
+        const selected = options[buttonIndex];
+        if (selected === "View Stats") {
+          onViewStats();
+          onClose();
+        } else if (selected === "Edit") {
+          onEdit();
+          onClose();
+        } else if (selected === "Mark as Active") {
+          onMarkActive();
+          onClose();
+        } else if (selected === "Mark as Paused") {
+          onMarkPaused();
+          onClose();
+        } else if (selected === "Mark as Canceled") {
+          onMarkCancelled();
+          onClose();
+        } else if (selected === "Delete") {
+          handleDelete();
+        } else {
+          onClose();
+        }
+      },
+    );
+  };
+
+  // Show iOS action sheet when visible changes to true
+  useEffect(() => {
+    if (Platform.OS === "ios" && visible) {
+      showActionSheet();
+    }
+  }, [visible]);
+
+  // iOS: no UI to render (native action sheet)
+  if (Platform.OS === "ios") {
+    return null;
+  }
+
+  // Android: custom bottom sheet
+  if (!visible) return null;
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <Pressable className="flex-1 bg-black/50" onPress={on
+
+--- UpcomingSubscriptionCard.tsx (1092 chars) ---
+import { formatCurrency } from "@/lib/utils";
+import React from "react";
+import {
+  Image,
+  ImageSourcePropType,
+  Pressable,
+  Text,
+  View,
+} from "react-native";
+
+interface UpcomingSubscriptionCardProps {
+  name: string;
+  price: number;
+  daysLeft: number;
+  icon: ImageSourcePropType;
+  currency?: string;
+  onPress?: () => void;
+}
+
+const UpcomingSubscriptionCard = ({
+  name,
+  price,
+  daysLeft,
+  icon,
+  currency,
+  onPress,
+}: UpcomingSubscriptionCardProps) => {
+  return (
+    <Pressable onPress={onPress} className="upcoming-card">
+      <View className="upcoming-row">
+        <Image source={icon} className="upcoming-icon" />
+        <View>
+          <Text className="upcoming-price">
+            {formatCurrency(price, currency)}
+          </Text>
+          <Text className="upcoming-meta" numberOfLines={1}>
+            {daysLeft > 1 ? `${daysLeft} days left` : `Last day`}
+          </Text>
+        </View>
+      </View>
+      <Text className="upcoming-name" numberOfLines={1}>
+        {name}
+      </Text>
+    </Pressable>
+  );
+};
+
+export default UpcomingSubscriptionCard;
+
+
+=== LIB / SERVICES / CONSTANTS ===
+
+--- lib/notifications.ts (3612 chars) ---
+import * as Notifications from "expo-notifications";
+import { Platform } from "react-native";
+
+/**
+ * Configure the notification handler to show a foreground alert.
+ */
+export function configureNotificationHandler() {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  });
+}
+
+/**
+ * Request notification permissions from the user.
+ */
+export async function requestNotificationPermissions(): Promise<boolean> {
+  const { status: existingStatus } = await Notifications.getPermissionsAsync();
+  let finalStatus = existingStatus;
+
+  if (existingStatus !== "granted") {
+    const { status } = await Notifications.requestPermissionsAsync();
+    finalStatus = status;
+  }
+
+  if (finalStatus !== "granted") {
+    console.warn("Notification permission not granted");
+    return false;
+  }
+
+  // Android requires a notification channel
+  if (Platform.OS === "android") {
+    await Notifications.setNotificationChannelAsync("upcoming-renewals", {
+      name: "Upcoming Renewals",
+      importance: Notifications.AndroidImportance.HIGH,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: "#ea7a53",
+    });
+  }
+
+  return true;
+}
+
+/**
+ * Schedule a daily notification for a subscription that's upcoming.
+ * The notification repeats daily at 9:00 AM until the renewal date.
+ */
+export async function scheduleUpcomingNotification(
+  subscriptionId: string,
+  name: string,
+  daysLeft: number,
+  price: string,
+  renewalDate: string,
+): Promise<string | undefined> {
+  try {
+    // Cancel any existing notification for this subscription first
+    await cancelSubscriptionNotifications(subscriptionId);
+
+    const identifier = await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "🔔 Upcoming Renewal",
+        body: `${name} renews in ${daysLeft} day${daysLeft === 1 ? "" : "s"} — ${price}`,
+        data: { subscriptionId },
+        sound: true,
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DAILY,
+        hour: 9,
+        minute: 0,
+      } as Notifications.DailyTriggerInput,
+    });
+
+    return identifier;
+  } catch (error) {
+    console.error("Failed to schedule notification:", error);
+    return undefined;
+  }
+}
+
+/**
+ * Cancel all notifications for a specific subscription.
+ */
+export async function cancelSubscriptionNotifications(subscriptionId: 
+
+--- lib/resolveLogo.ts (5953 chars) ---
+import { icons } from "@/constants/icons";
+import type { ImageSourcePropType } from "react-native";
+
+interface BrandEntry {
+  names: string[];
+  icon: ImageSourcePropType;
+  category?: string;
+}
+
+interface LogoResult {
+  icon: ImageSourcePropType;
+  confidence: "high" | "medium" | "low";
+  alternatives: { name: string; icon: ImageSourcePropType }[];
+}
+
+const brandLogos: BrandEntry[] = [
+  {
+    names: ["netflix", "netflix premium", "netflix basic", "netflix standard"],
+    icon: icons.netflix,
+    category: "Entertainment",
+  },
+  {
+    names: ["spotify", "spotify premium", "spotify family", "spotify duo"],
+    icon: icons.spotify,
+    category: "Music",
+  },
+  {
+    names: [
+      "figma",
+      "figma professional",
+      "figma organization",
+      "figma enterprise",
+    ],
+    icon: icons.figma,
+    category: "Design",
+  },
+  {
+    names: [
+      "adobe",
+      "adobe creative cloud",
+      "creative cloud",
+      "adobe photoshop",
+      "adobe illustrator",
+      "adobe after effects",
+      "adobe premiere",
+      "adobe xd",
+    ],
+    icon: icons.adobe,
+    category: "Design",
+  },
+  {
+    names: ["canva", "canva pro", "canva teams", "canva enterprise"],
+    icon: icons.canva,
+    category: "Design",
+  },
+  {
+    names: ["github", "github pro", "github enterprise", "github team"],
+    icon: icons.github,
+    category: "Developer Tools",
+  },
+  {
+    names: ["claude", "claude pro", "claude team", "anthropic"],
+    icon: icons.claude,
+    category: "AI Tools",
+  },
+  {
+    names: ["openai", "chatgpt", "gpt", "openai api", "chatgpt plus", "gpt-4"],
+    icon: icons.openai,
+    category: "AI Tools",
+  },
+  {
+    names: ["notion", "notion ai", "notion team", "notion enterprise"],
+    icon: icons.notion,
+    category: "Productivity",
+  },
+  {
+    names: ["dropbox", "dropbox plus", "dropbox family", "dropbox business"],
+    icon: icons.dropbox,
+    category: "Cloud",
+  },
+  {
+    names: ["medium", "medium membership"],
+    icon: icons.medium,
+    category: "Productivity",
+  },
+];
+
+/**
+ * Take a user-provided subscription name and resolve it to the best matching
+ * brand icon. Returns the icon, a confidence level, and alternative matches.
+ *
+ * @param name - The subscription name (e.g. "Netflix Premium", "spotify")
+ * @returns An object with the best matching icon, confidence, and alternatives
+ */
+export function resolveLogo(name: string): LogoResult {
+  const query = name.toLowerCase().trim();
+  if (!query) {
+    return {
+      icon: icons.plus,
+      co
+
+--- lib/utils.ts (726 chars) ---
+import dayjs from "dayjs";
+
+export const formatCurrency = (value: number, currency = "USD"): string => {
+  try {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value);
+  } catch {
+    return value.toFixed(2);
+  }
+};
+
+export const formatSubscriptionDateTime = (value?: string): string => {
+  if (!value) return "Not provided";
+  const parsedDate = dayjs(value);
+  return parsedDate.isValid()
+    ? parsedDate.format("MM/DD/YYYY")
+    : "Not provided";
+};
+
+export const formatStatusLabel = (value?: string): string => {
+  if (!value) return "Unknown";
+  return value.charAt(0).toUpperCase() + value.slice(1);
+};
+
+
+--- services/database.ts (38337 chars) ---
+import { icons } from "@/constants/icons";
+import * as Crypto from "expo-crypto";
+import { CryptoDigestAlgorithm } from "expo-crypto";
+import { Directory, File, Paths } from "expo-file-system";
+import { readAsStringAsync, writeAsStringAsync } from "expo-file-system/legacy";
+import * as SecureStore from "expo-secure-store";
+import { type SQLiteDatabase, openDatabaseAsync } from "expo-sqlite";
+
+// ---------------------------------------------------------------------------
+// Key Management
+// ---------------------------------------------------------------------------
+
+function getSecureStoreKey(userId: string): string {
+  return `db_key_${userId}`;
+}
+
+async function getOrCreateDbKey(userId: string): Promise<string> {
+  const existing = await SecureStore.getItemAsync(getSecureStoreKey(userId));
+  if (existing) return existing;
+
+  const randomBytes = Crypto.getRandomBytes(32);
+  const passphrase = Array.from(randomBytes)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+
+  await SecureStore.setItemAsync(getSecureStoreKey(userId), passphrase, {
+    requireAuthentication: false,
+  });
+  return passphrase;
+}
+
+// ---------------------------------------------------------------------------
+// Schema
+// ---------------------------------------------------------------------------
+
+const SCHEMA_SQL = `
+CREATE TABLE IF NOT EXISTS subscriptions (
+  id            TEXT PRIMARY KEY,
+  name          TEXT NOT NULL,
+  plan          TEXT,
+  category      TEXT,
+  payment_method TEXT,
+  status        TEXT DEFAULT 'active',
+  start_date    TEXT,
+  price         REAL NOT NULL,
+  currency      TEXT DEFAULT 'USD',
+  billing       TEXT NOT NULL,
+  frequency     TEXT,
+  renewal_date  TEXT,
+  color         TEXT,
+  icon_key      TEXT,
+  created_at    TEXT DEFAULT (datetime('now')),
+  updated_at    TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS icon_cache (
+  icon_key      TEXT PRIMARY KEY,
+  image_data    TEXT,
+  source        TEXT DEFAULT 'local',
+  original_url  TEXT,
+  format        TEXT DEFAULT 'png',
+  fallback_tier INTEGER DEFAULT 0,
+  updated_at    TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS icon_crawl_queue (
+  id                INTEGER PRIMARY KEY AUTOINCREMENT,
+  icon_key          TEXT NOT NULL UNIQUE,
+  subscription_id   TEXT,
+  attempt_count     INTEGER DEFAULT 0,
+  last_attempt_at   TEXT,
+  created_at        TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS preferences (
+  key           TEXT PRIMARY KEY,
+  value      
+
+--- constants/data.ts (2033 chars) ---
+import { icons } from "./icons";
+
+export const tabs: AppTab[] = [
+  { name: "index", title: "Home", icon: icons.home },
+  { name: "subscriptions", title: "Subscriptions", icon: icons.wallet },
+  { name: "insights", title: "Insights", icon: icons.activity },
+  { name: "settings", title: "Settings", icon: icons.setting },
+];
+
+export const HOME_USER = {
+  name: "Adrian | JS Mastery",
+};
+
+export const HOME_BALANCE = {
+  amount: 2489.48,
+  nextRenewalDate: "2026-03-18T09:00:00.000Z",
+};
+
+export const HOME_SUBSCRIPTIONS: Subscription[] = [
+  {
+    id: "adobe-creative-cloud",
+    icon: icons.adobe,
+    name: "Adobe Creative Cloud",
+    plan: "Teams Plan",
+    category: "Design",
+    paymentMethod: "Visa ending in 8530",
+    status: "active",
+    startDate: "2025-03-20T10:00:00.000Z",
+    price: 77.49,
+    currency: "USD",
+    billing: "Monthly",
+    renewalDate: "2026-03-20T10:00:00.000Z",
+    color: "#f5c542",
+  },
+  {
+    id: "github-pro",
+    icon: icons.github,
+    name: "GitHub Pro",
+    plan: "Developer",
+    category: "Developer Tools",
+    paymentMethod: "Mastercard ending in 2408",
+    status: "active",
+    startDate: "2024-11-24T10:00:00.000Z",
+    price: 9.99,
+    currency: "USD",
+    billing: "Monthly",
+    renewalDate: "2026-03-24T10:00:00.000Z",
+    color: "#e8def8",
+  },
+  {
+    id: "claude-pro",
+    icon: icons.claude,
+    name: "Claude Pro",
+    plan: "Pro Plan",
+    category: "AI Tools",
+    paymentMethod: "Amex ending in 1010",
+    status: "paused",
+    startDate: "2025-06-27T10:00:00.000Z",
+    price: 20.0,
+    currency: "USD",
+    billing: "Monthly",
+    renewalDate: "2026-03-27T10:00:00.000Z",
+    color: "#b8d4e3",
+  },
+  {
+    id: "canva-pro",
+    icon: icons.canva,
+    name: "Canva Pro",
+    plan: "Yearly Access",
+    category: "Design",
+    paymentMethod: "Visa ending in 7784",
+    status: "cancelled",
+    startDate: "2024-04-02T10:00:00.000Z",
+    price: 119.99,
+    currency: "USD",
+    billing: "Yearly",
+    renewalDate: "2026-04-02T10:00:00.000Z",
+    color: "#b8e8d0",
+  },
+];
+
+
+--- constants/icons.ts (1253 chars) ---
+import activity from "@/assets/icons/activity.png";
+import add from "@/assets/icons/add.png";
+import adobe from "@/assets/icons/adobe.png";
+import back from "@/assets/icons/back.png";
+import canva from "@/assets/icons/canva.png";
+import claude from "@/assets/icons/claude.png";
+import dropbox from "@/assets/icons/dropbox.png";
+import figma from "@/assets/icons/figma.png";
+import github from "@/assets/icons/github.png";
+import home from "@/assets/icons/home.png";
+import { default as icloud, default as logo } from "@/assets/icons/logo.png";
+import medium from "@/assets/icons/medium.png";
+import menu from "@/assets/icons/menu.png";
+import netflix from "@/assets/icons/netflix.png";
+import notion from "@/assets/icons/notion.png";
+import openai from "@/assets/icons/openai.png";
+import plus from "@/assets/icons/plus.png";
+import setting from "@/assets/icons/setting.png";
+import spotify from "@/assets/icons/spotify.png";
+import wallet from "@/assets/icons/wallet.png";
+
+export const icons = {
+  home,
+  wallet,
+  setting,
+  activity,
+  add,
+  back,
+  menu,
+  plus,
+  notion,
+  dropbox,
+  openai,
+  adobe,
+  medium,
+  figma,
+  spotify,
+  github,
+  claude,
+  canva,
+  netflix,
+  logo,
+  icloud,
+} as const;
+
+export type IconKey = keyof typeof icons;
+
+
+--- constants/images.ts (156 chars) ---
+import avatar from "@/assets/images/avatar.png";
+import splashPattern from "@/assets/images/splash-pattern.png";
+
+export default { avatar, splashPattern };
+
+
+--- constants/theme.ts (808 chars) ---
+export const colors = {
+  background: "#fff9e3",
+  foreground: "#081126",
+  card: "#fff8e7",
+  muted: "#f6eecf",
+  mutedForeground: "rgba(0, 0, 0, 0.6)",
+  primary: "#081126",
+  accent: "#ea7a53",
+  border: "rgba(0, 0, 0, 0.1)",
+  success: "#16a34a",
+  destructive: "#dc2626",
+  subscription: "#8fd1bd",
+} as const;
+
+export const spacing = {
+  0: 0,
+  1: 4,
+  2: 8,
+  3: 12,
+  4: 16,
+  5: 20,
+  6: 24,
+  7: 28,
+  8: 32,
+  9: 36,
+  10: 40,
+  11: 44,
+  12: 48,
+  14: 56,
+  16: 64,
+  18: 72,
+  20: 80,
+  24: 96,
+  30: 120,
+} as const;
+
+export const components = {
+  tabBar: {
+    height: spacing[18],
+    horizontalInset: spacing[5],
+    radius: spacing[8],
+    iconFrame: spacing[12],
+    itemPaddingVertical: spacing[2],
+  },
+} as const;
+
+export const theme = {
+  colors,
+  spacing,
+  components,
+} as const;
+
+
+=== SRC TREE ===
+src/hooks/useCachedIcon.ts
+src/services/faviconExtractor.ts
+src/services/iconScraper.ts
+src/services/iconReportService.ts
+src/services/rateLimitTracker.ts
+src/services/webViewSearchEngine.ts
+src/services/searchEngines.ts
+src/services/htmlIconExtractor.ts
+src/services/iconLoadingRegistry.ts
+src/services/cloudsync/types.ts
+src/services/cloudsync/storage/DropboxStorage.ts
+src/services/cloudsync/storage/OneDriveStorage.ts
+src/services/cloudsync/storage/OwnCloudNextcloudStorage.ts
+src/services/cloudsync/storage/ICloudStorage.ts
+src/services/cloudsync/storage/GoogleDriveStorage.ts
+src/services/cloudsync/CloudSyncService.ts
+src/services/iconProcessing.ts
+src/services/iconValidation.ts
+src/services/whiteBgRemoval.ts
+src/services/iconUpscaler.ts
+src/services/generatedModelMap.ts
+src/services/iconBackgroundCrawler.ts
+src/config/posthog.ts
+src/components/SubscriptionStatsModal.tsx
+src/components/UserSettingsModal.tsx
+src/components/HiddenSearchWebView.tsx
+src/components/EditSubscriptionModal.tsx
+src/components/ConfirmModal.tsx
+src/components/CreateSubscriptionModal.tsx
+src/components/ConflictResolutionModal.tsx
+src/components/SubscriptionIconPickerModal.tsx
+src/context/CloudSyncContext.tsx
+src/context/IconCacheContext.tsx
+src/context/SubscriptionContext.tsx
+src/context/DatabaseProvider.tsx
+src/types/fast-tflite.d.ts
+
+=== SRC FILE CONTENTS (non-empty) ===
+
+--- src/components/ConfirmModal.tsx (2032 chars) ---
+import React from "react";
+import { Modal, Pressable, Text, View } from "react-native";
+
+interface ConfirmModalProps {
+  visible: boolean;
+  title: string;
+  message: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  destructive?: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}
+
+const ConfirmModal = ({
+  visible,
+  title,
+  message,
+  confirmLabel = "Confirm",
+  cancelLabel = "Cancel",
+  destructive = false,
+  onConfirm,
+  onCancel,
+}: ConfirmModalProps) => {
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      onRequestClose={onCancel}
+    >
+      <Pressable className="flex-1 bg-black/50" onPress={onCancel}>
+        <Pressable
+          className="mt-auto rounded-t-3xl bg-background p-5"
+          onPress={(e) => e.stopPropagation()}
+        >
+          {/* Handle */}
+          <View className="mb-4 items-center">
+            <View className="h-1 w-12 rounded-full bg-muted-foreground/30" />
+          </View>
+
+          {/* Title */}
+          <Text className="mb-2 text-xl font-sans-bold text-primary">
+            {title}
+          </Text>
+
+          {/* Message */}
+          <Text className="mb-6 text-sm font-sans-medium leading-5 text-muted-foreground">
+            {message}
+          </Text>
+
+          {/* Confirm */}
+          <Pressable
+            className={`mb-3 items-center rounded-2xl py-4 ${
+              destructive ? "bg-destructive" : "bg-accent"
+            }`}
+            onPress={onConfirm}
+          >
+            <Text className="text-base font-sans-bold text-white">
+              {confirmLabel}
+            </Text>
+          </Pressable>
+
+          {/* Cancel */}
+          <Pressable
+            className="items-center rounded-2xl bg-muted py-4"
+            onPress={onCancel}
+          >
+            <Text className="text-base font-sans-bold text-primary">
+              {cancelLabel}
+            </Text>
+          </Pressable>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+--- src/components/ConflictResolutionModal.tsx (11514 chars) ---
+import React, { useCallback, useEffect, useState } from "react";
+import { Modal, Pressable, ScrollView, Text, View } from "react-native";
+
+interface ConflictRow {
+  id: string;
+  name: string;
+  price: number;
+  plan?: string;
+  category?: string;
+  billing?: string;
+  status?: string;
+}
+
+interface ConflictResolutionModalProps {
+  visible: boolean;
+  conflicts: ConflictRow[];
+  onResolve: (
+    actions: {
+      id: string;
+      action: "merge_skip" | "merge_overwrite" | "duplicate";
+      newId?: string;
+    }[],
+  ) => Promise<void>;
+  onCancel: () => void;
+}
+
+const ConflictResolutionModal = ({
+  visible,
+  conflicts,
+  onResolve,
+  onCancel,
+}: ConflictResolutionModalProps) => {
+  const [currentIdx, setCurrentIdx] = useState(0);
+  const [applyToAll, setApplyToAll] = useState(false);
+  const [mergeOverwrite, setMergeOverwrite] = useState(false);
+  const [resolving, setResolving] = useState(false);
+  const [actions, setActions] = useState<
+    {
+      id: string;
+      action: "merge_skip" | "merge_overwrite" | "duplicate";
+      newId?: string;
+    }[]
+  >([]);
+
+  // Reset state whenever modal opens with new conflicts
+  useEffect(() => {
+    if (visible) {
+      setCurrentIdx(0);
+      setApplyToAll(false);
+      setMergeOverwrite(false);
+      setResolving(false);
+      setActions([]);
+    }
+  }, [visible, conflicts.length]);
+
+  const current = conflicts[currentIdx];
+  const isLast = currentIdx >= conflicts.length - 1;
+  const totalConflicts = conflicts.length;
+  const progressLabel = `Conflict ${currentIdx + 1} of ${totalConflicts}`;
+
+  const handleMerge = useCallback(async () => {
+    if (applyToAll) {
+      // Apply "Merge" to all remaining conflicts
+      const remaining = conflicts.slice(currentIdx).map((c) => ({
+        id: c.id,
+        action: (mergeOverwrite ? "merge_overwrite" : "merge_skip") as
+          "merge_overwrite" | "merge_skip",
+      }));
+      const resolved = [...actions, ...remaining];
+      setResolving(true);
+      await onResolve(resolv
+
+--- src/components/CreateSubscriptionModal.tsx (13735 chars) ---
+import { icons } from "@/constants/icons";
+import { searchLogos } from "@/lib/resolveLogo";
+import { getCachedIcon } from "@/services/database";
+import {
+  queueIconForScraping,
+  startIconCrawl,
+} from "@/src/services/iconBackgroundCrawler";
+import {
+  addCacheUpdateListener,
+  isIconLoading,
+} from "@/src/services/iconLoadingRegistry";
+import { nameToSlug } from "@/src/services/iconScraper";
+import clsx from "clsx";
+import dayjs from "dayjs";
+import { usePostHog } from "posthog-react-native";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import {
+  Image,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
+
+const CATEGORIES = [
+  "Entertainment",
+  "AI Tools",
+  "Developer Tools",
+  "Productivity",
+  "Cloud",
+  "Music",
+  "Design",
+  "Other",
+] as const;
+
+const CATEGORY_COLORS: Record<string, string> = {
+  Entertainment: "#f5c542",
+  "AI Tools": "#b8d4e3",
+  "Developer Tools": "#e8def8",
+  Productivity: "#8fd1bd",
+  Cloud: "#b8e8d0",
+  Music: "#d4a8e8",
+  Design: "#ff8c42",
+  Other: "#c4c4c4",
+};
+
+interface CreateSubscriptionModalProps {
+  visible: boolean;
+  onClose: () => void;
+  onCreate: (subscription: Subscription) => Promise<void> | void;
+}
+
+const CreateSubscriptionModal = ({
+  visible,
+  onClose,
+  onCreate,
+}: CreateSubscriptionModalProps) => {
+  const posthog = usePostHog();
+  const [name, setName] = useState("");
+  const [price, setPrice] = useState("");
+  const [frequency, setFrequency] = useState<"Monthly" | "Yearly">("Monthly");
+  const [category, setCategory] = useState<string>("Other");
+  const [selectedIcon, setSelectedIcon] = useState(icons.plus);
+  const [showAutocomplete, setShowAutocomplete] = useState(false);
+  const [autocompleteResults, setAutocompleteResults] = useState<
+    { name: string; icon: any; category?: string }[]
+  >([]);
+  // Live web-discovered icon (auto-assigned as the user types)
+  const [liveIconUri, setLiveIconUri] = useState<
+
+--- src/components/EditSubscriptionModal.tsx (14903 chars) ---
+import { icons } from "@/constants/icons";
+import { searchLogos } from "@/lib/resolveLogo";
+import { getCachedIcon } from "@/services/database";
+import { startIconCrawl } from "@/src/services/iconBackgroundCrawler";
+import {
+  addCacheUpdateListener,
+  isIconLoading,
+} from "@/src/services/iconLoadingRegistry";
+import { nameToSlug } from "@/src/services/iconScraper";
+import clsx from "clsx";
+import dayjs from "dayjs";
+import { usePostHog } from "posthog-react-native";
+import React, { useEffect, useRef, useState } from "react";
+import {
+  FlatList,
+  Image,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
+
+const CATEGORIES = [
+  "Entertainment",
+  "AI Tools",
+  "Developer Tools",
+  "Productivity",
+  "Cloud",
+  "Music",
+  "Design",
+  "Other",
+] as const;
+
+const CATEGORY_COLORS: Record<string, string> = {
+  Entertainment: "#f5c542",
+  "AI Tools": "#b8d4e3",
+  "Developer Tools": "#e8def8",
+  Productivity: "#8fd1bd",
+  Cloud: "#b8e8d0",
+  Music: "#d4a8e8",
+  Design: "#ff8c42",
+  Other: "#c4c4c4",
+};
+
+interface EditSubscriptionModalProps {
+  visible: boolean;
+  subscription: Subscription | null;
+  onClose: () => void;
+  onSave: (id: string, data: Partial<Subscription>) => void;
+}
+
+const EditSubscriptionModal = ({
+  visible,
+  subscription,
+  onClose,
+  onSave,
+}: EditSubscriptionModalProps) => {
+  const posthog = usePostHog();
+  const [name, setName] = useState("");
+  const [price, setPrice] = useState("");
+  const [frequency, setFrequency] = useState<"Monthly" | "Yearly">("Monthly");
+  const [category, setCategory] = useState<string>("Other");
+  const [plan, setPlan] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("");
+  const [renewalDate, setRenewalDate] = useState("");
+  const [selectedIcon, setSelectedIcon] = useState(icons.plus);
+  const [showAutocomplete, setShowAutocomplete] = useState(false);
+  const [autocompleteResults, setAutocompleteResults] = useState<
+    { name:
+
+--- src/components/HiddenSearchWebView.tsx (3337 chars) ---
+/**
+ * Hidden WebView component for background web scraping.
+ * This component is invisible but active - it loads search pages in the background
+ * and extracts links using injected JavaScript, bypassing anti-bot detection.
+ * Only rendered on native platforms (iOS/Android) - WebView doesn't work on web.
+ */
+
+import React, { useEffect, useRef, useState } from "react";
+import { Platform, View } from "react-native";
+
+import {
+  getInjectionScript,
+  getSearchUrl,
+  handleWebViewMessage,
+  setSearchTriggerCallback,
+} from "@/src/services/webViewSearchEngine";
+
+interface HiddenSearchWebViewProps {
+  onSearchComplete?: (urls: string[]) => void;
+}
+
+const HiddenSearchWebView: React.FC<HiddenSearchWebViewProps> = () => {
+  // Only load WebView on native platforms
+  const [WebView, setWebView] = useState<any>(null);
+
+  useEffect(() => {
+    if (Platform.OS !== "web") {
+       
+      const WebViewComponent = require("react-native-webview").WebView;
+      setWebView(() => WebViewComponent);
+    }
+  }, []);
+
+  const [searchUrl, setSearchUrl] = useState<string>("");
+  const [injectionScript, setInjectionScript] = useState<string>("");
+  const webViewRef = useRef<any>(null);
+
+  // Register the search trigger callback on mount - always mounted
+  useEffect(() => {
+    setSearchTriggerCallback((brand: string, requestId: string) => {
+      console.log(
+        `[WEBVIEW_COMPONENT] Triggering search for "${brand}" (requestId: ${requestId})`,
+      );
+      setSearchUrl(getSearchUrl(brand));
+      setInjectionScript(getInjectionScript(requestId));
+    });
+
+    return () => {
+      setSearchTriggerCallback(null);
+    };
+  }, []);
+
+  const handleMessage = (event: any) => {
+    handleWebViewMessage(event);
+  };
+
+  const handleLoadComplete = () => {
+    if (injectionScript && webViewRef.current) {
+      console.log("[WEBVIEW_COMPONENT] Page loaded, injecting script");
+      webViewRef.current.injectJavaScript(injectionScript);
+    }
+  };
+
+  // Reset state after search completes (allow next
+
+--- src/components/SubscriptionIconPickerModal.tsx (28668 chars) ---
+import { icons } from "@/constants/icons";
+import {
+  deleteCachedIcon,
+  saveCrawlResult,
+  setCachedIcon,
+} from "@/services/database";
+import {
+  getIconCollection,
+  startIconCrawl,
+} from "@/src/services/iconBackgroundCrawler";
+import {
+  addCacheUpdateListener,
+  addLoadingListener,
+  isIconLoading,
+  notifyCacheUpdate,
+} from "@/src/services/iconLoadingRegistry";
+import {
+  isLowResIcon,
+  isQualityAvailable,
+  upscaleIconAi,
+  type UpscaleQuality,
+} from "@/src/services/iconProcessing";
+import {
+  getReportsForIcon,
+  rejectReportedIcon,
+  reportIcon,
+} from "@/src/services/iconReportService";
+import {
+  addRateLimitListener,
+  getRateLimitedDomains,
+} from "@/src/services/rateLimitTracker";
+import { detectWhiteBg, removeWhiteBg } from "@/src/services/whiteBgRemoval";
+import { usePostHog } from "posthog-react-native";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Image,
+  ImageSourcePropType,
+  Modal,
+  Pressable,
+  Switch,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
+
+interface IconPickerProps {
+  visible: boolean;
+  iconKey: string | null;
+  subscriptionIcon?: ImageSourcePropType;
+  subscriptionName: string;
+  onClose: () => void;
+  onIconChange: () => void;
+}
+
+interface PickerIcon {
+  id: string;
+  imageData: string;
+  source: string;
+  format: string;
+  originalUrl: string | null;
+  reportedType?: "wrong" | "broken" | null;
+  originalWidth?: number;
+  originalHeight?: number;
+}
+
+interface IconDetection {
+  hasWhite: boolean;
+  isLowRes: boolean;
+}
+
+// Whether the "sharp" (FSRCNN) family has bundled models. Until those models
+// are generated this is false, so the UI defaults to (and locks onto) "fast".
+const SHARP_AVAILABLE = isQualityAvailable("sharp");
+
+const SubscriptionIconPickerModal = ({
+  visible,
+  iconKey,
+  subscriptionIcon,
+  subscriptionName,
+  onClose,
+  onIconChange,
+}: IconPickerProps) => {
+  const posthog = usePostHog();
+  const [availableIcons, setAvai
+
+--- src/components/SubscriptionStatsModal.tsx (7479 chars) ---
+import { formatCurrency } from "@/lib/utils";
+import dayjs from "dayjs";
+import React from "react";
+import { Image, Modal, Pressable, Text, View } from "react-native";
+
+interface SubscriptionStatsModalProps {
+  visible: boolean;
+  subscription: Subscription | null;
+  onClose: () => void;
+  onRenew: (id: string) => void;
+}
+
+const SubscriptionStatsModal = ({
+  visible,
+  subscription,
+  onClose,
+  onRenew,
+}: SubscriptionStatsModalProps) => {
+  if (!subscription) return null;
+
+  const now = dayjs();
+  const startDate = subscription.startDate
+    ? dayjs(subscription.startDate)
+    : null;
+  const renewalDate = subscription.renewalDate
+    ? dayjs(subscription.renewalDate)
+    : null;
+
+  // Calculate days remaining
+  const daysRemaining = renewalDate ? renewalDate.diff(now, "day") : null;
+
+  // Calculate total billing period length in days
+  const billingPeriodDays =
+    startDate && renewalDate
+      ? renewalDate.diff(startDate, "day")
+      : subscription.billing === "Yearly"
+        ? 365
+        : 30;
+
+  // Calculate days elapsed in current period
+  const periodStart = renewalDate
+    ? renewalDate.subtract(billingPeriodDays, "day")
+    : startDate || now;
+  const daysElapsedInPeriod = now.diff(periodStart, "day");
+  const progressPercent = Math.min(
+    Math.max((daysElapsedInPeriod / billingPeriodDays) * 100, 0),
+    100,
+  );
+
+  // Calculate months since start and total spent
+  const monthsSinceStart = startDate
+    ? Math.max(now.diff(startDate, "month"), 0)
+    : 0;
+  const monthlyCost =
+    subscription.billing === "Yearly" || subscription.frequency === "Yearly"
+      ? subscription.price / 12
+      : subscription.price;
+  const totalSpentToDate = monthlyCost * (monthsSinceStart || 1);
+
+  // Calculate days left display
+  const daysLeftDisplay =
+    daysRemaining !== null
+      ? daysRemaining > 0
+        ? `${daysRemaining} days remaining`
+        : daysRemaining === 0
+          ? "Due today!"
+          : `Overdue by ${Math.abs(daysRemaining)} days`
+      : 
+
+--- src/components/UserSettingsModal.tsx (10695 chars) ---
+import images from "@/constants/images";
+import { useSubscriptions } from "@/src/context/SubscriptionContext";
+import { useUser } from "@clerk/expo";
+import * as DocumentPicker from "expo-document-picker";
+import { readAsStringAsync } from "expo-file-system/legacy";
+import React, { useEffect, useState } from "react";
+import {
+  Alert,
+  ActivityIndicator,
+  Image,
+  Modal,
+  Pressable,
+  Switch,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
+import { setPreference } from "../../services/database";
+
+interface UserSettingsModalProps {
+  visible: boolean;
+  onClose: () => void;
+}
+
+const UserSettingsModal = ({ visible, onClose }: UserSettingsModalProps) => {
+  const { user } = useUser();
+  const { notificationEnabled, setNotificationEnabled } = useSubscriptions();
+
+  // Profile editing state
+  const [editMode, setEditMode] = useState(false);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [importingAvatar, setImportingAvatar] = useState(false);
+
+  // Sync form state when user changes
+  useEffect(() => {
+    if (user) {
+      setFirstName(user.firstName || "");
+      setLastName(user.lastName || "");
+      setAvatarUrl(user.imageUrl || "");
+    }
+  }, [user?.id]);
+
+  const displayName =
+    user?.firstName ||
+    user?.fullName ||
+    user?.emailAddresses[0]?.emailAddress ||
+    "User";
+  const email = user?.emailAddresses[0]?.emailAddress;
+
+  const handleSaveProfile = async () => {
+    if (saving) return;
+
+    // Validate required fields
+    if (!firstName.trim() && !lastName.trim() && !avatarUrl) {
+      Alert.alert("Error", "Please enter at least a first name, last name, or select an avatar.");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      // Update Clerk user
+      if (firstName.trim() || lastName.trim()) {
+        await user?.update({
+          firstName: firstName.trim() || undefined,
+          l
+
+--- src/config/posthog.ts (970 chars) ---
+import Constants from "expo-constants";
+import PostHog from "posthog-react-native";
+
+const apiKey = Constants.expoConfig?.extra?.posthogProjectToken as
+  string | undefined;
+const host =
+  (Constants.expoConfig?.extra?.posthogHost as string) ||
+  "https://us.i.posthog.com";
+const isPostHogConfigured = Boolean(
+  apiKey && apiKey !== "phc_your_project_token_here",
+);
+
+if (!isPostHogConfigured) {
+  console.warn(
+    "PostHog project token not configured. Analytics will be disabled. " +
+      "Set POSTHOG_PROJECT_TOKEN in your .env file to enable analytics.",
+  );
+}
+
+export const posthog = new PostHog(apiKey || "placeholder_key", {
+  host,
+  disabled: !isPostHogConfigured,
+  captureAppLifecycleEvents: true,
+  flushAt: 20,
+  flushInterval: 10000,
+  maxBatchSize: 100,
+  maxQueueSize: 1000,
+  preloadFeatureFlags: true,
+  sendFeatureFlagEvent: true,
+  featureFlagsRequestTimeoutMs: 10000,
+  requestTimeout: 10000,
+  fetchRetryCount: 3,
+  fetchRetryDelay: 3000,
+});
+
+
+--- src/context/CloudSyncContext.tsx (13298 chars) ---
+import {
+  getSyncMetadata,
+  SyncMetadata,
+  updateSyncMetadata,
+} from "@/services/database";
+import { CloudSyncService } from "@/src/services/cloudsync/CloudSyncService";
+import { CloudProvider, SyncResult } from "@/src/services/cloudsync/types";
+import { useUser } from "@clerk/expo";
+import * as AuthSession from "expo-auth-session";
+import * as SecureStore from "expo-secure-store";
+import * as WebBrowser from "expo-web-browser";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import { Alert } from "react-native";
+
+interface CloudSyncContextType {
+  cloudSyncService: CloudSyncService | null;
+  syncMetadata: SyncMetadata | null;
+  isInitialized: boolean;
+  isSyncing: boolean;
+  lastSyncResult: SyncResult | null;
+
+  initializeProvider: (
+    provider: CloudProvider,
+    config?: { serverUrl?: string },
+  ) => Promise<void>;
+  connectProvider: (
+    provider: CloudProvider,
+    config?: { serverUrl?: string },
+  ) => Promise<boolean>;
+  authenticate: () => Promise<boolean>;
+  disconnect: () => Promise<void>;
+  sync: () => Promise<SyncResult>;
+  toggleSync: (enabled: boolean) => Promise<void>;
+}
+
+const CloudSyncContext = createContext<CloudSyncContextType | undefined>(
+  undefined,
+);
+
+export const CloudSyncProvider = ({ children }: { children: ReactNode }) => {
+  const { user } = useUser();
+  const cloudSyncServiceRef = useRef<CloudSyncService | null>(null);
+  const [cloudSyncService, setCloudSyncService] =
+    useState<CloudSyncService | null>(null);
+  const [syncMetadata, setSyncMetadata] = useState<SyncMetadata | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [lastSyncResult, setLastSyncResult] = useState<SyncResult | null>(null);
+
+  const userId = user?.id;
+
+  const loadSyncMetadata = useCallback(async () => {
+    try {
+      const metadata = await getSyncMetadata();
+      setSyncMetadata(metad
+
+--- src/context/DatabaseProvider.tsx (4699 chars) ---
+import { useAuth } from "@clerk/expo";
+import type { SQLiteDatabase } from "expo-sqlite";
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { closeDatabase, openDatabase } from "../../services/database";
+
+interface DatabaseContextType {
+  db: SQLiteDatabase | null;
+  userId: string | null;
+  isReady: boolean;
+}
+
+const DatabaseContext = createContext<DatabaseContextType | null>(null);
+
+export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
+  const { isSignedIn, isLoaded, userId: clerkUserId } = useAuth();
+  const [db, setDb] = useState<SQLiteDatabase | null>(null);
+  const [dbError, setDbError] = useState<string | null>(null);
+  const openingRef = useRef<{
+    userId: string | null;
+    promise: Promise<void> | null;
+  }>({
+    userId: null,
+    promise: null,
+  });
+
+  useEffect(() => {
+    if (!isLoaded) return;
+
+    if (!isSignedIn || !clerkUserId) {
+      if (db) {
+        closeDatabase().then(() => setDb(null));
+      }
+      return;
+    }
+
+    let cancelled = false;
+
+    const init = async () => {
+      const currentUserId = clerkUserId;
+
+      // If already opening for this user, wait for that promise
+      if (
+        openingRef.current.userId === currentUserId &&
+        openingRef.current.promise
+      ) {
+        await openingRef.current.promise;
+        return;
+      }
+
+      // If a different user's open is in flight, start fresh after it settles
+      if (openingRef.current.promise) {
+        await openingRef.current.promise;
+      }
+
+      const openPromise = (async () => {
+        try {
+          const database = await openDatabase(currentUserId);
+          if (!cancelled) {
+            setDb(database);
+            setDbError(null);
+          }
+        } catch (error) {
+          if (!cancelled) {
+            console.error("Failed to open database:", error);
+            setDb
+
+--- src/context/IconCacheContext.tsx (2544 chars) ---
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useState,
+  type ReactNode,
+} from "react";
+import { getCachedIcon } from "../../services/database";
+
+interface IconCacheContextType {
+  getCachedIconData: (iconKey: string) => Promise<string | null>;
+  cachedIcons: Map<string, string>;
+  isIconCached: (iconKey: string) => boolean;
+  clearCache: () => void;
+}
+
+const IconCacheContext = createContext<IconCacheContextType | undefined>(
+  undefined,
+);
+
+// In-memory cache for fast access
+const iconCacheMap = new Map<string, string>();
+
+export const IconCacheProvider = ({ children }: { children: ReactNode }) => {
+  const [cachedIcons, setCachedIcons] = useState<Map<string, string>>(
+    new Map(),
+  );
+
+  // Sync the exposed cache state with the in-memory map
+  const syncCachedIcons = useCallback(() => {
+    setCachedIcons(new Map(iconCacheMap));
+  }, []);
+
+  // Load cached icon into memory
+  const getCachedIconData = useCallback(
+    async (iconKey: string): Promise<string | null> => {
+      // Check in-memory cache first
+      if (iconCacheMap.has(iconKey)) {
+        return iconCacheMap.get(iconKey) ?? null;
+      }
+
+      // Check database
+      const cached = await getCachedIcon(iconKey);
+      if (cached?.imageData) {
+        iconCacheMap.set(iconKey, cached.imageData);
+        // Keep exposed state in sync
+        syncCachedIcons();
+        return cached.imageData;
+      }
+
+      return null;
+    },
+    [syncCachedIcons],
+  );
+
+  const isIconCached = useCallback(
+    (iconKey: string) => {
+      return iconCacheMap.has(iconKey) || cachedIcons.has(iconKey);
+    },
+    [cachedIcons],
+  );
+
+  // Empty both the module-level in-memory map and the exposed state. The
+  // database table is cleared separately by clearIconCache().
+  const clearCache = useCallback(() => {
+    iconCacheMap.clear();
+    setCachedIcons(new Map());
+  }, []);
+
+  // No AppState listener here: DatabaseProvider is a child of this provider,
+  // so the database may not be ready yet. Fore
+
+--- src/context/SubscriptionContext.tsx (10450 chars) ---
+import { posthog } from "@/src/config/posthog";
+import { processIconQueue } from "@/src/services/iconBackgroundCrawler";
+import dayjs from "dayjs";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import { AppState } from "react-native";
+import {
+  addSubscription as dbAddSubscription,
+  deleteSubscription as dbDeleteSubscription,
+  renewSubscription as dbRenewSubscription,
+  updateSubscription as dbUpdateSubscription,
+  updateSubscriptionStatus as dbUpdateSubscriptionStatus,
+  getAllSubscriptions,
+  getOldCrawledUrls,
+  getPreference,
+  setPreference,
+  updateCrawledUrlAttempt,
+} from "../../services/database";
+import { useDatabase } from "./DatabaseProvider";
+
+interface SubscriptionContextType {
+  subscriptions: Subscription[];
+  addSubscription: (subscription: Subscription) => Promise<void>;
+  updateSubscription: (
+    id: string,
+    data: Partial<Subscription>,
+  ) => Promise<void>;
+  deleteSubscription: (id: string) => Promise<void>;
+  updateSubscriptionStatus: (
+    id: string,
+    status: "active" | "paused" | "cancelled",
+  ) => Promise<void>;
+  renewSubscription: (id: string) => Promise<void>;
+  getUpcomingSubscriptions: (daysAhead?: number) => UpcomingSubscription[];
+  notificationEnabled: boolean;
+  setNotificationEnabled: (enabled: boolean) => Promise<void>;
+  refreshSubscriptions: () => Promise<void>;
+}
+
+const SubscriptionContext = createContext<SubscriptionContextType | undefined>(
+  undefined,
+);
+
+export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
+  const { db, isReady } = useDatabase();
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
+  const [notificationEnabled, setNotificationEnabledState] = useState(true);
+  const hasProcessedOnStartup = useRef(false);
+
+  // Process queued icons when app comes to foreground.
+  // This runs inside DatabaseProvider, so the DB is always ready.
+  // Guarded to not double-trigger on
+
+--- src/hooks/useCachedIcon.ts (4774 chars) ---
+import { useEffect, useState } from "react";
+import {
+  getCachedIcon,
+  getQueuedIcons,
+  setCachedIcon,
+} from "../../services/database";
+import {
+  addCacheUpdateListener,
+  addLoadingListener,
+  isIconLoading,
+} from "../services/iconLoadingRegistry";
+import { mimeForFormat, upscaleIconIfSmall } from "../services/iconUpscaler";
+
+export type IconStatus =
+  "placeholder" | "loading" | "cached" | "error" | "no_icon";
+
+interface IconState {
+  status: IconStatus;
+  iconUri: string | null;
+  format: string | null;
+}
+
+export function useCachedIcon(iconKey: string | undefined): IconState {
+  const [iconUri, setIconUri] = useState<string | null>(null);
+  const [format, setFormat] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [_, setForceUpdate] = useState(0);
+
+  useEffect(() => {
+    if (!iconKey) {
+      setIconUri(null);
+      setFormat(null);
+      setLoading(false);
+      return;
+    }
+
+    let active = true;
+
+    // Check cache on mount - but also check if icon is queued
+    const checkCache = async () => {
+      const cached = await getCachedIcon(iconKey);
+      if (!active) return;
+
+      if (cached?.imageData) {
+        // A "local_asset:" sentinel in the cache is not a real image — it
+        // means "use the static brand asset". Treat it as no override so the
+        // card falls back to the bundled icon instead of a blank/broken URI.
+        if (cached.imageData.startsWith("local_asset:")) {
+          setIconUri(null);
+          setFormat(null);
+        } else {
+          await applyCachedImage(cached, active);
+          return;
+        }
+      }
+
+      // Check if icon is in the queue (needs loading state)
+      const queued = await getQueuedIcons();
+      if (!active) return;
+
+      const isQueued = queued.some((item) => item.icon_key === iconKey);
+
+      if (isQueued || isIconLoading(iconKey)) {
+        setLoading(true);
+      } else {
+        setLoading(false);
+      }
+      setIconUri(null);
+      setFormat(nu
+
+--- src/services/cloudsync/CloudSyncService.ts (14261 chars) ---
+import * as Crypto from "expo-crypto";
+import { CryptoDigestAlgorithm } from "expo-crypto";
+import { Directory, Paths } from "expo-file-system";
+import { deleteAsync, readAsStringAsync } from "expo-file-system/legacy";
+import {
+  computeDatabaseHash,
+  executeNonConflictingImport,
+  exportBackup,
+  getDatabase,
+  getSyncMetadata,
+  importBackup,
+  updateSyncMetadata,
+} from "../../../services/database";
+import { DropboxStorage } from "./storage/DropboxStorage";
+import { GoogleDriveStorage } from "./storage/GoogleDriveStorage";
+import { ICloudStorage } from "./storage/ICloudStorage";
+import { OneDriveStorage } from "./storage/OneDriveStorage";
+import { OwnCloudNextcloudStorage } from "./storage/OwnCloudNextcloudStorage";
+import { CloudProvider, CloudStorageProvider, SyncResult } from "./types";
+
+export class CloudSyncService {
+  private provider: CloudStorageProvider | null = null;
+  private userId: string;
+  private isSyncing: boolean = false;
+
+  constructor(userId: string) {
+    this.userId = userId;
+  }
+
+  async initializeProvider(
+    providerType: CloudProvider,
+    config?: {
+      serverUrl?: string;
+    },
+  ): Promise<void> {
+    switch (providerType) {
+      case "google_drive":
+        this.provider = new GoogleDriveStorage(this.userId);
+        break;
+      case "onedrive":
+        this.provider = new OneDriveStorage(this.userId);
+        break;
+      case "dropbox":
+        this.provider = new DropboxStorage(this.userId);
+        break;
+      case "icloud":
+        this.provider = new ICloudStorage(this.userId);
+        break;
+      case "owncloud":
+      case "nextcloud":
+        if (!config?.serverUrl) {
+          throw new Error("Server URL required for ownCloud/Nextcloud");
+        }
+        this.provider = new OwnCloudNextcloudStorage(
+          this.userId,
+          config.serverUrl,
+          providerType,
+        );
+        break;
+      default:
+        throw new Error(`Unsupported provider: ${providerType}`);
+    }
+
+    // Load existing tokens 
+
+--- src/services/cloudsync/storage/DropboxStorage.ts (6437 chars) ---
+import * as FileSystem from "expo-file-system/legacy";
+import * as SecureStore from "expo-secure-store";
+import { CloudStorageProvider } from "../types";
+
+const DROPBOX_API_BASE = "https://api.dropboxapi.com/2";
+const DROPBOX_CONTENT_BASE = "https://content.dropboxapi.com/2";
+
+export class DropboxStorage implements CloudStorageProvider {
+  private tokens: any = null;
+  private userId: string = "";
+
+  constructor(userId: string) {
+    this.userId = userId;
+  }
+
+  async authenticate(): Promise<void> {
+    const tokensJson = await SecureStore.getItemAsync(
+      `dropbox_tokens_${this.userId}`,
+    );
+    if (tokensJson) {
+      this.tokens = JSON.parse(tokensJson);
+    }
+  }
+
+  async isAuthenticated(): Promise<boolean> {
+    if (!this.tokens) {
+      const tokensJson = await SecureStore.getItemAsync(
+        `dropbox_tokens_${this.userId}`,
+      );
+      if (tokensJson) {
+        this.tokens = JSON.parse(tokensJson);
+      }
+    }
+    return !!this.tokens?.accessToken;
+  }
+
+  async disconnect(): Promise<void> {
+    await SecureStore.deleteItemAsync(`dropbox_tokens_${this.userId}`);
+    this.tokens = null;
+  }
+
+  async uploadFile(
+    localPath: string,
+    remotePath: string,
+  ): Promise<{
+    fileId: string;
+    modified: string;
+    size: number;
+  }> {
+    if (!this.tokens?.accessToken) {
+      throw new Error("Not authenticated");
+    }
+
+    const fileName = remotePath.split("/").pop() || "backup.db";
+    const dropboxPath = `/SubTracker/${fileName}`;
+
+    const fileContent = await FileSystem.readAsStringAsync(localPath, {
+      encoding: FileSystem.EncodingType.Base64,
+    } as any);
+
+    const response = await fetch(`${DROPBOX_CONTENT_BASE}/files/upload`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${this.tokens.accessToken}`,
+        "Content-Type": "application/octet-stream",
+        "Dropbox-API-Arg": JSON.stringify({
+          path: dropboxPath,
+          mode: "overwrite",
+          autorename: false,
+        }),
+      },
+     
+
+--- src/services/cloudsync/storage/GoogleDriveStorage.ts (6340 chars) ---
+import * as FileSystem from "expo-file-system/legacy";
+import * as SecureStore from "expo-secure-store";
+import { CloudStorageProvider } from "../types";
+
+const GOOGLE_DRIVE_API_BASE = "https://www.googleapis.com/drive/v3";
+
+export class GoogleDriveStorage implements CloudStorageProvider {
+  private tokens: any = null;
+  private userId: string = "";
+
+  constructor(userId: string) {
+    this.userId = userId;
+  }
+
+  async authenticate(): Promise<void> {
+    // OAuth flow will be handled by the UI layer
+    // This method is called after successful OAuth
+    const tokensJson = await SecureStore.getItemAsync(
+      `gdrive_tokens_${this.userId}`,
+    );
+    if (tokensJson) {
+      this.tokens = JSON.parse(tokensJson);
+    }
+  }
+
+  async isAuthenticated(): Promise<boolean> {
+    if (!this.tokens) {
+      const tokensJson = await SecureStore.getItemAsync(
+        `gdrive_tokens_${this.userId}`,
+      );
+      if (tokensJson) {
+        this.tokens = JSON.parse(tokensJson);
+      }
+    }
+    return !!this.tokens?.accessToken;
+  }
+
+  async disconnect(): Promise<void> {
+    await SecureStore.deleteItemAsync(`gdrive_tokens_${this.userId}`);
+    this.tokens = null;
+  }
+
+  async uploadFile(
+    localPath: string,
+    remotePath: string,
+  ): Promise<{
+    fileId: string;
+    modified: string;
+    size: number;
+  }> {
+    if (!this.tokens?.accessToken) {
+      throw new Error("Not authenticated");
+    }
+
+    // Read file content
+    const fileContent = await FileSystem.readAsStringAsync(localPath, {
+      encoding: FileSystem.EncodingType.Base64,
+    } as any);
+
+    // Upload to Google Drive
+    const fileName = remotePath.split("/").pop() || "backup.db";
+
+    const metadata = {
+      name: fileName,
+      parents: ["appDataFolder"], // Hidden folder, not visible to user
+    };
+
+    const response = await fetch(
+      `${GOOGLE_DRIVE_API_BASE}/files?uploadType=multipart&fields=id,modifiedTime,size`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bear
+
+--- src/services/cloudsync/storage/ICloudStorage.ts (6172 chars) ---
+import * as FileSystem from "expo-file-system/legacy";
+import * as SecureStore from "expo-secure-store";
+import { CloudStorageProvider } from "../types";
+
+// iCloud WebDAV endpoint (note: Apple restricts access to iCloud - this works through iCloud Drive)
+// Users must enable iCloud Drive and the app must be configured for iCloud entitlements
+const ICLOUD_WEBDAV_BASE = "https://www.icloud.com/iclouddav.com";
+
+export class ICloudStorage implements CloudStorageProvider {
+  private tokens: any = null;
+  private userId: string = "";
+
+  constructor(userId: string) {
+    this.userId = userId;
+  }
+
+  async authenticate(): Promise<void> {
+    // iCloud authentication is handled through Apple ID sign-in on iOS
+    // For now, we use stored session tokens
+    const tokensJson = await SecureStore.getItemAsync(
+      `icloud_tokens_${this.userId}`,
+    );
+    if (tokensJson) {
+      this.tokens = JSON.parse(tokensJson);
+    }
+  }
+
+  async isAuthenticated(): Promise<boolean> {
+    if (!this.tokens) {
+      const tokensJson = await SecureStore.getItemAsync(
+        `icloud_tokens_${this.userId}`,
+      );
+      if (tokensJson) {
+        this.tokens = JSON.parse(tokensJson);
+      }
+    }
+    return !!this.tokens?.accessToken;
+  }
+
+  async disconnect(): Promise<void> {
+    await SecureStore.deleteItemAsync(`icloud_tokens_${this.userId}`);
+    this.tokens = null;
+  }
+
+  async uploadFile(
+    localPath: string,
+    remotePath: string,
+  ): Promise<{
+    fileId: string;
+    modified: string;
+    size: number;
+  }> {
+    if (!this.tokens?.accessToken) {
+      throw new Error(
+        "Not authenticated with iCloud. Please sign in with Apple ID on iOS.",
+      );
+    }
+
+    // Read the local file
+    const fileContent = await FileSystem.readAsStringAsync(localPath, {
+      encoding: FileSystem.EncodingType.Base64,
+    } as any);
+
+    // iCloud WebDAV upload
+    const response = await fetch(`${ICLOUD_WEBDAV_BASE}/upload${remotePath}`, {
+      method: "PUT",
+      headers: {
+        Auth
+
+--- src/services/cloudsync/storage/OneDriveStorage.ts (7170 chars) ---
+import * as FileSystem from "expo-file-system/legacy";
+import * as SecureStore from "expo-secure-store";
+import { CloudStorageProvider } from "../types";
+
+const ONEDRIVE_API_BASE = "https://graph.microsoft.com/v1.0";
+
+export class OneDriveStorage implements CloudStorageProvider {
+  private tokens: any = null;
+  private userId: string = "";
+
+  constructor(userId: string) {
+    this.userId = userId;
+  }
+
+  async authenticate(): Promise<void> {
+    const tokensJson = await SecureStore.getItemAsync(
+      `onedrive_tokens_${this.userId}`,
+    );
+    if (tokensJson) {
+      this.tokens = JSON.parse(tokensJson);
+    }
+  }
+
+  async isAuthenticated(): Promise<boolean> {
+    if (!this.tokens) {
+      const tokensJson = await SecureStore.getItemAsync(
+        `onedrive_tokens_${this.userId}`,
+      );
+      if (tokensJson) {
+        this.tokens = JSON.parse(tokensJson);
+      }
+    }
+    return !!this.tokens?.accessToken;
+  }
+
+  async disconnect(): Promise<void> {
+    await SecureStore.deleteItemAsync(`onedrive_tokens_${this.userId}`);
+    this.tokens = null;
+  }
+
+  // Ensure the SubTracker folder exists in OneDrive
+  private async ensureFolderExists(): Promise<void> {
+    if (!this.tokens?.accessToken) return;
+
+    try {
+      // Create the folder under Documents - OneDrive will create it if it doesn't exist
+      // If it exists, OneDrive returns 409 which we can ignore
+      await fetch(
+        `${ONEDRIVE_API_BASE}/me/drive/root:/Documents/SubTracker:/content`,
+        {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${this.tokens.accessToken}`,
+          },
+          // Empty PUT creates an empty folder
+          body: "",
+        },
+      );
+    } catch {
+      // Ignore errors - folder may already exist or creation failed
+    }
+  }
+
+  async uploadFile(
+    localPath: string,
+    remotePath: string,
+  ): Promise<{
+    fileId: string;
+    modified: string;
+    size: number;
+  }> {
+    if (!this.tokens?.accessToken) {
+      throw new Err
+
+--- src/services/cloudsync/storage/OwnCloudNextcloudStorage.ts (8284 chars) ---
+import * as FileSystem from "expo-file-system/legacy";
+import * as SecureStore from "expo-secure-store";
+import { CloudStorageProvider } from "../types";
+
+export class OwnCloudNextcloudStorage implements CloudStorageProvider {
+  private tokens: any = null;
+  private userId: string = "";
+  private serverUrl: string = "";
+  private provider: "owncloud" | "nextcloud" = "nextcloud";
+
+  constructor(
+    userId: string,
+    serverUrl: string,
+    provider: "owncloud" | "nextcloud" = "nextcloud",
+  ) {
+    this.userId = userId;
+    this.serverUrl = serverUrl.replace(/\/$/, ""); // Remove trailing slash
+    this.provider = provider;
+  }
+
+  async authenticate(): Promise<void> {
+    const key = `${this.provider}_tokens_${this.userId}`;
+    const tokensJson = await SecureStore.getItemAsync(key);
+    if (tokensJson) {
+      this.tokens = JSON.parse(tokensJson);
+    }
+  }
+
+  async isAuthenticated(): Promise<boolean> {
+    if (!this.tokens) {
+      const key = `${this.provider}_tokens_${this.userId}`;
+      const tokensJson = await SecureStore.getItemAsync(key);
+      if (tokensJson) {
+        this.tokens = JSON.parse(tokensJson);
+      }
+    }
+    return !!this.tokens?.accessToken;
+  }
+
+  async disconnect(): Promise<void> {
+    const key = `${this.provider}_tokens_${this.userId}`;
+    await SecureStore.deleteItemAsync(key);
+    this.tokens = null;
+  }
+
+  private getRemotePath(fileName: string): string {
+    const userId = this.tokens?.user_id;
+    if (!userId) {
+      throw new Error(
+        `${this.provider}: user_id not available. Ensure authentication completed successfully.`,
+      );
+    }
+    return `${this.serverUrl}/remote.php/dav/files/${userId}/SubTracker/${fileName}`;
+  }
+
+  async uploadFile(
+    localPath: string,
+    remotePath: string,
+  ): Promise<{
+    fileId: string;
+    modified: string;
+    size: number;
+  }> {
+    if (!this.tokens?.accessToken) {
+      throw new Error("Not authenticated");
+    }
+
+    const fileName = remotePath.split("/").pop() || "backup.db
+
+--- src/services/cloudsync/types.ts (1349 chars) ---
+export type CloudProvider =
+  "google_drive" | "onedrive" | "dropbox" | "owncloud" | "nextcloud" | "icloud";
+
+export interface CloudProviderConfig {
+  name: string;
+  provider: CloudProvider;
+  icon: string;
+  authUrl?: string;
+  clientId?: string;
+  scope?: string;
+}
+
+export interface SyncResult {
+  success: boolean;
+  synced: boolean;
+  conflicts?: any[];
+  error?: string;
+  message?: string;
+}
+
+export interface CloudStorageProvider {
+  authenticate(): Promise<void>;
+  isAuthenticated(): Promise<boolean>;
+  disconnect(): Promise<void>;
+
+  uploadFile(
+    localPath: string,
+    remotePath: string,
+  ): Promise<{
+    fileId: string;
+    modified: string;
+    size: number;
+  }>;
+
+  downloadFile(
+    fileId: string,
+    localPath: string,
+  ): Promise<{
+    size: number;
+    modified: string;
+  }>;
+
+  deleteFile(fileId: string): Promise<void>;
+
+  getFileMetadata(fileId: string): Promise<{
+    modified: string;
+    size: number;
+    exists: boolean;
+  } | null>;
+
+  findBackupFile(fileName: string): Promise<{
+    fileId: string;
+    modified: string;
+    size: number;
+  } | null>;
+}
+
+export interface ProviderOAuthTokens {
+  accessToken: string;
+  refreshToken?: string;
+  expiresAt?: number;
+}
+
+export interface SyncState {
+  isSyncing: boolean;
+  lastSyncTimestamp: string | null;
+  pendingChanges: boolean;
+  error: string | null;
+}
+
+
+--- src/services/faviconExtractor.ts (5221 chars) ---
+import { cacheIconToFileSystem, downloadIconAsBase64 } from "./iconScraper";
+
+interface FaviconResult {
+  url: string;
+  format: "svg" | "png" | "ico";
+}
+
+const FETCH_TIMEOUT_MS = 5000;
+const MAX_CONCURRENT_DOMAINS = 3;
+
+// Timeout-aware fetch
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit = {},
+  timeoutMs: number = FETCH_TIMEOUT_MS,
+): Promise<Response | null> {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+      });
+      return response;
+    } finally {
+      clearTimeout(timer);
+    }
+  } catch {
+    return null;
+  }
+}
+
+// Generate likely domain names from brand name
+function generateLikelyDomains(brandName: string): string[] {
+  const cleaned = brandName
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "")
+    .replace(/\s+/g, "");
+
+  return [
+    `https://${cleaned}.com`,
+    `https://${cleaned}.io`,
+    `https://www.${cleaned}.com`,
+    `https://${cleaned}plus.com`, // For services like Disney+
+    `https://www.${cleaned}plus.com`,
+  ];
+}
+
+// Extract domain from URL
+function extractDomain(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+}
+
+// Check favicon at common paths
+async function tryCommonFaviconPaths(
+  domain: string,
+): Promise<FaviconResult | null> {
+  const paths = [
+    `/favicon.ico`,
+    `/favicon.svg`,
+    `/apple-touch-icon.png`,
+    `/apple-touch-icon-152x152.png`,
+    `/android-chrome-192x192.png`,
+    `/android-chrome-512x512.png`,
+  ];
+
+  for (const path of paths) {
+    const url = `https://${domain}${path}`;
+    const response = await fetchWithTimeout(url, { method: "HEAD" });
+    if (response?.ok) {
+      const format = path.endsWith(".svg")
+        ? "svg"
+        : path.endsWith(".png")
+          ? "png"
+          : "ico";
+      return { url, format };
+    }
+  }
+
+  
+
+--- src/services/generatedModelMap.ts (6678 chars) ---
+/**
+ * AUTO-GENERATED FILE — DO NOT EDIT BY HAND.
+ *
+ * Generated by `scripts/generate-model-map.js` from the `*.tflite` files that
+ * physically exist in `assets/models/`. It is regenerated automatically during
+ * the build (see `scripts/build-android.sh`) and via `npm run generate-model-map`.
+ *
+ * Because the require list is derived from a directory scan, it can never
+ * reference a missing file: the build never fails on absent models, and newly
+ * generated models are bundled automatically on the next build.
+ *
+ * Current contents: 35 fast (ESPCN) + 35 sharp (FSRCNN) = 70 models.
+ */
+
+/* eslint-disable @typescript-eslint/no-require-imports */
+// Metro resolves these static `require` paths at build time.
+export const MODEL_MAP: Record<string, number> = {
+  "espcn_128x_256x.tflite": require("../../assets/models/espcn_128x_256x.tflite"),
+  "espcn_128x_384x.tflite": require("../../assets/models/espcn_128x_384x.tflite"),
+  "espcn_128x_512x.tflite": require("../../assets/models/espcn_128x_512x.tflite"),
+  "espcn_16x_128x.tflite": require("../../assets/models/espcn_16x_128x.tflite"),
+  "espcn_16x_192x.tflite": require("../../assets/models/espcn_16x_192x.tflite"),
+  "espcn_16x_256x.tflite": require("../../assets/models/espcn_16x_256x.tflite"),
+  "espcn_16x_32x.tflite": require("../../assets/models/espcn_16x_32x.tflite"),
+  "espcn_16x_384x.tflite": require("../../assets/models/espcn_16x_384x.tflite"),
+  "espcn_16x_512x.tflite": require("../../assets/models/espcn_16x_512x.tflite"),
+  "espcn_16x_64x.tflite": require("../../assets/models/espcn_16x_64x.tflite"),
+  "espcn_192x_384x.tflite": require("../../assets/models/espcn_192x_384x.tflite"),
+  "espcn_192x_576x.tflite": require("../../assets/models/espcn_192x_576x.tflite"),
+  "espcn_256x_512x.tflite": require("../../assets/models/espcn_256x_512x.tflite"),
+  "espcn_32x_128x.tflite": require("../../assets/models/espcn_32x_128x.tflite"),
+  "espcn_32x_192x.tflite": require("../../assets/models/espcn_32x_192x.tflite"),
+  "espcn_
+
+--- src/services/htmlIconExtractor.ts (10338 chars) ---
+/**
+ * Follow-links spider: takes a URL from search results, fetches the page,
+ * and extracts all icon-related tags (favicons, og:image, twitter:image,
+ * JSON-LD logos, Apple touch icons).
+ */
+
+interface ExtractedIcon {
+  url: string;
+  format: "svg" | "png" | "ico" | "jpg" | "jpeg" | "webp";
+  source: string; // e.g. "favicon", "og_image", "twitter_image", "jsonld"
+  width?: number;
+  height?: number;
+}
+
+const FETCH_TIMEOUT_MS = 6000;
+
+async function fetchPage(url: string): Promise<string | null> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
+        Accept:
+          "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+      },
+    });
+    if (!response.ok) return null;
+    const text = await response.text();
+    return text;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function detectImageFormat(url: string): ExtractedIcon["format"] {
+  const clean = url.toLowerCase().split("?")[0].split("#")[0];
+  if (clean.endsWith(".svg")) return "svg";
+  if (clean.endsWith(".ico")) return "ico";
+  if (clean.endsWith(".jpg") || clean.endsWith(".jpeg")) return "jpeg";
+  if (clean.endsWith(".webp")) return "webp";
+  return "png";
+}
+
+// Decode common HTML entities that appear in attribute values (e.g. og:image
+// URLs often carry & in their query string, which must become & or the
+// fetch returns HTTP 400). Entity strings are built via concatenation so the
+// source formatter doesn't collapse them into their literal characters.
+const AMP = "&" + "amp;";
+const LT = "&" + "lt;";
+const GT = "&" + "gt;";
+const QUOT = "&" + "quot;";
+const APOS = "&" + "apos;";
+
+function decodeHtmlEnti
+
+--- src/services/iconBackgroundCrawler.ts (27887 chars) ---
+import { icons } from "@/constants/icons";
+import {
+  dequeueIcon,
+  enqueueIconScrape,
+  getCachedIcon,
+  getCrawlResults,
+  getQueuedIcons,
+  isUrlAlreadyCrawled,
+  isUrlAlreadyCrawledBatch,
+  markUrlAsCrawled,
+  saveCrawlResult,
+  setCachedIcon,
+} from "@/services/database";
+import { extractFavicon } from "@/src/services/faviconExtractor";
+import { extractIconsFromUrls } from "@/src/services/htmlIconExtractor";
+import {
+  notifyCacheUpdate,
+  setIconLoading,
+} from "@/src/services/iconLoadingRegistry";
+import {
+  getReportsForIcon,
+  hashImageData,
+} from "@/src/services/iconReportService";
+import { findAllIconSources } from "@/src/services/iconScraper";
+import { mimeForFormat, upscaleIconIfSmall } from "@/src/services/iconUpscaler";
+import { isBase64IconValid } from "@/src/services/iconValidation";
+import { isDomainRateLimited } from "@/src/services/rateLimitTracker";
+import { searchForLinksToSpider } from "@/src/services/searchEngines";
+import { Image } from "react-native";
+
+// In-flight guard
+let isProcessingQueue = false;
+
+const MAX_LIBRARY_CANDIDATES = 50;
+const MAX_SPIDERED_URLS = 20;
+const MAX_SPIDERED_ICONS = 15;
+const MAX_WEB_SEARCH_RESULTS = 50;
+
+function detectUrlFormat(url: string): string {
+  const clean = url.toLowerCase().split("?")[0].split("#")[0];
+  if (clean.endsWith(".svg")) return "svg";
+  if (clean.endsWith(".ico")) return "ico";
+  if (clean.endsWith(".jpg") || clean.endsWith(".jpeg")) return "jpg";
+  if (clean.endsWith(".webp")) return "webp";
+  if (clean.endsWith(".gif")) return "gif";
+  return "png";
+}
+
+// Load local icon asset as base64
+async function loadLocalIconAsBase64(iconKey: string): Promise<string | null> {
+  const iconSource = icons[iconKey as keyof typeof icons];
+  if (!iconSource) {
+    console.log(`[LOCAL] No local icon found for key: ${iconKey}`);
+    return null;
+  }
+  console.log(`[LOCAL] Using local icon for ${iconKey}`);
+  return `local_asset:${iconKey}`;
+}
+
+// Download image and save to DB
+async function downloadImageAs
+
+--- src/services/iconLoadingRegistry.ts (1250 chars) ---
+// Plain module-level loading-state registry - keeps iconBackgroundCrawler React-agnostic
+
+const loadingIcons = new Set<string>();
+
+// Force update listeners
+const listenerCallbacks: (() => void)[] = [];
+
+export function setIconLoading(iconKey: string, loading: boolean): void {
+  if (loading) {
+    loadingIcons.add(iconKey);
+  } else {
+    loadingIcons.delete(iconKey);
+  }
+  // Notify all listeners to force re-render
+  listenerCallbacks.forEach((callback) => callback());
+}
+
+export function isIconLoading(iconKey: string): boolean {
+  return loadingIcons.has(iconKey);
+}
+
+export function addLoadingListener(callback: () => void): () => void {
+  listenerCallbacks.push(callback);
+  return () => {
+    const idx = listenerCallbacks.indexOf(callback);
+    if (idx !== -1) listenerCallbacks.splice(idx, 1);
+  };
+}
+
+// Cache update notification
+const cacheUpdateCallbacks: (() => void)[] = [];
+
+export function notifyCacheUpdate(): void {
+  cacheUpdateCallbacks.forEach((callback) => callback());
+}
+
+export function addCacheUpdateListener(callback: () => void): () => void {
+  cacheUpdateCallbacks.push(callback);
+  return () => {
+    const idx = cacheUpdateCallbacks.indexOf(callback);
+    if (idx !== -1) cacheUpdateCallbacks.splice(idx, 1);
+  };
+}
+
+
+--- src/services/iconProcessing.ts (17968 chars) ---
+/**
+ * Edge-AI icon processing for the picker.
+ *
+ * - `upscaleIconAi` uses react-native-fast-tflite with multiple bundled super-resolution
+ *   models. Model is selected dynamically based on input size, target output size
+ *   (determined by device pixel density), and quality mode.
+ * - Two quality modes are supported:
+ *     - `fast`: small ESPCN models (lower quality, fastest inference).
+ *     - `sharp`: FSRCNN models trained with MAE + MS-SSIM + VGG perceptual loss.
+ * - If the native module or model is unavailable, it transparently falls back to
+ *   the existing bilinear `upscaleIconIfSmall` so the button always works.
+ * - `isLowResIcon` detects icons small enough to benefit from upscaling.
+ * - White-background removal is handled by whiteBgRemoval.ts using
+ *   expo-image-manipulator + upng-js (no WebView needed).
+ */
+
+import { Image, PixelRatio } from "react-native";
+import { MODEL_MAP } from "./generatedModelMap";
+import { mimeForFormat, upscaleIconIfSmall } from "./iconUpscaler";
+
+// Below this max dimension an icon is "low-res" and worth upscaling.
+const LOW_RES_THRESHOLD_PX = 64;
+
+// Base display size for icons (what we want to show on screen)
+const BASE_DISPLAY_SIZE = 64;
+
+export type UpscaleQuality = "fast" | "sharp";
+
+// Model registry - maps quality -> input_size -> { scale -> model_file }
+const MODEL_REGISTRY: Record<
+  UpscaleQuality,
+  Record<number, Record<number, string>>
+> = {
+  fast: {
+    16: {
+      4: "espcn_16x_64x.tflite",
+      8: "espcn_16x_128x.tflite",
+      12: "espcn_16x_192x.tflite",
+      16: "espcn_16x_256x.tflite",
+      24: "espcn_16x_384x.tflite",
+      32: "espcn_16x_512x.tflite",
+    },
+    32: {
+      2: "espcn_32x_64x.tflite",
+      4: "espcn_32x_128x.tflite",
+      6: "espcn_32x_192x.tflite",
+      8: "espcn_32x_256x.tflite",
+      12: "espcn_32x_384x.tflite",
+      16: "espcn_32x_512x.tflite",
+    },
+    48: {
+      2: "espcn_48x_96x.tflite",
+      3: "espcn_48x_144x.tflite",
+      4: "espcn_48x_192x.tflite",
+      5: 
+
+--- src/services/iconReportService.ts (4635 chars) ---
+/**
+ * Icon reporting service.
+ * Handles wrong/broken icon reports: stores locally, provides feedback,
+ * and can hide rejected icons from appearing again.
+ */
+
+import { getDatabase } from "../../services/database";
+
+export type ReportType = "wrong" | "broken";
+
+export interface IconReport {
+  id?: number;
+  iconKey: string;
+  reportType: ReportType;
+  source: string;
+  imageData: string;
+  rejected: boolean;
+  comment?: string;
+  reportedAt: string;
+}
+
+const REPORTS_TABLE_SQL = `
+CREATE TABLE IF NOT EXISTS icon_reports (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  icon_key      TEXT NOT NULL,
+  report_type   TEXT NOT NULL,
+  source        TEXT,
+  image_data    TEXT,
+  comment       TEXT,
+  rejected      INTEGER DEFAULT 0,
+  reported_at   TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_icon_reports_key ON icon_reports(icon_key);
+`;
+
+/**
+ * Generate a stable hash of a base64 string for comparison/storage.
+ * Uses a simple but deterministic hash (Fowler-Noll-Vo-1a) that avoids
+ * storing full base64 payloads in the database.
+ */
+export function hashImageData(data: string): string {
+  let hash = 0x811c9dc5; // FNV offset basis
+  for (let i = 0; i < data.length; i++) {
+    hash ^= data.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193); // FNV prime
+  }
+  return hash.toString(16);
+}
+
+let tableEnsured = false;
+
+async function ensureTable(): Promise<void> {
+  if (tableEnsured) return;
+  try {
+    const db = getDatabase();
+    await db.execAsync(REPORTS_TABLE_SQL);
+    // Existing installs created before `comment` was added will lack the
+    // column; ALTER so inserts of the comment column don't fail.
+    await db
+      .execAsync("ALTER TABLE icon_reports ADD COLUMN comment TEXT")
+      .catch(() => {
+        // Column already exists (or table just created above) — ignore.
+      });
+    tableEnsured = true;
+  } catch {
+    // Table might already exist
+    tableEnsured = true;
+  }
+}
+
+/**
+ * Report an icon as wrong or broken.
+ * A non-empty co
+
+--- src/services/iconScraper.ts (9223 chars) ---
+import { Directory, File, Paths } from "expo-file-system";
+import { writeAsStringAsync } from "expo-file-system/legacy";
+
+interface ScrapedIcon {
+  source: "simple-icons" | "tabler" | "devicons" | "boxicons" | "icons8";
+  url: string;
+  format: "svg" | "png";
+}
+
+/**
+ * Convert brand name to slug for icon search.
+ * FIXED: Handles edge cases like trailing dashes, multiple dashes,
+ * empty strings, special characters, and common name normalization.
+ */
+export function nameToSlug(name: string): string {
+  let slug = name
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, "-") // spaces to dashes
+    .replace(/[^a-z0-9-]/g, "") // remove non-alphanumeric except dash
+    .replace(/-+/g, "-") // collapse multiple dashes
+    .replace(/^-+|-+$/g, ""); // trim leading/trailing dashes
+
+  // If slug is empty after sanitization, try fallback
+  if (!slug) {
+    slug = name.toLowerCase().replace(/[^a-z0-9]/g, "");
+  }
+
+  return slug;
+}
+
+/**
+ * Generate alternative slugs for fuzzy matching.
+ * Useful when the brand name has common variations.
+ */
+export function generateAlternativeSlugs(name: string): string[] {
+  const base = nameToSlug(name);
+  const alternatives: string[] = [base];
+
+  // Remove common suffixes
+  const noSuffix = base
+    .replace(/-(app|io|tv|ai|hq|tech|pro|me)$/i, "")
+    .replace(/-(com|net|org)$/i, "");
+  if (noSuffix !== base) alternatives.push(noSuffix);
+
+  // Remove trailing numbers (e.g. "web3" -> "web")
+  const noTrailingNumber = base.replace(/-\d+$/, "");
+  if (noTrailingNumber !== base) alternatives.push(noTrailingNumber);
+
+  // Try without hyphens for compound names (e.g. "microsoft-teams" -> "microsoftteams")
+  const noHyphen = base.replace(/-/g, "");
+  if (noHyphen !== base) alternatives.push(noHyphen);
+
+  // Add just the first part for compound names
+  const firstPart = base.split("-")[0];
+  if (firstPart && firstPart !== base) alternatives.push(firstPart);
+
+  return [...new Set(alternatives)];
+}
+
+// Shared timeout-aware fetch helper
+const FETCH_
+
+--- src/services/iconUpscaler.ts (5200 chars) ---
+/**
+ * Rudimentary icon upscaling for low-resolution icons (e.g. 16x16 favicons
+ * shown at 48–64px, which look pixelated).
+ *
+ * Uses expo-image-manipulator (native) to resample small raster icons up to a
+ * clean target size once, so the upscaled bytes are what get cached and shown
+ * everywhere. Vector (SVG) icons are passed through untouched.
+ */
+
+import {
+  cacheDirectory,
+  deleteAsync,
+  EncodingType,
+  readAsStringAsync,
+  writeAsStringAsync,
+} from "expo-file-system/legacy";
+import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
+import { Image } from "react-native";
+
+// Below this max dimension an icon is considered "low-res" and worth upscaling.
+// DISABLED for crawl-time: we now store ORIGINAL resolution and only upscale
+// on-demand when user taps "Upscale (AI)". This prevents bilinear garbage
+// from polluting the training/upscaling pipeline.
+// const UPSCALE_THRESHOLD_PX = 64;
+
+// Target size for upscaled icons (power-of-two friendly, crisp at card size).
+const TARGET_SIZE_PX = 256;
+
+// Crawl-time upscaling is DISABLED. Set to true ONLY for manual "Upscale (AI)" button.
+const CRAWL_TIME_UPSCALE_ENABLED = false;
+
+export function mimeForFormat(format: string): string {
+  switch (format) {
+    case "svg":
+      return "image/svg+xml";
+    case "png":
+      return "image/png";
+    case "ico":
+      return "image/x-icon";
+    case "jpg":
+    case "jpeg":
+      return "image/jpeg";
+    case "gif":
+      return "image/gif";
+    case "webp":
+      return "image/webp";
+    default:
+      return "image/png";
+  }
+}
+
+function saveFormatFor(format: string): SaveFormat {
+  switch (format) {
+    case "png":
+      return SaveFormat.PNG;
+    case "jpg":
+    case "jpeg":
+      return SaveFormat.JPEG;
+    case "webp":
+      return SaveFormat.WEBP;
+    default:
+      return SaveFormat.PNG;
+  }
+}
+
+export interface UpscaleResult {
+  base64: string;
+  format: string;
+}
+
+/**
+ * Upscale a small raster icon (base64 + format) to TARGET_SIZE_PX if needed.
+ * Return
+
+--- src/services/iconValidation.ts (2759 chars) ---
+/**
+ * Lightweight, dependency-free heuristics to reject empty / blank / placeholder
+ * icons before they ever reach the picker UI.
+ *
+ * Note: synchronous checks (byte size + PNG IHDR) run at save/collection time.
+ * The async runtime dimension check (Image.getSize) is used as a best-effort
+ * second pass when we already have a decoded data URI handy.
+ */
+
+import { Image } from "react-native";
+
+// Below this many decoded bytes, an image is almost certainly blank/placeholder.
+const MIN_DECODED_BYTES = 300;
+
+// Below this many pixels on either axis, the icon is effectively empty.
+const MIN_DIMENSION_PX = 8;
+
+/**
+ * Read width/height from a PNG IHDR (bytes 16-24) synchronously.
+ * Returns null if not a PNG or unreadable.
+ */
+function readPngDimensions(bytes: Uint8Array): { w: number; h: number } | null {
+  try {
+    if (bytes.length < 24) return null;
+    // PNG signature already verified by caller.
+    const w =
+      (bytes[16] << 24) | (bytes[17] << 16) | (bytes[18] << 8) | bytes[19];
+    const h =
+      (bytes[20] << 24) | (bytes[21] << 16) | (bytes[22] << 8) | bytes[23];
+    if (w <= 0 || h <= 0 || w > 100000 || h > 100000) return null;
+    return { w, h };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Synchronous validity check using only the base64 + format.
+ * Returns false for blank/placeholder images.
+ */
+export function isBase64IconValid(base64: string, format: string): boolean {
+  // SVG: accept any non-trivial markup.
+  if (format === "svg") {
+    return base64.length > 64;
+  }
+
+  let binary: string;
+  try {
+    binary = atob(base64);
+  } catch {
+    // Not decodable base64 — treat as invalid.
+    return false;
+  }
+
+  // Byte-size heuristic (decoded length in bytes).
+  if (binary.length < MIN_DECODED_BYTES) return false;
+
+  // PNG dimension check from IHDR.
+  if (format === "png" || binary.startsWith("\x89PNG")) {
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    const dims = rea
+
+--- src/services/rateLimitTracker.ts (6895 chars) ---
+/**
+ * Domain-level rate limit tracker.
+ * Persists rate limit state to SecureStore so it survives app restarts.
+ * Falls back to in-memory-only if SecureStore is unavailable.
+ *
+ * Prevents hammering domains that have returned 429 (or 403) responses.
+ * Uses an escalating cooldown ladder: 30s → 2min → 5min → 15min → 1hr → 4hr
+ */
+
+const STORAGE_KEY = "rate_limiter_state_v1";
+
+// Cooldown ladder in milliseconds
+const COOLDOWN_LADDER = [
+  30_000, 120_000, 300_000, 900_000, 3_600_000, 14_400_000,
+];
+const MAX_COOLDOWN = 14_400_000; // 4 hours
+
+interface DomainRateState {
+  isRateLimited: boolean;
+  rateLimitedAt: number;
+  cooldownUntil: number;
+  consecutive429s: number;
+  lastSuccessAt: number;
+}
+
+// In-memory state map
+const stateMap = new Map<string, DomainRateState>();
+
+// Listeners for UI updates
+type Listener = () => void;
+const listeners = new Set<Listener>();
+
+let loaded = false;
+let storageAvailable = true;
+
+// ---- Lazy storage abstraction ----
+// SecureStore may not be available in all environments (e.g. Expo Go, web, etc.)
+// We lazily import it and fall back to in-memory-only if it fails.
+// Sentinel undefined = not yet loaded, null = failed to load, object = loaded successfully
+let secureStoreModule: any = undefined;
+
+async function getSecureStore(): Promise<any> {
+  if (secureStoreModule !== undefined) return secureStoreModule;
+  try {
+    secureStoreModule = await import("expo-secure-store");
+    return secureStoreModule;
+  } catch (err) {
+    console.warn(
+      "[RATE_LIMIT] expo-secure-store not available, using in-memory only:",
+      err,
+    );
+    secureStoreModule = null;
+    storageAvailable = false;
+    return null;
+  }
+}
+
+function getDomainFromUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    return u.hostname;
+  } catch {
+    return "unknown";
+  }
+}
+
+// ---- Persistence ----
+
+async function saveState(): Promise<void> {
+  if (!storageAvailable) return;
+  try {
+    const store = await getSecureStore();
+    if (!store) retur
+
+--- src/services/searchEngines.ts (14597 chars) ---
+/**
+ * Multi-engine image search + Google dork search scraper.
+ * No API keys required — scrapes HTML results directly.
+ * Uses rotating User-Agents and timeouts.
+ */
+
+const FETCH_TIMEOUT_MS = 10000;
+const MAX_RETRIES = 2;
+
+interface ImageSearchResult {
+  url: string;
+  format: "svg" | "png" | "ico" | "jpg" | "jpeg" | "gif" | "webp";
+  source: string;
+  width?: number;
+  height?: number;
+}
+
+const USER_AGENTS = [
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1",
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:124.0) Gecko/20100101 Firefox/124.0",
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:124.0) Gecko/20100101 Firefox/124.0",
+];
+
+function getRandomUserAgent(): string {
+  return USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
+}
+
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit = {},
+  timeoutMs: number = FETCH_TIMEOUT_MS,
+): Promise<Response | null> {
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      console.log(`[SEARCH] Fetching: ${url} (attempt ${attempt + 1}/${MAX_RETRIES + 1})`);
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+        headers: {
+          ...options.headers,
+          "User-Agent": getRandomUserAgent(),
+          Accept:
+            "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+          "Accept-Language": "en-US,en;q=0.9",
+        },
+      });
+ 
+
+--- src/services/webViewSearchEngine.ts (6764 chars) ---
+/**
+ * WebView-based search engine for mobile scraping.
+ * Uses react-native-webview to load search pages and extract links
+ * after JavaScript has executed (bypasses anti-bot measures).
+ *
+ * This service provides a reliable alternative to fetch() when
+ * search engines block simple HTTP requests.
+ */
+
+import { isDomainRateLimited } from "./rateLimitTracker";
+
+// Types for search results
+interface WebSearchResult {
+  url: string;
+  title?: string;
+  snippet?: string;
+}
+
+// Store pending WebView requests - keyed by requestId
+const pendingRequests = new Map<
+  string,
+  {
+    resolve: (results: string[]) => void;
+    reject: (error: Error) => void;
+    timeout: ReturnType<typeof setTimeout>;
+  }
+>();
+
+// Callback for triggering WebView search from React context
+let triggerSearchCallback: ((brand: string, requestId: string) => void) | null =
+  null;
+
+// Search configuration
+const SEARCH_TIMEOUT_MS = 15000;
+const WEBVIEW_LOAD_DELAY_MS = 3000; // Additional time for JS to execute
+
+let requestCounter = 0;
+
+/**
+ * Generate a unique request ID for tracking WebView searches
+ */
+function generateRequestId(): string {
+  requestCounter++;
+  return `search_${Date.now()}_${requestCounter}`;
+}
+
+/**
+ * Set the callback that triggers WebView searches
+ * This is called by the HiddenSearchWebView component
+ */
+export function setSearchTriggerCallback(
+  callback: ((brand: string, requestId: string) => void) | null,
+) {
+  triggerSearchCallback = callback;
+}
+
+/**
+ * Search for links to spider using WebView-based scraping.
+ * This is the mobile-friendly alternative to fetch-based search.
+ */
+export async function searchForLinksWithWebView(
+  brand: string,
+): Promise<string[]> {
+  // Check if DuckDuckGo is already rate-limited before attempting
+  const rateLimited = await isDomainRateLimited("https://duckduckgo.com");
+  if (rateLimited) {
+    console.log(
+      `[WEBVIEW_SEARCH] DuckDuckGo is rate-limited, skipping search for "${brand}"`,
+    );
+    return [];
+  }
+
+  const id = generate
+
+--- src/services/whiteBgRemoval.ts (5081 chars) ---
+/**
+ * White-background detection and removal for icons.
+ *
+ * Uses expo-image-manipulator to normalise the image to PNG, then upng-js to
+ * decode/encode the raw pixel data — no WebView needed, no postMessage limits.
+ */
+
+import {
+  deleteAsync,
+  EncodingType,
+  readAsStringAsync,
+} from "expo-file-system/legacy";
+import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
+import UPNG from "upng-js";
+
+/**
+ * Detect whether an icon has a white/off-white background by sampling a grid
+ * of points. Returns true if >= 50% of sampled pixels are white-like.
+ */
+export async function detectWhiteBg(
+  base64: string,
+  format: string,
+  tolerance = 60,
+): Promise<boolean> {
+  if (format === "svg") return false;
+
+  let tmpUri: string | undefined;
+  try {
+    const mime = format === "svg" ? "image/svg+xml" : `image/${format}`;
+    const srcUri = `data:${mime};base64,${base64}`;
+
+    // Normalise to PNG so upng-js can decode it.
+    const result = await manipulateAsync(
+      srcUri,
+      [{ resize: { width: 128 } }], // keep it small for speed
+      { compress: 1, format: SaveFormat.PNG },
+    );
+    tmpUri = result.uri;
+
+    const pngB64 = await readAsStringAsync(result.uri, {
+      encoding: EncodingType.Base64,
+    });
+
+    const binary = atob(pngB64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+
+    const decoded = UPNG.decode(bytes.buffer);
+    const w = decoded.width;
+    const h = decoded.height;
+    const rgba = new Uint8Array(UPNG.toRGBA8(decoded)[0]);
+
+    // Sample a grid of points.
+    const stepX = Math.max(1, Math.floor(w / 5));
+    const stepY = Math.max(1, Math.floor(h / 5));
+    const pts: [number, number][] = [];
+    for (let y = 0; y < h; y += stepY) {
+      for (let x = 0; x < w; x += stepX) {
+        pts.push([x, y]);
+      }
+    }
+    pts.push([0, 0], [w - 1, 0], [0, h - 1], [w - 1, h - 1]);
+
+    let whiteLike = 0;
+    for (const [x, y] of pts) {
+      const id
+
+--- src/types/fast-tflite.d.ts (539 chars) ---
+// Ambient declaration for react-native-fast-tflite. The package is installed
+// via a native dev build and is not present in the Expo Go type environment,
+// so we declare its surface here to keep tsc green.
+declare module "react-native-fast-tflite" {
+  export function loadTensorflowModel(
+    modelPath: any,
+    options?: any,
+  ): Promise<{
+    runSync: (inputs: TypedArray[]) => TypedArray[];
+    run: (inputs: TypedArray[]) => Promise<TypedArray[]>;
+    [key: string]: any;
+  }>;
+  const _default: any;
+  export default _default;
+}
+
+
+=== GREP tflite/espcn/fsrcnn/upscale ===
+src/hooks/useCachedIcon.ts:12:import { mimeForFormat, upscaleIconIfSmall } from "../services/iconUpscaler";
+src/hooks/useCachedIcon.ts:130:  // small raster icon once and reflecting the upscaled bytes/format.
+src/hooks/useCachedIcon.ts:140:    const { base64: upscaled, format: outFormat } = await upscaleIconIfSmall(
+src/hooks/useCachedIcon.ts:144:    if (upscaled !== cached.imageData && active) {
+src/hooks/useCachedIcon.ts:147:        upscaled,
+src/hooks/useCachedIcon.ts:155:    setIconUri(`data:${mime};base64,${upscaled}`);
+src/services/iconProcessing.ts:4: * - `upscaleIconAi` uses react-native-fast-tflite with multiple bundled super-resolution
+src/services/iconProcessing.ts:11: *   the existing bilinear `upscaleIconIfSmall` so the button always works.
+src/services/iconProcessing.ts:19:import { mimeForFormat, upscaleIconIfSmall } from "./iconUpscaler";
+src/services/iconProcessing.ts:27:export type UpscaleQuality = "fast" | "sharp";
+src/services/iconProcessing.ts:31:  UpscaleQuality,
+src/services/iconProcessing.ts:36:      4: "espcn_16x_64x.tflite",
+src/services/iconProcessing.ts:37:      8: "espcn_16x_128x.tflite",
+src/services/iconProcessing.ts:38:      12: "espcn_16x_192x.tflite",
+src/services/iconProcessing.ts:39:      16: "espcn_16x_256x.tflite",
+src/services/iconProcessing.ts:40:      24: "espcn_16x_384x.tflite",
+src/services/iconProcessing.ts:41:      32: "espcn_16x_512x.tflite",
+src/services/iconProcessing.ts:44:      2: "espcn_32x_64x.tflite",
+src/services/iconProcessing.ts:45:      4: "espcn_32x_128x.tflite",
+src/services/iconProcessing.ts:46:      6: "espcn_32x_192x.tflite",
+src/services/iconProcessing.ts:47:      8: "espcn_32x_256x.tflite",
+src/services/iconProcessing.ts:48:      12: "espcn_32x_384x.tflite",
+src/services/iconProcessing.ts:49:      16: "espcn_32x_512x.tflite",
+src/services/iconProcessing.ts:52:      2: "espcn_48x_96x.tflite",
+src/services/iconProcessing.ts:53:      3: "espcn_48x_144x.tflite",
+src/services/iconProcessing.ts:54:      4: "espcn_48x_192x.tflite",
+src/services/iconProcessing.ts:55:      5: "espcn_48x_240x.tflite",
+src/services/iconProcessing.ts:56:      8: "espcn_48x_384x.tflite",
+src/services/iconProcessing.ts:57:      12: "espcn_48x_576x.tflite",
+src/services/iconProcessing.ts:60:      2: "espcn_64x_128x.tflite",
+src/services/iconProcessing.ts:61:      3: "espcn_64x_192x.tflite",
+src/services/iconProcessing.ts:62:      4: "espcn_64x_256x.tflite",
+src/services/iconProcessing.ts:63:      6: "espcn_64x_384x.tflite",
+src/services/iconProcessing.ts:64:      8: "espcn_64x_512x.tflite",
+src/services/iconProcessing.ts:67:      2: "espcn_96x_192x.tflite",
+src/services/iconProcessing.ts:68:      3: "espcn_96x_288x.tflite",
+src/services/iconProcessing.ts:69:      4: "espcn_96x_384x.tflite",
+src/services/iconProcessing.ts:70:      5: "espcn_96x_480x.tflite",
+src/services/iconProcessing.ts:73:      2: "espcn_128x_256x.tflite",
+src/services/iconProcessing.ts:74:      3: "espcn_128x_384x.tflite",
+src/services/iconProcessing.ts:77:      2: "espcn_192x_384x.tflite",
+src/services/iconProcessing.ts:78:      3: "espcn_192x_576x.tflite",
+src/services/iconProcessing.ts:81:      2: "espcn_256x_512x.tflite",
+src/services/iconProcessing.ts:86:      4: "fsrcnn_16x_64x.tflite",
+src/services/iconProcessing.ts:87:      8: "fsrcnn_16x_128x.tflite",
+src/services/iconProcessing.ts:88:      12: "fsrcnn_16x_192x.tflite",
+src/services/iconProcessing.ts:89:      16: "fsrcnn_16x_256x.tflite",
+src/services/iconProcessing.ts:90:      24: "fsrcnn_16x_384x.tflite",
+src/services/iconProcessing.ts:91:      32: "fsrcnn_16x_512x.tflite",
+src/services/iconProcessing.ts:94:      2: "fsrcnn_32x_64x.tflite",
+src/services/iconProcessing.ts:95:      4: "fsrcnn_32x_128x.tflite",
+src/services/iconProcessing.ts:96:      6: "fsrcnn_32x_192x.tflite",
+src/services/iconProcessing.ts:97:      8: "fsrcnn_32x_256x.tflite",
+src/services/iconProcessing.ts:98:      12: "fsrcnn_32x_384x.tflite",
+src/services/iconProcessing.ts:99:      16: "fsrcnn_32x_512x.tflite",
+src/services/iconProcessing.ts:102:      2: "fsrcnn_48x_96x.tflite",
+src/services/iconProcessing.ts:103:      3: "fsrcnn_48x_144x.tflite",
+src/services/iconProcessing.ts:104:      4: "fsrcnn_48x_192x.tflite",
+src/services/iconProcessing.ts:105:      5: "fsrcnn_48x_240x.tflite",
+src/services/iconProcessing.ts:106:      8: "fsrcnn_48x_384x.tflite",
+src/services/iconProcessing.ts:107:      12: "fsrcnn_48x_576x.tflite",
+src/services/iconProcessing.ts:110:      2: "fsrcnn_64x_128x.tflite",
+src/services/iconProcessing.ts:111:      3: "fsrcnn_64x_192x.tflite",
+src/services/iconProcessing.ts:112:      4: "fsrcnn_64x_256x.tflite",
+src/services/iconProcessing.ts:113:      6: "fsrcnn_64x_384x.tflite",
+src/services/iconProcessing.ts:114:      8: "fsrcnn_64x_512x.tflite",
+src/services/iconProcessing.ts:117:      2: "fsrcnn_96x_192x.tflite",
+src/services/iconProcessing.ts:118:      3: "fsrcnn_96x_288x.tflite",
+src/services/iconProcessing.ts:119:      4: "fsrcnn_96x_384x.tflite",
+src/services/iconProcessing.ts:120:      5: "fsrcnn_96x_480x.tflite",
+src/services/iconProcessing.ts:123:      2: "fsrcnn_128x_256x.tflite",
+src/services/iconProcessing.ts:124:      3: "fsrcnn_128x_384x.tflite",
+src/services/iconProcessing.ts:125:      4: "fsrcnn_128x_512x.tflite",
+src/services/iconProcessing.ts:128:      2: "fsrcnn_192x_384x.tflite",
+src/services/iconProcessing.ts:129:      3: "fsrcnn_192x_576x.tflite",
+src/services/iconProcessing.ts:132:      2: "fsrcnn_256x_512x.tflite",
+src/services/iconProcessing.ts:138:// auto-generated from the `*.tflite` files present in assets/models/ by
+src/services/iconProcessing.ts:169:  quality: UpscaleQuality,
+src/services/iconProcessing.ts:192:  quality: UpscaleQuality,
+src/services/iconProcessing.ts:231: * `false` until the `fsrcnn_*.tflite` files are generated and wired into

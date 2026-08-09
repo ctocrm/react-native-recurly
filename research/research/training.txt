@@ -1,0 +1,2288 @@
+=== SCRIPT MTIMES ===
+total 304
+drwxrwxr-x  4 d d  4096 2026-08-05 05:35 .
+drwxrwxr-x 20 d d 12288 2026-08-05 07:49 ..
+-rwxrwxr-x  1 d d 18203 2026-08-04 21:11 android-emulator.sh
+drwxrwxr-x  3 d d  4096 2026-07-10 19:25 android-emulator.sh<
+-rwxrwxr-x  1 d d 12067 2026-07-16 02:39 build-android.sh
+-rwxrwxr-x  1 d d  3185 2026-07-10 00:17 build-monitor.sh
+-rwxrwxr-x  1 d d  3984 2026-08-04 22:15 generate-model.js
+-rw-rw-r--  1 d d  3630 2026-07-14 03:07 generate-model-map.js
+-rw-rw-r--  1 d d  2795 2026-07-28 18:14 generate-model-registry.js
+-rwxrwxr-x  1 d d  1670 2026-07-16 02:39 prebuild-ios.sh
+drwxrwxr-x  2 d d  4096 2026-08-05 14:51 __pycache__
+-rw-rw-r--  1 d d  3857 2026-07-14 03:08 sharpen_icons.py
+-rwxrwxr-x  1 d d  2555 2026-07-10 00:08 train_espcn_fast.py
+-rw-rw-r--  1 d d 23183 2026-08-05 20:05 train_espcn_multi.py
+-rw-rw-r--  1 d d  5401 2026-07-14 03:13 train_espcn_perceptual.py
+-rw-rw-r--  1 d d 25157 2026-08-05 20:07 train_fsrcnn_multi.py
+-rw-rw-r--  1 d d  6357 2026-07-14 03:38 train_fsrcnn.py
+-rwxrwxr-x  1 d d  8760 2026-08-01 22:06 train-setup.sh
+-rwxrwxr-x  1 d d  4536 2026-08-03 16:54 train.sh
+-rwxrwxr-x  1 d d  2938 2026-07-11 01:56 verify-android.sh
+
+=== MODEL COUNT/SIZE ===
+70
+11M	assets/models
+     35 espcn
+     35 fsrcnn
+      1 model
+
+=== MODEL MTIMES sample ===
+total 10464
+drwxr-xr-x 2 d d   16384 2026-08-04 15:13 .
+drwxrwxr-x 7 d d    4096 2026-08-04 17:14 ..
+-rw-r--r-- 1 d d    6640 2026-08-03 17:40 espcn_128x_256x.tflite
+-rw-r--r-- 1 d d    9040 2026-08-03 17:41 espcn_128x_384x.tflite
+-rw-r--r-- 1 d d   12400 2026-08-03 17:43 espcn_128x_512x.tflite
+-rw-r--r-- 1 d d   35416 2026-08-03 17:16 espcn_16x_128x.tflite
+-rw-r--r-- 1 d d   73824 2026-08-03 17:16 espcn_16x_192x.tflite
+-rw-r--r-- 1 d d  127592 2026-08-03 17:17 espcn_16x_256x.tflite
+-rw-r--r-- 1 d d    6576 2026-08-03 17:15 espcn_16x_32x.tflite
+-rw-r--r-- 1 d d  281192 2026-08-03 17:18 espcn_16x_384x.tflite
+-rw-r--r-- 1 d d  496232 2026-08-03 17:21 espcn_16x_512x.tflite
+-rw-r--r-- 1 d d   12376 2026-08-03 17:16 espcn_16x_64x.tflite
+-rw-r--r-- 1 d d    6640 2026-08-03 17:44 espcn_192x_384x.tflite
+-rw-r--r-- 1 d d    8976 2026-08-03 18:17 espcn_192x_576x.tflite
+-rw-r--r-- 1 d d    6616 2026-08-03 18:21 espcn_256x_512x.tflite
+-rw-r--r-- 1 d d   12392 2026-08-03 17:21 espcn_32x_128x.tflite
+-rw-r--r-- 1 d d   21992 2026-08-03 17:22 espcn_32x_192x.tflite
+-rw-r--r-- 1 d d   35440 2026-08-03 17:22 espcn_32x_256x.tflite
+-rw-r--r-- 1 d d   73840 2026-08-03 17:23 espcn_32x_384x.tflite
+-rw-r--r-- 1 d d  127600 2026-08-03 17:26 espcn_32x_512x.tflite
+-rw-r--r-- 1 d d    6632 2026-08-03 17:21 espcn_32x_64x.tflite
+-rw-r--r-- 1 d d    9032 2026-08-03 17:26 espcn_48x_144x.tflite
+-rw-r--r-- 1 d d   12400 2026-08-03 17:26 espcn_48x_192x.tflite
+-rw-r--r-- 1 d d   16720 2026-08-03 17:27 espcn_48x_240x.tflite
+-rw-r--r-- 1 d d   35440 2026-08-03 17:28 espcn_48x_384x.tflite
+-rw-r--r-- 1 d d   73840 2026-08-03 17:31 espcn_48x_576x.tflite
+-rw-r--r-- 1 d d    6640 2026-08-03 17:26 espcn_48x_96x.tflite
+-rw-r--r-- 1 d d    6640 2026-08-03 17:31 espcn_64x_128x.tflite
+-rw-r--r-- 1 d d    9040 2026-08-03 17:31 espcn_64x_192x.tflite
+-rw-r--r-- 1 d d   12400 2026-08-03 17:32 espcn_64x_256x.tflite
+-rw-r--r-- 1 d d   22000 2026-08-03 17:32 espcn_64x_384x.tflite
+-rw-r--r-- 1 d d   35440 2026-08-03 17:34 espcn_64x_512x.tflite
+-rw-r--r-- 1 d d    6640 2026-08-03 17:35 espcn_96x_192x.tflite
+-rw-r--r-- 1 d d    9040 2026-08-03 17:35 espcn_96x_288x.tflite
+-rw-r--r-- 1 d d   12400 2026-08-03 17:36 espcn_96x_384x.tflite
+-rw-r--r-- 1 d d   16720 2026-08-03 17:38 espcn_96x_480x.tflite
+-rw-r--r-- 1 d d   22000 2026-08-03 17:40 espcn_96x_576x.tflite
+-rw-r--r-- 1 d d   27768 2026-08-04 11:26 fsrcnn_128x_256x.tflite
+-rw-r--r-- 1 d d   40016 2026-08-04 11:51 fsrcnn_128x_384x.tflite
+-rw-r--r-- 1 d d   57152 2026-08-04 12:45 fsrcnn_128x_512x.tflite
+-rw-r--r-- 1 d d  174656 2026-08-03 18:28 fsrcnn_16x_128x.tflite
+-rw-r--r-- 1 d d  370496 2026-08-03 18:39 fsrcnn_16x_192x.tflite
+-rw-r--r-- 1 d d  644672 2026-08-03 19:02 fsrcnn_16x_256x.tflite
+-rw-r--r-- 1 d d   27656 2026-08-03 18:21 fsrcnn_16x_32x.tflite
+-rw-r--r-- 1 d d 1428032 2026-08-03 19:57 fsrcnn_16x_384x.tflite
+-rw-r--r-- 1 d d 2524616 2026-08-04 00:13 fsrcnn_16x_512x.tflite
+-rw-r--r-- 1 d d   57144 2026-08-03 18:23 fsrcnn_16x_64x.tflite
+-rw-r--r-- 1 d d   27776 2026-08-04 13:06 fsrcnn_192x_384x.tflite
+-rw-r--r-- 1 d d   40016 2026-08-04 14:04 fsrcnn_192x_576x.tflite
+-rw-r--r-- 1 d d   27776 2026-08-04 15:13 fsrcnn_256x_512x.tflite
+-rw-r--r-- 1 d d   57152 2026-08-04 00:18 fsrcnn_32x_128x.tflite
+-rw-r--r-- 1 d d  106112 2026-08-04 00:27 fsrcnn_32x_192x.tflite
+-rw-r--r-- 1 d d  174656 2026-08-04 00:45 fsrcnn_32x_256x.tflite
+-rw-r--r-- 1 d d  370496 2026-08-04 01:30 fsrcnn_32x_384x.tflite
+-rw-r--r-- 1 d d  644672 2026-08-04 02:59 fsrcnn_32x_512x.tflite
+-rw-r--r-- 1 d d   27768 2026-08-04 00:14 fsrcnn_32x_64x.tflite
+-rw-r--r-- 1 d d   40016 2026-08-04 03:04 fsrcnn_48x_144x.tflite
+-rw-r--r-- 1 d d   57160 2026-08-04 03:12 fsrcnn_48x_192x.tflite
+-rw-r--r-- 1 d d   79216 2026-08-04 03:26 fsrcnn_48x_240x.tflite
+
+============================================================
+FILE: scripts/train_espcn_multi.py
+SIZE: 23181
+"""Multi-resolution ESPCN model training with perceptual + MS-SSIM loss."""
+import os
+import sys
+import re
+import json
+import numpy as np
+import tensorflow as tf
+from tensorflow import keras
+from tensorflow.keras import layers, Model
+import urllib.request
+from io import BytesIO
+
+# Disable XLA globally to prevent MirrorPadGrad compile-time constant errors
+tf.config.optimizer.set_jit(False)
+
+# Use MirroredStrategy only when multiple GPUs are available AND explicitly requested;
+# with a single GPU the default strategy avoids MultiDeviceIterator overhead.
+# Default to FALSE due to NCCL instability on some setups.
+_gpu_count = len(tf.config.list_physical_devices("GPU"))
+_use_multi_gpu = _gpu_count > 1 and os.environ.get("USE_MULTI_GPU", "false").lower() == "true"
+
+if _use_multi_gpu:
+    strategy = tf.distribute.MirroredStrategy()
+    print(f"[TRAIN] Using MirroredStrategy with {strategy.num_replicas_in_sync} GPUs")
+else:
+    strategy = tf.distribute.get_strategy()
+    print(f"[TRAIN] Using single device strategy")
+
+FORCE = "--force" in sys.argv
+NO_PERCEPTUAL = "--no-perceptual" in sys.argv
+SPECIFIC_MODEL = None
+INPUT_SIZE = None
+OUTPUT_DIR = None
+for arg in sys.argv:
+    if arg.startswith("--model="):
+        SPECIFIC_MODEL = arg.split("=")[1]
+    elif arg.startswith("--input-size="):
+        INPUT_SIZE = int(arg.split("=")[1])
+    elif arg.startswith("--output-dir="):
+        OUTPUT_DIR = arg.split("=")[1]
+
+# Model configurations: input_size -> list of (scale, epochs) tuples
+# Scale = output_size / input_size
+# Epochs scaled for quality: large scales (8x+) get 300+ epochs for ESPCN (small model)
+# Capped at 576px output max (largest size used by the app).
+MODEL_CONFIGS = [
+    # 16px input - baseline (7 scales, up to 512px output)
+    (16, [(2, 80), (4, 120), (8, 300), (12, 350), (16, 400), (24, 400), (32, 400)]),
+    # 32px input - 6 scales, up to 512px output
+    (32, [(2, 80), (4, 120), (6, 150), (8, 250), (12, 300), (16, 350)]),
+    # 48px input - 6 scales, up to 576px output
+    (48, [(2, 80), (3, 100), (4, 150), (5, 200), (8, 250), (12, 300)]),
+    # 64px input - 5 scales, up to 512px output
+    (64, [(2, 80), (3, 100), (4, 150), (6, 250), (8, 300)]),
+    # 96px input - 5 scales, up to 576px output
+    (96, [(2, 80), (3, 100), (4, 150), (5, 200), (6, 250)]),
+    # 128px input - 3 scales, up to 512px output
+    (128, [(2, 80), (3, 100), (4, 200)]),
+    # 192px input - 2 scales, up to 576px output
+    (192, [(2, 80), (3, 150)]),
+    # 256px input - 1 scale, up to 512px output
+    (256, [(2, 200)]),
+]
+
+
+# Icon sources for real training data
+ICON_SOURCES = [
+    # Simple Icons CDN URLs (these are actual brand icons)
+    "https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/{}.svg",
+    # Tabler Icons
+    "https://raw.githubusercontent.com/tabler/tabler-icons/main/icons/outline/{}.svg",
+]
+
+# Popular brand names for training data
+TRAINING_BRANDS = [
+    "netflix", "spotify", "github", "figma", "notion", "dropbox", "google",
+    "microsoft", "apple", "amazon", "hulu", "disney", "youtube",
+    "twitter", "instagram", "linkedin", "facebook", "slack", "discord",
+    "zoom", "shopify", "stripe", "paypal", "airbnb", "uber", "lyft",
+    "adobe", "canva", "openai", "claude", "medium",
+]
+
+
+# ---- Perceptual + MS-SSIM Loss (ported from train_fsrcnn_multi.py) ----
+
+def build_vgg_feature_extractor():
+    """Build a lightweight VGG-based perceptual loss feature extractor."""
+    vgg = tf.keras.applications.VGG19(
+        include_top=False,
+        weights="imagenet",
+        input_shape=(None, None, 3),
+    )
+    # Use blocks 1-3 only for efficiency
+    outputs = [vgg.get_layer(f"block{i}_conv2").output for i in [1, 2, 3]]
+    return Model(vgg.input, outputs, name="vgg_features")
+
+
+VGG_FEATURES = None
+
+
+def perceptual_loss(y_true, y_pred):
+    """Perceptual loss using VGG19 features (normalized by feature map size)."""
+    global VGG_FEATURES
+    if VGG_FEATURES is None:
+        VGG_FEATURES = build_vgg_feature_extractor()
+        VGG_FEATURES.trainable = False
+
+    # VGG expects 0-255 images run through preprocessing (RGB->BGR + ImageNet mean)
+    y_true_255 = tf.keras.applications.vgg19.preprocess_input(y_true * 255.0)
+    y_pred_255 = tf.keras.applications.vgg19.preprocess_input(y_pred * 255.0)
+
+    true_features = VGG_FEATURES(y_true_255)
+    pred_features = VGG_FEATURES(y_pred_255)
+
+    loss = 0.0
+    for tf_true, tf_pred in zip(true_features, pred_features):
+        # Normalize by number of elements in feature map to keep loss scale consistent
+        # across different VGG layers (block1_conv2: 64ch, block2_conv2: 128ch, block3_conv2: 256ch)
+        num_elements = tf.cast(tf.size(tf_true), tf.float32)
+        loss += tf.reduce_sum(tf.abs(tf_true - tf_pred)) / num_elements
+    return loss / len(true_features)
+
+
+# MS-SSIM default power factors (5 scales)
+_MS_SSIM_POWER_FACTORS = [0.0448, 0.2856, 0.3001, 0.2363, 0.1333]
+_MS_SSIM_FILTER_SIZE = 7
+
+
+def _ssim_scales_for(output_size: int) -> int:
+    """How many MS-SSIM scales fit a given output size."""
+    n = 1
+    while n < len(_MS_SSIM_POWER_FACTORS) and output_size >= _MS_SSIM_FILTER_SIZE * (2 ** n):
+        n += 1
+    return n
+
+
+@tf.custom_gradient
+def _sanitize_grad(x):
+    """Identity forward; zero NaN/Inf gradients on backward."""
+    def grad(dy):
+        return tf.where(tf.math.is_finite(dy), dy, tf.zeros_like(dy))
+    return tf.identity(x), grad
+
+
+def make_combined_loss(output_size: int, use_perceptual: bool = True):
+    """Build combined MAE + (MS-)SSIM + perceptual loss for fixed output size."""
+    n_scales = _ssim_scales_for(output_size)
+
+    def _finite(value):
+        return tf.where(tf.math.is_finite(value), value, tf.zeros_like(value))
+
+    if n_scales <= 1:
+        def ssim_term(y_true, y_pred):
+            filter_size = min(_MS_SSIM_FILTER_SIZE, output_size)
+            s = tf.image.ssim(
+                y_true, _sanitize_grad(y_pred), max_val=1.0, filter_size=filter_size
+            )
+            return 1.0 - tf.reduce_mean(_finite(s))
+    else:
+        pf = _MS_SSIM_POWER_FACTORS[:n_scales]
+        total = sum(pf)
+        pf = [p / total for p in pf]
+
+        def ssim_term(y_true, y_pred):
+            s = tf.image.ssim_multiscale(
+                y_true,
+                _sanitize_grad(y_pred),
+                max_val=1.0,
+                filter_size=_MS_SSIM_FILTER_SIZE,
+                power_factors=pf,
+            )
+            return 1.0 - tf.reduce_mean(_finite(s))
+
+    def combined_loss(y_true, y_pred):
+        y_true = tf.clip_by_value(y_true, 0.0, 1.0)
+        y_pred = tf.clip_by_value(y_pred, 0.0, 1.0)
+        mae = tf.reduce_mean(tf.abs(y_true - y_pred))
+        ssim = ssim_term(y_true, y_pred)
+        if use_perceptual:
+            perceptual = perceptual_loss(y_true, y_pred)
+            # Match FSRCNN perceptual weight for better feature learning at high scales
+            return mae + 0.15 * ssim + 0.05 * perceptual
+        return mae + 0.15 * ssim
+
+    return combined_loss
+
+
+# ---- Model Architecture ----
+
+def build_espcn(scale: int, input_size: int = 16):
+    """Build ESPCN model for a specific scale factor with fixed input shape.
+    
+    Channel capacity and depth scale with upscale factor:
+    - 2x-4x: 16 channels, 0 mapping layers (baseline ESPCN)
+    - 6x-8x: 32 channels, 0 mapping layers
+    - 12x+: 64 channels, 2 mapping layers with residuals (hybrid)
+    - 16x+: 80 channels, 2 mapping layers with residuals (hybrid)
+    """
+    # Scale internal channels and mapping layers with upscale factor
+    if scale <= 4:
+        channels, mapping_layers = 16, 0
+    elif scale <= 8:
+        channels, mapping_layers = 32, 0
+    elif scale <= 12:
+        channels, mapping_layers = 64, 2
+    else:  # 16x+
+        channels, mapping_layers = 80, 2
+    
+    inp = layers.Input(shape=(input_size, input_size, 3))
+    x = layers.Conv2D(channels, 3, padding="same", activation="relu")(inp)
+    
+    # Mapping layers with residual connections for high scales (12x+)
+    for _ in range(mapping_layers):
+        residual = x
+        x = layers.Conv2D(channels, 3, padding="same", activation="relu")(x)
+        x = layers.Add()([x, residual])
+    
+    x = layers.Conv2D(scale * scale * 3, 3, padding="same")(x)
+    x = layers.Lambda(lambda t: tf.nn.depth_to_space(t, scale))(x)
+    out = layers.Conv2D(3, 3, padding="same", activation="sigmoid")(x)
+    return Model(inp, out)
+
+
+# ---- Data Pipeline ----
+
+def fetch_svg_icon(slug: str) -> bytes | None:
+    """Fetch SVG icon from CDN sources."""
+    for template in ICON_SOURCES:
+        url = template.format(slug)
+        try:
+            req = urllib.request.Request(
+                url,
+                headers={"User-Agent": "Mozilla/5.0"},
+            )
+            with urllib.request.urlopen(req, timeout=5) as response:
+                return response.read()
+        except Exception:
+            continue
+    return None
+
+
+def rasterize_svg_to_png(svg_bytes: bytes, size: int) -> np.ndarray | None:
+    """Rasterize SVG to PNG at specified size using cairosvg (required)."""
+    import cairosvg
+    from PIL import Image
+    png_data = cairosvg.svg2png(bytestring=svg_bytes, output_width=size, output_height=size)
+    img = Image.open(BytesIO(png_data))
+    arr = np.array(img.convert("RGBA"))
+    return arr.astype(np.float32) / 255.0
+
+
+def augment_icon(hr: np.ndarray, rng: np.random.Generator) -> np.ndarray:
+    """Apply light augmentation to a training icon."""
+    if rng.random() < 0.5:
+        hr = np.flip(hr, axis=1).copy()
+    k = rng.integers(0, 4)
+    if k:
+        hr = np.rot90(hr, k=k, axes=(0, 1)).copy()
+    hr = hr * rng.uniform(0.9, 1.1)
+    hr = np.clip(hr, 0.0, 1.0)
+    return hr
+
+
+def generate_icon_like_synthetic(n: int, target_size: int, rng) -> np.ndarray:
+    """Generate synthetic icons with text-like strokes, sharp corners, logo shapes."""
+    hr_images = np.zeros((n, target_size, target_size, 3), dtype=np.float32)
+    for i in range(n):
+        bg = rng.uniform(0.0, 0.2, size=3)
+        hr_images[i] = bg
+        fg = rng.uniform(0.7, 1.0, size=3)
+        
+        # Randomly choose icon-like pattern
+        pattern = rng.integers(0, 4)
+        if pattern == 0:
+            # Rounded rectangle (app icon style)
+            cy, cx = target_size // 2, target_size // 2
+            r = rng.integers(target_size // 3, target_size // 2)
+            yy, xx = np.mgrid[0:target_size, 0:target_size]
+            mask = (np.abs(xx - cx) <= r) & (np.abs(yy - cy) <= r)
+            # Round corners
+            corner_r = r // 4
+            for corner_y, corner_x in [(cy-r, cx-r), (cy-r, cx+r), (cy+r, cx-r), (cy+r, cx+r)]:
+                corner_mask = (xx - corner_x) ** 2 + (yy - corner_y) ** 2 > corner_r ** 2
+                mask = mask & corner_mask
+            hr_images[i, mask] = fg
+        elif pattern == 1:
+            # Horizontal bar (text-like)
+            cy = rng.integers(target_size // 3, 2 * target_size // 3)
+            h = rng.integers(target_size // 8, target_size // 4)
+            hr_images[i, cy-h:cy+h, target_size//6:5*target_size//6] = fg
+        elif pattern == 2:
+            # Vertical bar
+            cx = rng.integers(target_size // 3, 2 * target_size // 3)
+            w = rng.integers(target_size // 8, target_size // 4)
+            hr_images[i, target_size//6:5*target_size//6, cx-w:cx+w] = fg
+        else:
+            # Cross/plus shape
+            cy, cx = target_size // 2, target_size // 2
+            w = rng.integers(target_size // 6, target_size // 4)
+            hr_images[i, cy-w:cy+w, target_size//4:3*target_size//4] = fg
+            hr_images[i, target_size//4:3*target_size//4, cx-w:cx+w] = fg
+    return hr_images
+
+
+def generate_real_icon_data(n: int, target_size: int) -> np.ndarray:
+    """Generate training data from real icons (cairosvg required, 80% target)."""
+    rng = np.random.default_rng(42)
+    hr_images = np.zeros((n, target_size, target_size, 3), dtype=np.float32)
+
+    real_icon_cache: list[np.ndarray] = []
+    brand_attempts = 0
+    rea
+...[trunc 23181]
+
+============================================================
+FILE: scripts/train_espcn_fast.py
+SIZE: 2555
+"""Tiny ESPCN 2x model - minimal for fast training on CPU."""
+import os
+import numpy as np
+import tensorflow as tf
+from tensorflow import keras
+from tensorflow.keras import layers, Model
+
+SCALE = 2
+LR = 32
+HR = 64
+BATCH = 32
+MAX_EPOCHS = 12
+
+def build_espcn():
+    inp = layers.Input(shape=(None, None, 3))
+    x = layers.Conv2D(16, 3, padding="same", activation="relu")(inp)
+    x = layers.Conv2D(SCALE * SCALE * 3, 3, padding="same")(x)
+    x = layers.Lambda(lambda t: tf.nn.depth_to_space(t, SCALE))(x)
+    out = layers.Conv2D(3, 3, padding="same", activation="sigmoid")(x)
+    return Model(inp, out)
+
+def synth_data(n=1000):
+    """Generate synthetic icon-like images with edges and shapes (deterministic).
+
+    These stand in for real high-resolution app icons: flat coloured shapes
+    (circles, rectangles) on a contrasting background, exercising real edges
+    rather than random pixel noise so the upscaler learns meaningful detail.
+    """
+    rng = np.random.default_rng(42)
+    hr = np.zeros((n, HR, HR, 3), dtype=np.float32)
+    for i in range(n):
+        # Background colour
+        bg = rng.uniform(0.0, 0.3, size=3)
+        hr[i] = bg
+        # Foreground shape colour
+        fg = rng.uniform(0.6, 1.0, size=3)
+        cy, cx = rng.integers(HR // 4, 3 * HR // 4, size=2)
+        r = rng.integers(HR // 5, HR // 3)
+        yy, xx = np.mgrid[0:HR, 0:HR]
+        mask = (xx - cx) ** 2 + (yy - cy) ** 2 <= r * r
+        if rng.random() < 0.5:
+            hr[i, mask] = fg
+        else:
+            # Square / rectangle region
+            half = r
+            rect = (
+                (np.abs(xx - cx) <= half)
+                & (np.abs(yy - cy) <= half)
+            )
+            hr[i, rect] = fg
+    lr = tf.image.resize(hr, (LR, LR), method="bicubic").numpy()
+    return lr, hr
+
+def main():
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    model_dir = os.path.join(script_dir, "..", "assets", "models")
+    os.makedirs(model_dir, exist_ok=True)
+    model = build_espcn()
+    model.compile(optimizer="adam", loss="mae")
+    print(f"Model params: {model.count_params()}")
+
+    lr, hr = synth_data()
+    split = int(len(lr) * 0.9)
+    model.fit(lr[:split], hr[:split], batch_size=BATCH, epochs=MAX_EPOCHS, verbose=2)
+
+    converter = tf.lite.TFLiteConverter.from_keras_model(model)
+    tflite_model = converter.convert()
+
+    out = os.path.join(model_dir, "espcn_2x.tflite")
+    with open(out, "wb") as f:
+        f.write(tflite_model)
+    print(f"WROTE {out} ({len(tflite_model)} bytes)")
+
+if __name__ == "__main__":
+    main()
+
+============================================================
+FILE: scripts/train_espcn_perceptual.py
+SIZE: 5401
+#!/usr/bin/env python3
+"""ESPCN training with perceptual loss for better quality upscaling.
+
+Reference/experiment trainer. Outputs are written with an `espcn_perceptual_*`
+prefix so they do NOT collide with (or get auto-bundled alongside) the
+production ESPCN matrix produced by `train_espcn_multi.py`.
+"""
+
+import os
+import sys
+import numpy as np
+import tensorflow as tf
+from tensorflow import keras
+from tensorflow.keras import layers, Model
+
+FORCE = "--force" in sys.argv
+
+# Model configurations - same shape as train_espcn_multi.py
+MODEL_CONFIGS = [
+    (16, [(4, 200)]),
+    (32, [(4, 200)]),
+    (48, [(4, 200)]),
+    (64, [(4, 200)]),
+]
+
+
+def build_espcn(scale: int):
+    """Build ESPCN model for a specific scale factor."""
+    inp = layers.Input(shape=(None, None, 3))
+    x = layers.Conv2D(64, 3, padding="same", activation="relu")(inp)
+    x = layers.Conv2D(64, 3, padding="same", activation="relu")(x)
+    x = layers.Conv2D(scale * scale * 3, 3, padding="same")(x)
+    x = layers.Lambda(lambda t: tf.nn.depth_to_space(t, scale))(x)
+    out = layers.Conv2D(3, 3, padding="same", activation="sigmoid")(x)
+    return Model(inp, out)
+
+
+# Cache a single frozen VGG19 instance so perceptual_loss doesn't rebuild (and
+# re-download weights for) the network on every call.
+_VGG = None
+
+
+def _get_vgg():
+    global _VGG
+    if _VGG is None:
+        vgg = tf.keras.applications.VGG19(include_top=False, weights="imagenet")
+        vgg.trainable = False
+        _VGG = vgg
+    return _VGG
+
+
+def perceptual_loss(y_true, y_pred):
+    """Perceptual loss using VGG features (reuses one frozen VGG19)."""
+    vgg = _get_vgg()
+
+    # Process images for VGG (0-255 + RGB->BGR / ImageNet mean subtraction)
+    y_true_vgg = tf.keras.applications.vgg19.preprocess_input(y_true * 255.0)
+    y_pred_vgg = tf.keras.applications.vgg19.preprocess_input(y_pred * 255.0)
+
+    # Compare features
+    features_true = vgg(y_true_vgg)
+    features_pred = vgg(y_pred_vgg)
+
+    return tf.reduce_mean(tf.abs(features_true - features_pred))
+
+
+def combined_loss(y_true, y_pred):
+    """MAE + a small perceptual term for sharper edges."""
+    mae = tf.reduce_mean(tf.abs(y_true - y_pred))
+    return mae + 0.05 * perceptual_loss(y_true, y_pred)
+
+
+def generate_training_data(input_size: int, scale: int, n: int = 400):
+    """Generate simple synthetic HR/LR training pairs."""
+    rng = np.random.default_rng(42)
+    output_size = input_size * scale
+    hr = np.zeros((n, output_size, output_size, 3), dtype=np.float32)
+    for i in range(n):
+        hr[i] = rng.uniform(0.0, 0.3, size=3)
+        fg = rng.uniform(0.6, 1.0, size=3)
+        cy, cx = rng.integers(output_size // 4, 3 * output_size // 4, size=2)
+        r = rng.integers(output_size // 5, output_size // 3)
+        yy, xx = np.mgrid[0:output_size, 0:output_size]
+        if rng.random() < 0.5:
+            mask = (xx - cx) ** 2 + (yy - cy) ** 2 <= r * r
+        else:
+            mask = (np.abs(xx - cx) <= r) & (np.abs(yy - cy) <= r)
+        hr[i][mask] = fg
+    lr = tf.image.resize(hr, (input_size, input_size), method="bicubic").numpy()
+    return lr, hr
+
+
+def train_and_export_model(model_dir: str, input_size: int, scale: int, epochs: int):
+    """Train a perceptual-loss ESPCN and export it to TFLite."""
+    output_size = input_size * scale
+    model_name = f"espcn_perceptual_{input_size}x_{output_size}x.tflite"
+    out_path = os.path.join(model_dir, model_name)
+
+    if not FORCE and os.path.exists(out_path):
+        size = os.path.getsize(out_path)
+        print(f"[SKIP] {model_name} exists ({size} bytes), use --force to retrain")
+        return model_name, size
+
+    print(f"\n{'='*50}")
+    print(f"[TRAIN] Training {input_size}->{output_size} (scale {scale}x, {epochs} epochs)")
+
+    model = build_espcn(scale)
+    optimizer = keras.optimizers.Adam(learning_rate=1e-4, clipnorm=1.0)
+    model.compile(optimizer=optimizer, loss=combined_loss)
+    print(f"[TRAIN] Model params: {model.count_params()}")
+
+    lr, hr = generate_training_data(input_size, scale)
+    perm = np.random.default_rng(1234).permutation(len(lr))
+    lr, hr = lr[perm], hr[perm]
+
+    model.fit(lr, hr, batch_size=16, epochs=epochs, verbose=2, validation_split=0.1)
+
+    converter = tf.lite.TFLiteConverter.from_keras_model(model)
+    converter.optimizations = [tf.lite.Optimize.DEFAULT]
+    tflite_model = converter.convert()
+
+    with open(out_path, "wb") as f:
+        f.write(tflite_model)
+    print(f"[TRAIN] WROTE {out_path} ({len(tflite_model)} bytes)")
+
+    return model_name, len(tflite_model)
+
+
+def main():
+    print("ESPCN Perceptual Loss Training Script")
+    print("Usage: python train_espcn_perceptual.py [--force]")
+
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    model_dir = os.path.join(script_dir, "..", "assets", "models")
+    os.makedirs(model_dir, exist_ok=True)
+
+    results = []
+    for input_size, scale_configs in MODEL_CONFIGS:
+        for scale, epochs in scale_configs:
+            try:
+                model_name, size = train_and_export_model(
+                    model_dir, input_size, scale, epochs
+                )
+                results.append((model_name, size))
+            except Exception as e:
+                print(f"[ERROR] Failed to train {input_size}->{input_size*scale}: {e}")
+
+    print(f"\n{'='*50}")
+    print(f"[TRAIN] Generated {len(results)} perceptual ESPCN models")
+
+
+if __name__ == "__main__":
+    main()
+
+
+============================================================
+FILE: scripts/train_fsrcnn.py
+SIZE: 6357
+#!/usr/bin/env python3
+"""FSRCNN (Fast Super-Resolution CNN) training for edge-friendly upscaling.
+
+Single-scale reference trainer. For the full multi-resolution matrix used by
+the app, see `train_fsrcnn_multi.py` (this file is kept as a minimal,
+self-contained example/experiment trainer).
+"""
+
+import os
+import sys
+import json
+import numpy as np
+import tensorflow as tf
+from tensorflow import keras
+from tensorflow.keras import layers, Model
+
+FORCE = "--force" in sys.argv
+
+# FSRCNN configurations: input_size -> list of (scale, epochs)
+MODEL_CONFIGS = [
+    (16, [(4, 150)]),
+    (32, [(4, 150)]),
+    (48, [(4, 150)]),
+    (64, [(4, 150)]),
+]
+
+
+def build_fsrcnn(scale: int, d: int = 56, s: int = 12, m: int = 4):
+    """
+    Build FSRCNN model.
+
+    Args:
+        scale: Upscaling factor
+        d: Number of filters in feature extraction / expanding layers
+        s: Number of filters in shrinking + mapping layers
+        m: Number of mapping layers
+    """
+    # Feature extraction
+    inp = layers.Input(shape=(None, None, 3))
+    x = layers.Conv2D(d, 5, padding='same')(inp)
+    x = layers.Activation('relu')(x)
+
+    # Shrinking
+    x = layers.Conv2D(s, 1, padding='same')(x)
+    x = layers.Activation('relu')(x)
+
+    # Mapping (m layers, each with s filters)
+    for _ in range(m):
+        x = layers.Conv2D(s, 3, padding='same')(x)
+        x = layers.Activation('relu')(x)
+
+    # Expanding
+    x = layers.Conv2D(d, 1, padding='same')(x)
+    x = layers.Activation('relu')(x)
+
+    # Deconvolution (sub-pixel convolution)
+    x = layers.Conv2D(scale * scale * 3, 5, padding='same')(x)
+    x = layers.Lambda(lambda t: tf.nn.depth_to_space(t, scale))(x)
+
+    out = layers.Conv2D(3, 5, padding='same', activation='sigmoid')(x)
+
+    return Model(inp, out)
+
+
+# Cache a single frozen VGG19 instance so the perceptual loss doesn't rebuild
+# (and re-download weights for) the network on every call.
+_VGG = None
+
+
+def _get_vgg():
+    global _VGG
+    if _VGG is None:
+        vgg = tf.keras.applications.VGG19(
+            include_top=False, weights='imagenet', input_shape=(None, None, 3)
+        )
+        vgg.trainable = False
+        _VGG = vgg
+    return _VGG
+
+
+def perceptual_loss(y_true, y_pred):
+    """Perceptual loss using VGG features (reuses one frozen VGG19)."""
+    vgg = _get_vgg()
+
+    y_true_vgg = tf.keras.applications.vgg19.preprocess_input(y_true * 255.0)
+    y_pred_vgg = tf.keras.applications.vgg19.preprocess_input(y_pred * 255.0)
+
+    features_true = vgg(y_true_vgg)
+    features_pred = vgg(y_pred_vgg)
+
+    return tf.reduce_mean(tf.abs(features_true - features_pred))
+
+
+def combined_loss(y_true, y_pred):
+    """MAE + a small perceptual term for sharper edges."""
+    mae = tf.reduce_mean(tf.abs(y_true - y_pred))
+    return mae + 0.05 * perceptual_loss(y_true, y_pred)
+
+
+def generate_training_data(input_size: int, scale: int, n: int = 400):
+    """Generate simple synthetic HR/LR training pairs."""
+    rng = np.random.default_rng(42)
+    output_size = input_size * scale
+    hr = np.zeros((n, output_size, output_size, 3), dtype=np.float32)
+    for i in range(n):
+        hr[i] = rng.uniform(0.0, 0.3, size=3)
+        fg = rng.uniform(0.6, 1.0, size=3)
+        cy, cx = rng.integers(output_size // 4, 3 * output_size // 4, size=2)
+        r = rng.integers(output_size // 5, output_size // 3)
+        yy, xx = np.mgrid[0:output_size, 0:output_size]
+        if rng.random() < 0.5:
+            mask = (xx - cx) ** 2 + (yy - cy) ** 2 <= r * r
+        else:
+            mask = (np.abs(xx - cx) <= r) & (np.abs(yy - cy) <= r)
+        hr[i][mask] = fg
+    lr = tf.image.resize(hr, (input_size, input_size), method="bicubic").numpy()
+    return lr, hr
+
+
+def train_and_export_model(model_dir: str, input_size: int, scale: int, epochs: int):
+    """Train and export a single FSRCNN model."""
+    output_size = input_size * scale
+    # Use a `fsrcnn_ref_` prefix so these reference/experiment exports cannot
+    # collide with the production `fsrcnn_<in>x_<out>x.tflite` outputs (from
+    # train_fsrcnn_multi.py) nor match the model-map bundling regex.
+    model_name = f"fsrcnn_ref_{input_size}x_{output_size}x.tflite"
+    out_path = os.path.join(model_dir, model_name)
+
+
+    if not FORCE and os.path.exists(out_path):
+        size = os.path.getsize(out_path)
+        print(f"[SKIP] {model_name} exists ({size} bytes), use --force to retrain")
+        return model_name, size
+
+    print(f"\n{'='*50}")
+    print(f"[TRAIN] Training {input_size}->{output_size} (scale {scale}x, {epochs} epochs)")
+
+    model = build_fsrcnn(scale)
+    optimizer = keras.optimizers.Adam(learning_rate=1e-4, clipnorm=1.0)
+    model.compile(optimizer=optimizer, loss=combined_loss)
+    print(f"[TRAIN] Model params: {model.count_params()}")
+
+    lr, hr = generate_training_data(input_size, scale)
+    perm = np.random.default_rng(1234).permutation(len(lr))
+    lr, hr = lr[perm], hr[perm]
+
+    model.fit(lr, hr, batch_size=16, epochs=epochs, verbose=2, validation_split=0.1)
+
+    converter = tf.lite.TFLiteConverter.from_keras_model(model)
+    converter.optimizations = [tf.lite.Optimize.DEFAULT]
+    tflite_model = converter.convert()
+
+    with open(out_path, "wb") as f:
+        f.write(tflite_model)
+    print(f"[TRAIN] WROTE {out_path} ({len(tflite_model)} bytes)")
+
+    return model_name, len(tflite_model)
+
+
+def main():
+    print("FSRCNN Training Script")
+    print("Usage: python train_fsrcnn.py [--force]")
+
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    model_dir = os.path.join(script_dir, "..", "assets", "models")
+    os.makedirs(model_dir, exist_ok=True)
+
+    results = []
+    for input_size, scale_configs in MODEL_CONFIGS:
+        for scale, epochs in scale_configs:
+            try:
+                model_name, size = train_and_export_model(
+                    model_dir, input_size, scale, epochs
+                )
+                results.append({
+                    "input_size": input_size,
+                    "scale": scale,
+                    "output_size": input_size * scale,
+                    "file": model_name,
+                    "size_bytes": size,
+                })
+            except Exception as e:
+                print(f"[ERROR] Failed to train {input_size}->{input_size*scale}: {e}")
+
+    print(f"\n{'='*50}")
+    print(f"[TRAIN] Generated {len(results)} models")
+
+
+if __name__ == "__main__":
+    main()
+
+
+============================================================
+FILE: scripts/train_fsrcnn_multi.py
+SIZE: 25153
+"""Multi-resolution FSRCNN model training with perceptual + MS-SSIM loss."""
+import os
+import sys
+import re
+import json
+import numpy as np
+import tensorflow as tf
+from tensorflow import keras
+from tensorflow.keras import layers, Model
+import urllib.request
+from io import BytesIO
+
+# Disable XLA globally to prevent MirrorPadGrad compile-time constant errors
+tf.config.optimizer.set_jit(False)
+
+# Use MirroredStrategy only when multiple GPUs are available AND explicitly requested;
+# with a single GPU the default strategy avoids MultiDeviceIterator overhead.
+# Default to FALSE due to NCCL instability on some setups.
+_gpu_count = len(tf.config.list_physical_devices("GPU"))
+_use_multi_gpu = _gpu_count > 1 and os.environ.get("USE_MULTI_GPU", "false").lower() == "true"
+
+if _use_multi_gpu:
+    strategy = tf.distribute.MirroredStrategy()
+    print(f"[TRAIN] Using MirroredStrategy with {strategy.num_replicas_in_sync} GPUs")
+else:
+    strategy = tf.distribute.get_strategy()
+    print(f"[TRAIN] Using single device strategy")
+
+FORCE = "--force" in sys.argv
+NO_PERCEPTUAL = "--no-perceptual" in sys.argv
+SPECIFIC_MODEL = None
+INPUT_SIZE = None
+OUTPUT_DIR = None
+for arg in sys.argv:
+    if arg.startswith("--model="):
+        SPECIFIC_MODEL = arg.split("=")[1]
+    elif arg.startswith("--input-size="):
+        INPUT_SIZE = int(arg.split("=")[1])
+    elif arg.startswith("--output-dir="):
+        OUTPUT_DIR = arg.split("=")[1]
+
+# Model configurations: input_size -> list of (scale, epochs) tuples
+# Scale = output_size / input_size
+# Epochs scaled for quality: large scales (8x+) get 300+ epochs
+# Capped at 576px output max (largest size used by the app).
+MODEL_CONFIGS = [
+    # 16px input - baseline (7 scales, up to 512px output)
+    (16, [(2, 80), (4, 120), (8, 300), (12, 350), (16, 400), (24, 400), (32, 400)]),
+    # 32px input - 6 scales, up to 512px output
+    (32, [(2, 80), (4, 120), (6, 150), (8, 250), (12, 300), (16, 350)]),
+    # 48px input - 6 scales, up to 576px output
+    (48, [(2, 80), (3, 100), (4, 150), (5, 200), (8, 250), (12, 300)]),
+    # 64px input - 5 scales, up to 512px output
+    (64, [(2, 80), (3, 100), (4, 150), (6, 250), (8, 300)]),
+    # 96px input - 5 scales, up to 576px output
+    (96, [(2, 80), (3, 100), (4, 150), (5, 200), (6, 250)]),
+    # 128px input - 3 scales, up to 512px output
+    (128, [(2, 80), (3, 100), (4, 200)]),
+    # 192px input - 2 scales, up to 576px output
+    (192, [(2, 80), (3, 150)]),
+    # 256px input - 1 scale, up to 512px output
+    (256, [(2, 200)]),
+]
+
+# Icon sources for real training data
+ICON_SOURCES = [
+    "https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/{}.svg",
+    "https://raw.githubusercontent.com/tabler/tabler-icons/main/icons/outline/{}.svg",
+]
+
+TRAINING_BRANDS = [
+    "netflix", "spotify", "github", "figma", "notion", "dropbox", "google",
+    "microsoft", "apple", "amazon", "hulu", "disney", "youtube",
+    "twitter", "instagram", "linkedin", "facebook", "slack", "discord",
+    "zoom", "shopify", "stripe", "paypal", "airbnb", "uber", "lyft",
+    "adobe", "canva", "openai", "claude", "medium",
+]
+
+
+def build_vgg_feature_extractor():
+    """Build a lightweight VGG-based perceptual loss feature extractor."""
+    vgg = tf.keras.applications.VGG19(
+        include_top=False,
+        weights="imagenet",
+        input_shape=(None, None, 3),
+    )
+    # Use blocks 1-3 only for efficiency
+    outputs = [vgg.get_layer(f"block{i}_conv2").output for i in [1, 2, 3]]
+    return Model(vgg.input, outputs, name="vgg_features")
+
+
+VGG_FEATURES = None
+
+
+def perceptual_loss(y_true, y_pred):
+    """Perceptual loss using VGG19 features (normalized by feature map size)."""
+    global VGG_FEATURES
+    if VGG_FEATURES is None:
+        VGG_FEATURES = build_vgg_feature_extractor()
+        VGG_FEATURES.trainable = False
+
+    # VGG expects 0-255 images run through the model's preprocessing
+    # (RGB->BGR + ImageNet mean subtraction) before feature extraction.
+    y_true_255 = tf.keras.applications.vgg19.preprocess_input(y_true * 255.0)
+    y_pred_255 = tf.keras.applications.vgg19.preprocess_input(y_pred * 255.0)
+
+    true_features = VGG_FEATURES(y_true_255)
+    pred_features = VGG_FEATURES(y_pred_255)
+
+
+    loss = 0.0
+    for tf_true, tf_pred in zip(true_features, pred_features):
+        # Normalize by number of elements in feature map to keep loss scale consistent
+        # across different VGG layers (block1_conv2: 64ch, block2_conv2: 128ch, block3_conv2: 256ch)
+        num_elements = tf.cast(tf.size(tf_true), tf.float32)
+        loss += tf.reduce_sum(tf.abs(tf_true - tf_pred)) / num_elements
+    return loss / len(true_features)
+
+
+# MS-SSIM default power factors (5 scales). Each additional scale halves the
+# image, so the number of usable scales is bounded by the output resolution.
+_MS_SSIM_POWER_FACTORS = [0.0448, 0.2856, 0.3001, 0.2363, 0.1333]
+_MS_SSIM_FILTER_SIZE = 7
+
+
+def _ssim_scales_for(output_size: int) -> int:
+    """How many MS-SSIM scales fit a given output size.
+
+    `tf.image.ssim_multiscale` downsamples the image by 2 for each extra scale,
+    and the Gaussian window (filter_size) must still fit the smallest scale, so
+    we need `output_size >= filter_size * 2**(n-1)` for `n` scales. Using the
+    full 5 scales on a small (e.g. 64px) output shrinks it to 4px < 7px filter
+    and crashes, so we clamp the scale count to what actually fits.
+    """
+    n = 1
+    while n < len(_MS_SSIM_POWER_FACTORS) and output_size >= _MS_SSIM_FILTER_SIZE * (2 ** n):
+        n += 1
+    return n
+
+
+@tf.custom_gradient
+def _sanitize_grad(x):
+    """Identity in the forward pass; zeroes NaN/Inf gradients on the backward.
+
+    `tf.image.ssim_multiscale` yields NaN *gradients* for dissimilar images
+    (fractional powers of negative contrast/structure terms) even when its
+    forward value is finite. Those NaNs propagate into the weights on the very
+    first step and can't be rescued by `clipnorm` (NaN norm -> NaN clip).
+    Wrapping the SSIM input with this op replaces the non-finite gradient
+    entries with 0, so a degenerate SSIM gradient can't poison training while
+    the MAE + perceptual terms still provide a valid learning signal.
+    """
+    def grad(dy):
+        return tf.where(tf.math.is_finite(dy), dy, tf.zeros_like(dy))
+
+    return tf.identity(x), grad
+
+
+def make_combined_loss(output_size: int, use_perceptual: bool = True):
+
+    """Build a combined MAE + (MS-)SSIM + perceptual loss for a fixed output size.
+
+    The SSIM term adapts to the output resolution: multiscale SSIM when the
+    image is large enough, single-scale SSIM otherwise. This keeps the loss
+    numerically valid for every model in the matrix (smallest output is 64px).
+    """
+    n_scales = _ssim_scales_for(output_size)
+
+    def _finite(value):
+        """Replace any NaN/Inf entries with 0 before reducing.
+
+        `tf.image.ssim`/`ssim_multiscale` can emit NaN/Inf on flat patches
+        (near-zero local variance) or from fractional powers of negative
+        contrast terms. Our synthetic icons have large constant backgrounds, so
+        this happens on the very first batch and poisons the whole loss into
+        NaN. Neutralising the non-finite entries keeps the loss well-defined.
+        """
+        return tf.where(tf.math.is_finite(value), value, tf.zeros_like(value))
+
+    if n_scales <= 1:
+        def ssim_term(y_true, y_pred):
+            filter_size = min(_MS_SSIM_FILTER_SIZE, output_size)
+            # _sanitize_grad zeroes any NaN/Inf gradient the SSIM op sends back
+            # into y_pred (see its docstring); _finite guards the forward value.
+            s = tf.image.ssim(
+                y_true, _sanitize_grad(y_pred), max_val=1.0, filter_size=filter_size
+            )
+            return 1.0 - tf.reduce_mean(_finite(s))
+    else:
+        pf = _MS_SSIM_POWER_FACTORS[:n_scales]
+        total = sum(pf)
+        pf = [p / total for p in pf]  # renormalise the subset to sum to 1
+
+        def ssim_term(y_true, y_pred):
+            # _sanitize_grad zeroes any NaN/Inf gradient MS-SSIM sends back into
+            # y_pred (see its docstring); _finite guards the forward value.
+            s = tf.image.ssim_multiscale(
+                y_true,
+                _sanitize_grad(y_pred),
+                max_val=1.0,
+                filter_size=_MS_SSIM_FILTER_SIZE,
+                power_factors=pf,
+            )
+            return 1.0 - tf.reduce_mean(_finite(s))
+
+
+    def combined_loss(y_true, y_pred):
+        # SSIM/MAE assume values in [0, 1]; clamp so out-of-range predictions
+        # (or targets) can't drive the metrics into undefined territory.
+        y_true = tf.clip_by_value(y_true, 0.0, 1.0)
+        y_pred = tf.clip_by_value(y_pred, 0.0, 1.0)
+        mae = tf.reduce_mean(tf.abs(y_true - y_pred))
+        ssim = ssim_term(y_true, y_pred)
+        if use_perceptual:
+            perceptual = perceptual_loss(y_true, y_pred)
+            return mae + 0.15 * ssim + 0.05 * perceptual
+        return mae + 0.15 * ssim
+
+    return combined_loss
+
+
+
+
+def build_fsrcnn(scale: int, input_size: int = 16, d: int = 32, s: int = 8, m: int = 3):
+    """Build FSRCNN model for a specific scale factor with fixed input shape."""
+    inp = layers.Input(shape=(input_size, input_size, 3))
+
+    # Feature extraction
+    x = layers.Conv2D(d, 5, padding="same", activation="relu")(inp)
+
+    # Shrinking
+    x = layers.Conv2D(s, 1, padding="same", activation="relu")(x)
+
+    # Mapping layers
+    for _ in range(m):
+        x = layers.Conv2D(s, 3, padding="same", activation="relu")(x)
+
+    # Expanding
+    x = layers.Conv2D(d, 1, padding="same", activation="relu")(x)
+
+    # Sub-pixel convolution
+    x = layers.Conv2D(scale * scale * 3, 5, padding="same")(x)
+    x = layers.Lambda(lambda t: tf.nn.depth_to_space(t, scale))(x)
+
+    out = layers.Conv2D(3, 5, padding="same", activation="sigmoid")(x)
+    return Model(inp, out)
+
+
+def fetch_svg_icon(slug: str) -> bytes | None:
+    """Fetch SVG icon from CDN sources."""
+    for template in ICON_SOURCES:
+        url = template.format(slug)
+        try:
+            req = urllib.request.Request(
+                url,
+                headers={"User-Agent": "Mozilla/5.0"},
+            )
+            with urllib.request.urlopen(req, timeout=5) as response:
+                return response.read()
+        except Exception:
+            continue
+    return None
+
+
+def rasterize_svg_to_png(svg_bytes: bytes, size: int) -> np.ndarray | None:
+    """Rasterize SVG to PNG at specified size using cairosvg (required)."""
+    import cairosvg
+    from PIL import Image
+    png_data = cairosvg.svg2png(bytestring=svg_bytes, output_width=size, output_height=size)
+    img = Image.open(BytesIO(png_data))
+    arr = np.array(img.convert("RGBA"))
+    return arr.astype(np.float32) / 255.0
+
+
+def augment_icon(hr: np.ndarray, rng: np.random.Generator) -> np.ndarray:
+    """Apply light augmentation to a training icon."""
+    if rng.random() < 0.5:
+        hr = np.flip(hr, axis=1).copy()
+    k = rng.integers(0, 4)
+    if k:
+        hr = np.rot90(hr, k=k, axes=(0, 1)).copy()
+    hr = hr * rng.uniform(0.9, 1.1)
+    hr = np.clip(hr, 0.0, 1.0)
+    return hr
+
+
+def generate_icon_like_synthetic(n: int, target_size: int, rng) -> np.ndarray:
+    """Generate synthetic icons with text-like strokes, sharp corners, logo shapes."""
+    hr_images = np.zeros((n, target_size, target_size, 3), dtype=np.float32)
+    for i in range(n):
+        bg = rng.uniform(0.0, 0.2, size=3)
+        hr_images[i] = bg
+        fg = rng.uniform(0.7, 1.0, size=3)
+        
+        # Randomly choose icon-like pattern
+        pattern = rng.integers(0, 4)
+        if pattern == 0:
+            # Rounded rectangle (app icon style)
+            cy, cx = target_size // 2, target_size // 2
+            r = rng.integers(target_size // 3, target_size // 2)
+            yy, xx = np.mgrid[0:target_size, 0:target_size]
+            mask = (np.abs(xx - cx) <= r) & (np.abs(yy - cy) <= r)
+            # Round corners
+            corner_r = r // 4
+            for corner_y, c
+...[trunc 25153]
+
+============================================================
+FILE: scripts/generate-model.js
+SIZE: 3984
+#!/usr/bin/env node
+/**
+ * Multi-model generation script for super-resolution models.
+ *
+ * Requires a pre-configured Python virtual environment at `.venv/` in the
+ * project root. Run `bash scripts/train-setup.sh` to create it.
+ *
+ * Usage:
+ *   node scripts/generate-model.js [--force] [--model=N] [--input-size=N]
+ *     [--output-dir=PATH] [--quality=fast|sharp] [--no-perceptual]
+ *
+ * Options:
+ *   --force            Force regeneration even if models exist and are fresh
+ *   --model=N          Train only a specific model (by input_size_output_size, e.g., 16_32 for 16->32)
+ *   --input-size=N     Train every configured model for one input size
+ *   --output-dir=PATH  Write models and the merged registry to this directory
+ *   --quality=fast     Train the small ESPCN models instead of the default FSRCNN sharp models
+ *   --no-perceptual    Skip VGG perceptual loss for sharp dev/test runs
+ */
+
+const { execFileSync } = require("child_process");
+const fs = require("fs");
+const path = require("path");
+
+const FORCE = process.argv.includes("--force");
+const NO_PERCEPTUAL = process.argv.includes("--no-perceptual");
+const SPECIFIC_MODEL = process.argv
+  .find((arg) => arg.startsWith("--model="))
+  ?.split("=")[1];
+const INPUT_SIZE = process.argv
+  .find((arg) => arg.startsWith("--input-size="))
+  ?.split("=")[1];
+const OUTPUT_DIR = process.argv
+  .find((arg) => arg.startsWith("--output-dir="))
+  ?.split("=")[1];
+const QUALITY =
+  process.argv.find((arg) => arg.startsWith("--quality="))?.split("=")[1] ||
+  "sharp";
+
+if (!["fast", "sharp"].includes(QUALITY)) {
+  console.error(
+    `[MODEL] Invalid quality "${QUALITY}"; expected fast or sharp.`,
+  );
+  process.exit(1);
+}
+
+for (const [flag, value] of [
+  ["--model", SPECIFIC_MODEL],
+  ["--input-size", INPUT_SIZE],
+  ["--output-dir", OUTPUT_DIR],
+]) {
+  if (value === "") {
+    console.error(`[MODEL] ${flag} requires a value.`);
+    process.exit(1);
+  }
+}
+
+const pythonScript = path.join(
+  __dirname,
+  QUALITY === "fast" ? "train_espcn_multi.py" : "train_fsrcnn_multi.py",
+);
+
+function main() {
+  console.log("[MODEL] Starting multi-model generation process...");
+  console.log(`[MODEL] Quality mode: ${QUALITY}`);
+
+  const venvPython = path.join(__dirname, "..", ".venv", "bin", "python");
+
+  // Self-healing: auto-run train-setup.sh if venv is missing
+  if (!fs.existsSync(venvPython)) {
+    console.log(
+      "[MODEL] Python virtual environment not found, running setup...",
+    );
+    try {
+      execFileSync("bash", ["scripts/train-setup.sh"], {
+        stdio: "inherit",
+        cwd: path.join(__dirname, ".."),
+      });
+      console.log("[MODEL] Setup completed, venv should now exist");
+    } catch (err) {
+      console.error("[MODEL] Failed to auto-setup venv:", err);
+      console.error("");
+      console.error("[MODEL] Run the setup script manually:");
+      console.error("  bash scripts/train-setup.sh");
+      console.error("");
+      console.error("[MODEL] Or via npm:");
+      console.error("  npm run train:setup");
+      process.exit(1);
+    }
+  }
+
+  // Verify venv exists after setup attempt
+  if (!fs.existsSync(venvPython)) {
+    console.error("[MODEL] Venv still not found after setup attempt");
+    process.exit(1);
+  }
+
+  try {
+    const args = [pythonScript];
+    if (FORCE) {
+      args.push("--force");
+    }
+    if (SPECIFIC_MODEL) {
+      args.push(`--model=${SPECIFIC_MODEL}`);
+    }
+    if (INPUT_SIZE) {
+      args.push(`--input-size=${INPUT_SIZE}`);
+    }
+    if (OUTPUT_DIR) {
+      args.push(`--output-dir=${OUTPUT_DIR}`);
+    }
+    if (NO_PERCEPTUAL) {
+      args.push("--no-perceptual");
+    }
+    console.log(`[MODEL] Running training script: ${args.join(" ")}`);
+    execFileSync(venvPython, args, {
+      stdio: "inherit",
+      cwd: path.join(__dirname, ".."),
+    });
+    console.log("[MODEL] Multi-model generation completed successfully!");
+  } catch (err) {
+    console.error("[MODEL] Error during model generation:", err);
+    process.exit(1);
+  }
+}
+
+main();
+
+
+============================================================
+FILE: scripts/generate-model-map.js
+SIZE: 3628
+#!/usr/bin/env node
+/**
+ * Codegen: builds `src/services/generatedModelMap.ts` from whatever
+ * `*.tflite` files physically exist in `assets/models/`.
+ *
+ * Why: Metro only bundles an asset when it sees a *literal* static
+ * `require("....tflite")`, and it fails the whole bundle if a `require()`
+ * points at a file that does not exist. By generating the require list from a
+ * directory scan we guarantee:
+ *   - the build never references a missing model (so it never fails), and
+ *   - any newly-generated model (e.g. the sharp FSRCNN family) is picked up
+ *     automatically on the next build with zero hand-editing.
+ *
+ * Usage:
+ *   node scripts/generate-model-map.js
+ *
+ * This is safe to run anytime and is idempotent. It is wired into
+ * `scripts/build-android.sh` right after model generation.
+ */
+
+const fs = require("fs");
+const path = require("path");
+
+const modelDir = path.join(__dirname, "..", "assets", "models");
+const outFile = path.join(
+  __dirname,
+  "..",
+  "src",
+  "services",
+  "generatedModelMap.ts",
+);
+
+// Only bundle recognised super-resolution model files. `espcn_2x.tflite` is a
+// legacy single-model artifact that is not part of the picker matrix, so we
+// skip it. The picker matrix uses `<family>_<in>x_<out>x.tflite`.
+const MODEL_RE = /^(espcn|fsrcnn)_(\d+)x_(\d+)x\.tflite$/;
+
+function main() {
+  if (!fs.existsSync(modelDir)) {
+    console.error(`[MODEL_MAP] Model dir not found: ${modelDir}`);
+    process.exit(1);
+  }
+
+  const files = fs
+    .readdirSync(modelDir)
+    .filter((f) => MODEL_RE.test(f))
+    .sort();
+
+  if (files.length === 0) {
+    // No `<family>_<in>x_<out>x.tflite` models matched. We intentionally still
+    // write an empty map (and exit 0) rather than aborting: the build is
+    // designed to degrade gracefully to bilinear upscaling when no AI models
+    // are bundled. Emit a loud warning so the empty output is never silent.
+    console.warn(
+      `[MODEL_MAP] WARNING: no model files matched ${MODEL_RE} in ${modelDir}. ` +
+        `The generated map will be empty and AI upscaling will fall back to bilinear. ` +
+        `Run "npm run generate-model" (and/or --quality=fast) to produce models.`,
+    );
+  }
+
+  const lines = files.map(
+    (f) => `  "${f}": require("../../assets/models/${f}"),`,
+  );
+
+  const espcnCount = files.filter((f) => f.startsWith("espcn_")).length;
+  const fsrcnnCount = files.filter((f) => f.startsWith("fsrcnn_")).length;
+
+  const content = `/**
+ * AUTO-GENERATED FILE — DO NOT EDIT BY HAND.
+ *
+ * Generated by \`scripts/generate-model-map.js\` from the \`*.tflite\` files that
+ * physically exist in \`assets/models/\`. It is regenerated automatically during
+ * the build (see \`scripts/build-android.sh\`) and via \`npm run generate-model-map\`.
+ *
+ * Because the require list is derived from a directory scan, it can never
+ * reference a missing file: the build never fails on absent models, and newly
+ * generated models are bundled automatically on the next build.
+ *
+ * Current contents: ${espcnCount} fast (ESPCN) + ${fsrcnnCount} sharp (FSRCNN) = ${files.length} models.
+ */
+
+/* eslint-disable @typescript-eslint/no-require-imports */
+// Metro resolves these static \`require\` paths at build time.
+export const MODEL_MAP: Record<string, number> = {
+${lines.join("\n")}
+};
+
+/** The set of model file names that are actually bundled. */
+export const AVAILABLE_MODEL_FILES: ReadonlySet<string> = new Set(
+  Object.keys(MODEL_MAP),
+);
+`;
+
+  fs.writeFileSync(outFile, content, "utf8");
+  console.log(
+    `[MODEL_MAP] Wrote ${outFile} (${files.length} models: ${espcnCount} espcn, ${fsrcnnCount} fsrcnn)`,
+  );
+}
+
+main();
+
+
+============================================================
+FILE: scripts/generate-model-registry.js
+SIZE: 2793
+#!/usr/bin/env node
+/**
+ * Model registry generator — scans `assets/models/*.tflite` and produces
+ * `model_registry.json` with actual file sizes.
+ *
+ * This replaces hand-maintained registry entries in the Python training scripts.
+ * It is safe to run at any time and is idempotent.
+ *
+ * Usage:
+ *   node scripts/generate-model-registry.js
+ *
+ * The resulting registry is written to `assets/models/model_registry.json`.
+ * Known epochs are preserved from an existing registry; for new files they
+ * default to 0.
+ */
+
+const fs = require("fs");
+const path = require("path");
+
+const MODEL_DIR = path.join(__dirname, "..", "assets", "models");
+const REGISTRY_PATH = path.join(MODEL_DIR, "model_registry.json");
+
+// Matches <family>_<in>x_<out>x.tflite, e.g. espcn_16x_64x.tflite
+const MODEL_RE = /^(espcn|fsrcnn)_(\d+)x_(\d+)x\.tflite$/;
+
+function main() {
+  if (!fs.existsSync(MODEL_DIR)) {
+    console.error(`[REGISTRY] Model dir not found: ${MODEL_DIR}`);
+    process.exit(1);
+  }
+
+  // Load existing registry to preserve epoch info
+  let existingEpochs = {};
+  if (fs.existsSync(REGISTRY_PATH)) {
+    try {
+      const existing = JSON.parse(fs.readFileSync(REGISTRY_PATH, "utf8"));
+      for (const m of existing.models || []) {
+        existingEpochs[m.file] = m.epochs;
+      }
+    } catch (e) {
+      console.warn(`[REGISTRY] Could not read existing registry: ${e.message}`);
+    }
+  }
+
+  const files = fs
+    .readdirSync(MODEL_DIR)
+    .filter((f) => MODEL_RE.test(f))
+    .sort();
+
+  if (files.length === 0) {
+    console.warn(
+      `[REGISTRY] WARNING: no model files matched ${MODEL_RE} in ${MODEL_DIR}. Writing empty registry.`,
+    );
+  }
+
+  const models = files.map((f) => {
+    const [, family, inStr, outStr] = f.match(MODEL_RE);
+    const inputSize = parseInt(inStr, 10);
+    const outputSize = parseInt(outStr, 10);
+    const scale = outputSize / inputSize;
+    const filePath = path.join(MODEL_DIR, f);
+    const sizeBytes = fs.statSync(filePath).size;
+    const epochs = existingEpochs[f] || 0;
+
+    return {
+      input_size: inputSize,
+      scale,
+      output_size: outputSize,
+      epochs,
+      file: f,
+      size_bytes: sizeBytes,
+    };
+  });
+
+  const totalBytes = models.reduce((sum, m) => sum + m.size_bytes, 0);
+
+  const registry = {
+    models,
+    total_size_bytes: totalBytes,
+  };
+
+  fs.writeFileSync(
+    REGISTRY_PATH,
+    JSON.stringify(registry, null, 2) + "\n",
+    "utf8",
+  );
+
+  const espcnCount = models.filter((m) => m.file.startsWith("espcn_")).length;
+  const fsrcnnCount = models.filter((m) => m.file.startsWith("fsrcnn_")).length;
+
+  console.log(
+    `[REGISTRY] Wrote ${REGISTRY_PATH} (` +
+      `${espcnCount} espcn + ${fsrcnnCount} fsrcnn = ${models.length} models, ` +
+      `total ~${Math.round(totalBytes / 1024)}KB)`,
+  );
+}
+
+main();
+
+
+============================================================
+FILE: scripts/train.sh
+SIZE: 4530
+#!/bin/bash
+# Train wrapper script — runs one or both upscaling model trainers.
+#
+# Usage:
+#   bash scripts/train.sh [--fast|--sharp|--both] [--force] [--input-size N] [--model N]
+#
+# Examples:
+#   bash scripts/train.sh --both                          # train fast + sharp (default)
+#   bash scripts/train.sh --both --force                  # force retrain both
+#   bash scripts/train.sh --both --input-size 32          # both, only 32px input
+#   bash scripts/train.sh --both --force --input-size 32  # force both, 32px input
+#   bash scripts/train.sh --fast                          # fast only
+#   bash scripts/train.sh --sharp --force --model 16_64   # sharp force, specific model
+
+set -euo pipefail
+
+# Belt-and-suspenders: disable XLA auto-jit to prevent MirrorPadGrad errors
+export TF_XLA_FLAGS=--tf_xla_auto_jit=0
+
+# Suppress TF startup warnings (cuFFT/cuDNN/cuBLAS factory registration, oneDNN)
+export TF_CPP_MIN_LOG_LEVEL=2
+export TF_ENABLE_ONEDNN_OPTS=0
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
+# Defaults
+QUALITY="both"
+FORCE=""
+INPUT_SIZE=""
+MODEL=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --fast)   QUALITY="fast" ; shift ;;
+        --sharp)  QUALITY="sharp" ; shift ;;
+        --both)   QUALITY="both" ; shift ;;
+        --force)  FORCE="--force" ; shift ;;
+        --input-size)
+            if [ $# -lt 2 ] || [[ "$2" == --* ]]; then
+                echo "[TRAIN] Error: --input-size requires a value" >&2
+                exit 1
+            fi
+            INPUT_SIZE="$2" ; shift 2 ;;
+        --model)
+            if [ $# -lt 2 ] || [[ "$2" == --* ]]; then
+                echo "[TRAIN] Error: --model requires a value" >&2
+                exit 1
+            fi
+            MODEL="$2" ; shift 2 ;;
+        *)        echo "[TRAIN] Unknown option: $1" ; exit 1 ;;
+    esac
+done
+
+VENV_PYTHON="$PROJECT_ROOT/.venv/bin/python"
+if [ ! -f "$VENV_PYTHON" ]; then
+    echo "[TRAIN] Error: Python virtual environment not found at $PROJECT_ROOT/.venv"
+    echo "[TRAIN] Run setup first: npm run train:setup  (bash scripts/train-setup.sh)"
+    exit 1
+fi
+
+# Preflight: verify the environment BEFORE launching multi-hour training.
+echo "[TRAIN] Preflight: verifying training environment..."
+"$VENV_PYTHON" - <<'EOF'
+import sys
+
+version = f"{sys.version_info.major}.{sys.version_info.minor}"
+if version not in ("3.10", "3.11", "3.12"):
+    print(f"[TRAIN] ERROR: venv Python {version} unsupported by TensorFlow (need 3.10-3.12).", file=sys.stderr)
+    print("[TRAIN] Re-run setup: npm run train:setup", file=sys.stderr)
+    sys.exit(1)
+
+try:
+    import tensorflow as tf
+except Exception as e:
+    print(f"[TRAIN] ERROR: TensorFlow import failed: {e}", file=sys.stderr)
+    print("[TRAIN] Re-run setup: npm run train:setup", file=sys.stderr)
+    sys.exit(1)
+
+gpus = tf.config.list_physical_devices("GPU")
+if gpus:
+    print(f"[TRAIN] TensorFlow {tf.__version__} — training on GPU: {[g.name for g in gpus]}")
+else:
+    import shutil
+    if shutil.which("nvidia-smi"):
+        print("[TRAIN] ERROR: An NVIDIA GPU is present but TensorFlow cannot see it.", file=sys.stderr)
+        print("[TRAIN] You would be paying for a GPU while training on CPU. Aborting.", file=sys.stderr)
+        print("[TRAIN] Fix: npm run train:setup:gpu   (installs tensorflow[and-cuda])", file=sys.stderr)
+        sys.exit(1)
+    print(f"[TRAIN] TensorFlow {tf.__version__} — no GPU detected, training on CPU.")
+EOF
+
+CMD_ARGS=()
+[ -n "$FORCE" ]      && CMD_ARGS+=("$FORCE")
+[ -n "$INPUT_SIZE" ] && CMD_ARGS+=("--input-size=$INPUT_SIZE")
+[ -n "$MODEL" ]      && CMD_ARGS+=("--model=$MODEL")
+
+run_trainer() {
+    local quality="$1"
+    local script_name
+    if [ "$quality" = "fast" ]; then
+        script_name="train_espcn_multi.py"
+    else
+        script_name="train_fsrcnn_multi.py"
+    fi
+    local script_path="$SCRIPT_DIR/$script_name"
+    echo ""
+    echo "=========================================="
+    echo "[TRAIN] Training $quality models..."
+    echo "=========================================="
+    "$VENV_PYTHON" "$script_path" "${CMD_ARGS[@]}"
+}
+
+case "$QUALITY" in
+    both)
+        run_trainer "fast"
+        run_trainer "sharp"
+        ;;
+    fast|sharp)
+        run_trainer "$QUALITY"
+        ;;
+esac
+
+# Regenerate registry from actual .tflite files
+echo ""
+echo "=========================================="
+echo "[TRAIN] Regenerating model registry..."
+echo "=========================================="
+node "$SCRIPT_DIR/generate-model-registry.js"
+
+echo ""
+echo "[TRAIN] Done."
+
+
+============================================================
+FILE: scripts/train-setup.sh
+SIZE: 8750
+#!/bin/bash
+# Train Setup Script — fully self-contained training environment bootstrap.
+#
+# Creates a Python 3.12 virtual environment with a PINNED TensorFlow stack.
+# GPU mode uses tensorflow[and-cuda]==2.19.0 which bundles CUDA 12.5 + cuDNN 9.3
+# as pip wheels — NO system CUDA toolkit or cuDNN is needed. The only host
+# requirement for GPU training is a working NVIDIA driver (>= 525).
+#
+# If no compatible system Python (3.10-3.12) exists, this script bootstraps
+# `uv` (no root needed) and downloads a standalone Python 3.12.
+#
+# Usage:
+#   bash scripts/train-setup.sh           # auto-detect GPU via nvidia-smi
+#   bash scripts/train-setup.sh --gpu     # force GPU install (fails if no GPU)
+#   bash scripts/train-setup.sh --cpu     # force CPU install
+#
+# Or via npm:
+#   npm run train:setup
+#   npm run train:setup:gpu
+#   npm run train:setup:cpu
+#
+# After setup, train with:
+#   npm run train:models          (bash scripts/train.sh --both)
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+VENV_PATH="$PROJECT_ROOT/.venv"
+VENV_PYTHON="$VENV_PATH/bin/python"
+
+# TF 2.19 supports Python 3.9-3.12. We accept 3.10-3.12.
+SUPPORTED_PY_VERSIONS=("3.12" "3.11" "3.10")
+UV_PYTHON_VERSION="3.12"
+
+MODE="auto"  # auto | gpu | cpu
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --gpu) MODE="gpu" ; shift ;;
+        --cpu) MODE="cpu" ; shift ;;
+        *) echo "[TRAIN_SETUP] Unknown option: $1" >&2 ; exit 1 ;;
+    esac
+done
+
+log()  { echo "[TRAIN_SETUP] $*"; }
+fail() { echo "[TRAIN_SETUP] ERROR: $*" >&2 ; exit 1; }
+
+# ---------------------------------------------------------------------------
+# 1. Decide GPU vs CPU
+# ---------------------------------------------------------------------------
+GPU_AVAILABLE="no"
+if command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi >/dev/null 2>&1; then
+    GPU_AVAILABLE="yes"
+    log "NVIDIA GPU detected: $(nvidia-smi --query-gpu=name,driver_version --format=csv,noheader | head -n1)"
+else
+    log "No working NVIDIA GPU detected (nvidia-smi missing or failed)."
+fi
+
+if [ "$MODE" = "auto" ]; then
+    if [ "$GPU_AVAILABLE" = "yes" ]; then
+        MODE="gpu"
+    else
+        MODE="cpu"
+    fi
+    log "Auto-detected mode: $MODE"
+elif [ "$MODE" = "gpu" ] && [ "$GPU_AVAILABLE" = "no" ]; then
+    fail "GPU mode requested but nvidia-smi is missing or failing.
+  On a rented GPU instance this usually means the NVIDIA driver/kernel module
+  is broken (e.g. 'modprobe: Module nvidia not found'). Fix the driver or use:
+    bash scripts/train-setup.sh --cpu"
+fi
+
+if [ "$MODE" = "gpu" ]; then
+    REQUIREMENTS="$PROJECT_ROOT/requirements-gpu.txt"
+else
+    REQUIREMENTS="$PROJECT_ROOT/requirements-cpu.txt"
+fi
+[ -f "$REQUIREMENTS" ] || fail "Requirements file not found: $REQUIREMENTS"
+log "Using requirements: $(basename "$REQUIREMENTS")"
+
+# ---------------------------------------------------------------------------
+# 2. Find a compatible Python (3.10-3.12), bootstrap uv if none exists
+# ---------------------------------------------------------------------------
+py_version_of() {
+    "$1" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")' 2>/dev/null || true
+}
+
+is_supported_version() {
+    local v="$1"
+    for s in "${SUPPORTED_PY_VERSIONS[@]}"; do
+        [ "$v" = "$s" ] && return 0
+    done
+    return 1
+}
+
+find_system_python() {
+    # Prefer explicit versioned binaries, then generic python3 if it qualifies.
+    for v in "${SUPPORTED_PY_VERSIONS[@]}"; do
+        if command -v "python$v" >/dev/null 2>&1; then
+            echo "python$v"
+            return 0
+        fi
+    done
+    if command -v python3 >/dev/null 2>&1; then
+        local v
+        v="$(py_version_of python3)"
+        if is_supported_version "$v"; then
+            echo "python3"
+            return 0
+        fi
+    fi
+    return 1
+}
+
+bootstrap_uv_python() {
+    local uv_bin=""
+    if command -v uv >/dev/null 2>&1; then
+        uv_bin="$(command -v uv)"
+    elif [ -x "$HOME/.local/bin/uv" ]; then
+        uv_bin="$HOME/.local/bin/uv"
+    else
+        log "No compatible system Python found. Bootstrapping uv (standalone Python manager, no root needed)..."
+        curl -LsSf https://astral.sh/uv/install.sh | sh >/dev/null 2>&1 \
+            || fail "Failed to install uv. Install Python 3.12 manually and re-run."
+        if [ -x "$HOME/.local/bin/uv" ]; then
+            uv_bin="$HOME/.local/bin/uv"
+        elif [ -x "$HOME/.cargo/bin/uv" ]; then
+            uv_bin="$HOME/.cargo/bin/uv"
+        else
+            fail "uv installed but binary not found in ~/.local/bin or ~/.cargo/bin"
+        fi
+    fi
+    log "Using uv at $uv_bin to install standalone Python $UV_PYTHON_VERSION..."
+    "$uv_bin" python install "$UV_PYTHON_VERSION" >/dev/null
+    local py_path
+    py_path="$("$uv_bin" python find "$UV_PYTHON_VERSION")"
+    [ -n "$py_path" ] || fail "uv could not locate Python $UV_PYTHON_VERSION after install"
+    echo "$py_path"
+}
+
+PYTHON_BIN=""
+if PYTHON_BIN="$(find_system_python)"; then
+    log "Found compatible system Python: $PYTHON_BIN ($(py_version_of "$PYTHON_BIN"))"
+else
+    PYTHON_BIN="$(bootstrap_uv_python)"
+    log "Using uv-managed Python: $PYTHON_BIN ($(py_version_of "$PYTHON_BIN"))"
+fi
+
+PY_VERSION="$(py_version_of "$PYTHON_BIN")"
+is_supported_version "$PY_VERSION" \
+    || fail "Resolved Python $PY_VERSION is not supported (need ${SUPPORTED_PY_VERSIONS[*]}). TensorFlow 2.19 does not support Python 3.13+."
+
+# ---------------------------------------------------------------------------
+# 3. Create (or recreate) the venv with the correct Python
+# ---------------------------------------------------------------------------
+if [ -f "$VENV_PYTHON" ]; then
+    EXISTING_VERSION="$(py_version_of "$VENV_PYTHON")"
+    if ! is_supported_version "$EXISTING_VERSION"; then
+        log "Existing .venv uses unsupported Python $EXISTING_VERSION — recreating..."
+        rm -rf "$VENV_PATH"
+    else
+        log "Existing .venv uses Python $EXISTING_VERSION (ok)."
+    fi
+fi
+
+if [ ! -f "$VENV_PYTHON" ]; then
+    log "Creating virtual environment at $VENV_PATH with $PYTHON_BIN..."
+    "$PYTHON_BIN" -m venv "$VENV_PATH"
+fi
+
+# ---------------------------------------------------------------------------
+# 4. Install pinned dependencies
+# ---------------------------------------------------------------------------
+log "Upgrading pip..."
+"$VENV_PYTHON" -m pip install --upgrade pip >/dev/null
+
+log "Installing pinned dependencies from $(basename "$REQUIREMENTS")..."
+if [ "$MODE" = "gpu" ]; then
+    log "(GPU mode downloads ~3GB of CUDA/cuDNN wheels — this is expected.)"
+fi
+"$VENV_PYTHON" -m pip install -r "$REQUIREMENTS"
+
+# ---------------------------------------------------------------------------
+# 5. Verify the installation — fail loudly BEFORE wasting GPU-instance time
+# ---------------------------------------------------------------------------
+log "Verifying TensorFlow installation..."
+if [ "$MODE" = "gpu" ]; then
+    "$VENV_PYTHON" - <<'EOF'
+import sys
+import tensorflow as tf
+print(f"[TRAIN_SETUP] TensorFlow {tf.__version__} on Python {sys.version.split()[0]}")
+gpus = tf.config.list_physical_devices("GPU")
+if not gpus:
+    print("[TRAIN_SETUP] ERROR: TensorFlow cannot see any GPU.", file=sys.stderr)
+    print("[TRAIN_SETUP] Check: nvidia-smi works? Driver >= 525?", file=sys.stderr)
+    sys.exit(1)
+print(f"[TRAIN_SETUP] GPU(s) visible to TensorFlow: {[g.name for g in gpus]}")
+# Smoke test: run a tiny op on the GPU to catch cuDNN/CUDA init failures now.
+with tf.device("/GPU:0"):
+    x = tf.random.normal((64, 64))
+    y = tf.matmul(x, x)
+print("[TRAIN_SETUP] GPU smoke test passed (matmul on /GPU:0).")
+EOF
+else
+    "$VENV_PYTHON" - <<'EOF'
+import sys
+import tensorflow as tf
+print(f"[TRAIN_SETUP] TensorFlow {tf.__version__} on Python {sys.version.split()[0]} (CPU mode)")
+x = tf.random.normal((64, 64))
+y = tf.matmul(x, x)
+print("[TRAIN_SETUP] CPU smoke test passed.")
+EOF
+fi
+
+log "Verifying cairosvg + pillow..."
+"$VENV_PYTHON" -c "import cairosvg, PIL; print(f'[TRAIN_SETUP] cairosvg {cairosvg.__version__}, pillow {PIL.__version__}')" \
+    || fail "cairosvg/pillow import failed. On minimal Linux images you may need: apt-get install -y libcairo2"
+
+log "Setup complete ($MODE mode)."
+echo ""
+echo "[TRAIN_SETUP] To train models, run one of:"
+echo "  npm run train:models          # fast + sharp"
+echo "  npm run train:models:force    # force retrain everything"
+echo "  bash scripts/train.sh --both --input-size 32"
+
+# If sourced, activate the venv for the current shell
+if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
+    echo ""
+    log "Activating virtual environment..."
+    source "$VENV_PATH/bin/activate"
+    log "Virtual environment activated. Use 'deactivate' to exit."
+fi
+
+============================================================
+FILE: scripts/sharpen_icons.py
+SIZE: 3853
+#!/usr/bin/env python3
+"""
+Sharpening post-processing for icon upscaling.
+Implements unsharp mask algorithm for quick quality enhancement.
+"""
+
+import numpy as np
+from PIL import Image, ImageFilter
+import base64
+from io import BytesIO
+import sys
+
+
+def unsharp_mask(image: Image.Image, radius: float = 2.0, percent: int = 150, threshold: int = 3) -> Image.Image:
+    """
+    Apply unsharp mask to enhance image sharpness.
+    
+    Args:
+        image: PIL Image object
+        radius: Blur radius for creating the mask (default: 2.0)
+        percent: Sharpening strength (default: 150)
+        threshold: Minimum brightness difference to apply sharpening (default: 3)
+    
+    Returns:
+        Sharpened PIL Image object
+    """
+    # Create blurred version
+    blurred = image.filter(ImageFilter.GaussianBlur(radius=radius))
+    
+    # Convert to numpy for processing
+    img_array = np.array(image).astype(np.float32)
+    blur_array = np.array(blurred).astype(np.float32)
+    
+    # Calculate difference
+    diff = img_array - blur_array
+    
+    # Apply threshold
+    mask = np.abs(diff) > threshold
+    
+    # Apply sharpening
+    sharpened = img_array + (diff * percent / 100.0) * mask
+    
+    # Clip values and convert back
+    sharpened = np.clip(sharpened, 0, 255).astype(np.uint8)
+    
+    return Image.fromarray(sharpened)
+
+
+def sharpen_base64_image(base64_str: str, format: str = 'png', 
+                         radius: float = 2.0, percent: int = 150, threshold: int = 3) -> str:
+    """
+    Sharpen a base64-encoded image.
+    
+    Args:
+        base64_str: Base64-encoded image data
+        format: Image format ('png', 'jpg', etc.)
+        radius: Blur radius for unsharp mask
+        percent: Sharpening strength
+        threshold: Minimum difference threshold
+    
+    Returns:
+        Base64-encoded sharpened image
+    """
+    # Decode base64
+    image_data = base64.b64decode(base64_str)
+    
+    # Open image
+    image = Image.open(BytesIO(image_data))
+    
+    # Convert to RGB if necessary (handle RGBA, P, etc.)
+    if image.mode not in ('RGB', 'RGBA'):
+        image = image.convert('RGB')
+    
+    # Apply unsharp mask
+    sharpened = unsharp_mask(image, radius, percent, threshold)
+    
+    # Save to bytes
+    output = BytesIO()
+    if format.lower() in ('jpg', 'jpeg'):
+        sharpened.save(output, format='JPEG', quality=95)
+    else:
+        sharpened.save(output, format='PNG')
+    
+    # Encode back to base64
+    output.seek(0)
+    return base64.b64encode(output.read()).decode('utf-8')
+
+
+def test_sharpening():
+    """Test sharpening on a sample image."""
+    import os
+    import tempfile
+
+
+    # Create a simple test image
+    test_img = Image.new('RGB', (64, 64), color='white')
+    
+    # Add some shapes
+    from PIL import ImageDraw
+    draw = ImageDraw.Draw(test_img)
+    draw.rectangle([10, 10, 30, 30], fill='red')
+    draw.ellipse([35, 35, 55, 55], fill='blue')
+    
+    # Allocate temporary output paths instead of hardcoding /tmp.
+    original_fd, original_path = tempfile.mkstemp(prefix='test_original_', suffix='.png')
+    os.close(original_fd)
+    sharpened_fd, sharpened_path = tempfile.mkstemp(prefix='test_sharpened_', suffix='.png')
+    os.close(sharpened_fd)
+
+    # Save original
+    test_img.save(original_path)
+    
+    # Apply sharpening
+    sharpened = unsharp_mask(test_img, radius=2.0, percent=150, threshold=3)
+    sharpened.save(sharpened_path)
+    
+    print(f"✓ Test images saved to {original_path} and {sharpened_path}")
+    print("✓ Sharpening function working correctly")
+
+
+
+if __name__ == '__main__':
+    if len(sys.argv) > 1 and sys.argv[1] == '--test':
+        test_sharpening()
+    else:
+        print("Sharpening module loaded successfully")
+        print("Use sharpen_base64_image() function to sharpen images")
+        print("Run with --test flag to test the implementation")
+
+=== BUILD LOG TAILS ===
+
+--- build-arm64-v8a.log (1467 lines) ---
+> Task :app:desugarReleaseFileDependencies
+> Task :app:mergeReleaseStartupProfile
+> Task :app:mergeReleaseShaders
+> Task :app:compileReleaseShaders NO-SOURCE
+> Task :app:generateReleaseAssets UP-TO-DATE
+> Task :app:mergeReleaseArtProfile
+> Task :app:mergeReleaseAssets
+> Task :app:compressReleaseAssets
+> Task :app:extractReleaseVersionControlInfo
+> Task :app:extractProguardFiles
+> Task :app:collectReleaseDependencies
+> Task :app:sdkReleaseDependencyData
+> Task :app:validateSigningRelease
+> Task :app:writeReleaseAppMetadata
+> Task :app:writeReleaseSigningConfigVersions
+> Task :app:processReleaseManifestForPackage
+> Task :app:processReleaseResources
+> Task :app:optimizeReleaseResources
+
+> Task :app:compileReleaseKotlin
+w: file:///home/d/Desktop/jsmastery/android/app/src/main/java/com/ctocrm/jsmastery/MainApplication.kt:9:8 'class ReactNativeHost : Any' is deprecated. Deprecated in Java.
+w: file:///home/d/Desktop/jsmastery/android/app/src/main/java/com/ctocrm/jsmastery/MainApplication.kt:21:16 This declaration overrides a deprecated member but is not marked as deprecated itself. Add the '@Deprecated' annotation or suppress the diagnostic.
+w: file:///home/d/Desktop/jsmastery/android/app/src/main/java/com/ctocrm/jsmastery/MainApplication.kt:21:33 'class ReactNativeHost : Any' is deprecated. Deprecated in Java.
+
+> Task :app:compileReleaseJavaWithJavac
+> Task :app:dexBuilderRelease
+> Task :app:mergeReleaseGlobalSynthetics
+> Task :app:generateReleaseLintVitalReportModel
+> Task :app:processReleaseJavaRes
+> Task :app:lintVitalAnalyzeRelease
+> Task :app:lintVitalReportRelease
+> Task :app:lintVitalRelease
+> Task :app:mergeExtDexRelease
+> Task :app:mergeReleaseJavaResource
+> Task :app:mergeDexRelease
+> Task :app:compileReleaseArtProfile
+> Task :app:packageRelease
+> Task :app:createReleaseApkListingFileRedirect
+> Task :app:assembleRelease
+
+[Incubating] Problems report is available at: file:///home/d/Desktop/jsmastery/android/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.14.3/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 10m 11s
+716 actionable tasks: 692 executed, 24 up-to-date
+
+--- build-armeabi-v7a.log (1197 lines) ---
+> Task :app:processReleaseMainManifest UP-TO-DATE
+> Task :app:processReleaseManifest UP-TO-DATE
+> Task :app:processReleaseManifestForPackage UP-TO-DATE
+> Task :app:extractReleaseNativeSymbolTables
+> Task :app:processReleaseResources UP-TO-DATE
+> Task :app:compileReleaseKotlin UP-TO-DATE
+> Task :app:javaPreCompileRelease UP-TO-DATE
+> Task :app:compileReleaseJavaWithJavac UP-TO-DATE
+> Task :app:dexBuilderRelease UP-TO-DATE
+> Task :app:desugarReleaseFileDependencies UP-TO-DATE
+> Task :app:mergeReleaseStartupProfile UP-TO-DATE
+> Task :app:mergeExtDexRelease UP-TO-DATE
+> Task :app:mergeDexRelease UP-TO-DATE
+> Task :app:mergeReleaseArtProfile UP-TO-DATE
+> Task :app:mergeReleaseGlobalSynthetics UP-TO-DATE
+> Task :app:compileReleaseArtProfile UP-TO-DATE
+> Task :app:mergeReleaseShaders UP-TO-DATE
+> Task :app:compileReleaseShaders NO-SOURCE
+> Task :app:generateReleaseAssets UP-TO-DATE
+> Task :app:mergeReleaseAssets UP-TO-DATE
+> Task :app:compressReleaseAssets UP-TO-DATE
+> Task :app:extractReleaseVersionControlInfo UP-TO-DATE
+> Task :app:extractProguardFiles UP-TO-DATE
+> Task :app:generateReleaseLintVitalReportModel UP-TO-DATE
+> Task :app:processReleaseJavaRes UP-TO-DATE
+> Task :app:mergeReleaseJavaResource UP-TO-DATE
+> Task :app:optimizeReleaseResources UP-TO-DATE
+> Task :app:collectReleaseDependencies UP-TO-DATE
+> Task :app:sdkReleaseDependencyData UP-TO-DATE
+> Task :app:validateSigningRelease UP-TO-DATE
+> Task :app:writeReleaseAppMetadata UP-TO-DATE
+> Task :app:writeReleaseSigningConfigVersions UP-TO-DATE
+> Task :app:mergeReleaseNativeDebugMetadata
+> Task :app:lintVitalAnalyzeRelease
+> Task :app:lintVitalReportRelease UP-TO-DATE
+> Task :app:lintVitalRelease
+> Task :app:packageRelease
+> Task :app:createReleaseApkListingFileRedirect UP-TO-DATE
+> Task :app:assembleRelease
+
+[Incubating] Problems report is available at: file:///home/d/Desktop/jsmastery/android/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.14.3/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 4m 36s
+716 actionable tasks: 82 executed, 634 up-to-date
+
+--- build-x86.log (1197 lines) ---
+> Task :app:processReleaseMainManifest UP-TO-DATE
+> Task :app:processReleaseManifest UP-TO-DATE
+> Task :app:processReleaseManifestForPackage UP-TO-DATE
+> Task :app:extractReleaseNativeSymbolTables
+> Task :app:processReleaseResources UP-TO-DATE
+> Task :app:compileReleaseKotlin UP-TO-DATE
+> Task :app:javaPreCompileRelease UP-TO-DATE
+> Task :app:compileReleaseJavaWithJavac UP-TO-DATE
+> Task :app:dexBuilderRelease UP-TO-DATE
+> Task :app:desugarReleaseFileDependencies UP-TO-DATE
+> Task :app:mergeReleaseStartupProfile UP-TO-DATE
+> Task :app:mergeExtDexRelease UP-TO-DATE
+> Task :app:mergeDexRelease UP-TO-DATE
+> Task :app:mergeReleaseArtProfile UP-TO-DATE
+> Task :app:mergeReleaseGlobalSynthetics UP-TO-DATE
+> Task :app:compileReleaseArtProfile UP-TO-DATE
+> Task :app:mergeReleaseShaders UP-TO-DATE
+> Task :app:compileReleaseShaders NO-SOURCE
+> Task :app:generateReleaseAssets UP-TO-DATE
+> Task :app:mergeReleaseAssets UP-TO-DATE
+> Task :app:compressReleaseAssets UP-TO-DATE
+> Task :app:extractReleaseVersionControlInfo UP-TO-DATE
+> Task :app:extractProguardFiles UP-TO-DATE
+> Task :app:generateReleaseLintVitalReportModel UP-TO-DATE
+> Task :app:processReleaseJavaRes UP-TO-DATE
+> Task :app:mergeReleaseJavaResource UP-TO-DATE
+> Task :app:optimizeReleaseResources UP-TO-DATE
+> Task :app:collectReleaseDependencies UP-TO-DATE
+> Task :app:sdkReleaseDependencyData UP-TO-DATE
+> Task :app:validateSigningRelease UP-TO-DATE
+> Task :app:writeReleaseAppMetadata UP-TO-DATE
+> Task :app:writeReleaseSigningConfigVersions UP-TO-DATE
+> Task :app:mergeReleaseNativeDebugMetadata
+> Task :app:lintVitalAnalyzeRelease
+> Task :app:lintVitalReportRelease UP-TO-DATE
+> Task :app:lintVitalRelease
+> Task :app:packageRelease
+> Task :app:createReleaseApkListingFileRedirect UP-TO-DATE
+> Task :app:assembleRelease
+
+[Incubating] Problems report is available at: file:///home/d/Desktop/jsmastery/android/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.14.3/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 4m 30s
+716 actionable tasks: 82 executed, 634 up-to-date
+
+--- build-x86_64.log (1153 lines) ---
+> Task :app:processReleaseMainManifest UP-TO-DATE
+> Task :app:processReleaseManifest UP-TO-DATE
+> Task :app:processReleaseManifestForPackage UP-TO-DATE
+> Task :app:extractReleaseNativeSymbolTables
+> Task :app:processReleaseResources UP-TO-DATE
+> Task :app:compileReleaseKotlin UP-TO-DATE
+> Task :app:javaPreCompileRelease UP-TO-DATE
+> Task :app:compileReleaseJavaWithJavac UP-TO-DATE
+> Task :app:dexBuilderRelease UP-TO-DATE
+> Task :app:desugarReleaseFileDependencies UP-TO-DATE
+> Task :app:mergeReleaseStartupProfile UP-TO-DATE
+> Task :app:mergeExtDexRelease UP-TO-DATE
+> Task :app:mergeDexRelease UP-TO-DATE
+> Task :app:mergeReleaseArtProfile UP-TO-DATE
+> Task :app:mergeReleaseGlobalSynthetics UP-TO-DATE
+> Task :app:compileReleaseArtProfile UP-TO-DATE
+> Task :app:mergeReleaseShaders UP-TO-DATE
+> Task :app:compileReleaseShaders NO-SOURCE
+> Task :app:generateReleaseAssets UP-TO-DATE
+> Task :app:mergeReleaseAssets UP-TO-DATE
+> Task :app:compressReleaseAssets UP-TO-DATE
+> Task :app:extractReleaseVersionControlInfo UP-TO-DATE
+> Task :app:extractProguardFiles UP-TO-DATE
+> Task :app:generateReleaseLintVitalReportModel UP-TO-DATE
+> Task :app:processReleaseJavaRes UP-TO-DATE
+> Task :app:mergeReleaseJavaResource UP-TO-DATE
+> Task :app:optimizeReleaseResources UP-TO-DATE
+> Task :app:collectReleaseDependencies UP-TO-DATE
+> Task :app:sdkReleaseDependencyData UP-TO-DATE
+> Task :app:validateSigningRelease UP-TO-DATE
+> Task :app:writeReleaseAppMetadata UP-TO-DATE
+> Task :app:writeReleaseSigningConfigVersions UP-TO-DATE
+> Task :app:mergeReleaseNativeDebugMetadata
+> Task :app:lintVitalAnalyzeRelease
+> Task :app:lintVitalReportRelease UP-TO-DATE
+> Task :app:lintVitalRelease
+> Task :app:packageRelease
+> Task :app:createReleaseApkListingFileRedirect UP-TO-DATE
+> Task :app:assembleRelease
+
+[Incubating] Problems report is available at: file:///home/d/Desktop/jsmastery/android/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.14.3/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 4m 34s
+716 actionable tasks: 82 executed, 634 up-to-date
+
+=== GREP model refs (no node_modules) ===
+src/services/iconProcessing.ts:36:      4: "espcn_16x_64x.tflite",
+src/services/iconProcessing.ts:37:      8: "espcn_16x_128x.tflite",
+src/services/iconProcessing.ts:38:      12: "espcn_16x_192x.tflite",
+src/services/iconProcessing.ts:39:      16: "espcn_16x_256x.tflite",
+src/services/iconProcessing.ts:40:      24: "espcn_16x_384x.tflite",
+src/services/iconProcessing.ts:41:      32: "espcn_16x_512x.tflite",
+src/services/iconProcessing.ts:44:      2: "espcn_32x_64x.tflite",
+src/services/iconProcessing.ts:45:      4: "espcn_32x_128x.tflite",
+src/services/iconProcessing.ts:46:      6: "espcn_32x_192x.tflite",
+src/services/iconProcessing.ts:47:      8: "espcn_32x_256x.tflite",
+src/services/iconProcessing.ts:48:      12: "espcn_32x_384x.tflite",
+src/services/iconProcessing.ts:49:      16: "espcn_32x_512x.tflite",
+src/services/iconProcessing.ts:52:      2: "espcn_48x_96x.tflite",
+src/services/iconProcessing.ts:53:      3: "espcn_48x_144x.tflite",
+src/services/iconProcessing.ts:54:      4: "espcn_48x_192x.tflite",
+src/services/iconProcessing.ts:55:      5: "espcn_48x_240x.tflite",
+src/services/iconProcessing.ts:56:      8: "espcn_48x_384x.tflite",
+src/services/iconProcessing.ts:57:      12: "espcn_48x_576x.tflite",
+src/services/iconProcessing.ts:60:      2: "espcn_64x_128x.tflite",
+src/services/iconProcessing.ts:61:      3: "espcn_64x_192x.tflite",
+src/services/iconProcessing.ts:62:      4: "espcn_64x_256x.tflite",
+src/services/iconProcessing.ts:63:      6: "espcn_64x_384x.tflite",
+src/services/iconProcessing.ts:64:      8: "espcn_64x_512x.tflite",
+src/services/iconProcessing.ts:67:      2: "espcn_96x_192x.tflite",
+src/services/iconProcessing.ts:68:      3: "espcn_96x_288x.tflite",
+src/services/iconProcessing.ts:69:      4: "espcn_96x_384x.tflite",
+src/services/iconProcessing.ts:70:      5: "espcn_96x_480x.tflite",
+src/services/iconProcessing.ts:73:      2: "espcn_128x_256x.tflite",
+src/services/iconProcessing.ts:74:      3: "espcn_128x_384x.tflite",
+src/services/iconProcessing.ts:77:      2: "espcn_192x_384x.tflite",
+src/services/iconProcessing.ts:78:      3: "espcn_192x_576x.tflite",
+src/services/iconProcessing.ts:81:      2: "espcn_256x_512x.tflite",
+src/services/iconProcessing.ts:86:      4: "fsrcnn_16x_64x.tflite",
+src/services/iconProcessing.ts:87:      8: "fsrcnn_16x_128x.tflite",
+src/services/iconProcessing.ts:88:      12: "fsrcnn_16x_192x.tflite",
+src/services/iconProcessing.ts:89:      16: "fsrcnn_16x_256x.tflite",
+src/services/iconProcessing.ts:90:      24: "fsrcnn_16x_384x.tflite",
+src/services/iconProcessing.ts:91:      32: "fsrcnn_16x_512x.tflite",
+src/services/iconProcessing.ts:94:      2: "fsrcnn_32x_64x.tflite",
+src/services/iconProcessing.ts:95:      4: "fsrcnn_32x_128x.tflite",
+src/services/iconProcessing.ts:96:      6: "fsrcnn_32x_192x.tflite",
+src/services/iconProcessing.ts:97:      8: "fsrcnn_32x_256x.tflite",
+src/services/iconProcessing.ts:98:      12: "fsrcnn_32x_384x.tflite",
+src/services/iconProcessing.ts:99:      16: "fsrcnn_32x_512x.tflite",
+src/services/iconProcessing.ts:102:      2: "fsrcnn_48x_96x.tflite",
+src/services/iconProcessing.ts:103:      3: "fsrcnn_48x_144x.tflite",
+src/services/iconProcessing.ts:104:      4: "fsrcnn_48x_192x.tflite",
+src/services/iconProcessing.ts:105:      5: "fsrcnn_48x_240x.tflite",
+src/services/iconProcessing.ts:106:      8: "fsrcnn_48x_384x.tflite",
+src/services/iconProcessing.ts:107:      12: "fsrcnn_48x_576x.tflite",
+src/services/iconProcessing.ts:110:      2: "fsrcnn_64x_128x.tflite",
+src/services/iconProcessing.ts:111:      3: "fsrcnn_64x_192x.tflite",
+src/services/iconProcessing.ts:112:      4: "fsrcnn_64x_256x.tflite",
+src/services/iconProcessing.ts:113:      6: "fsrcnn_64x_384x.tflite",
+src/services/iconProcessing.ts:114:      8: "fsrcnn_64x_512x.tflite",
+src/services/iconProcessing.ts:117:      2: "fsrcnn_96x_192x.tflite",
+src/services/iconProcessing.ts:118:      3: "fsrcnn_96x_288x.tflite",
+src/services/iconProcessing.ts:119:      4: "fsrcnn_96x_384x.tflite",
+src/services/iconProcessing.ts:120:      5: "fsrcnn_96x_480x.tflite",
+src/services/iconProcessing.ts:123:      2: "fsrcnn_128x_256x.tflite",
+src/services/iconProcessing.ts:124:      3: "fsrcnn_128x_384x.tflite",
+src/services/iconProcessing.ts:125:      4: "fsrcnn_128x_512x.tflite",
+src/services/iconProcessing.ts:128:      2: "fsrcnn_192x_384x.tflite",
+src/services/iconProcessing.ts:129:      3: "fsrcnn_192x_576x.tflite",
+src/services/iconProcessing.ts:132:      2: "fsrcnn_256x_512x.tflite",
+src/services/iconProcessing.ts:138:// auto-generated from the `*.tflite` files present in assets/models/ by
+src/services/iconProcessing.ts:231: * `false` until the `fsrcnn_*.tflite` files are generated and wired into
+src/services/generatedModelMap.ts:4: * Generated by `scripts/generate-model-map.js` from the `*.tflite` files that
+src/services/generatedModelMap.ts:18:  "espcn_128x_256x.tflite": require("../../assets/models/espcn_128x_256x.tflite"),
+src/services/generatedModelMap.ts:19:  "espcn_128x_384x.tflite": require("../../assets/models/espcn_128x_384x.tflite"),
+src/services/generatedModelMap.ts:20:  "espcn_128x_512x.tflite": require("../../assets/models/espcn_128x_512x.tflite"),
+src/services/generatedModelMap.ts:21:  "espcn_16x_128x.tflite": require("../../assets/models/espcn_16x_128x.tflite"),
+src/services/generatedModelMap.ts:22:  "espcn_16x_192x.tflite": require("../../assets/models/espcn_16x_192x.tflite"),
+src/services/generatedModelMap.ts:23:  "espcn_16x_256x.tflite": require("../../assets/models/espcn_16x_256x.tflite"),
+src/services/generatedModelMap.ts:24:  "espcn_16x_32x.tflite": require("../../assets/models/espcn_16x_32x.tflite"),
+src/services/generatedModelMap.ts:25:  "espcn_16x_384x.tflite": require("../../assets/models/espcn_16x_384x.tflite"),
+src/services/generatedModelMap.ts:26:  "espcn_16x_512x.tflite": require("../../assets/models/espcn_16x_512x.tflite"),
+src/services/generatedModelMap.ts:27:  "espcn_16x_64x.tflite": require("../../assets/models/espcn_16x_64x.tflite"),
+src/services/generatedModelMap.ts:28:  "espcn_192x_384x.tflite": require("../../assets/models/espcn_192x_384x.tflite"),
+src/services/generatedModelMap.ts:29:  "espcn_192x_576x.tflite": require("../../assets/models/espcn_192x_576x.tflite"),

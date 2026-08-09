@@ -483,3 +483,10 @@ Does **not** change loss formula or brand-safe hybrid `t=0.25`.
 8× one-shots (e.g. 16→128) use the **same capacity tier as 12×**: **64 channels + 2 residual mapping layers** (was 32/0).  
 Levers unchanged. Both ESPCN and FSRCNN still required for every size the app ships.
 
+## Full matrix = POC policy (canonical)
+
+- **Train:** `bash scripts/train.sh --both --force` → **`assets/models/` only**
+- **Audit before train:** `python scripts/audit_full_matrix_policy.py` (must exit 0)
+- Recipe: `train_levers.py` + brand-safe loss + ESPCN scale≥8 capacity; app hybrid t=0.25 in `iconProcessing.ts`
+- Do **not** use side dirs (`models_poc_*`) for app weights
+

@@ -1,5 +1,13 @@
 #!/bin/bash
 # Train wrapper script — runs one or both upscaling model trainers.
+# Frozen POC policy (do not train without this):
+#   - scripts/train_levers.py (LR/batch/ReduceLR/best-ckpt)
+#   - brand-safe loss: MAE+color+stroke_mass+edge0.08
+#   - ESPCN scale>=8 → 64ch/2map
+#   - default output: assets/models/  (app load path)
+#   - full replace of old weights: --both --force
+#   - verify: python scripts/audit_full_matrix_policy.py
+#
 #
 # Usage:
 #   bash scripts/train.sh [--fast|--sharp|--both] [--force] [--input-size N] [--model N]

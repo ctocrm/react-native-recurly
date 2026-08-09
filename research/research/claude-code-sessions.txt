@@ -1,0 +1,5 @@
+TOTAL Claude Code sessions found: 1
+
+2026-06-26T02:32:08.461Z | /home/d/.claude/projects/-home-d-Desktop-jsmastery/ffecd4ec-4f69-4c50-b299-fcc5b418882b.jsonl
+  You have access to the PostHog MCP server.  Project context: - PostHog Project ID: 473831 - PostHog public token: phc_Dc9KoZtBYsZXoibqRszv9rGbTEHbioZQW38WxtoVG93r - PostHog Host: https://us.i.posthog.com  You have access to the PostHog MCP server which provides skills to integrate PostHog into this React Native project.  Project context: - PostHog 
+
