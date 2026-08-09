@@ -7,9 +7,9 @@ set -o pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-OUT_DIR="${POC_OUT_DIR:-$ROOT/assets/models_poc_levers}"
+OUT_DIR="${POC_OUT_DIR:-$ROOT/assets/models_poc_policy}"
 LOG_DIR="${POC_LOG_DIR:-$ROOT/training_logs}"
-LOG="$LOG_DIR/poc_levers_matrix.log"
+LOG="$LOG_DIR/poc_policy_matrix.log"
 mkdir -p "$OUT_DIR" "$LOG_DIR"
 
 if [[ -x "$ROOT/.venv/bin/python" ]]; then
@@ -47,7 +47,7 @@ run_one() {
 
 echo "POC levers matrix start $(ts)" | tee "$LOG"
 echo "python=$PY out=$OUT_DIR" | tee -a "$LOG"
-echo "Expect: LR >= 1e-4 (hard scale >= 1.5e-4), ReduceLR, Restored best checkpoint" | tee -a "$LOG"
+echo "Expect: LR policy + ESPCN scale>=8 capacity (64ch/2map on 8x) + full epochs. NO SMOKE." | tee -a "$LOG"
 
 FAIL=0
 # Same cell set as batch POC — full epochs under new levers

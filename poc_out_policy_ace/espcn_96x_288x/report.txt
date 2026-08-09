@@ -1,0 +1,13 @@
+source: https://www.acehardware.com/favicon.ico
+lr_shape: (96, 96, 4)
+model: assets/models_poc_policy/espcn_96x_288x.tflite
+mode: one_shot
+in_size: 96 out_size: 288
+brand_safe_t: 0.25
+pred_wc_range: 0.0628..1.0000
+pred_wc_var: 0.054023
+hybrid_var: 0.054165
+pred_raw_range: 0.0628..1.0000
+contact: LR | bilin | model | hybrid | alpha
+Open 00_contact_sheet.png and 04b_brand_safe_hybrid.png
+SMOKE: PASS
