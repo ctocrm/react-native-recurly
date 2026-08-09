@@ -82,9 +82,9 @@ for arg in sys.argv:
 MODEL_CONFIGS = [
     # Epochs = matrix lever policy (shared intent with train_levers.py).
     # Harder scales get more time; loss formula unchanged.
-    (16, [(2, 80), (4, 150), (8, 400), (12, 450), (16, 500), (24, 550), (32, 600)]),
-    (32, [(2, 100), (4, 180), (6, 220), (8, 350), (12, 400), (16, 450)]),
-    (48, [(2, 120), (3, 160), (4, 220), (5, 260), (8, 350), (12, 400)]),
+    (16, [(2, 80), (4, 150), (8, 450), (12, 450), (16, 500), (24, 550), (32, 600)]),
+    (32, [(2, 100), (4, 180), (6, 220), (8, 400), (12, 400), (16, 450)]),
+    (48, [(2, 120), (3, 160), (4, 220), (5, 260), (8, 400), (12, 400)]),
     (64, [(2, 140), (3, 180), (4, 240), (6, 340), (8, 400)]),
     (96, [(2, 280), (3, 280), (4, 320), (5, 350), (6, 380)]),
     (128, [(2, 320), (3, 320), (4, 400)]),
@@ -304,13 +304,15 @@ def build_espcn(scale: int, input_size: int = 16):
     Large-input 2x/3x used to keep the 16-ch toy net (same as 16→32) and lost
     to strong bicubic (~28–31 dB). Bump channels + residual mapping for input≥96.
     """
-    # Base capacity by upscale factor
+    # Base capacity by upscale factor.
+    # scale>=8 used to sit at 32ch/0 map while 12x got 64/2 — 16->128 failed
+    # PSNR gate under full levers; 16->192 passed. Hard one-shots share 12x tier.
     if scale <= 4:
         channels, mapping_layers = 16, 0
-    elif scale <= 8:
+    elif scale < 8:
         channels, mapping_layers = 32, 0
     elif scale <= 12:
-        channels, mapping_layers = 64, 2
+        channels, mapping_layers = 64, 2  # includes 8x (16->128)
     else:  # 16x+
         channels, mapping_layers = 80, 2
 

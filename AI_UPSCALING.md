@@ -478,3 +478,8 @@ Shared module: `scripts/train_levers.py` (used by ESPCN + FSRCNN).
 
 Does **not** change loss formula or brand-safe hybrid `t=0.25`.
 
+## ESPCN hard-scale capacity (scale ≥ 8)
+
+8× one-shots (e.g. 16→128) use the **same capacity tier as 12×**: **64 channels + 2 residual mapping layers** (was 32/0).  
+Levers unchanged. Both ESPCN and FSRCNN still required for every size the app ships.
+
