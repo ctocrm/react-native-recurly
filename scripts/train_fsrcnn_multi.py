@@ -6,6 +6,7 @@ L1+Sobel edge+
 SSIM, degradation-aware LR, higher capacity on 2x. Float TFLite only.
 """
 import os
+import tempfile
 import sys
 import re
 import json
@@ -49,14 +50,26 @@ else:
 FORCE = "--force" in sys.argv
 NO_PERCEPTUAL = "--no-perceptual" in sys.argv
 # Default ON: edge/Sobel loss for sharper logos (research + user quality bar).
-# Default OFF: sobel_edges/MirrorPad multi-GPU crashes (see ESPCN full-matrix log).
-# Opt-in: --edge. Keep --no-edge as no-op for old cmds.
-USE_EDGE_LOSS = "--edge" in sys.argv
+# Default ON (mild edge). Class-A = batch 1/GPU. Disable: --no-edge
+USE_EDGE_LOSS = "--no-edge" not in sys.argv
+
+# Shared matrix levers (LR / batch / callbacks) — same for ESPCN + FSRCNN
+import sys as _sys
+from pathlib import Path as _Path
+_sys.path.insert(0, str(_Path(__file__).resolve().parent))
+from train_levers import (  # noqa: E402
+    compute_lr,
+    get_optimal_batch_size,
+    load_best_if_exists,
+    make_train_callbacks,
+)
+
 # Prefer cascade 2x rungs only (16-32-64-128-192 path).
 CASCADE_RUNGS = "--cascade-rungs" in sys.argv
 SPECIFIC_MODEL = None
 INPUT_SIZE = None
 OUTPUT_DIR = None
+EPOCHS_OVERRIDE = None  # --epochs=N POC short runs
 for arg in sys.argv:
     if arg.startswith("--model="):
         SPECIFIC_MODEL = arg.split("=")[1]
@@ -64,21 +77,24 @@ for arg in sys.argv:
         INPUT_SIZE = int(arg.split("=")[1])
     elif arg.startswith("--output-dir="):
         OUTPUT_DIR = arg.split("=")[1]
+    elif arg.startswith("--epochs="):
+        EPOCHS_OVERRIDE = int(arg.split("=", 1)[1])
 
 # Model configurations: input_size -> list of (scale, epochs) tuples
 # Scale = output_size / input_size
 # Epochs scaled for quality: large scales (8x+) get 300+ epochs
 # Capped at 576px output max (largest size used by the app).
 MODEL_CONFIGS = [
-    # Match ESPCN post-16px quality recipe (more epochs on large-in / extreme scale)
-    (16, [(2, 80), (4, 120), (8, 300), (12, 350), (16, 400), (24, 450), (32, 550)]),
-    (32, [(2, 100), (4, 150), (6, 180), (8, 280), (12, 320), (16, 380)]),
-    (48, [(2, 120), (3, 140), (4, 180), (5, 220), (8, 280), (12, 320)]),
-    (64, [(2, 140), (3, 160), (4, 200), (6, 280), (8, 320)]),
-    (96, [(2, 250), (3, 250), (4, 280), (5, 300), (6, 320)]),
-    (128, [(2, 300), (3, 300), (4, 350)]),
-    (192, [(2, 350), (3, 350)]),
-    (256, [(2, 400)]),
+    # Epochs = matrix lever policy (shared intent with train_levers.py).
+    # Harder scales get more time; loss formula unchanged.
+    (16, [(2, 80), (4, 150), (8, 400), (12, 450), (16, 500), (24, 550), (32, 600)]),
+    (32, [(2, 100), (4, 180), (6, 220), (8, 350), (12, 400), (16, 450)]),
+    (48, [(2, 120), (3, 160), (4, 220), (5, 260), (8, 350), (12, 400)]),
+    (64, [(2, 140), (3, 180), (4, 240), (6, 340), (8, 400)]),
+    (96, [(2, 280), (3, 280), (4, 320), (5, 350), (6, 380)]),
+    (128, [(2, 320), (3, 320), (4, 400)]),
+    (192, [(2, 380), (3, 380)]),
+    (256, [(2, 450)]),
 ]
 
 # Cascade POC path: strong 2x rungs only (waifu2x / LapSRN / ProSR practice).
@@ -627,6 +643,9 @@ def train_and_export_model(model_dir: str, input_size: int, scale: int, epochs: 
         return model_name, size
 
     print(f"\n{'='*50}")
+    if EPOCHS_OVERRIDE is not None:
+        print(f"[TRAIN] epochs override {epochs} -> {EPOCHS_OVERRIDE}")
+        epochs = EPOCHS_OVERRIDE
     print(f"[TRAIN] Training {input_size}->{output_size} (scale {scale}x, {epochs} epochs)")
 
     with strategy.scope():
@@ -654,30 +673,10 @@ def train_and_export_model(model_dir: str, input_size: int, scale: int, epochs: 
             VGG_FEATURES = build_vgg_feature_extractor()
             VGG_FEATURES.trainable = False
 
-        def get_optimal_batch_size(output_size, num_replicas, use_perceptual_loss):
-            """Calculate optimal batch size based on GPU memory and output size."""
-            if output_size >= 512:
-                base_per_gpu = 1
-            elif output_size >= 384:
-                base_per_gpu = 1 if use_perceptual_loss else 2
-            elif output_size >= 256:
-                base_per_gpu = 1 if use_perceptual_loss else 4
-            elif output_size >= 192:
-                base_per_gpu = 2 if use_perceptual_loss else 4
-            elif output_size >= 128:
-                base_per_gpu = 4 if use_perceptual_loss else 8
-            elif output_size >= 64:
-                base_per_gpu = 16
-            else:
-                base_per_gpu = 32
-            return base_per_gpu * num_replicas
-
         batch_size = get_optimal_batch_size(output_size, strategy.num_replicas_in_sync, use_perceptual)
 
-        base_lr = 1e-4
-        lr = max(base_lr * (batch_size / 32.0), 5e-5)
-        if input_size >= 96 and scale <= 3:
-            lr = max(lr, 1e-4)
+        # Matrix-wide LR policy (train_levers.compute_lr) — floor 1e-4, hard scale bump
+        lr = compute_lr(batch_size, input_size, scale)
 
         optimizer = keras.optimizers.Adam(learning_rate=lr, clipnorm=1.0)
         model.compile(
@@ -707,6 +706,11 @@ def train_and_export_model(model_dir: str, input_size: int, scale: int, epochs: 
         lr_data, hr_data = lr_data[perm], hr_data[perm]
         split = int(len(lr_data) * 0.9)
 
+        ckpt_path = os.path.join(
+            tempfile.gettempdir(),
+            f"best_{input_size}x_{output_size}x_{os.getpid()}.keras",
+        )
+        callbacks = make_train_callbacks(ckpt_path, epochs)
         model.fit(
             lr_data[:split],
             hr_data[:split],
@@ -714,7 +718,13 @@ def train_and_export_model(model_dir: str, input_size: int, scale: int, epochs: 
             epochs=epochs,
             verbose=2,
             validation_split=0.1,
+            callbacks=callbacks,
         )
+        load_best_if_exists(model, ckpt_path)
+        try:
+            os.remove(ckpt_path)
+        except OSError:
+            pass
 
     # Color-preservation gate (NOT Ace-specific): solid R/G/B patches must keep
     # channel dominance after upscale. Catches wash-to-white/gray that still
@@ -900,12 +910,14 @@ def _run_jobs_in_subprocesses(jobs, script_path: str) -> int:
             cmd.append("--force")
         if NO_PERCEPTUAL:
             cmd.append("--no-perceptual")
-        if USE_EDGE_LOSS:
-            cmd.append("--edge")
+        if not USE_EDGE_LOSS:
+            cmd.append("--no-edge")
         if CASCADE_RUNGS:
             cmd.append("--cascade-rungs")
         if OUTPUT_DIR:
             cmd.append(f"--output-dir={OUTPUT_DIR}")
+        if EPOCHS_OVERRIDE is not None:
+            cmd.append(f"--epochs={EPOCHS_OVERRIDE}")
         env = os.environ.copy()
         env["TRAIN_WORKER"] = "1"
         print(f"\n[TRAIN] Subprocess isolate {input_size}->{out} (scale {scale}x, {epochs} ep)")

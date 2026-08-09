@@ -53,7 +53,7 @@ Upscale tiny **brand favicons** (often 16×16) to display size (~192–512) **on
 | --------------- | ----------------------------------------------------------------------------------------------------- |
 | **Inference**   | TFLite SR → **bilin + 0.25 · clamp(residual)** → alpha restore                                        |
 | **Train arch**  | Residual FSRCNN/ESPCN: `bilin(LR) + depth_to_space(zero-init subpixel)`                               |
-| **Train loss**  | MAE-first + color_preserve(0.25) + stroke_mass(0.20) + light SSIM/VGG (**Sobel edge OFF by default**) |
+| **Train loss**  | MAE-first + color_preserve(0.25) + stroke_mass(0.20) + mild edge(0.08) + light SSIM/VGG; **batch ≥2/GPU** |
 | **Train LR**    | Mild degrade (~80% bicubic, rare light JPEG q75–95)                                                   |
 | **Export**      | **Float32 TFLite only** — never `Optimize.DEFAULT` quant (destroyed reds)                             |
 | **Entry**       | `npm run train:models:force`                                                                          |
@@ -195,7 +195,7 @@ Equivalent: `bash scripts/train.sh --both --force`
 3. **Solid R/G/B color gate** (catch red→gray wash)
 4. Float TFLite round-trip sanity where implemented
 
-Healthy logs: `ColorPreserve`, `StrokeMass`, `Edge: off` (default), `[VALIDATE] PASSED`, `[TRAIN] WROTE …tflite`
+Healthy logs: `ColorPreserve`, `StrokeMass`, `Edge: on`, `per GPU: >=2`, `[VALIDATE] PASSED`, `[TRAIN] WROTE …tflite`
 
 ### Architecture (both families)
 
@@ -245,6 +245,8 @@ From the original training fiasco (constant gray / worse than bicubic):
 ### Fixes in trainers / `train.sh`
 
 - **2026-08-08 post-matrix:** Sobel edge **default OFF** (`--edge` opt-in). Full ESPCN run: 22 ok / 13 fail — 12× `sobel_edges` MirrorPad under MirroredStrategy; `train.sh` `set -e` skipped all FSRCNN after fast failures. Fixed: edge off + always run sharp after fast.
+- **2026-08-08 batch POC:** Class-A crashes correlated with **batch=2 (1/GPU)**. Trainers now `max(per_gpu, 2)` under multi-GPU; edge stays **ON**. Larger POC before full matrix: `bash scripts/poc_batch_matrix.sh` → `assets/models_poc_batch/`.
+
 
 1. `USE_MULTI_GPU=true` by default when ≥2 GPUs
 2. `set_memory_growth(True)` on all GPUs
@@ -412,7 +414,9 @@ Illustration-friendly; can redraw curves; leash each hop or accept brand drift.
 | `poc_out_hybrid_brand/`           | Lerp/clamp brand grid             |
 | `poc_brand_safe_*.png`            | User pick sheets                  |
 | `assets/models_cascade/`          | Cascade tflites (not app default) |
-| `scripts/poc_upscale_smoke.py`    | Desktop ↔ app path smoke          |
+| `scripts/poc_upscale_smoke.py`    | Desktop smoke; `--batch-dir` + `--expect-poc-batch` |
+| `scripts/poc_batch_matrix.sh`     | Batch-floor POC train + smoke     |
+| `poc_out_batch_smoke/`            | Per-model smoke after POC train   |
 | `scripts/poc_hybrid_composite.py` | Hybrid / brand grids              |
 
 ---
@@ -440,7 +444,8 @@ Illustration-friendly; can redraw curves; leash each hop or accept brand drift.
 | 2026-08-07      | Correct residual; hard-sample PSNR; Ace slightly > bilin |
 | 2026-08-08      | Cascade POC metrics win / brand fail                     |
 | 2026-08-08      | Hybrid + brand-safe grid; freeze t=0.25                  |
-| 2026-08-08      | Edge default OFF; train.sh always runs sharp after fast  |
+| 2026-08-08      | Class-A = batch 1/GPU; floor ≥2/GPU; edge ON; poc_batch_matrix |
+| 2026-08-08      | train.sh always runs sharp after fast                    |
 | 2026-08-08      | App hybrid; stroke_mass + color_preserve trainers        |
 | 2026-08-08      | **Merged** four docs → this file; brainstorm §8          |
 
@@ -458,3 +463,18 @@ Illustration-friendly; can redraw curves; leash each hop or accept brand drift.
 | `GARBAGE_REPORT.md`              | Project autopsy   |
 | `CATASTROPHE_ANALYSIS*.md`       | Gray/black era    |
 | `assets/models/`                 | Shipped tflites   |
+
+## Matrix lever policy (train only — loss/hybrid frozen)
+
+Shared module: `scripts/train_levers.py` (used by ESPCN + FSRCNN).
+
+| Lever | Policy |
+| ----- | ------ |
+| Batch | Memory table; **≥2/GPU** multi-GPU |
+| LR | `max(1e-4 * batch/32, 1e-4)`; scale≥8 → floor **1.5e-4**; cap 3e-4 |
+| Epochs | Bumped hard scales in `MODEL_CONFIGS` (e.g. 8×→400, 12×→450) |
+| Schedule | `ReduceLROnPlateau` on val_loss |
+| Checkpoint | Best val_loss → restore before TFLite export |
+
+Does **not** change loss formula or brand-safe hybrid `t=0.25`.
+
