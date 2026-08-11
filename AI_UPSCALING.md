@@ -1,7 +1,7 @@
 # AI Icon Upscaling — Single Source of Truth
 
 **Last updated:** 2026-08-11
-**Status:** No training. Phases 1–3: registry→map, iconQuality sources, crawl reliability (rate-limit clear, retries, queue re-run).
+**Status:** No training. Phases 1–4: registry→map, iconQuality, crawl reliability, DB schema split (services/db) + crawl-result dedupe.
 
 This file **replaces and merges**:
 

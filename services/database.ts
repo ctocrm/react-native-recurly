@@ -1,255 +1,29 @@
+/**
+ * Database public API — thin facade over services/db/*.
+ * Call sites keep importing from `@/services/database` / `services/database`.
+ */
 import { icons } from "@/constants/icons";
 import * as Crypto from "expo-crypto";
 import { CryptoDigestAlgorithm } from "expo-crypto";
 import { Directory, File, Paths } from "expo-file-system";
 import { readAsStringAsync, writeAsStringAsync } from "expo-file-system/legacy";
-import * as SecureStore from "expo-secure-store";
-import { type SQLiteDatabase, openDatabaseAsync } from "expo-sqlite";
+import { openDatabaseAsync } from "expo-sqlite";
 
-// ---------------------------------------------------------------------------
-// Key Management
-// ---------------------------------------------------------------------------
+import {
+  closeDatabase,
+  getCurrentUserId,
+  getDatabase,
+  getOrCreateDbKey,
+  openDatabase,
+} from "./db/connection";
 
-function getSecureStoreKey(userId: string): string {
-  return `db_key_${userId}`;
-}
-
-async function getOrCreateDbKey(userId: string): Promise<string> {
-  const existing = await SecureStore.getItemAsync(getSecureStoreKey(userId));
-  if (existing) return existing;
-
-  const randomBytes = Crypto.getRandomBytes(32);
-  const passphrase = Array.from(randomBytes)
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-
-  await SecureStore.setItemAsync(getSecureStoreKey(userId), passphrase, {
-    requireAuthentication: false,
-  });
-  return passphrase;
-}
-
-// ---------------------------------------------------------------------------
-// Schema
-// ---------------------------------------------------------------------------
-
-const SCHEMA_SQL = `
-CREATE TABLE IF NOT EXISTS subscriptions (
-  id            TEXT PRIMARY KEY,
-  name          TEXT NOT NULL,
-  plan          TEXT,
-  category      TEXT,
-  payment_method TEXT,
-  status        TEXT DEFAULT 'active',
-  start_date    TEXT,
-  price         REAL NOT NULL,
-  currency      TEXT DEFAULT 'USD',
-  billing       TEXT NOT NULL,
-  frequency     TEXT,
-  renewal_date  TEXT,
-  color         TEXT,
-  icon_key      TEXT,
-  created_at    TEXT DEFAULT (datetime('now')),
-  updated_at    TEXT DEFAULT (datetime('now'))
-);
-
-CREATE TABLE IF NOT EXISTS icon_cache (
-  icon_key      TEXT PRIMARY KEY,
-  image_data    TEXT,
-  source        TEXT DEFAULT 'local',
-  original_url  TEXT,
-  format        TEXT DEFAULT 'png',
-  fallback_tier INTEGER DEFAULT 0,
-  updated_at    TEXT DEFAULT (datetime('now'))
-);
-
-CREATE TABLE IF NOT EXISTS icon_crawl_queue (
-  id                INTEGER PRIMARY KEY AUTOINCREMENT,
-  icon_key          TEXT NOT NULL UNIQUE,
-  subscription_id   TEXT,
-  attempt_count     INTEGER DEFAULT 0,
-  last_attempt_at   TEXT,
-  created_at        TEXT DEFAULT (datetime('now'))
-);
-
-CREATE TABLE IF NOT EXISTS preferences (
-  key           TEXT PRIMARY KEY,
-  value         TEXT NOT NULL
-);
-
-INSERT OR IGNORE INTO preferences (key, value) VALUES ('notification_enabled', 'true');
-
-CREATE TABLE IF NOT EXISTS sync_metadata (
-  id                     INTEGER PRIMARY KEY CHECK (id = 1),
-  sync_enabled           INTEGER DEFAULT 0,
-  provider               TEXT,
-  provider_user_id       TEXT,
-  remote_file_id         TEXT,
-  remote_file_hash       TEXT,
-  remote_file_modified   TEXT,
-  last_sync_timestamp    TEXT,
-  server_url             TEXT
-);
-`;
-
-// ---------------------------------------------------------------------------
-// Database Lifecycle
-// ---------------------------------------------------------------------------
-
-let activeDb: SQLiteDatabase | null = null;
-let activeUserId: string | null = null;
-
-const MIGRATIONS = [
-  // Migration 1: Add icon_crawl_results table
-  async (db: SQLiteDatabase) => {
-    const tables = await db.getAllAsync<{ name: string }>(
-      "SELECT name FROM sqlite_master WHERE type='table' AND name='icon_crawl_results'",
-    );
-    if (tables.length === 0) {
-      await db.execAsync(`
-        CREATE TABLE IF NOT EXISTS icon_crawl_results (
-          id            INTEGER PRIMARY KEY AUTOINCREMENT,
-          icon_key      TEXT NOT NULL,
-          image_data    TEXT,
-          source        TEXT,
-          format        TEXT DEFAULT 'png',
-          original_url  TEXT,
-          fallback_tier INTEGER DEFAULT 0,
-          created_at    TEXT DEFAULT (datetime('now'))
-        );
-        CREATE INDEX IF NOT EXISTS idx_icon_crawl_results_key ON icon_crawl_results(icon_key);
-      `);
-    }
-  },
-  // Migration 5: Add universal crawled URLs history table
-  async (db: SQLiteDatabase) => {
-    const tables = await db.getAllAsync<{ name: string }>(
-      "SELECT name FROM sqlite_master WHERE type='table' AND name='crawled_urls'",
-    );
-    if (tables.length === 0) {
-      await db.execAsync(`
-        CREATE TABLE IF NOT EXISTS crawled_urls (
-          id           INTEGER PRIMARY KEY AUTOINCREMENT,
-          url          TEXT NOT NULL UNIQUE,
-          first_seen   TEXT DEFAULT (datetime('now')),
-          last_attempt TEXT DEFAULT (datetime('now'))
-        );
-        CREATE INDEX IF NOT EXISTS idx_crawled_urls_url ON crawled_urls(url);
-      `);
-    }
-  },
-  // Migration 2: Add format, original_url, fallback_tier columns to icon_cache
-  async (db: SQLiteDatabase) => {
-    const columns = await db.getAllAsync<{ name: string }>(
-      "PRAGMA table_info(icon_cache)",
-    );
-    const names = columns.map((c: any) => c.name);
-    if (!names.includes("format")) {
-      await db.execAsync(
-        "ALTER TABLE icon_cache ADD COLUMN format TEXT DEFAULT 'png'",
-      );
-    }
-    if (!names.includes("original_url")) {
-      await db.execAsync("ALTER TABLE icon_cache ADD COLUMN original_url TEXT");
-    }
-    if (!names.includes("fallback_tier")) {
-      await db.execAsync(
-        "ALTER TABLE icon_cache ADD COLUMN fallback_tier INTEGER DEFAULT 0",
-      );
-    }
-  },
-  // Migration 3: Add attempt tracking to icon_crawl_queue
-  async (db: SQLiteDatabase) => {
-    const columns = await db.getAllAsync<{ name: string }>(
-      "PRAGMA table_info(icon_crawl_queue)",
-    );
-    const names = columns.map((c: any) => c.name);
-    if (!names.includes("attempt_count")) {
-      await db.execAsync(
-        "ALTER TABLE icon_crawl_queue ADD COLUMN attempt_count INTEGER DEFAULT 0",
-      );
-    }
-    if (!names.includes("last_attempt_at")) {
-      await db.execAsync(
-        "ALTER TABLE icon_crawl_queue ADD COLUMN last_attempt_at TEXT",
-      );
-    }
-  },
-  // Migration 6: Add original_width, original_height to icon_crawl_results
-  async (db: SQLiteDatabase) => {
-    const columns = await db.getAllAsync<{ name: string }>(
-      "PRAGMA table_info(icon_crawl_results)",
-    );
-    const names = columns.map((c: any) => c.name);
-    if (!names.includes("original_width")) {
-      await db.execAsync(
-        "ALTER TABLE icon_crawl_results ADD COLUMN original_width INTEGER",
-      );
-    }
-    if (!names.includes("original_height")) {
-      await db.execAsync(
-        "ALTER TABLE icon_crawl_results ADD COLUMN original_height INTEGER",
-      );
-    }
-  },
-  // Migration 7: Add original_width, original_height to icon_cache
-  async (db: SQLiteDatabase) => {
-    const columns = await db.getAllAsync<{ name: string }>(
-      "PRAGMA table_info(icon_cache)",
-    );
-    const names = columns.map((c: any) => c.name);
-    if (!names.includes("original_width")) {
-      await db.execAsync(
-        "ALTER TABLE icon_cache ADD COLUMN original_width INTEGER",
-      );
-    }
-    if (!names.includes("original_height")) {
-      await db.execAsync(
-        "ALTER TABLE icon_cache ADD COLUMN original_height INTEGER",
-      );
-    }
-  },
-];
-
-export async function openDatabase(userId: string): Promise<SQLiteDatabase> {
-  if (activeDb && activeUserId === userId) return activeDb;
-  if (activeDb && activeUserId !== userId) await closeDatabase();
-
-  const passphrase = await getOrCreateDbKey(userId);
-  const filename = `user_${userId}.db`;
-  const db = await openDatabaseAsync(filename);
-  await db.execAsync(`PRAGMA key = '${passphrase}';`);
-  await db.execAsync(SCHEMA_SQL);
-  for (const migrate of MIGRATIONS) await migrate(db);
-
-  activeDb = db;
-  activeUserId = userId;
-  return db;
-}
-
-export async function closeDatabase(): Promise<void> {
-  if (activeDb) {
-    await activeDb.closeAsync();
-    activeDb = null;
-    activeUserId = null;
-  }
-}
-
-export function getDatabase(): SQLiteDatabase {
-  if (!activeDb)
-    throw new Error("Database not opened. Call openDatabase(userId) first.");
-  return activeDb;
-}
-
-export function getCurrentUserId(): string | null {
-  return activeUserId;
-}
-
-function getDbFile(userId: string): File {
-  const db = activeDb;
-  if (!db) throw new Error("Database not open");
-  return new File(db.databasePath);
-}
+export {
+  closeDatabase,
+  getCurrentUserId,
+  getDatabase,
+  openDatabase,
+} from "./db/connection";
+export { SCHEMA_VERSION } from "./db/schema";
 
 // ---------------------------------------------------------------------------
 // CRUD: Subscriptions
@@ -582,6 +356,39 @@ export async function saveCrawlResult(
   originalHeight?: number,
 ): Promise<void> {
   const db = getDatabase();
+  // When URL is known, update the existing row (placeholder → bytes) instead of
+  // appending duplicates. Unique index enforces one row per (icon_key, url).
+  if (originalUrl) {
+    const existing = await db.getFirstAsync<{ id: number; image_data: string }>(
+      `SELECT id, image_data FROM icon_crawl_results
+       WHERE icon_key = ? AND original_url = ?
+       ORDER BY id DESC LIMIT 1`,
+      iconKey,
+      originalUrl,
+    );
+    if (existing) {
+      const existingLen = existing.image_data?.length ?? 0;
+      const nextLen = imageData?.length ?? 0;
+      // Prefer longer payload (empty placeholder loses to real download)
+      if (nextLen >= existingLen) {
+        await db.runAsync(
+          `UPDATE icon_crawl_results SET
+             image_data = ?, source = ?, format = ?, fallback_tier = ?,
+             original_width = COALESCE(?, original_width),
+             original_height = COALESCE(?, original_height)
+           WHERE id = ?`,
+          imageData,
+          source,
+          format,
+          fallbackTier,
+          originalWidth ?? null,
+          originalHeight ?? null,
+          existing.id,
+        );
+      }
+      return;
+    }
+  }
   await db.runAsync(
     "INSERT INTO icon_crawl_results (icon_key, image_data, source, format, original_url, fallback_tier, original_width, original_height) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
     iconKey,
