@@ -263,11 +263,11 @@ export async function getIconCollection(iconKey: string): Promise<{
       console.log(`[COLLECTION] Added subscription icon to collection`);
     }
 
-    // Sort: subscription first, then cached, then others
+    // Sort: AI upscales first (user just improved these), then subscription, then rest
     const sorted = Array.from(iconMap.values()).sort((a, b) => {
-      if (a.source === "subscription") return -1;
-      if (b.source === "subscription") return 1;
-      return 0;
+      const rank = (s: string) =>
+        s === "ai_upscale" ? 0 : s === "subscription" ? 1 : 2;
+      return rank(a.source) - rank(b.source);
     });
 
     // Derive the MIME subtype directly from the format string

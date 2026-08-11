@@ -592,6 +592,61 @@ export async function saveCrawlResult(
   );
 }
 
+/** Remove one crawl-result row by exact image bytes (AI replace path). */
+export async function deleteCrawlResultByImageData(
+  iconKey: string,
+  imageData: string,
+): Promise<void> {
+  const db = getDatabase();
+  await db.runAsync(
+    "DELETE FROM icon_crawl_results WHERE icon_key = ? AND image_data = ?",
+    iconKey,
+    imageData,
+  );
+}
+
+/**
+ * Persist AI upscale: cache for card, drop source crawl twin, insert ai_upscale.
+ * setCachedIcon already fires notifyCacheUpdate.
+ */
+export async function replaceIconWithAiUpscale(
+  iconKey: string,
+  sourceImageData: string,
+  aiImageData: string,
+  format: string,
+  originalUrl: string | null = null,
+  originalWidth?: number,
+  originalHeight?: number,
+): Promise<void> {
+  await setCachedIcon(
+    iconKey,
+    aiImageData,
+    "ai_upscale",
+    format,
+    originalUrl,
+    0,
+    originalWidth,
+    originalHeight,
+  );
+  await deleteCrawlResultByImageData(iconKey, sourceImageData);
+  const db = getDatabase();
+  await db.runAsync(
+    "DELETE FROM icon_crawl_results WHERE icon_key = ? AND source = ?",
+    iconKey,
+    "ai_upscale",
+  );
+  await saveCrawlResult(
+    iconKey,
+    aiImageData,
+    "ai_upscale",
+    format,
+    originalUrl,
+    0,
+    originalWidth,
+    originalHeight,
+  );
+}
+
 export async function deleteCrawlResults(iconKey: string): Promise<void> {
   const db = getDatabase();
   await db.runAsync(

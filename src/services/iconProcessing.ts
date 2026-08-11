@@ -317,12 +317,20 @@ export function getModelForUpscale(
  */
 /**
  * Brand-safe hybrid (Ace POC 2026-08-08): bilin owns stroke mass; model is a
- * mild residual. User preferred lerp 80/20–70/30 over full clamp (thinned letters).
- * See AI_UPSCALING.md / scripts/poc_hybrid_composite.py.
+ * residual. Base t≈0.25 for mid/large LR; tiny favicons need stronger model mix
+ * or thumbs look identical to bilinear. See AI_UPSCALING.md.
  */
-const BRAND_SAFE_LERP_T = 0.25; // between 80/20 and 70/30
+const BRAND_SAFE_LERP_T = 0.25;
 const BRAND_SAFE_MAX_DARKEN = 0.12;
 const BRAND_SAFE_MAX_BRIGHTEN = 0.35;
+
+/** Adaptive model mix: more snap on tiny LR, still not full model (avoids hollow letters). */
+function brandSafeLerpTForInput(inputPx: number): number {
+  if (inputPx <= 24) return 0.48;
+  if (inputPx <= 48) return 0.38;
+  if (inputPx <= 96) return 0.32;
+  return BRAND_SAFE_LERP_T;
+}
 
 /** Bilinear upsample RGB float32 planar [H*W*3] in 0..1. */
 function bilinearUpsampleRgb(
@@ -488,12 +496,19 @@ export function isLowResIcon(
  * `quality` selects the model family: "fast" (ESPCN) or "sharp" (FSRCNN).
  * The target output size is determined dynamically based on device pixel density.
  */
+export type AiUpscaleResult = {
+  base64: string;
+  format: string;
+  width?: number;
+  height?: number;
+};
+
 export async function upscaleIconAi(
   base64: string,
   format: string,
   force = false,
   quality: UpscaleQuality = "fast",
-): Promise<{ base64: string; format: string }> {
+): Promise<AiUpscaleResult> {
   if (format === "svg") return { base64, format };
 
   // Get actual input dimensions
@@ -655,12 +670,12 @@ export async function upscaleIconAi(
       }
     }
 
-    // Brand-safe hybrid: bilin stroke mass + mild clamped model residual.
-    // (User POC: full model thins letters; lerp ~25% keeps Ace branding.)
+    // Brand-safe hybrid: bilin mass + clamped residual; adaptive t for tiny LR.
     const bilinRgb = bilinearUpsampleRgb(rgbIn, inW, inH, outW, outH);
-    const hybridRgb = brandSafeHybridRgb(bilinRgb, outBytes);
+    const hybridT = brandSafeLerpTForInput(inW);
+    const hybridRgb = brandSafeHybridRgb(bilinRgb, outBytes, hybridT);
     console.log(
-      `[ICON_AI] brand-safe hybrid t=${BRAND_SAFE_LERP_T} (bilin + clamped residual)`,
+      `[ICON_AI] brand-safe hybrid t=${hybridT.toFixed(2)} in=${inW}px (bilin + clamped residual)`,
     );
 
     // NN-upscale alpha from LR → HR (models are RGB-only; alpha is geometry).
@@ -721,7 +736,7 @@ export async function upscaleIconAi(
     console.log(
       `[ICON_AI] Upscaled ${inputSize}px → ${outW}x${outH}px using ${modelInfo.modelFile} + brand-safe hybrid`,
     );
-    return { base64: result, format: "png" };
+    return { base64: result, format: "png", width: outW, height: outH };
   } catch (err) {
     console.warn("[ICON_AI] model run failed, bilinear fallback:", err);
     return upscaleIconIfSmall(base64, format, true);

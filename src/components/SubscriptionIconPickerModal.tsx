@@ -1,6 +1,7 @@
 import { icons } from "@/constants/icons";
 import {
   deleteCachedIcon,
+  replaceIconWithAiUpscale,
   saveCrawlResult,
   setCachedIcon,
 } from "@/services/database";
@@ -12,7 +13,6 @@ import {
   addCacheUpdateListener,
   addLoadingListener,
   isIconLoading,
-  notifyCacheUpdate,
 } from "@/src/services/iconLoadingRegistry";
 import {
   isLowResIcon,
@@ -22,6 +22,7 @@ import {
 } from "@/src/services/iconProcessing";
 import {
   getReportsForIcon,
+  hashImageData,
   rejectReportedIcon,
   reportIcon,
 } from "@/src/services/iconReportService";
@@ -355,9 +356,7 @@ const SubscriptionIconPickerModal = ({
     onClose();
   };
 
-  // Persist a processed icon (white-bg removed or AI-upscaled) as the cached
-  // icon so the card reflects it immediately. `extraProps` are merged into the
-  // PostHog event for richer analytics (e.g. the chosen upscale quality).
+  // Persist white-bg clear (keep source label; append crawl row).
   const persistProcessedIcon = async (
     icon: PickerIcon,
     processedBase64: string,
@@ -380,17 +379,13 @@ const SubscriptionIconPickerModal = ({
       newFormat,
       icon.originalUrl,
     );
-    // Force immediate cache notification so cards re-render before picker closes
-    notifyCacheUpdate();
+    // setCachedIcon already notifies; avoid double reload thrash
     posthog.capture(event, {
       subscription_name: subscriptionName,
       icon_key: iconKey,
       source: icon.source,
       ...extraProps,
     });
-    // Update the visible tile in-place so the user sees the processed icon
-    // right away (the tapped tile's id is derived from the ORIGINAL bytes, so
-    // reloading from the crawl-result rows alone would still show the old art).
     setAvailableIcons((prev) =>
       prev.map((i) =>
         i.id === icon.id
@@ -406,6 +401,61 @@ const SubscriptionIconPickerModal = ({
     );
     onIconChange();
     Alert.alert("Updated", "The icon has been updated.");
+  };
+
+  /** AI path: replace source crawl bytes, cache as ai_upscale, show AI tile first. */
+  const persistAiUpscaledIcon = async (
+    icon: PickerIcon,
+    processedBase64: string,
+    newFormat: string,
+    width: number | undefined,
+    height: number | undefined,
+    extraProps: Record<string, unknown> = {},
+  ) => {
+    if (!iconKey) return;
+    await replaceIconWithAiUpscale(
+      iconKey,
+      icon.imageData,
+      processedBase64,
+      newFormat,
+      icon.originalUrl ?? null,
+      width,
+      height,
+    );
+    posthog.capture("icon_picker_upscale_ai", {
+      subscription_name: subscriptionName,
+      icon_key: iconKey,
+      source: "ai_upscale",
+      width: width ?? null,
+      height: height ?? null,
+      ...extraProps,
+    });
+    const newId = hashImageData(processedBase64);
+    setAvailableIcons((prev) => {
+      const rest = prev.filter(
+        (i) => i.id !== icon.id && i.imageData !== icon.imageData,
+      );
+      const aiTile: PickerIcon = {
+        id: newId,
+        imageData: processedBase64,
+        format: newFormat,
+        source: "ai_upscale",
+        originalUrl: icon.originalUrl,
+        originalWidth: width,
+        originalHeight: height,
+        reportedType: null,
+      };
+      return [aiTile, ...rest];
+    });
+    setDetections((prev) => ({
+      ...prev,
+      [newId]: { hasWhite: false, isLowRes: false },
+    }));
+    onIconChange();
+    Alert.alert(
+      "AI upscale saved",
+      "The improved icon is first in the list and set as the subscription icon. Tap it if you want to confirm selection.",
+    );
   };
 
   const handleClearWhiteBackground = async (icon: PickerIcon) => {
@@ -446,28 +496,18 @@ const SubscriptionIconPickerModal = ({
     try {
       // force=true so we always re-upscale even if the stored bytes were
       // already a 256px bilinear upscale from crawl time (still low quality).
-      const { base64, format } = await upscaleIconAi(
+      const { base64, format, width, height } = await upscaleIconAi(
         icon.imageData,
         icon.format,
         true,
         requestedQuality,
       );
-      await persistProcessedIcon(
-        icon,
-        base64,
-        format,
-        "icon_picker_upscale_ai",
-        {
-          requested_quality: requestedQuality,
-          effective_quality: effectiveQuality,
-          sharp_available: SHARP_AVAILABLE,
-          output_format: format,
-        },
-      );
-      setDetections((prev) => ({
-        ...prev,
-        [icon.id]: { ...prev[icon.id], isLowRes: false } as IconDetection,
-      }));
+      await persistAiUpscaledIcon(icon, base64, format, width, height, {
+        requested_quality: requestedQuality,
+        effective_quality: effectiveQuality,
+        sharp_available: SHARP_AVAILABLE,
+        output_format: format,
+      });
     } catch (err) {
       console.error("[PICKER] upscale failed:", err);
       Alert.alert("Error", "Failed to upscale icon.");
@@ -576,7 +616,7 @@ const SubscriptionIconPickerModal = ({
     return (
       <View className="items-center gap-2 px-2 py-3">
         <Pressable
-          className="size-16 items-center justify-center rounded-xl border-2 border-border bg-card"
+          className="relative size-16 items-center justify-center rounded-xl border-2 border-border bg-card"
           onPress={() => handleSelectIcon(item)}
         >
           <Image
@@ -584,6 +624,11 @@ const SubscriptionIconPickerModal = ({
             className="size-12"
             resizeMode="contain"
           />
+          {item.source === "ai_upscale" ? (
+            <View className="absolute -right-1 -top-1 rounded bg-purple-600 px-1">
+              <Text className="text-[8px] font-sans-bold text-white">AI</Text>
+            </View>
+          ) : null}
         </Pressable>
 
         {/* Corrective chips (white-bg / upscale) — shown based on detection */}
