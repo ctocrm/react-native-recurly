@@ -26,7 +26,9 @@ import {
   clearIconCache,
   executeImportActions,
   executeNonConflictingImport,
+  BACKUP_FULL_USER_COPY,
   exportBackup,
+  SYNC_SCOPE_USER_COPY,
   getIconCacheStats,
   importBackup,
   type IconCacheStats,
@@ -416,7 +418,7 @@ const Settings = () => {
       if (result.success && result.synced) {
         Alert.alert(
           "Synced",
-          result.message || "Your data has been synchronized successfully",
+          result.message || "Subscriptions, preferences, and chosen icons are up to date. Crawl history stays on this device.",
         );
         posthog.capture("cloud_sync_completed");
       } else if (!result.success) {
@@ -521,6 +523,9 @@ const Settings = () => {
         <View className="auth-card mb-5">
           <Text className="text-base font-sans-semibold text-primary mb-3">
             Cloud Sync
+          </Text>
+          <Text className="text-xs font-sans-medium text-muted-foreground mb-3">
+            {SYNC_SCOPE_USER_COPY}
           </Text>
 
           {syncMetadata?.syncEnabled && syncMetadata.provider ? (
@@ -684,8 +689,8 @@ const Settings = () => {
             )}
           </Pressable>
           <Text className="text-xs font-sans-medium text-muted-foreground mb-3">
-            Export your encrypted database to share/save via the native share
-            sheet. The backup is fully encrypted with your personal key.
+            {BACKUP_FULL_USER_COPY} Encrypted with your personal key; share via
+            the native share sheet.
           </Text>
 
           {/* Import Backup */}

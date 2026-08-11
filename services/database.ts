@@ -24,6 +24,13 @@ export {
   openDatabase,
 } from "./db/connection";
 export { SCHEMA_VERSION } from "./db/schema";
+export {
+  BACKUP_FULL_USER_COPY,
+  SYNC_LOCAL_ONLY_TABLES,
+  SYNC_SCOPE_USER_COPY,
+  SYNC_USER_TABLES,
+} from "./db/syncScope";
+import { SYNC_LOCAL_ONLY_TABLES } from "./db/syncScope";
 
 // ---------------------------------------------------------------------------
 // CRUD: Subscriptions
@@ -661,6 +668,45 @@ export async function exportBackup(): Promise<string> {
   }
 }
 
+/**
+ * Cloud-sync payload: full encrypted DB copy with crawl/ephemeral tables emptied.
+ * Keeps subscriptions, preferences, icon_cache (chosen icons).
+ */
+export async function exportSyncBackup(): Promise<string> {
+  const userId = getCurrentUserId();
+  if (!userId) throw new Error("No active user session for sync backup");
+  const uri = await exportBackup();
+  const passphrase = await getOrCreateDbKey(userId);
+  const path = uri.startsWith("file://") ? uri.replace("file://", "") : uri;
+  const stripDb = await openDatabaseAsync(path);
+  try {
+    await stripDb.execAsync(`PRAGMA key = '${passphrase}';`);
+    for (const table of SYNC_LOCAL_ONLY_TABLES) {
+      try {
+        await stripDb.execAsync(`DELETE FROM ${table}`);
+      } catch {
+        /* table may not exist in very old backups */
+      }
+    }
+    // Do not ship remote file ids from this device into another install's meta
+    try {
+      await stripDb.execAsync(
+        `UPDATE sync_metadata SET remote_file_id = NULL, remote_file_hash = NULL, remote_file_modified = NULL WHERE id = 1`,
+      );
+    } catch {
+      /* optional */
+    }
+    try {
+      await stripDb.execAsync("VACUUM");
+    } catch {
+      /* VACUUM optional on some builds */
+    }
+  } finally {
+    await stripDb.closeAsync();
+  }
+  return uri;
+}
+
 export interface ImportScanResult {
   totalRows: number;
   conflictingIds: string[];
@@ -963,6 +1009,7 @@ export async function updateSyncMetadata(
   );
 }
 
+/** Full-file hash (closes DB briefly). Prefer computeUserDataHash for sync. */
 export async function computeDatabaseHash(): Promise<string> {
   const userId = getCurrentUserId();
   if (!userId) throw new Error("No active user session");
@@ -977,8 +1024,133 @@ export async function computeDatabaseHash(): Promise<string> {
   return Crypto.digestStringAsync(CryptoDigestAlgorithm.SHA256, base64Content);
 }
 
+async function hashUserTables(db: {
+  getAllAsync: <T>(sql: string, ...params: any[]) => Promise<T[]>;
+}): Promise<string> {
+  const subscriptions = await db.getAllAsync(
+    "SELECT * FROM subscriptions ORDER BY id",
+  );
+  const preferences = await db.getAllAsync(
+    "SELECT * FROM preferences ORDER BY key",
+  );
+  // Fingerprint icons without dumping entire base64 into the hash string twice
+  const icons = await db.getAllAsync(
+    `SELECT icon_key, source, format, original_url, fallback_tier,
+            original_width, original_height, updated_at,
+            length(IFNULL(image_data,'')) AS image_len,
+            substr(IFNULL(image_data,''), 1, 96) AS image_head
+     FROM icon_cache ORDER BY icon_key`,
+  );
+  const payload = JSON.stringify({
+    v: 1,
+    subscriptions,
+    preferences,
+    icons,
+  });
+  return Crypto.digestStringAsync(CryptoDigestAlgorithm.SHA256, payload);
+}
+
+/**
+ * Hash of user-facing data only (subscriptions, prefs, chosen icons).
+ * Crawl activity does not change this hash — keeps sync honest and quiet.
+ */
+export async function computeUserDataHash(): Promise<string> {
+  return hashUserTables(getDatabase());
+}
+
+/** Same hash from an encrypted backup file (for remote comparison). */
+export async function computeUserDataHashFromBackup(
+  sourceUri: string,
+): Promise<string> {
+  const userId = getCurrentUserId();
+  if (!userId) throw new Error("No active user session");
+  const passphrase = await getOrCreateDbKey(userId);
+  const path = sourceUri.startsWith("file://")
+    ? sourceUri.replace("file://", "")
+    : sourceUri;
+  const importDb = await openDatabaseAsync(path);
+  try {
+    await importDb.execAsync(`PRAGMA key = '${passphrase}';`);
+    return await hashUserTables(importDb);
+  } finally {
+    await importDb.closeAsync();
+  }
+}
+
+/**
+ * Merge chosen icons from a backup/sync file into local icon_cache.
+ * Does not touch crawl_results / crawled_urls.
+ */
+export async function mergeIconCacheFromBackup(
+  sourceUri: string,
+): Promise<number> {
+  const userId = getCurrentUserId();
+  if (!userId) throw new Error("No active user session");
+  const passphrase = await getOrCreateDbKey(userId);
+  const importsDir = new Directory(Paths.cache, "imports");
+  try {
+    await importsDir.create({ intermediates: true });
+  } catch {}
+  const importTempPath = `${importsDir.uri}import_icons_${Date.now()}.db`;
+  const content = await readAsStringAsync(sourceUri, { encoding: "base64" });
+  await writeAsStringAsync(importTempPath, content, { encoding: "base64" });
+  const importDb = await openDatabaseAsync(importTempPath);
+  const db = getDatabase();
+  let merged = 0;
+  try {
+    await importDb.execAsync(`PRAGMA key = '${passphrase}';`);
+    let rows: Record<string, any>[] = [];
+    try {
+      rows = await importDb.getAllAsync<Record<string, any>>(
+        "SELECT * FROM icon_cache",
+      );
+    } catch {
+      return 0;
+    }
+    for (const row of rows) {
+      if (!row.icon_key || !row.image_data) continue;
+      const local = await db.getFirstAsync<{ updated_at: string | null }>(
+        "SELECT updated_at FROM icon_cache WHERE icon_key = ?",
+        row.icon_key,
+      );
+      const remoteUpdated = row.updated_at ?? "";
+      const localUpdated = local?.updated_at ?? "";
+      if (local && localUpdated >= remoteUpdated) continue;
+      await db.runAsync(
+        `INSERT OR REPLACE INTO icon_cache
+          (icon_key, image_data, source, format, original_url, fallback_tier,
+           original_width, original_height, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')))`,
+        row.icon_key,
+        row.image_data,
+        row.source ?? "local",
+        row.format ?? "png",
+        row.original_url ?? null,
+        row.fallback_tier ?? 0,
+        row.original_width ?? null,
+        row.original_height ?? null,
+        row.updated_at ?? null,
+      );
+      merged++;
+    }
+    if (merged > 0) {
+      setTimeout(async () => {
+        const { notifyCacheUpdate } =
+          await import("../src/services/iconLoadingRegistry");
+        notifyCacheUpdate();
+      }, 0);
+    }
+    return merged;
+  } finally {
+    await importDb.closeAsync();
+    try {
+      await new File(importTempPath).delete();
+    } catch {}
+  }
+}
+
 export async function needsSync(): Promise<boolean> {
-  const localHash = await computeDatabaseHash();
+  const localHash = await computeUserDataHash();
   const metadata = await getSyncMetadata();
   if (!metadata.syncEnabled) return false;
   if (localHash === metadata.remoteFileHash) return false;

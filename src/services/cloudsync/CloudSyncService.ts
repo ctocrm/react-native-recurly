@@ -1,14 +1,15 @@
-import * as Crypto from "expo-crypto";
 import { CryptoDigestAlgorithm } from "expo-crypto";
 import { Directory, Paths } from "expo-file-system";
 import { deleteAsync, readAsStringAsync } from "expo-file-system/legacy";
 import {
-  computeDatabaseHash,
+  computeUserDataHash,
+  computeUserDataHashFromBackup,
   executeNonConflictingImport,
-  exportBackup,
+  exportSyncBackup,
   getDatabase,
   getSyncMetadata,
   importBackup,
+  mergeIconCacheFromBackup,
   updateSyncMetadata,
 } from "../../../services/database";
 import { DropboxStorage } from "./storage/DropboxStorage";
@@ -101,7 +102,7 @@ export class CloudSyncService {
       }
 
       // Compute local database hash
-      const localHash = await computeDatabaseHash();
+      const localHash = await computeUserDataHash();
 
       // If no remote file exists yet, upload local database
       if (!metadata.remoteFileHash) {
@@ -160,24 +161,19 @@ export class CloudSyncService {
       return null;
     }
 
-    // Download and compute hash
+    // Download and hash user tables only (not crawl ephemera)
     const tempPath = `${Paths.cache}/sync_check_${Date.now()}.db`;
     await this.provider.downloadFile(metadata.remoteFileId, tempPath);
 
-    // Compute hash from file content using base64 to preserve binary data
-    const content = await readAsStringAsync(tempPath, {
-      encoding: "base64",
-    });
-    const hash = await Crypto.digestStringAsync(
-      CryptoDigestAlgorithm.SHA256,
-      content,
-    );
-
-    // Clean up temp file
+    let hash: string;
     try {
-      await deleteAsync(tempPath, { idempotent: true });
-    } catch {
-      // Ignore cleanup errors
+      hash = await computeUserDataHashFromBackup(tempPath);
+    } finally {
+      try {
+        await deleteAsync(tempPath, { idempotent: true });
+      } catch {
+        // Ignore cleanup errors
+      }
     }
 
     return hash;
@@ -189,15 +185,15 @@ export class CloudSyncService {
     }
 
     try {
-      // Export backup
-      const backupPath = await this.exportBackup();
+      // Scoped sync payload (no crawl history / candidates)
+      const backupPath = await this.exportSyncBackup();
 
       // Upload to cloud
       const fileName = `backup_${this.userId}.db`;
       const uploadResult = await this.provider.uploadFile(backupPath, fileName);
 
-      // Update metadata
-      const newHash = await computeDatabaseHash();
+      // Update metadata with user-data hash
+      const newHash = await computeUserDataHash();
       await updateSyncMetadata({
         remoteFileId: uploadResult.fileId,
         remoteFileHash: newHash,
@@ -244,11 +240,15 @@ export class CloudSyncService {
       const importPath = `${importsDir.uri}import_${Date.now()}.db`;
       await this.provider.downloadFile(metadata.remoteFileId, importPath);
 
-      // Import the backup (this will use the existing conflict resolution logic)
+      // Import subscriptions (conflict-aware) + chosen icons
       const scanResult = await this.importBackup(importPath);
+      if (scanResult.conflictingIds.length === 0) {
+        await this.importNonConflicting(importPath, []);
+      }
+      await mergeIconCacheFromBackup(importPath);
 
-      // Update metadata
-      const newHash = await computeDatabaseHash();
+      // Update metadata with user-data hash
+      const newHash = await computeUserDataHash();
       await updateSyncMetadata({
         remoteFileHash: newHash,
         lastSyncTimestamp: new Date().toISOString(),
@@ -308,13 +308,15 @@ export class CloudSyncService {
       // Perform SQL merge under a single transaction
       const mergeResult = await this.performMerge(remotePath);
 
-      // Upload merged result
-      const backupPath = await this.exportBackup();
+      await mergeIconCacheFromBackup(remotePath);
+
+      // Upload merged result (scoped)
+      const backupPath = await this.exportSyncBackup();
       const fileName = `backup_${this.userId}.db`;
       const uploadResult = await this.provider.uploadFile(backupPath, fileName);
 
       // Update metadata
-      const newHash = await computeDatabaseHash();
+      const newHash = await computeUserDataHash();
       await updateSyncMetadata({
         remoteFileId: uploadResult.fileId,
         remoteFileHash: newHash,
@@ -470,7 +472,7 @@ export class CloudSyncService {
     return await executeNonConflictingImport(remoteDbPath, conflictingIds);
   }
 
-  private async exportBackup(): Promise<string> {
-    return await exportBackup();
+  private async exportSyncBackup(): Promise<string> {
+    return await exportSyncBackup();
   }
 }
