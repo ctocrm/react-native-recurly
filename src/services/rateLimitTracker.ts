@@ -127,7 +127,11 @@ async function ensureLoaded(): Promise<void> {
 
 // ---- Core API ----
 
-export async function recordRateLimit(url: string): Promise<void> {
+export async function recordRateLimit(
+  url: string,
+  /** Optional server-provided cooldown (e.g. Retry-After). Capped at MAX_COOLDOWN. */
+  retryAfterMs?: number,
+): Promise<void> {
   await ensureLoaded();
   const domain = getDomainFromUrl(url);
   const now = Date.now();
@@ -135,7 +139,10 @@ export async function recordRateLimit(url: string): Promise<void> {
 
   const consecutive429s = (existing?.consecutive429s ?? 0) + 1;
   const ladderIndex = Math.min(consecutive429s - 1, COOLDOWN_LADDER.length - 1);
-  const cooldownMs = COOLDOWN_LADDER[ladderIndex] ?? MAX_COOLDOWN;
+  let cooldownMs = COOLDOWN_LADDER[ladderIndex] ?? MAX_COOLDOWN;
+  if (typeof retryAfterMs === "number" && retryAfterMs > 0) {
+    cooldownMs = Math.min(Math.max(retryAfterMs, 5_000), MAX_COOLDOWN);
+  }
   const cooldownUntil = now + cooldownMs;
 
   stateMap.set(domain, {
@@ -161,15 +168,10 @@ export async function recordSuccess(url: string): Promise<void> {
   const domain = getDomainFromUrl(url);
   const now = Date.now();
   const existing = stateMap.get(domain);
+  const wasLimited = Boolean(existing?.isRateLimited);
 
-  // If this domain was rate-limited, notify listeners that it recovered
-  if (existing?.isRateLimited) {
-    await saveState();
-    notifyListeners();
-    console.log(`[RATE_LIMIT] ${domain}: Recovered (success recorded)`);
-    return;
-  }
-
+  // Always clear cooldown on a real success (previous code returned early and
+  // left isRateLimited stuck true until cooldown expired).
   stateMap.set(domain, {
     isRateLimited: false,
     rateLimitedAt: 0,
@@ -179,6 +181,10 @@ export async function recordSuccess(url: string): Promise<void> {
   });
 
   await saveState();
+  if (wasLimited) {
+    notifyListeners();
+    console.log(`[RATE_LIMIT] ${domain}: Recovered (success recorded)`);
+  }
 }
 
 /**

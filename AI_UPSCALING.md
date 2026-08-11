@@ -1,7 +1,7 @@
 # AI Icon Upscaling — Single Source of Truth
 
 **Last updated:** 2026-08-11
-**Status:** No training. Phase1 registry→map. Phase2 prefer SVG/apple-touch/large (iconQuality) + frozen hybrid.
+**Status:** No training. Phases 1–3: registry→map, iconQuality sources, crawl reliability (rate-limit clear, retries, queue re-run).
 
 This file **replaces and merges**:
 

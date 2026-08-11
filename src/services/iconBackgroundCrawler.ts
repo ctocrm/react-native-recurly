@@ -29,12 +29,20 @@ import {
 import { findAllIconSources } from "@/src/services/iconScraper";
 import { mimeForFormat, upscaleIconIfSmall } from "@/src/services/iconUpscaler";
 import { isBase64IconValid } from "@/src/services/iconValidation";
-import { isDomainRateLimited } from "@/src/services/rateLimitTracker";
+import {
+  isDomainRateLimited,
+  recordRateLimit,
+  recordSuccess,
+} from "@/src/services/rateLimitTracker";
 import { searchForLinksToSpider } from "@/src/services/searchEngines";
 import { Image } from "react-native";
 
 // In-flight guard
 let isProcessingQueue = false;
+/** If processIconQueue was skipped because busy, run again when free. */
+let queueRerunRequested = false;
+/** In-flight crawls so double-tap Search does not stack workers for same key. */
+const activeCrawls = new Set<string>();
 
 const MAX_LIBRARY_CANDIDATES = 50;
 const MAX_SPIDERED_URLS = 20;
@@ -62,80 +70,145 @@ async function loadLocalIconAsBase64(iconKey: string): Promise<string | null> {
   return `local_asset:${iconKey}`;
 }
 
-// Download image and save to DB
+// Download image and save to DB (rate-limit aware, short transient retries)
+const FETCH_TIMEOUT_MS = 15_000;
+const FETCH_MAX_ATTEMPTS = 3;
+
+function parseRetryAfterMs(header: string | null): number | undefined {
+  if (!header) return undefined;
+  const asInt = parseInt(header, 10);
+  if (!Number.isNaN(asInt) && asInt >= 0) {
+    // Retry-After: seconds
+    return Math.min(asInt * 1000, 14_400_000);
+  }
+  const when = Date.parse(header);
+  if (!Number.isNaN(when)) {
+    return Math.min(Math.max(when - Date.now(), 0), 14_400_000);
+  }
+  return undefined;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
 async function downloadImageAsBase64(
   url: string,
   source: string,
   iconKey: string,
 ): Promise<boolean> {
-  try {
-    console.log(`[FETCH] DOWNLOAD: ${source} ${url}`);
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 15000);
-    const response = await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        Accept: "image/*,*/*;q=0.8",
-      },
-    });
-    clearTimeout(timer);
-    if (!response.ok) {
-      console.log(`[FETCH] FAILED ${url}: ${response.status}`);
-      return false;
-    }
-
-    const arrayBuffer = await response.arrayBuffer();
-    const uint8Array = new Uint8Array(arrayBuffer);
-    let binary = "";
-    for (let i = 0; i < uint8Array.byteLength; i++) {
-      binary += String.fromCharCode(uint8Array[i]);
-    }
-    const b64 = btoa(binary);
-    console.log(`[FETCH] SUCCESS: ${url} (${b64.length} bytes)`);
-
-    // Measure original dimensions BEFORE upscaling so we can determine if the
-    // icon is truly low-res and show the "Upscale (AI)" button in the picker.
-    const format = detectUrlFormat(url);
-    const mime = mimeForFormat(format);
-    const dataUri = `data:${mime};base64,${b64}`;
-    const origSize = await new Promise<{ width: number; height: number }>(
-      (resolve, reject) => {
-        Image.getSize(
-          dataUri,
-          (width, height) => resolve({ width, height }),
-          (err) => reject(err),
-        );
-      },
-    ).catch(() => null);
-
-    // Rudimentary upscale for low-res icons (e.g. favicons) before storing.
-    const { base64: finalB64, format: finalFormat } = await upscaleIconIfSmall(
-      b64,
-      format,
-    );
-
-    await saveCrawlResult(
-      iconKey,
-      finalB64,
-      source,
-      finalFormat,
-      url,
-      0,
-      origSize?.width,
-      origSize?.height,
-    );
-    notifyCacheUpdate();
-    return true;
-  } catch (err: any) {
-    if (err.name !== "AbortError") {
-      console.log(`[FETCH] ERROR ${url}:`, err);
-    } else {
-      console.log(`[FETCH] TIMEOUT ${url}`);
-    }
+  if (await isDomainRateLimited(url)) {
+    console.log(`[FETCH] SKIP rate-limited domain: ${url}`);
     return false;
   }
+
+  let lastErr: unknown = null;
+  for (let attempt = 1; attempt <= FETCH_MAX_ATTEMPTS; attempt++) {
+    try {
+      console.log(
+        `[FETCH] DOWNLOAD${attempt > 1 ? ` retry ${attempt}/${FETCH_MAX_ATTEMPTS}` : ""}: ${source} ${url}`,
+      );
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+      let response: Response;
+      try {
+        response = await fetch(url, {
+          signal: controller.signal,
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            Accept: "image/*,*/*;q=0.8",
+          },
+        });
+      } finally {
+        clearTimeout(timer);
+      }
+
+      if (response.status === 429 || response.status === 403) {
+        const retryMs = parseRetryAfterMs(response.headers.get("Retry-After"));
+        await recordRateLimit(url, retryMs);
+        console.log(`[FETCH] RATE_LIMITED ${url}: ${response.status}`);
+        return false;
+      }
+
+      if (response.status >= 500 && attempt < FETCH_MAX_ATTEMPTS) {
+        const backoff = 400 * attempt + Math.floor(Math.random() * 200);
+        console.log(
+          `[FETCH] ${response.status} on ${url}, backoff ${backoff}ms`,
+        );
+        await sleep(backoff);
+        continue;
+      }
+
+      if (!response.ok) {
+        console.log(`[FETCH] FAILED ${url}: ${response.status}`);
+        return false;
+      }
+
+      const arrayBuffer = await response.arrayBuffer();
+      // Empty body is not a usable icon
+      if (!arrayBuffer || arrayBuffer.byteLength < 16) {
+        console.log(`[FETCH] EMPTY body ${url}`);
+        return false;
+      }
+      const uint8Array = new Uint8Array(arrayBuffer);
+      let binary = "";
+      for (let i = 0; i < uint8Array.byteLength; i++) {
+        binary += String.fromCharCode(uint8Array[i]);
+      }
+      const b64 = btoa(binary);
+      console.log(`[FETCH] SUCCESS: ${url} (${b64.length} bytes)`);
+
+      const format = detectUrlFormat(url);
+      const mime = mimeForFormat(format);
+      const dataUri = `data:${mime};base64,${b64}`;
+      const origSize = await new Promise<{ width: number; height: number }>(
+        (resolve, reject) => {
+          Image.getSize(
+            dataUri,
+            (width, height) => resolve({ width, height }),
+            (err) => reject(err),
+          );
+        },
+      ).catch(() => null);
+
+      const { base64: finalB64, format: finalFormat } = await upscaleIconIfSmall(
+        b64,
+        format,
+      );
+
+      await saveCrawlResult(
+        iconKey,
+        finalB64,
+        source,
+        finalFormat,
+        url,
+        0,
+        origSize?.width,
+        origSize?.height,
+      );
+      await recordSuccess(url);
+      notifyCacheUpdate();
+      return true;
+    } catch (err: any) {
+      lastErr = err;
+      const isAbort = err?.name === "AbortError";
+      if (isAbort) {
+        console.log(`[FETCH] TIMEOUT ${url} (attempt ${attempt})`);
+      } else {
+        console.log(`[FETCH] ERROR ${url} (attempt ${attempt}):`, err);
+      }
+      // Transient network / timeout — retry with backoff
+      if (attempt < FETCH_MAX_ATTEMPTS) {
+        await sleep(500 * attempt);
+        continue;
+      }
+    }
+  }
+  if (lastErr) {
+    console.log(`[FETCH] GIVING UP ${url}`);
+  }
+  return false;
 }
 
 // Re-fetch crawl results that previously failed (empty imageData) without
@@ -397,7 +470,6 @@ export async function findIconUrls(iconKey: string): Promise<void> {
     } else {
       // Record rate limit for non-200 responses
       if (response.status === 429 || response.status === 403) {
-        const { recordRateLimit } = await import("./rateLimitTracker");
         await recordRateLimit(ddgUrl);
       }
     }
@@ -658,11 +730,16 @@ export async function findIconUrls(iconKey: string): Promise<void> {
 export async function processIconQueue(): Promise<void> {
   console.log(`[QUEUE] processIconQueue starting`);
   if (isProcessingQueue) {
-    console.log(`[QUEUE] Already processing, skipping`);
+    queueRerunRequested = true;
+    console.log(`[QUEUE] Already processing, will re-run when free`);
     return;
   }
   isProcessingQueue = true;
   try {
+    // Loop while new work arrived mid-run
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+    queueRerunRequested = false;
     const queued = await getQueuedIcons();
     console.log(`[QUEUE] Found ${queued.length} items in queue`);
 
@@ -681,22 +758,37 @@ export async function processIconQueue(): Promise<void> {
           `[QUEUE] Found ${unfetchedUrls.length} URLs to fetch for ${item.icon_key}`,
         );
 
-        // Fetch all unfetched URLs, but mark them as crawled first to avoid duplication
-        for (const url of unfetchedUrls) {
-          const crawlResult = crawlResults.find((r) => r.originalUrl === url);
-          if (crawlResult) {
-            const alreadyCrawled = await isUrlAlreadyCrawled(url);
-            if (alreadyCrawled) continue;
+        // Prefer high-quality candidates; skip domains still in cooldown
+        const candidates = sortUrlsByQuality(
+          unfetchedUrls
+            .map((url) => {
+              const crawlResult = crawlResults.find((r) => r.originalUrl === url);
+              if (!crawlResult) return null;
+              return {
+                url,
+                source: crawlResult.source,
+                format: crawlResult.format,
+              };
+            })
+            .filter((x): x is { url: string; source: string; format: string } =>
+              Boolean(x),
+            ),
+        );
 
-            const success = await downloadImageAsBase64(
-              url,
-              crawlResult.source,
-              item.icon_key,
-            );
-            if (success) {
-              await markUrlAsCrawled(url);
-              console.log(`[QUEUE] Fetched ${url}`);
-            }
+        for (const c of candidates) {
+          if (await isUrlAlreadyCrawled(c.url)) continue;
+          if (await isDomainRateLimited(c.url)) {
+            console.log(`[QUEUE] Skip rate-limited ${c.url}`);
+            continue;
+          }
+          const success = await downloadImageAsBase64(
+            c.url,
+            c.source,
+            item.icon_key,
+          );
+          if (success) {
+            await markUrlAsCrawled(c.url);
+            console.log(`[QUEUE] Fetched ${c.url}`);
           }
         }
 
@@ -740,8 +832,15 @@ export async function processIconQueue(): Promise<void> {
         await dequeueIcon(item.icon_key);
       }
     }
+    if (!queueRerunRequested) break;
+    console.log(`[QUEUE] Re-running after mid-flight enqueue`);
+    } // while
   } finally {
     isProcessingQueue = false;
+    if (queueRerunRequested) {
+      queueRerunRequested = false;
+      void processIconQueue().catch(console.error);
+    }
   }
 }
 
@@ -792,6 +891,14 @@ export async function startIconCrawl(
   console.log(
     `[CRAWL] startIconCrawl for ${iconKey} (sub: ${subscriptionId ?? "none"})`,
   );
+  if (activeCrawls.has(iconKey)) {
+    console.log(`[CRAWL] Already crawling ${iconKey}, skip duplicate start`);
+    // Still ensure queue will process any pending rows
+    await enqueueIconScrape(iconKey, subscriptionId);
+    return;
+  }
+  activeCrawls.add(iconKey);
+
   // Durable DB record — this is what makes the search persistent/observable.
   // enqueueIconScrape also kicks off the fetch worker, so the crawl is
   // self-sustaining in the background without startIconCrawl awaiting the
@@ -817,6 +924,7 @@ export async function startIconCrawl(
       // Only clear the crawl-wide loading flag from here, never from the
       // per-item completion in processIconQueue.
       setIconLoading(iconKey, false);
+      activeCrawls.delete(iconKey);
     }
   })();
 }
