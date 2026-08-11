@@ -277,14 +277,16 @@ function extractIconsFromHtml(html: string, pageUrl: string): ExtractedIcon[] {
     }
   }
 
-  // 6. Common favicon paths in <head>
+  // 6. Common paths — large / vector first (order also helps consumers that take head)
   const commonPaths = [
-    "/favicon.ico",
     "/favicon.svg",
     "/apple-touch-icon.png",
+    "/apple-touch-icon-precomposed.png",
+    "/apple-touch-icon-180x180.png",
     "/apple-touch-icon-152x152.png",
-    "/android-chrome-192x192.png",
     "/android-chrome-512x512.png",
+    "/android-chrome-192x192.png",
+    "/favicon.ico",
   ];
 
   try {
@@ -304,6 +306,22 @@ function extractIconsFromHtml(html: string, pageUrl: string): ExtractedIcon[] {
     // Invalid page URL
   }
 
+  // Prefer SVG / apple-touch / large assets over classic favicon.ico
+  icons.sort((a, b) => {
+    const rank = (x: ExtractedIcon) => {
+      let s = 0;
+      const u = x.url.toLowerCase();
+      if (x.format === "svg") s += 50;
+      if (x.source.includes("apple") || u.includes("apple-touch")) s += 40;
+      if (u.includes("android-chrome") || u.includes("512x512")) s += 35;
+      if (x.source.includes("og")) s += 25;
+      if (x.source.includes("twitter")) s += 15;
+      if (x.source === "favicon" && x.format === "ico") s -= 10;
+      if ((x.width ?? 0) >= 180 || (x.height ?? 0) >= 180) s += 30;
+      return s;
+    };
+    return rank(b) - rank(a);
+  });
   return icons;
 }
 
@@ -343,5 +361,19 @@ export async function extractIconsFromUrls(
     }
   }
 
+  // Prefer larger / vector icons across spidered pages
+  allIcons.sort((a, b) => {
+    const rank = (x: ExtractedIcon) => {
+      let s = 0;
+      const u = x.url.toLowerCase();
+      if (x.format === "svg") s += 50;
+      if (u.includes("apple-touch")) s += 40;
+      if (u.includes("512x512") || u.includes("android-chrome")) s += 35;
+      if (x.source.includes("og")) s += 25;
+      if (x.format === "ico") s -= 10;
+      return s;
+    };
+    return rank(b) - rank(a);
+  });
   return allIcons;
 }

@@ -162,14 +162,10 @@ if [ "$DO_INSTALL" = "true" ] || [ "$DEV_MODE" = "true" ]; then
     export AVD_NAME
 fi
 
-# Step 1: Regenerate the static require() map from whatever *.tflite files
-# exist in assets/models/. This guarantees the bundle only references models
-# that are physically present (so the build never fails on missing models).
-#
-# Model training has been separated out — run `npm run train:setup && npm run train:models`
-# separately if you need to generate or update the upscaling models.
+# Step 1: Regenerate MODEL_MAP + MODEL_CATALOG from model_registry.json (SoT).
+# Only registry entries that exist on disk are bundled. Training is separate/frozen.
 echo ""
-echo "[BUILD] Step 1: Regenerating model map from assets/models/..."
+echo "[BUILD] Step 1: Regenerating model map from model_registry.json..."
 node "$SCRIPT_DIR/generate-model-map.js"
 
 

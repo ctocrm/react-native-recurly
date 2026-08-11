@@ -1,27 +1,25 @@
 #!/usr/bin/env node
 /**
- * Codegen: builds `src/services/generatedModelMap.ts` from whatever
- * `*.tflite` files physically exist in `assets/models/`.
+ * Codegen: builds `src/services/generatedModelMap.ts` from
+ * `assets/models/model_registry.json` (source of truth).
  *
- * Why: Metro only bundles an asset when it sees a *literal* static
- * `require("....tflite")`, and it fails the whole bundle if a `require()`
- * points at a file that does not exist. By generating the require list from a
- * directory scan we guarantee:
- *   - the build never references a missing model (so it never fails), and
- *   - any newly-generated model (e.g. the sharp FSRCNN family) is picked up
- *     automatically on the next build with zero hand-editing.
+ * - MODEL_MAP: static require() entries for Metro bundling
+ * - MODEL_CATALOG: fast|sharp → inputSize → scale → filename (app selection)
+ *
+ * Do not hand-edit the generated file. Do not maintain a second matrix in TS.
  *
  * Usage:
  *   node scripts/generate-model-map.js
+ *   npm run generate-model-map
  *
- * This is safe to run anytime and is idempotent. It is wired into
- * `scripts/build-android.sh` right after model generation.
+ * Wired into scripts/build-android.sh. Fails if registry is missing.
  */
 
 const fs = require("fs");
 const path = require("path");
 
 const modelDir = path.join(__dirname, "..", "assets", "models");
+const registryPath = path.join(modelDir, "model_registry.json");
 const outFile = path.join(
   __dirname,
   "..",
@@ -30,62 +28,143 @@ const outFile = path.join(
   "generatedModelMap.ts",
 );
 
-// Only bundle recognised super-resolution model files. `espcn_2x.tflite` is a
-// legacy single-model artifact that is not part of the picker matrix, so we
-// skip it. The picker matrix uses `<family>_<in>x_<out>x.tflite`.
 const MODEL_RE = /^(espcn|fsrcnn)_(\d+)x_(\d+)x\.tflite$/;
 
+function familyToQuality(family) {
+  if (family === "espcn") return "fast";
+  if (family === "fsrcnn") return "sharp";
+  return null;
+}
+
 function main() {
-  if (!fs.existsSync(modelDir)) {
-    console.error(`[MODEL_MAP] Model dir not found: ${modelDir}`);
+  if (!fs.existsSync(registryPath)) {
+    console.error(
+      `[MODEL_MAP] Registry not found: ${registryPath}\n` +
+        `  Run: node scripts/generate-model-registry.js`,
+    );
     process.exit(1);
   }
 
-  const files = fs
-    .readdirSync(modelDir)
-    .filter((f) => MODEL_RE.test(f))
-    .sort();
+  let registry;
+  try {
+    registry = JSON.parse(fs.readFileSync(registryPath, "utf8"));
+  } catch (e) {
+    console.error(`[MODEL_MAP] Failed to parse registry: ${e.message}`);
+    process.exit(1);
+  }
 
-  if (files.length === 0) {
-    // No `<family>_<in>x_<out>x.tflite` models matched. We intentionally still
-    // write an empty map (and exit 0) rather than aborting: the build is
-    // designed to degrade gracefully to bilinear upscaling when no AI models
-    // are bundled. Emit a loud warning so the empty output is never silent.
+  const models = Array.isArray(registry.models) ? registry.models : [];
+  if (models.length === 0) {
     console.warn(
-      `[MODEL_MAP] WARNING: no model files matched ${MODEL_RE} in ${modelDir}. ` +
-        `The generated map will be empty and AI upscaling will fall back to bilinear. ` +
-        `Run "npm run generate-model" (and/or --quality=fast) to produce models.`,
+      `[MODEL_MAP] WARNING: registry has 0 models. Map/catalog will be empty.`,
     );
   }
 
-  const lines = files.map(
-    (f) => `  "${f}": require("../../assets/models/${f}"),`,
+  // Validate entries against disk + filename pattern
+  const entries = [];
+  for (const m of models) {
+    const file = m.file;
+    if (typeof file !== "string" || !MODEL_RE.test(file)) {
+      console.warn(`[MODEL_MAP] Skipping invalid registry entry: ${JSON.stringify(m)}`);
+      continue;
+    }
+    const diskPath = path.join(modelDir, file);
+    if (!fs.existsSync(diskPath)) {
+      console.warn(`[MODEL_MAP] Skipping missing file on disk: ${file}`);
+      continue;
+    }
+    const match = file.match(MODEL_RE);
+    const family = match[1];
+    const quality = familyToQuality(family);
+    if (!quality) continue;
+
+    const inputSize = Number(m.input_size) || parseInt(match[2], 10);
+    const outputSize = Number(m.output_size) || parseInt(match[3], 10);
+    let scale = Number(m.scale);
+    if (!Number.isFinite(scale) || scale <= 0) {
+      scale = outputSize / inputSize;
+    }
+    // Prefer integer scale keys when exact
+    if (Number.isInteger(scale) || Math.abs(scale - Math.round(scale)) < 1e-9) {
+      scale = Math.round(scale);
+    }
+
+    entries.push({ file, quality, inputSize, scale, outputSize });
+  }
+
+  entries.sort((a, b) => a.file.localeCompare(b.file));
+
+  // Build catalog: quality -> inputSize -> scale -> file
+  const catalog = { fast: {}, sharp: {} };
+  for (const e of entries) {
+    if (!catalog[e.quality][e.inputSize]) catalog[e.quality][e.inputSize] = {};
+    catalog[e.quality][e.inputSize][e.scale] = e.file;
+  }
+
+  const requireLines = entries.map(
+    (e) => `  "${e.file}": require("../../assets/models/${e.file}"),`,
   );
 
-  const espcnCount = files.filter((f) => f.startsWith("espcn_")).length;
-  const fsrcnnCount = files.filter((f) => f.startsWith("fsrcnn_")).length;
+  // Serialize catalog as TS object literal
+  function emitCatalog(cat) {
+    const qParts = [];
+    for (const q of ["fast", "sharp"]) {
+      const byIn = cat[q] || {};
+      const inKeys = Object.keys(byIn)
+        .map(Number)
+        .sort((a, b) => a - b);
+      const inParts = inKeys.map((inSz) => {
+        const scales = byIn[inSz];
+        const sKeys = Object.keys(scales)
+          .map(Number)
+          .sort((a, b) => a - b);
+        const sParts = sKeys.map(
+          (s) => `      ${s}: "${scales[s]}",`,
+        );
+        return `    ${inSz}: {\n${sParts.join("\n")}\n    },`;
+      });
+      qParts.push(
+        `  ${q}: {\n${inParts.join("\n")}\n  },`,
+      );
+    }
+    return `{\n${qParts.join("\n")}\n}`;
+  }
+
+  const espcnCount = entries.filter((e) => e.quality === "fast").length;
+  const fsrcnnCount = entries.filter((e) => e.quality === "sharp").length;
 
   const content = `/**
  * AUTO-GENERATED FILE — DO NOT EDIT BY HAND.
  *
- * Generated by \`scripts/generate-model-map.js\` from the \`*.tflite\` files that
- * physically exist in \`assets/models/\`. It is regenerated automatically during
- * the build (see \`scripts/build-android.sh\`) and via \`npm run generate-model-map\`.
+ * Generated by \`scripts/generate-model-map.js\` from
+ * \`assets/models/model_registry.json\` (source of truth).
+ * Regenerated during Android build and via \`npm run generate-model-map\`.
  *
- * Because the require list is derived from a directory scan, it can never
- * reference a missing file: the build never fails on absent models, and newly
- * generated models are bundled automatically on the next build.
+ * - MODEL_MAP: Metro static requires (bundle)
+ * - MODEL_CATALOG: selection tree for getModelForUpscale (fast|sharp)
  *
- * Current contents: ${espcnCount} fast (ESPCN) + ${fsrcnnCount} sharp (FSRCNN) = ${files.length} models.
+ * Current: ${espcnCount} fast (ESPCN) + ${fsrcnnCount} sharp (FSRCNN) = ${entries.length} models.
  */
 
 /* eslint-disable @typescript-eslint/no-require-imports */
-// Metro resolves these static \`require\` paths at build time.
+
+export type GeneratedUpscaleQuality = "fast" | "sharp";
+
+/** Metro-bundled model assets keyed by filename. */
 export const MODEL_MAP: Record<string, number> = {
-${lines.join("\n")}
+${requireLines.join("\n")}
 };
 
-/** The set of model file names that are actually bundled. */
+/**
+ * Selection catalog derived from the registry.
+ * quality → input_size → scale → filename
+ */
+export const MODEL_CATALOG: Record<
+  GeneratedUpscaleQuality,
+  Record<number, Record<number, string>>
+> = ${emitCatalog(catalog)};
+
+/** Filenames present in MODEL_MAP. */
 export const AVAILABLE_MODEL_FILES: ReadonlySet<string> = new Set(
   Object.keys(MODEL_MAP),
 );
@@ -93,7 +172,7 @@ export const AVAILABLE_MODEL_FILES: ReadonlySet<string> = new Set(
 
   fs.writeFileSync(outFile, content, "utf8");
   console.log(
-    `[MODEL_MAP] Wrote ${outFile} (${files.length} models: ${espcnCount} espcn, ${fsrcnnCount} fsrcnn)`,
+    `[MODEL_MAP] Wrote ${outFile} from registry (${entries.length} models: ${espcnCount} espcn, ${fsrcnnCount} fsrcnn)`,
   );
 }
 

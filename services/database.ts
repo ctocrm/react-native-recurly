@@ -531,6 +531,8 @@ export async function setCachedIcon(
   fallbackTier: number = 0,
   originalWidth?: number,
   originalHeight?: number,
+  /** When true, skip cache listeners (use for multi-step writes; notify once at end). */
+  silent: boolean = false,
 ): Promise<void> {
   const db = getDatabase();
   await db.runAsync(
@@ -544,6 +546,7 @@ export async function setCachedIcon(
     originalWidth ?? null,
     originalHeight ?? null,
   );
+  if (silent) return;
   // Notify listeners that cache has been updated (dynamic import to avoid circular deps)
   setTimeout(async () => {
     const { notifyCacheUpdate } =
@@ -607,7 +610,7 @@ export async function deleteCrawlResultByImageData(
 
 /**
  * Persist AI upscale: cache for card, drop source crawl twin, insert ai_upscale.
- * setCachedIcon already fires notifyCacheUpdate.
+ * Notifies cache listeners once after all DB steps complete.
  */
 export async function replaceIconWithAiUpscale(
   iconKey: string,
@@ -627,6 +630,7 @@ export async function replaceIconWithAiUpscale(
     0,
     originalWidth,
     originalHeight,
+    true, // silent — notify once below
   );
   await deleteCrawlResultByImageData(iconKey, sourceImageData);
   const db = getDatabase();
@@ -645,6 +649,11 @@ export async function replaceIconWithAiUpscale(
     originalWidth,
     originalHeight,
   );
+  setTimeout(async () => {
+    const { notifyCacheUpdate } =
+      await import("../src/services/iconLoadingRegistry");
+    notifyCacheUpdate();
+  }, 0);
 }
 
 export async function deleteCrawlResults(iconKey: string): Promise<void> {

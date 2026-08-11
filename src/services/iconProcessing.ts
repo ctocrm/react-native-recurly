@@ -18,7 +18,7 @@
  */
 
 import { Image, PixelRatio } from "react-native";
-import { MODEL_MAP } from "./generatedModelMap";
+import { MODEL_CATALOG, MODEL_MAP } from "./generatedModelMap";
 import { mimeForFormat, upscaleIconIfSmall } from "./iconUpscaler";
 
 // Below this max dimension an icon is "low-res" and worth upscaling.
@@ -29,120 +29,11 @@ const BASE_DISPLAY_SIZE = 64;
 
 export type UpscaleQuality = "fast" | "sharp";
 
-// Model registry - maps quality -> input_size -> { scale -> model_file }
-const MODEL_REGISTRY: Record<
-  UpscaleQuality,
-  Record<number, Record<number, string>>
-> = {
-  fast: {
-    16: {
-      4: "espcn_16x_64x.tflite",
-      8: "espcn_16x_128x.tflite",
-      12: "espcn_16x_192x.tflite",
-      16: "espcn_16x_256x.tflite",
-      24: "espcn_16x_384x.tflite",
-      32: "espcn_16x_512x.tflite",
-    },
-    32: {
-      2: "espcn_32x_64x.tflite",
-      4: "espcn_32x_128x.tflite",
-      6: "espcn_32x_192x.tflite",
-      8: "espcn_32x_256x.tflite",
-      12: "espcn_32x_384x.tflite",
-      16: "espcn_32x_512x.tflite",
-    },
-    48: {
-      2: "espcn_48x_96x.tflite",
-      3: "espcn_48x_144x.tflite",
-      4: "espcn_48x_192x.tflite",
-      5: "espcn_48x_240x.tflite",
-      8: "espcn_48x_384x.tflite",
-      12: "espcn_48x_576x.tflite",
-    },
-    64: {
-      2: "espcn_64x_128x.tflite",
-      3: "espcn_64x_192x.tflite",
-      4: "espcn_64x_256x.tflite",
-      6: "espcn_64x_384x.tflite",
-      8: "espcn_64x_512x.tflite",
-    },
-    96: {
-      2: "espcn_96x_192x.tflite",
-      3: "espcn_96x_288x.tflite",
-      4: "espcn_96x_384x.tflite",
-      5: "espcn_96x_480x.tflite",
-    },
-    128: {
-      2: "espcn_128x_256x.tflite",
-      3: "espcn_128x_384x.tflite",
-    },
-    192: {
-      2: "espcn_192x_384x.tflite",
-      3: "espcn_192x_576x.tflite",
-    },
-    256: {
-      2: "espcn_256x_512x.tflite",
-    },
-  },
-  sharp: {
-    16: {
-      4: "fsrcnn_16x_64x.tflite",
-      8: "fsrcnn_16x_128x.tflite",
-      12: "fsrcnn_16x_192x.tflite",
-      16: "fsrcnn_16x_256x.tflite",
-      24: "fsrcnn_16x_384x.tflite",
-      32: "fsrcnn_16x_512x.tflite",
-    },
-    32: {
-      2: "fsrcnn_32x_64x.tflite",
-      4: "fsrcnn_32x_128x.tflite",
-      6: "fsrcnn_32x_192x.tflite",
-      8: "fsrcnn_32x_256x.tflite",
-      12: "fsrcnn_32x_384x.tflite",
-      16: "fsrcnn_32x_512x.tflite",
-    },
-    48: {
-      2: "fsrcnn_48x_96x.tflite",
-      3: "fsrcnn_48x_144x.tflite",
-      4: "fsrcnn_48x_192x.tflite",
-      5: "fsrcnn_48x_240x.tflite",
-      8: "fsrcnn_48x_384x.tflite",
-      12: "fsrcnn_48x_576x.tflite",
-    },
-    64: {
-      2: "fsrcnn_64x_128x.tflite",
-      3: "fsrcnn_64x_192x.tflite",
-      4: "fsrcnn_64x_256x.tflite",
-      6: "fsrcnn_64x_384x.tflite",
-      8: "fsrcnn_64x_512x.tflite",
-    },
-    96: {
-      2: "fsrcnn_96x_192x.tflite",
-      3: "fsrcnn_96x_288x.tflite",
-      4: "fsrcnn_96x_384x.tflite",
-      5: "fsrcnn_96x_480x.tflite",
-    },
-    128: {
-      2: "fsrcnn_128x_256x.tflite",
-      3: "fsrcnn_128x_384x.tflite",
-      4: "fsrcnn_128x_512x.tflite",
-    },
-    192: {
-      2: "fsrcnn_192x_384x.tflite",
-      3: "fsrcnn_192x_576x.tflite",
-    },
-    256: {
-      2: "fsrcnn_256x_512x.tflite",
-    },
-  },
-};
+// Selection matrix: MODEL_CATALOG from generatedModelMap.ts (registry → codegen).
+// Do not hardcode model lists here.
 
-// MODEL_MAP (the static `require()` list Metro bundles at build time) is
-// auto-generated from the `*.tflite` files present in assets/models/ by
-// `scripts/generate-model-map.js` (run during the build and via
-// `npm run generate-model-map`). It only ever references files that exist, so
-// the build never fails on missing models and newly generated ones (e.g. the
-// sharp FSRCNN family) are bundled automatically. See `./generatedModelMap`.
+// MODEL_MAP + MODEL_CATALOG are generated from assets/models/model_registry.json
+// by scripts/generate-model-map.js (build + npm run generate-model-map).
 
 // Cache for loaded models
 
@@ -171,7 +62,7 @@ function findNearestInputSize(
   actualSize: number,
   quality: UpscaleQuality,
 ): number {
-  const sizes = Object.keys(MODEL_REGISTRY[quality])
+  const sizes = Object.keys(MODEL_CATALOG[quality])
     .map(Number)
     .sort((a, b) => a - b);
 
@@ -194,7 +85,7 @@ function findBestScale(
   targetOutput: number,
   quality: UpscaleQuality,
 ): number | null {
-  const scaleMap = MODEL_REGISTRY[quality][inputSize];
+  const scaleMap = MODEL_CATALOG[quality][inputSize];
   if (!scaleMap) return null;
 
   // Only consider scales whose model file is actually bundled. This keeps us
@@ -235,7 +126,7 @@ function findBestScale(
  * MODEL_MAP. Consumers (e.g. the picker UI) can use this to disable a mode.
  */
 export function isQualityAvailable(quality: UpscaleQuality): boolean {
-  const byInput = MODEL_REGISTRY[quality];
+  const byInput = MODEL_CATALOG[quality];
   for (const inputSize of Object.keys(byInput)) {
     const scaleMap = byInput[Number(inputSize)];
     for (const scale of Object.keys(scaleMap)) {
@@ -273,7 +164,7 @@ function resolveBundledModel(
 
   if (scale === null) return null;
 
-  const modelFile = MODEL_REGISTRY[quality][nearestInput][scale];
+  const modelFile = MODEL_CATALOG[quality][nearestInput][scale];
   // Only return models that are physically bundled (see MODEL_MAP note).
   if (!modelFile || !MODEL_MAP[modelFile]) return null;
 

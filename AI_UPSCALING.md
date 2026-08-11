@@ -1,7 +1,7 @@
 # AI Icon Upscaling — Single Source of Truth
 
-**Last updated:** 2026-08-08  
-**Status:** Brand-safe freeze in app + trainers; full matrix retrain via `npm run train:models:force`
+**Last updated:** 2026-08-11
+**Status:** No training. Phase1 registry→map. Phase2 prefer SVG/apple-touch/large (iconQuality) + frozen hybrid.
 
 This file **replaces and merges**:
 

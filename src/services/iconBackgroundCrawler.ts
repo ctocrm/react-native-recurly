@@ -12,6 +12,11 @@ import {
   setCachedIcon,
 } from "@/services/database";
 import { extractFavicon } from "@/src/services/faviconExtractor";
+import {
+  pickBestIcon,
+  scoreIconQuality,
+  sortUrlsByQuality,
+} from "@/src/services/iconQuality";
 import { extractIconsFromUrls } from "@/src/services/htmlIconExtractor";
 import {
   notifyCacheUpdate,
@@ -263,11 +268,26 @@ export async function getIconCollection(iconKey: string): Promise<{
       console.log(`[COLLECTION] Added subscription icon to collection`);
     }
 
-    // Sort: AI upscales first (user just improved these), then subscription, then rest
+    // Sort: AI / subscription first, then by source quality (SVG, large touch icons, …)
     const sorted = Array.from(iconMap.values()).sort((a, b) => {
-      const rank = (s: string) =>
-        s === "ai_upscale" ? 0 : s === "subscription" ? 1 : 2;
-      return rank(a.source) - rank(b.source);
+      return (
+        scoreIconQuality({
+          source: b.source,
+          format: b.format,
+          originalUrl: b.originalUrl,
+          originalWidth: b.originalWidth,
+          originalHeight: b.originalHeight,
+          imageDataLength: b.imageData?.length,
+        }) -
+        scoreIconQuality({
+          source: a.source,
+          format: a.format,
+          originalUrl: a.originalUrl,
+          originalWidth: a.originalWidth,
+          originalHeight: a.originalHeight,
+          imageDataLength: a.imageData?.length,
+        })
+      );
     });
 
     // Derive the MIME subtype directly from the format string
@@ -393,15 +413,21 @@ export async function findIconUrls(iconKey: string): Promise<void> {
   if (officialSiteUrl) {
     console.log(`[SEARCH] TIER 0.5: Scraping official site for icons`);
 
-    // Get favicon from official site - use origin URL
-    const faviconUrl = new URL("/favicon.ico", officialSiteUrl).toString();
-    if (!existingUrls.has(faviconUrl)) {
-      await saveCrawlResult(iconKey, "", "official_favicon", "ico", faviconUrl);
-      urlsToFetch.push({
-        url: faviconUrl,
-        source: "official_favicon",
-        format: "ico",
-      });
+    // Prefer large / vector brand assets on the official origin before tiny .ico
+    const officialPaths: { path: string; source: string; format: string }[] = [
+      { path: "/favicon.svg", source: "official_favicon", format: "svg" },
+      { path: "/apple-touch-icon.png", source: "official_apple_touch", format: "png" },
+      { path: "/apple-touch-icon-precomposed.png", source: "official_apple_touch", format: "png" },
+      { path: "/android-chrome-512x512.png", source: "official_pwa", format: "png" },
+      { path: "/android-chrome-192x192.png", source: "official_pwa", format: "png" },
+      { path: "/favicon.ico", source: "official_favicon", format: "ico" },
+    ];
+    for (const op of officialPaths) {
+      const u = new URL(op.path, officialSiteUrl).toString();
+      if (existingUrls.has(u)) continue;
+      await saveCrawlResult(iconKey, "", op.source, op.format, u);
+      urlsToFetch.push({ url: u, source: op.source, format: op.format });
+      existingUrls.add(u);
     }
 
     // Scrape official site for images
@@ -564,11 +590,13 @@ export async function findIconUrls(iconKey: string): Promise<void> {
 
   // START IMMEDIATE FETCH of discovered URLs in parallel
   // This replaces the old queue-based approach which had race conditions
-  console.log(`[SEARCH] Immediately fetching ${urlsToFetch.length} URLs`);
-  if (urlsToFetch.length > 0) {
+  // High-quality sources first so the first batch is not all tiny favicons
+  const orderedFetch = sortUrlsByQuality(urlsToFetch);
+  console.log(`[SEARCH] Immediately fetching ${orderedFetch.length} URLs (quality-ordered)`);
+  if (orderedFetch.length > 0) {
     // Fetch first 5 immediately (user gets instant feedback)
-    const immediate = urlsToFetch.slice(0, 5);
-    const rest = urlsToFetch.slice(5);
+    const immediate = orderedFetch.slice(0, 5);
+    const rest = orderedFetch.slice(5);
 
     // Fetch first batch in parallel
     await Promise.all(
@@ -678,9 +706,12 @@ export async function processIconQueue(): Promise<void> {
           const all = await getCrawlResults(item.icon_key);
           const withData = all.filter((r) => r.imageData);
           if (withData.length > 0) {
-            const best = withData.reduce((prev, curr) =>
-              prev.fallbackTier < curr.fallbackTier ? prev : curr,
-            );
+            const best = pickBestIcon(
+              withData.map((r) => ({
+                ...r,
+                imageDataLength: r.imageData?.length,
+              })),
+            )!;
             // Upscale low-res picks (e.g. favicons) before caching.
             const bestUpscaled = await upscaleIconIfSmall(
               best.imageData,
@@ -725,9 +756,12 @@ export async function promoteFirstIconToCache(iconKey: string): Promise<void> {
     const withData = all.filter((r) => r.imageData);
     if (withData.length === 0) return;
 
-    const best = withData.reduce((prev, curr) =>
-      prev.fallbackTier < curr.fallbackTier ? prev : curr,
-    );
+    const best = pickBestIcon(
+      withData.map((r) => ({
+        ...r,
+        imageDataLength: r.imageData?.length,
+      })),
+    )!;
     // Upscale low-res picks (e.g. favicons) before caching.
     const bestUpscaled = await upscaleIconIfSmall(best.imageData, best.format);
     await setCachedIcon(

@@ -114,6 +114,8 @@ const SubscriptionIconPickerModal = ({
   );
   const isMounted = useRef(true);
   const latestKeyRef = useRef(iconKey);
+  /** True while white-bg / AI upscale runs — skip cache-driven reloads that race the list. */
+  const processingRef = useRef(false);
 
   useEffect(() => {
     latestKeyRef.current = iconKey;
@@ -270,6 +272,14 @@ const SubscriptionIconPickerModal = ({
           return true;
         });
 
+        // Never clobber a non-empty in-progress list with empty mid-upscale.
+        if (processingRef.current && visible.length === 0) {
+          console.log(
+            `[PICKER] Skip empty collection reload while processing for ${iconKey}`,
+          );
+          return;
+        }
+
         setAvailableIcons(visible);
         console.log(
           `[PICKER] Loaded ${visible.length} icons for ${iconKey} (${mapped.length} total, reports hidden by default)`,
@@ -280,6 +290,7 @@ const SubscriptionIconPickerModal = ({
       }
     } catch (error) {
       console.error("[PICKER] Failed to load icons:", error);
+      // Do not setAvailableIcons([]) — keep current list on failure.
     }
   }, [iconKey, showIncorrect, showBroken, detectIcons]);
 
@@ -305,6 +316,11 @@ const SubscriptionIconPickerModal = ({
   useEffect(() => {
     const unsubscribeCache = addCacheUpdateListener(() => {
       if (!isMounted.current || !visible || !iconKey) return;
+      // Avoid racing AI/white-bg local list updates with a full reload.
+      if (processingRef.current) {
+        console.log("[PICKER] Skip cache reload while processing");
+        return;
+      }
       loadIcons();
     });
     return unsubscribeCache;
@@ -459,6 +475,7 @@ const SubscriptionIconPickerModal = ({
   };
 
   const handleClearWhiteBackground = async (icon: PickerIcon) => {
+    processingRef.current = true;
     setProcessing({ id: icon.id, kind: "white" });
     try {
       const base64 = await removeWhiteBg(icon.imageData, icon.format, 60);
@@ -480,11 +497,13 @@ const SubscriptionIconPickerModal = ({
       console.error("[PICKER] white-bg removal failed:", err);
       Alert.alert("Error", "Failed to clear white background.");
     } finally {
+      processingRef.current = false;
       setProcessing(null);
     }
   };
 
   const handleUpscale = async (icon: PickerIcon) => {
+    processingRef.current = true;
     setProcessing({ id: icon.id, kind: "upscale" });
     // Track what the user requested vs. what actually ran: "sharp" transparently
     // degrades to "fast" (and then bilinear) when its models aren't bundled.
@@ -512,6 +531,7 @@ const SubscriptionIconPickerModal = ({
       console.error("[PICKER] upscale failed:", err);
       Alert.alert("Error", "Failed to upscale icon.");
     } finally {
+      processingRef.current = false;
       setProcessing(null);
     }
   };
