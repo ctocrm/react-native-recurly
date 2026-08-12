@@ -170,6 +170,14 @@ async function downloadImageAsBase64(
       console.log(`[FETCH] SUCCESS: ${url} (${b64.length} bytes)`);
 
       const format = detectUrlFormat(url);
+      // Reject empty / blank / fully-transparent images before they enter the DB.
+      if (!isBase64IconValid(b64, format)) {
+        console.log(
+          `[FETCH] REJECT empty/transparent icon ${url} (format=${format}, bytes=${b64.length})`,
+        );
+        return false;
+      }
+
       const mime = mimeForFormat(format);
       const dataUri = `data:${mime};base64,${b64}`;
       const origSize = await new Promise<{ width: number; height: number }>(
@@ -182,8 +190,28 @@ async function downloadImageAsBase64(
         },
       ).catch(() => null);
 
+      // Degenerate dimensions (when readable) are not usable card icons.
+      if (
+        origSize &&
+        (origSize.width < 8 ||
+          origSize.height < 8 ||
+          origSize.width > 100000 ||
+          origSize.height > 100000)
+      ) {
+        console.log(
+          `[FETCH] REJECT bad dimensions ${url}: ${origSize.width}x${origSize.height}`,
+        );
+        return false;
+      }
+
       const { base64: finalB64, format: finalFormat } =
         await upscaleIconIfSmall(b64, format);
+
+      // Re-validate after upscale (should still pass; guards against bad transforms).
+      if (!isBase64IconValid(finalB64, finalFormat)) {
+        console.log(`[FETCH] REJECT post-upscale invalid icon ${url}`);
+        return false;
+      }
 
       await saveCrawlResult(
         iconKey,
@@ -270,6 +298,8 @@ export async function getIconCollection(iconKey: string): Promise<{
 }> {
   try {
     console.log(`[COLLECTION] Loading icons for ${iconKey}`);
+    // Heal empty/transparent auto-assigned cache before building the picker list.
+    await promoteFirstIconToCache(iconKey);
     const cached = await getCachedIcon(iconKey);
     const results = await getCrawlResults(iconKey);
     // Build a set of reported (non-rejected) image hashes to hide by default.
@@ -371,15 +401,19 @@ export async function getIconCollection(iconKey: string): Promise<{
       );
     });
 
-    // Derive the MIME subtype directly from the format string
+    // Only expose cached URI when the cached icon itself is valid (not empty/transparent).
+    const cachedValid =
+      !!cached?.imageData && isBase64IconValid(cached.imageData, cached.format);
     const mimeSubtype =
       cached?.format === "svg" ? "svg+xml" : (cached?.format ?? "png");
-    console.log(`[COLLECTION] Returning ${sorted.length} icons`);
+    console.log(
+      `[COLLECTION] Returning ${sorted.length} icons (cachedValid=${cachedValid})`,
+    );
     return {
-      cachedIconUri: cached?.imageData
-        ? `data:image/${mimeSubtype};base64,${cached.imageData}`
+      cachedIconUri: cachedValid
+        ? `data:image/${mimeSubtype};base64,${cached!.imageData}`
         : null,
-      cachedFormat: cached?.format ?? null,
+      cachedFormat: cachedValid ? (cached?.format ?? null) : null,
       icons: sorted,
     };
   } catch (err) {
@@ -847,7 +881,7 @@ export async function processIconQueue(): Promise<void> {
   isProcessingQueue = true;
   try {
     // Loop while new work arrived mid-run
-     
+
     while (true) {
       queueRerunRequested = false;
       const queued = await getQueuedIcons();
@@ -905,11 +939,16 @@ export async function processIconQueue(): Promise<void> {
             }
           }
 
-          // After fetching, set best icon as cached
+          // After fetching, set best *valid* icon as cached (skip empty/transparent)
           const cached = await getCachedIcon(item.icon_key);
-          if (!cached?.imageData) {
+          if (
+            !cached?.imageData ||
+            !isBase64IconValid(cached.imageData, cached.format)
+          ) {
             const all = await getCrawlResults(item.icon_key);
-            const withData = all.filter((r) => r.imageData);
+            const withData = all.filter(
+              (r) => r.imageData && isBase64IconValid(r.imageData, r.format),
+            );
             if (withData.length > 0) {
               const best = pickBestIcon(
                 withData.map((r) => ({
@@ -922,17 +961,25 @@ export async function processIconQueue(): Promise<void> {
                 best.imageData,
                 best.format,
               );
-              await setCachedIcon(
-                item.icon_key,
-                bestUpscaled.base64,
-                best.source,
-                bestUpscaled.format,
-                best.originalUrl,
-                0,
-                best.originalWidth,
-                best.originalHeight,
-              );
-              console.log(`[QUEUE] Set best icon as cached: ${best.source}`);
+              if (
+                !isBase64IconValid(bestUpscaled.base64, bestUpscaled.format)
+              ) {
+                console.log(
+                  `[QUEUE] Skip caching invalid best icon for ${item.icon_key}`,
+                );
+              } else {
+                await setCachedIcon(
+                  item.icon_key,
+                  bestUpscaled.base64,
+                  best.source,
+                  bestUpscaled.format,
+                  best.originalUrl,
+                  0,
+                  best.originalWidth,
+                  best.originalHeight,
+                );
+                console.log(`[QUEUE] Set best icon as cached: ${best.source}`);
+              }
             }
           }
         } catch (error) {
@@ -957,16 +1004,30 @@ export async function processIconQueue(): Promise<void> {
   }
 }
 
-// Promote the first already-fetched crawl result to icon_cache so the
-// subscription card auto-assigns the icon without reopening any modal.
+// Promote the best already-fetched *valid* crawl result to icon_cache so the
+// subscription card auto-assigns a non-empty icon without reopening any modal.
 export async function promoteFirstIconToCache(iconKey: string): Promise<void> {
   try {
     const cached = await getCachedIcon(iconKey);
-    if (cached?.imageData) return;
+    // Keep existing cache only if it is still a usable (non-empty) icon.
+    if (
+      cached?.imageData &&
+      isBase64IconValid(cached.imageData, cached.format)
+    ) {
+      return;
+    }
 
     const all = await getCrawlResults(iconKey);
-    const withData = all.filter((r) => r.imageData);
-    if (withData.length === 0) return;
+    // Never auto-assign empty / fully-transparent images to the card.
+    const withData = all.filter(
+      (r) => r.imageData && isBase64IconValid(r.imageData, r.format),
+    );
+    if (withData.length === 0) {
+      console.log(
+        `[CRAWL] No valid icons to auto-assign for ${iconKey} (${all.filter((r) => r.imageData).length} with data, all invalid/empty)`,
+      );
+      return;
+    }
 
     const best = pickBestIcon(
       withData.map((r) => ({
@@ -976,6 +1037,12 @@ export async function promoteFirstIconToCache(iconKey: string): Promise<void> {
     )!;
     // Upscale low-res picks (e.g. favicons) before caching.
     const bestUpscaled = await upscaleIconIfSmall(best.imageData, best.format);
+    if (!isBase64IconValid(bestUpscaled.base64, bestUpscaled.format)) {
+      console.log(
+        `[CRAWL] Best icon for ${iconKey} became invalid after upscale — skip auto-assign`,
+      );
+      return;
+    }
     await setCachedIcon(
       iconKey,
       bestUpscaled.base64,
@@ -986,7 +1053,10 @@ export async function promoteFirstIconToCache(iconKey: string): Promise<void> {
       best.originalWidth,
       best.originalHeight,
     );
-    console.log(`[CRAWL] Auto-assigned first icon for ${iconKey}`);
+    console.log(
+      `[CRAWL] Auto-assigned first valid icon for ${iconKey} (source=${best.source})`,
+    );
+    notifyCacheUpdate();
   } catch (err) {
     console.error(`[CRAWL] Failed to promote icon for ${iconKey}:`, err);
   }

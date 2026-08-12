@@ -395,8 +395,10 @@ const CreateSubscriptionModal = ({
                   ))}
                 </View>
               </View>
+            </ScrollView>
 
-              {/* Submit */}
+            {/* Submit pinned outside ScrollView so it stays tappable */}
+            <View className="px-5 pb-5 pt-2">
               <Pressable
                 className={clsx(
                   "auth-button",
@@ -404,10 +406,12 @@ const CreateSubscriptionModal = ({
                 )}
                 onPress={handleSubmit}
                 disabled={!formValid}
+                accessibilityLabel="Create Subscription"
+                accessibilityRole="button"
               >
                 <Text className="auth-button-text">Create Subscription</Text>
               </Pressable>
-            </ScrollView>
+            </View>
           </Pressable>
         </Pressable>
       </KeyboardAvoidingView>
