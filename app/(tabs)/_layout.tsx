@@ -1,7 +1,7 @@
-import { tabs } from "@/constants/data";
-import { colors, components } from "@/constants/theme";
 import HiddenSearchWebView from "@/components/HiddenSearchWebView";
 import { posthog } from "@/config/posthog";
+import { tabs } from "@/constants/data";
+import { colors, components } from "@/constants/theme";
 import { CloudSyncProvider } from "@/context/CloudSyncContext";
 import { DatabaseProvider } from "@/context/DatabaseProvider";
 import { SubscriptionProvider } from "@/context/SubscriptionContext";
@@ -56,7 +56,9 @@ const TabLayout = () => {
     );
   }
 
-  if (!isSignedIn) {
+  // TEMP: __DEV__ bypass so crawler measurement works without Clerk email OTP.
+  // Remove after Phase A/D device proof. Production builds never set __DEV__.
+  if (!isSignedIn && !__DEV__) {
     return <Redirect href={"/(auth)/signIn"} />;
   }
 

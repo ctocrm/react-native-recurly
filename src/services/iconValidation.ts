@@ -98,10 +98,22 @@ function pngHasVisiblePixels(bytes: Uint8Array): boolean {
 export function isBase64IconValid(base64: string, format: string): boolean {
   if (!base64 || typeof base64 !== "string") return false;
 
-  // SVG: accept any non-trivial markup that isn't an empty shell.
+  // SVG payload is base64 of the SVG text — decode before tag checks.
+  // Checking tags on the base64 string always fails (no "<path" in base64).
   if (format === "svg") {
     if (base64.length <= 64) return false;
-    const lower = base64.toLowerCase();
+    const bytes = decodeBase64ToBytes(base64);
+    if (!bytes || bytes.length < 32) return false;
+    let svgText = "";
+    try {
+      for (let i = 0; i < bytes.length; i++) {
+        svgText += String.fromCharCode(bytes[i]);
+      }
+    } catch {
+      return false;
+    }
+    const lower = svgText.toLowerCase();
+    if (!lower.includes("<svg")) return false;
     // Reject SVGs with no drawing commands / only empty groups.
     if (
       !/<path|<rect|<circle|<polygon|<ellipse|<line|<polyline|<text|<image|<use/i.test(

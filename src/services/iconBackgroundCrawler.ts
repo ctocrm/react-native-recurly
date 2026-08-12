@@ -49,7 +49,8 @@ const MAX_SPIDERED_URLS = 40;
 const MAX_SPIDERED_ICONS = 40;
 const MAX_WEB_SEARCH_RESULTS = 50;
 /** How many discovered URLs to fetch immediately (rest go to queue). */
-const IMMEDIATE_FETCH_BATCH = 12;
+/** Fetch more candidates up-front so picker fills without waiting on queue alone. */
+const IMMEDIATE_FETCH_BATCH = 40;
 /** Max <img> candidates from official homepage scrape. */
 const MAX_OFFICIAL_SITE_IMGS = 20;
 
@@ -688,12 +689,13 @@ export async function findIconUrls(iconKey: string): Promise<void> {
   const isSearchEngineHost = (u: string) =>
     /google\.|bing\.|duckduckgo\.|yandex\./i.test(u);
 
+  // Match peak-era (5b7c1a0) image gate: extension OR logo/icon token in URL.
   const looksLikeDirectImage = (url: string): boolean => {
     const lower = url.toLowerCase();
     if (/\.(svg|png|jpg|jpeg|ico|webp|gif)(\?|#|$)/i.test(lower)) return true;
-    // CDN / brand asset paths without clean extensions
+    if (lower.includes("logo") || lower.includes("icon")) return true;
     if (
-      /(?:^|[/?#_.=-])(logo|icon|favicon|brand|apple-touch|android-chrome)(?:$|[/?#_.=-])/i.test(
+      /(?:^|[/?#_.=-])(favicon|brand|apple-touch|android-chrome)(?:$|[/?#_.=-])/i.test(
         lower,
       )
     ) {
