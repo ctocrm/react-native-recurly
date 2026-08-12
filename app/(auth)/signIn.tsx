@@ -35,13 +35,6 @@ const SignIn = () => {
   const [emailTouched, setEmailTouched] = useState(false);
   const [passwordTouched, setPasswordTouched] = useState(false);
 
-  // TEMP: skip Clerk gate in __DEV__ for crawler measurement on device.
-  useEffect(() => {
-    if (__DEV__) {
-      router.replace("/(tabs)" as Href);
-    }
-  }, [router]);
-
   useEffect(() => {
     const sub = Keyboard.addListener("keyboardDidShow", () => {
       scrollRef.current?.scrollToEnd({ animated: true });

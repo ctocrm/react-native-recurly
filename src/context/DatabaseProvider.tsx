@@ -1,4 +1,3 @@
-import { closeDatabase, openDatabase } from "@/services/database";
 import { useAuth } from "@clerk/expo";
 import type { SQLiteDatabase } from "expo-sqlite";
 import React, {
@@ -11,6 +10,7 @@ import React, {
   type ReactNode,
 } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { closeDatabase, openDatabase } from "@/services/database";
 
 interface DatabaseContextType {
   db: SQLiteDatabase | null;
@@ -19,8 +19,6 @@ interface DatabaseContextType {
 }
 
 const DatabaseContext = createContext<DatabaseContextType | null>(null);
-
-const DEV_LOCAL_USER_ID = "dev-local-crawler";
 
 export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
   const { isSignedIn, isLoaded, userId: clerkUserId } = useAuth();
@@ -34,14 +32,10 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
     promise: null,
   });
 
-  // TEMP: open a local DB in __DEV__ without Clerk so crawler can be measured.
-  const effectiveUserId = clerkUserId ?? (__DEV__ ? DEV_LOCAL_USER_ID : null);
-  const canOpenDb = Boolean(effectiveUserId) && (isSignedIn || __DEV__);
-
   useEffect(() => {
     if (!isLoaded) return;
 
-    if (!canOpenDb || !effectiveUserId) {
+    if (!isSignedIn || !clerkUserId) {
       if (db) {
         closeDatabase().then(() => setDb(null));
       }
@@ -51,7 +45,7 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
     let cancelled = false;
 
     const init = async () => {
-      const currentUserId = effectiveUserId;
+      const currentUserId = clerkUserId;
 
       // If already opening for this user, wait for that promise
       if (
@@ -95,18 +89,18 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
     return () => {
       cancelled = true;
     };
-  }, [isLoaded, canOpenDb, effectiveUserId, db]);
+  }, [isLoaded, isSignedIn, clerkUserId, db]);
 
   const value = useMemo(
     () => ({
       db,
-      userId: effectiveUserId,
-      isReady: isLoaded && (canOpenDb ? db !== null : true),
+      userId: clerkUserId ?? null,
+      isReady: isLoaded && (isSignedIn ? db !== null : true),
     }),
-    [db, effectiveUserId, isLoaded, canOpenDb],
+    [db, clerkUserId, isLoaded, isSignedIn],
   );
 
-  if (!isLoaded || (canOpenDb && !db && !dbError)) {
+  if (!isLoaded || (isSignedIn && !db && !dbError)) {
     return (
       <View className="flex-1 items-center justify-center bg-background">
         <ActivityIndicator size="large" />
@@ -134,7 +128,7 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
               className="mt-2 rounded-xl bg-accent px-6 py-2"
               onPress={() => {
                 setDbError(null);
-                const currentUserId = effectiveUserId;
+                const currentUserId = clerkUserId;
                 if (currentUserId) {
                   openDatabase(currentUserId)
                     .then((database) => setDb(database))
