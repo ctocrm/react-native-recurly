@@ -4,7 +4,7 @@
  * and can hide rejected icons from appearing again.
  */
 
-import { getDatabase } from "../../services/database";
+import { getDatabase } from "@/services/database";
 
 export type ReportType = "wrong" | "broken";
 

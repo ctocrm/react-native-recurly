@@ -1,6 +1,6 @@
 import { icons } from "@/constants/icons";
 import { formatCurrency } from "@/lib/utils";
-import { useSubscriptions } from "@/src/context/SubscriptionContext";
+import { useSubscriptions } from "@/context/SubscriptionContext";
 import { styled } from "nativewind";
 import { usePostHog } from "posthog-react-native";
 import React, { useEffect, useMemo, useState } from "react";

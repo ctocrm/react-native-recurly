@@ -512,7 +512,7 @@ export async function searchForLinksToSpider(brand: string): Promise<string[]> {
   // 1) WebView-based DuckDuckGo (best on device when HiddenSearchWebView is mounted)
   try {
     const { searchForLinksWithWebView } =
-      await import("@/src/services/webViewSearchEngine");
+      await import("@/services/webViewSearchEngine");
     const wvLinks = await searchForLinksWithWebView(brand);
     console.log(
       `[SEARCH] searchForLinksToSpider: WebView returned ${wvLinks.length} links`,

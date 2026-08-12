@@ -1,7 +1,7 @@
 # Product plan — icons, crawl, DB, sync (no training)
 
 **Last updated:** 2026-08-11  
-**Status:** Phases **1–5 complete** (built + emu smoke). Phase **5.5** in progress (A–C done; D next). Phase **6** after cleanup. **Training frozen.**
+**Status:** Phases **1–5 complete** (built + emu smoke). Phase **5.5** in progress (A–D done; E next). Phase **6** after cleanup. **Training frozen.**
 
 This is the living execution plan for app-side quality and reliability **without** retraining TFLite models. AI upscale strategy remains frozen in [`docs/AI_UPSCALING.md`](./AI_UPSCALING.md) (now under `docs/`).
 
@@ -319,9 +319,9 @@ Do **not** change global `@/*` mapping in this tranche (lower blast radius). Ali
 5. Normalize imports (`@/services/database`, `@/lib/…`, `@/constants/…`); kill mixed `../../services/database`
 6. Grep asset `require` / icon paths carefully
 
-- [ ] Moves + tsconfig/babel paths
-- [ ] Import rewrite complete; `tsc` clean
-- [ ] **Gate D** full build + emu (**critical**)
+- [x] Moves + tsconfig/babel paths
+- [x] Import rewrite complete; `tsc` clean
+- [x] **Gate D** full build + emu (**critical**)
 
 ---
 
@@ -431,3 +431,4 @@ npm run build:android:x86_64   # install + launch on emu when self-contained
 | 2026-08-11 | **5.5-A done:** artifacts removed, gitignore, APKs→`build-out/apk/`, gate passed |
 | 2026-08-11 | **5.5-B done:** docs under `docs/`; stubs/autopsy removed |
 | 2026-08-11 | **5.5-C done:** components merged into `src/components/`; gate passed |
+| 2026-08-11 | **5.5-D done:** lib/services/constants → src/; aliases `@/*`→src+root, `@assets/*`; gate passed |

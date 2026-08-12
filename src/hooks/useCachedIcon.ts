@@ -3,7 +3,7 @@ import {
   getCachedIcon,
   getQueuedIcons,
   setCachedIcon,
-} from "../../services/database";
+} from "@/services/database";
 import {
   addCacheUpdateListener,
   addLoadingListener,

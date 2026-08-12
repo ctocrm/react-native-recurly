@@ -1,12 +1,12 @@
 import { icons } from "@/constants/icons";
 import { searchLogos } from "@/lib/resolveLogo";
 import { getCachedIcon } from "@/services/database";
-import { startIconCrawl } from "@/src/services/iconBackgroundCrawler";
+import { startIconCrawl } from "@/services/iconBackgroundCrawler";
 import {
   addCacheUpdateListener,
   isIconLoading,
-} from "@/src/services/iconLoadingRegistry";
-import { nameToSlug } from "@/src/services/iconScraper";
+} from "@/services/iconLoadingRegistry";
+import { nameToSlug } from "@/services/iconScraper";
 import clsx from "clsx";
 import dayjs from "dayjs";
 import { usePostHog } from "posthog-react-native";

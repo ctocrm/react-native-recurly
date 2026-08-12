@@ -1,5 +1,5 @@
 import images from "@/constants/images";
-import { useSubscriptions } from "@/src/context/SubscriptionContext";
+import { useSubscriptions } from "@/context/SubscriptionContext";
 import { useUser } from "@clerk/expo";
 import * as DocumentPicker from "expo-document-picker";
 import { readAsStringAsync } from "expo-file-system/legacy";
@@ -15,7 +15,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { setPreference } from "../../services/database";
+import { setPreference } from "@/services/database";
 
 interface UserSettingsModalProps {
   visible: boolean;

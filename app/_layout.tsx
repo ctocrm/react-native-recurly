@@ -9,8 +9,8 @@ import {
 } from "expo-router";
 import { PostHogProvider } from "posthog-react-native";
 import React, { useEffect, useRef } from "react";
-import { posthog } from "../src/config/posthog";
-import { IconCacheProvider } from "../src/context/IconCacheContext";
+import { posthog } from "@/config/posthog";
+import { IconCacheProvider } from "@/context/IconCacheContext";
 
 SplashScreen.preventAutoHideAsync();
 

@@ -1,10 +1,10 @@
 import { tabs } from "@/constants/data";
 import { colors, components } from "@/constants/theme";
-import HiddenSearchWebView from "@/src/components/HiddenSearchWebView";
-import { posthog } from "@/src/config/posthog";
-import { CloudSyncProvider } from "@/src/context/CloudSyncContext";
-import { DatabaseProvider } from "@/src/context/DatabaseProvider";
-import { SubscriptionProvider } from "@/src/context/SubscriptionContext";
+import HiddenSearchWebView from "@/components/HiddenSearchWebView";
+import { posthog } from "@/config/posthog";
+import { CloudSyncProvider } from "@/context/CloudSyncContext";
+import { DatabaseProvider } from "@/context/DatabaseProvider";
+import { SubscriptionProvider } from "@/context/SubscriptionContext";
 
 import { useAuth, useUser } from "@clerk/expo";
 import clsx from "clsx";

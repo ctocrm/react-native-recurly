@@ -1,6 +1,6 @@
 /**
- * Database public API — thin facade over services/db/*.
- * Call sites keep importing from `@/services/database` / `services/database`.
+ * Database public API — thin facade over src/services/db/*.
+ * Call sites keep importing from `@/services/database`.
  */
 import { icons } from "@/constants/icons";
 import * as Crypto from "expo-crypto";
@@ -331,7 +331,7 @@ export async function setCachedIcon(
   // Notify listeners that cache has been updated (dynamic import to avoid circular deps)
   setTimeout(async () => {
     const { notifyCacheUpdate } =
-      await import("../src/services/iconLoadingRegistry");
+      await import("./iconLoadingRegistry");
     notifyCacheUpdate();
   }, 0);
 }
@@ -465,7 +465,7 @@ export async function replaceIconWithAiUpscale(
   );
   setTimeout(async () => {
     const { notifyCacheUpdate } =
-      await import("../src/services/iconLoadingRegistry");
+      await import("./iconLoadingRegistry");
     notifyCacheUpdate();
   }, 0);
 }
@@ -1136,7 +1136,7 @@ export async function mergeIconCacheFromBackup(
     if (merged > 0) {
       setTimeout(async () => {
         const { notifyCacheUpdate } =
-          await import("../src/services/iconLoadingRegistry");
+          await import("./iconLoadingRegistry");
         notifyCacheUpdate();
       }, 0);
     }
@@ -1205,7 +1205,7 @@ export async function clearIconCache(): Promise<void> {
   // Notify listeners so in-memory cache state is invalidated.
   setTimeout(async () => {
     const { notifyCacheUpdate } =
-      await import("../src/services/iconLoadingRegistry");
+      await import("./iconLoadingRegistry");
     notifyCacheUpdate();
   }, 0);
 }
@@ -1229,7 +1229,7 @@ export async function clearCrawlHistory(): Promise<void> {
   // Reset persisted rate-limit cooldowns (SecureStore + in-memory).
   try {
     const { clearAllRateLimits } =
-      await import("../src/services/rateLimitTracker");
+      await import("./rateLimitTracker");
     await clearAllRateLimits();
   } catch {
     /* rate-limit module unavailable */

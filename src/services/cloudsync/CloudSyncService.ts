@@ -11,7 +11,7 @@ import {
   importBackup,
   mergeIconCacheFromBackup,
   updateSyncMetadata,
-} from "../../../services/database";
+} from "@/services/database";
 import { DropboxStorage } from "./storage/DropboxStorage";
 import { GoogleDriveStorage } from "./storage/GoogleDriveStorage";
 import { ICloudStorage } from "./storage/ICloudStorage";

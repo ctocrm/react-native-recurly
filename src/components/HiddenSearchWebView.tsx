@@ -13,7 +13,7 @@ import {
   getSearchUrl,
   handleWebViewMessage,
   setSearchTriggerCallback,
-} from "@/src/services/webViewSearchEngine";
+} from "@/services/webViewSearchEngine";
 
 interface HiddenSearchWebViewProps {
   onSearchComplete?: (urls: string[]) => void;

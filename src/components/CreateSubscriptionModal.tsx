@@ -4,12 +4,12 @@ import { getCachedIcon } from "@/services/database";
 import {
   queueIconForScraping,
   startIconCrawl,
-} from "@/src/services/iconBackgroundCrawler";
+} from "@/services/iconBackgroundCrawler";
 import {
   addCacheUpdateListener,
   isIconLoading,
-} from "@/src/services/iconLoadingRegistry";
-import { nameToSlug } from "@/src/services/iconScraper";
+} from "@/services/iconLoadingRegistry";
+import { nameToSlug } from "@/services/iconScraper";
 import clsx from "clsx";
 import dayjs from "dayjs";
 import { usePostHog } from "posthog-react-native";

@@ -3,7 +3,7 @@ import {
   formatStatusLabel,
   formatSubscriptionDateTime,
 } from "@/lib/utils";
-import { useCachedIcon } from "@/src/hooks/useCachedIcon";
+import { useCachedIcon } from "@/hooks/useCachedIcon";
 import clsx from "clsx";
 import React, { useState } from "react";
 import { ActivityIndicator, Image, Pressable, Text, View } from "react-native";

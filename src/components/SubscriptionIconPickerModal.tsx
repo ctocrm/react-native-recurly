@@ -8,29 +8,29 @@ import {
 import {
   getIconCollection,
   startIconCrawl,
-} from "@/src/services/iconBackgroundCrawler";
+} from "@/services/iconBackgroundCrawler";
 import {
   addCacheUpdateListener,
   addLoadingListener,
   isIconLoading,
-} from "@/src/services/iconLoadingRegistry";
+} from "@/services/iconLoadingRegistry";
 import {
   isLowResIcon,
   isQualityAvailable,
   upscaleIconAi,
   type UpscaleQuality,
-} from "@/src/services/iconProcessing";
+} from "@/services/iconProcessing";
 import {
   getReportsForIcon,
   hashImageData,
   rejectReportedIcon,
   reportIcon,
-} from "@/src/services/iconReportService";
+} from "@/services/iconReportService";
 import {
   addRateLimitListener,
   getRateLimitedDomains,
-} from "@/src/services/rateLimitTracker";
-import { detectWhiteBg, removeWhiteBg } from "@/src/services/whiteBgRemoval";
+} from "@/services/rateLimitTracker";
+import { detectWhiteBg, removeWhiteBg } from "@/services/whiteBgRemoval";
 import { usePostHog } from "posthog-react-native";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {

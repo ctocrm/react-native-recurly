@@ -11,30 +11,30 @@ import {
   saveCrawlResult,
   setCachedIcon,
 } from "@/services/database";
-import { extractFavicon } from "@/src/services/faviconExtractor";
+import { extractFavicon } from "@/services/faviconExtractor";
 import {
   pickBestIcon,
   scoreIconQuality,
   sortUrlsByQuality,
-} from "@/src/services/iconQuality";
-import { extractIconsFromUrls } from "@/src/services/htmlIconExtractor";
+} from "@/services/iconQuality";
+import { extractIconsFromUrls } from "@/services/htmlIconExtractor";
 import {
   notifyCacheUpdate,
   setIconLoading,
-} from "@/src/services/iconLoadingRegistry";
+} from "@/services/iconLoadingRegistry";
 import {
   getReportsForIcon,
   hashImageData,
-} from "@/src/services/iconReportService";
-import { findAllIconSources } from "@/src/services/iconScraper";
-import { mimeForFormat, upscaleIconIfSmall } from "@/src/services/iconUpscaler";
-import { isBase64IconValid } from "@/src/services/iconValidation";
+} from "@/services/iconReportService";
+import { findAllIconSources } from "@/services/iconScraper";
+import { mimeForFormat, upscaleIconIfSmall } from "@/services/iconUpscaler";
+import { isBase64IconValid } from "@/services/iconValidation";
 import {
   isDomainRateLimited,
   recordRateLimit,
   recordSuccess,
-} from "@/src/services/rateLimitTracker";
-import { searchForLinksToSpider } from "@/src/services/searchEngines";
+} from "@/services/rateLimitTracker";
+import { searchForLinksToSpider } from "@/services/searchEngines";
 import { Image } from "react-native";
 
 // In-flight guard

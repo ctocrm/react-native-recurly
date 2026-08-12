@@ -1,5 +1,5 @@
-import { posthog } from "@/src/config/posthog";
-import { processIconQueue } from "@/src/services/iconBackgroundCrawler";
+import { posthog } from "@/config/posthog";
+import { processIconQueue } from "@/services/iconBackgroundCrawler";
 import dayjs from "dayjs";
 import React, {
   createContext,
@@ -22,7 +22,7 @@ import {
   getPreference,
   setPreference,
   updateCrawledUrlAttempt,
-} from "../../services/database";
+} from "@/services/database";
 import { useDatabase } from "./DatabaseProvider";
 
 interface SubscriptionContextType {

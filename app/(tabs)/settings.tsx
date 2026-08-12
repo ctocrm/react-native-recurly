@@ -1,10 +1,10 @@
 import images from "@/constants/images";
-import ConfirmModal from "@/src/components/ConfirmModal";
-import ConflictResolutionModal from "@/src/components/ConflictResolutionModal";
-import { useCloudSync } from "@/src/context/CloudSyncContext";
-import { useDatabase } from "@/src/context/DatabaseProvider";
-import { useIconCache } from "@/src/context/IconCacheContext";
-import { useSubscriptions } from "@/src/context/SubscriptionContext";
+import ConfirmModal from "@/components/ConfirmModal";
+import ConflictResolutionModal from "@/components/ConflictResolutionModal";
+import { useCloudSync } from "@/context/CloudSyncContext";
+import { useDatabase } from "@/context/DatabaseProvider";
+import { useIconCache } from "@/context/IconCacheContext";
+import { useSubscriptions } from "@/context/SubscriptionContext";
 import { useClerk, useUser } from "@clerk/expo";
 import * as DocumentPicker from "expo-document-picker";
 import * as Sharing from "expo-sharing";
@@ -33,7 +33,7 @@ import {
   importBackup,
   type IconCacheStats,
   type ImportScanResult,
-} from "../../services/database";
+} from "@/services/database";
 
 type ClearTarget = "iconCache" | "crawlHistory" | null;
 

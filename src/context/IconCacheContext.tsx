@@ -5,7 +5,7 @@ import React, {
   useState,
   type ReactNode,
 } from "react";
-import { getCachedIcon } from "../../services/database";
+import { getCachedIcon } from "@/services/database";
 
 interface IconCacheContextType {
   getCachedIconData: (iconKey: string) => Promise<string | null>;

@@ -10,7 +10,7 @@ import React, {
   type ReactNode,
 } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
-import { closeDatabase, openDatabase } from "../../services/database";
+import { closeDatabase, openDatabase } from "@/services/database";
 
 interface DatabaseContextType {
   db: SQLiteDatabase | null;

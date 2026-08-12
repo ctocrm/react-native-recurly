@@ -1,10 +1,10 @@
-import ListHeading from "@/src/components/ListHeading";
-import SubscriptionCard from "@/src/components/SubscriptionCard";
+import ListHeading from "@/components/ListHeading";
+import SubscriptionCard from "@/components/SubscriptionCard";
 import "@/global.css";
-import EditSubscriptionModal from "@/src/components/EditSubscriptionModal";
-import SubscriptionIconPickerModal from "@/src/components/SubscriptionIconPickerModal";
-import SubscriptionStatsModal from "@/src/components/SubscriptionStatsModal";
-import { useSubscriptions } from "@/src/context/SubscriptionContext";
+import EditSubscriptionModal from "@/components/EditSubscriptionModal";
+import SubscriptionIconPickerModal from "@/components/SubscriptionIconPickerModal";
+import SubscriptionStatsModal from "@/components/SubscriptionStatsModal";
+import { useSubscriptions } from "@/context/SubscriptionContext";
 import clsx from "clsx";
 import { useLocalSearchParams } from "expo-router";
 import { styled } from "nativewind";
