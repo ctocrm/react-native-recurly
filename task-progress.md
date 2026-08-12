@@ -1,48 +1,30 @@
-# Icon Search/Crawl System - Fix Plan
+# Task progress (legacy)
 
-## P1 - Critical Issues
+**Superseded by [`plan.md`](./plan.md)** (2026-08-11).
 
-### [ ] Fix web search returning 0 results (searchEngines.ts)
-- [ ] Add comprehensive error logging to each search function
-- [ ] Test each search engine individually with detailed logging
-- [ ] Prioritize DuckDuckGo (most likely to work in React Native)
-- [ ] Add fallback to DuckDuckGo's HTML/lite version
-- [ ] Handle CORS/blocking issues gracefully
+The old P1–P3 crawl checklist below is historical. Current status:
 
-### [ ] Fix queue always empty (iconBackgroundCrawler.ts, database.ts)
-- [ ] Add logging to enqueueIconScrape to confirm it writes to DB
-- [ ] Add small delay between enqueue and process to ensure DB write completes
-- [ ] Or change approach: pass URLs directly to processIconQueue instead of using queue table
-- [ ] Fix the startup flow in SubscriptionContext to properly call processIconQueue
+- Phases **1–5 complete** (registry/map, iconQuality, crawl reliability, DB schema split, sync honesty)
+- Phase **6** (ship polish) open
+- Training **frozen** — see `AI_UPSCALING.md`
 
-## P2 - High Priority Issues
+Do not add new work here; update `plan.md` instead.
 
-### [ ] Fix library CDN search (iconScraper.ts)
-- [ ] Check findAllIconSources function
-- [ ] Add logging for each CDN source queried
-- [ ] Fix nameToSlug to handle edge cases (trailing dashes, spaces, etc.)
-- [ ] Add more CDN sources if needed
-- [ ] Try multiple slug variations
+---
 
-### [ ] Fix spider (htmlIconExtractor.ts)
-- [ ] Add logging for HTML received from each URL
-- [ ] Check if HTML parsing correctly extracts icon links
-- [ ] Test with known websites
+## Historical checklist (pre-phase board)
 
-## P3 - Medium Priority Issues
+<details>
+<summary>Old Icon Search/Crawl Fix Plan (archived)</summary>
 
-### [ ] Add background crawler for old URLs (iconBackgroundCrawler.ts, SubscriptionContext.tsx)
-- [ ] Add setInterval in SubscriptionContext that runs every 30-60 minutes
-- [ ] Pick random old URLs from crawled_urls table
-- [ ] Re-download and update if content changed
-- [ ] Use getOldCrawledUrls function (already added to database.ts)
+### P1 - Critical Issues
+- Web search / queue empty — largely addressed via crawler + rate-limit work in Phase 3
 
-### [ ] Show library icons in collection immediately (iconBackgroundCrawler.ts)
-- [ ] After findIconUrls saves URLs to crawl_results, immediately trigger a fetch for those URLs
-- [ ] Don't wait for queue — fetch the first batch immediately
-- [ ] Queue handles the rest
+### P2 - High Priority
+- Library CDN / spider — improved via Phase 2 source order + quality scoring
 
-## Testing
-- [ ] Run TypeScript check: npx tsc --noEmit
-- [ ] Run lint check: npm run lint
-- [ ] Test the search functionality manually
+### P3 - Medium
+- Background crawler interval — present (`[CRAWLER] Background crawler started`)
+- Immediate library fetch batch — present in crawl flow
+
+</details>

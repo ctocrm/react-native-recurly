@@ -1,5 +1,7 @@
 # Welcome to your Expo app 👋
 
+**Roadmap:** see [`plan.md`](./plan.md) (phases 1–5 done, 6 ship polish). AI/train: [`AI_UPSCALING.md`](./AI_UPSCALING.md).
+
 This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
 
 ## Get started
