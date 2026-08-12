@@ -1,7 +1,7 @@
 # Product plan — icons, crawl, DB, sync (no training)
 
 **Last updated:** 2026-08-11  
-**Status:** Phases **1–5 complete** (built + emu smoke). Phase **5.5** (professional cleanup) **next**. Phase **6** after cleanup. **Training frozen.**
+**Status:** Phases **1–5 complete** (built + emu smoke). Phase **5.5** in progress (A done; B next). Phase **6** after cleanup. **Training frozen.**
 
 This is the living execution plan for app-side quality and reliability **without** retraining TFLite models. AI upscale strategy remains frozen in [`AI_UPSCALING.md`](./AI_UPSCALING.md) (path may move under `docs/` in Phase 5.5).
 
@@ -198,7 +198,7 @@ app.config.js / app.json
 
 | Tranche | Name | Risk | Status |
 | ------- | ---- | ---- | ------ |
-| **A** | Artifacts + `.gitignore` + APK output dir | Low | Open |
+| **A** | Artifacts + `.gitignore` + APK output dir | Low | **Done** |
 | **B** | Docs → `docs/`, delete stubs/autopsy | Low | Open |
 | **C** | Merge `components/` → `src/components/` | Medium | Open |
 | **D** | `services` / `lib` / `constants` under `src/` + aliases | High | Open |
@@ -248,10 +248,10 @@ emu_*.png
 
 **Build script:** copy APKs to `build-out/apk/app-release-${ARCH}.apk` (gitignored), not repo root. Update README paths.
 
-- [ ] Delete artifacts listed above
-- [ ] Extend `.gitignore`
-- [ ] Point `scripts/build-android.sh` (or successor) at `build-out/apk/`
-- [ ] **Gate A:** `tsc` + `build:android:x86_64` + emu smoke
+- [x] Delete artifacts listed above
+- [x] Extend `.gitignore`
+- [x] Point `scripts/build-android.sh` (or successor) at `build-out/apk/`
+- [x] **Gate A:** `tsc` + `build:android:x86_64` + emu smoke
 
 ---
 
@@ -428,3 +428,4 @@ npm run build:android:x86_64   # install + launch on emu when self-contained
 | ---- | ---- |
 | 2026-08-11 | Phases 1–5 implemented and smoke-tested; `plan.md` created as living board |
 | 2026-08-11 | **Phase 5.5** inserted: professional cleanup (artifacts, docs, src layout) between Phase 5 and Phase 6 |
+| 2026-08-11 | **5.5-A done:** artifacts removed, gitignore, APKs→`build-out/apk/`, gate passed |

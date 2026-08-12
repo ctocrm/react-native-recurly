@@ -32,6 +32,9 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+BUILD_OUT_DIR="$PROJECT_ROOT/build-out"
+BUILD_OUT_APK_DIR="$BUILD_OUT_DIR/apk"
+BUILD_OUT_LOG_DIR="$BUILD_OUT_DIR/logs"
 ANDROID_SDK="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/home/d/Android/Sdk}}"
 
 # Defaults
@@ -194,7 +197,8 @@ fi
 
 ALL_PASSED=true
 for ARCH in "${BUILD_ARCHS[@]}"; do
-    LOG_FILE="$PROJECT_ROOT/build-${ARCH}.log"
+    mkdir -p "$BUILD_OUT_LOG_DIR" "$BUILD_OUT_APK_DIR"
+    LOG_FILE="$BUILD_OUT_LOG_DIR/build-${ARCH}.log"
     if [ "$DEV_MODE" = "true" ]; then
         APK_FILE="$BUILD_DIR/app/build/outputs/apk/debug/app-debug.apk"
         GRADLE_TASK="assembleDebug"
@@ -240,9 +244,9 @@ for ARCH in "${BUILD_ARCHS[@]}"; do
         # Copy APK to arch-specific filename to prevent overwriting
         if [ -f "$APK_FILE" ]; then
             if [ "$DEV_MODE" = "true" ]; then
-                ARCH_APK="$PROJECT_ROOT/app-debug-${ARCH}.apk"
+                ARCH_APK="$BUILD_OUT_APK_DIR/app-debug-${ARCH}.apk"
             else
-                ARCH_APK="$PROJECT_ROOT/app-release-${ARCH}.apk"
+                ARCH_APK="$BUILD_OUT_APK_DIR/app-release-${ARCH}.apk"
             fi
             cp "$APK_FILE" "$ARCH_APK"
             echo "[BUILD] Copied to: $ARCH_APK"

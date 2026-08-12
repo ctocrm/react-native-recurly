@@ -124,7 +124,9 @@ This generates/updates the native Android project with:
 Output per architecture:
 
 - `android/app/build/outputs/apk/debug/app-debug.apk`
-- `android/app/build/outputs/apk/release/app-release.apk`
+- `android/app/build/outputs/apk/release/app-release.apk` (Gradle output)
+- `build-out/apk/app-release-<abi>.apk` (copied by `scripts/build-android.sh`; gitignored)
+- `build-out/logs/build-<abi>.log` (build logs; gitignored)
 
 #### Step 4: Start Emulator and Install
 
