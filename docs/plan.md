@@ -1,7 +1,7 @@
 # Product plan — icons, crawl, DB, sync (no training)
 
 **Last updated:** 2026-08-11  
-**Status:** Phases **1–5 complete** (built + emu smoke). Phase **5.5** in progress (A–D done; E next). Phase **6** after cleanup. **Training frozen.**
+**Status:** Phases **1–5 complete** (built + emu smoke). Phase **5.5** in progress (A–E done; F next). Phase **6** after cleanup. **Training frozen.**
 
 This is the living execution plan for app-side quality and reliability **without** retraining TFLite models. AI upscale strategy remains frozen in [`docs/AI_UPSCALING.md`](./AI_UPSCALING.md) (now under `docs/`).
 
@@ -202,7 +202,7 @@ app.config.js / app.json
 | **B** | Docs → `docs/`, delete stubs/autopsy | Low | **Done** |
 | **C** | Merge `components/` → `src/components/` | Medium | **Done** |
 | **D** | `services` / `lib` / `constants` under `src/` + aliases | High | Open |
-| **E** | `scripts/{android,train,models}` layout | Low–med | Open |
+| **E** | `scripts/{android,train,models}` layout | Low–med | **Done** |
 | **F** | README / import consistency / this plan | Low | Open |
 
 **Rule:** gate after **A**, **C**, **D**, **E** (full build). Never combine D with A untested.
@@ -335,8 +335,8 @@ scripts/
   poc/         # optional: poc_*.py/sh only; outputs gitignored
 ```
 
-- [ ] Move scripts; update `package.json` paths
-- [ ] **Gate E:** `tsc` + one android build (train need not run)
+- [x] Move scripts; update `package.json` paths
+- [x] **Gate E:** `tsc` + one android build (train need not run)
 
 ---
 
@@ -432,3 +432,4 @@ npm run build:android:x86_64   # install + launch on emu when self-contained
 | 2026-08-11 | **5.5-B done:** docs under `docs/`; stubs/autopsy removed |
 | 2026-08-11 | **5.5-C done:** components merged into `src/components/`; gate passed |
 | 2026-08-11 | **5.5-D done:** lib/services/constants → src/; aliases `@/*`→src+root, `@assets/*`; gate passed |
+| 2026-08-11 | **5.5-E done:** scripts/{android,train,models,poc}; train:registry OK; gate passed |

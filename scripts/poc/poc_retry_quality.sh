@@ -4,7 +4,7 @@
 set -u
 set -o pipefail
 
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
 OUT_DIR="${POC_OUT_DIR:-$ROOT/assets/models_poc_batch}"
@@ -31,9 +31,9 @@ run_one() {
   local model="$2"
   local script
   if [[ "$family" == "espcn" ]]; then
-    script="$ROOT/scripts/train_espcn_multi.py"
+    script="$ROOT/scripts/train/train_espcn_multi.py"
   else
-    script="$ROOT/scripts/train_fsrcnn_multi.py"
+    script="$ROOT/scripts/train/train_fsrcnn_multi.py"
   fi
   echo "" | tee -a "$LOG"
   echo "======== $(ts) $family $model FULL_EPOCHS ========" | tee -a "$LOG"

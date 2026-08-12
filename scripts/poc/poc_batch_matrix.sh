@@ -5,7 +5,7 @@
 set -u
 set -o pipefail
 
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
 OUT_DIR="${POC_OUT_DIR:-$ROOT/assets/models_poc_batch}"
@@ -32,9 +32,9 @@ run_one() {
   local epochs="$3"
   local script
   if [[ "$family" == "espcn" ]]; then
-    script="$ROOT/scripts/train_espcn_multi.py"
+    script="$ROOT/scripts/train/train_espcn_multi.py"
   else
-    script="$ROOT/scripts/train_fsrcnn_multi.py"
+    script="$ROOT/scripts/train/train_fsrcnn_multi.py"
   fi
   echo "" | tee -a "$LOG"
   echo "======== $(ts) $family $model epochs=$epochs ========" | tee -a "$LOG"
@@ -81,7 +81,7 @@ SMOKE_OUT="${POC_SMOKE_OUT:-$ROOT/poc_out_batch_smoke}"
 echo "" | tee -a "$LOG"
 echo "======== $(ts) batch smoke $OUT_DIR -> $SMOKE_OUT ========" | tee -a "$LOG"
 set +e
-"$PY" -u "$ROOT/scripts/poc_upscale_smoke.py" \
+"$PY" -u "$ROOT/scripts/poc/poc_upscale_smoke.py" \
   --batch-dir "$OUT_DIR" \
   --out "$SMOKE_OUT" \
   --expect-poc-batch 2>&1 | tee -a "$LOG"

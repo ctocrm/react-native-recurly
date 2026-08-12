@@ -17,7 +17,7 @@
 const fs = require("fs");
 const path = require("path");
 
-const MODEL_DIR = path.join(__dirname, "..", "assets", "models");
+const MODEL_DIR = path.join(__dirname, "..", "..", "assets", "models");
 const REGISTRY_PATH = path.join(MODEL_DIR, "model_registry.json");
 
 // Matches <family>_<in>x_<out>x.tflite, e.g. espcn_16x_64x.tflite

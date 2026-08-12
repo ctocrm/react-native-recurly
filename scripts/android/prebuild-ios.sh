@@ -9,7 +9,7 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 echo "=========================================="
 echo "iOS Prebuild Script"
@@ -31,7 +31,7 @@ fi
 
 # Step 1: Regenerate model map (iOS uses the same model assets as Android)
 echo "[IOS] Step 1: Regenerating model map from assets/models/..."
-node "$SCRIPT_DIR/generate-model-map.js"
+node "$SCRIPT_DIR/../models/generate-model-map.js"
 
 # Step 2: Prebuild iOS project
 echo ""

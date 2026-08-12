@@ -40,7 +40,7 @@ export USE_MULTI_GPU="${USE_MULTI_GPU:-true}"
 export TRAIN_ISOLATE="${TRAIN_ISOLATE:-true}"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 # Defaults
 QUALITY="both"
@@ -163,7 +163,7 @@ echo ""
 echo "=========================================="
 echo "[TRAIN] Regenerating model registry..."
 echo "=========================================="
-node "$SCRIPT_DIR/generate-model-registry.js"
+node "$SCRIPT_DIR/../models/generate-model-registry.js"
 
 echo ""
 echo "[TRAIN] Done."

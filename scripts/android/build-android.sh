@@ -31,7 +31,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 BUILD_OUT_DIR="$PROJECT_ROOT/build-out"
 BUILD_OUT_APK_DIR="$BUILD_OUT_DIR/apk"
 BUILD_OUT_LOG_DIR="$BUILD_OUT_DIR/logs"
@@ -169,7 +169,7 @@ fi
 # Only registry entries that exist on disk are bundled. Training is separate/frozen.
 echo ""
 echo "[BUILD] Step 1: Regenerating model map from model_registry.json..."
-node "$SCRIPT_DIR/generate-model-map.js"
+node "$SCRIPT_DIR/../models/generate-model-map.js"
 
 
 # Step 2: Prebuild Android project

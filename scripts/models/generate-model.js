@@ -57,6 +57,8 @@ for (const [flag, value] of [
 
 const pythonScript = path.join(
   __dirname,
+  "..",
+  "train",
   QUALITY === "fast" ? "train_espcn_multi.py" : "train_fsrcnn_multi.py",
 );
 
@@ -64,7 +66,7 @@ function main() {
   console.log("[MODEL] Starting multi-model generation process...");
   console.log(`[MODEL] Quality mode: ${QUALITY}`);
 
-  const venvPython = path.join(__dirname, "..", ".venv", "bin", "python");
+  const venvPython = path.join(__dirname, "..", "..", ".venv", "bin", "python");
 
   // Self-healing: auto-run train-setup.sh if venv is missing
   if (!fs.existsSync(venvPython)) {
@@ -74,7 +76,7 @@ function main() {
     try {
       execFileSync("bash", ["scripts/train-setup.sh"], {
         stdio: "inherit",
-        cwd: path.join(__dirname, ".."),
+        cwd: path.join(__dirname, "..", ".."),
       });
       console.log("[MODEL] Setup completed, venv should now exist");
     } catch (err) {
@@ -115,7 +117,7 @@ function main() {
     console.log(`[MODEL] Running training script: ${args.join(" ")}`);
     execFileSync(venvPython, args, {
       stdio: "inherit",
-      cwd: path.join(__dirname, ".."),
+      cwd: path.join(__dirname, "..", ".."),
     });
     console.log("[MODEL] Multi-model generation completed successfully!");
   } catch (err) {

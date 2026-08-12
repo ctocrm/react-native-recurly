@@ -12,10 +12,10 @@ This project uses `react-native-fast-tflite` for on-device AI icon upscaling. Si
 
 ```bash
 # Quick dev mode: build x86_64 only, install on emulator, launch app
-./scripts/build-android.sh --dev --watch
+./scripts/android/build-android.sh --dev --watch
 
 # Or full verification (same as above but with log monitoring)
-./scripts/verify-android.sh --watch
+./scripts/android/verify-android.sh --watch
 ```
 
 ---
@@ -27,7 +27,7 @@ The build script supports multiple modes for different workflows:
 ### Usage
 
 ```
-./scripts/build-android.sh [options]
+./scripts/android/build-android.sh [options]
 
 Options:
   --arch all|x86_64|arm64-v8a|armeabi-v7a|x86   Architecture to build (default: all)
@@ -42,10 +42,10 @@ Options:
 
 | Mode             | Command                                       | Description                                |
 | ---------------- | --------------------------------------------- | ------------------------------------------ |
-| **Default**      | `./scripts/build-android.sh`                  | Builds all 4 architectures sequentially    |
-| **Dev**          | `./scripts/build-android.sh --dev`            | x86_64 only + install + launch on emulator |
-| **Single arch**  | `./scripts/build-android.sh --arch arm64-v8a` | Build a specific architecture              |
-| **With monitor** | `./scripts/build-android.sh --dev --watch`    | Live status display during build           |
+| **Default**      | `./scripts/android/build-android.sh`                  | Builds all 4 architectures sequentially    |
+| **Dev**          | `./scripts/android/build-android.sh --dev`            | x86_64 only + install + launch on emulator |
+| **Single arch**  | `./scripts/android/build-android.sh --arch arm64-v8a` | Build a specific architecture              |
+| **With monitor** | `./scripts/android/build-android.sh --dev --watch`    | Live status display during build           |
 
 ### Live Monitor
 
@@ -112,40 +112,40 @@ This generates/updates the native Android project with:
 
 ```bash
 # Build all architectures (sequential)
-./scripts/build-android.sh
+./scripts/android/build-android.sh
 
 # Build only for emulator (x86_64)
-./scripts/build-android.sh --arch x86_64
+./scripts/android/build-android.sh --arch x86_64
 
 # Build with live monitor
-./scripts/build-android.sh --arch x86_64 --watch
+./scripts/android/build-android.sh --arch x86_64 --watch
 ```
 
 Output per architecture:
 
 - `android/app/build/outputs/apk/debug/app-debug.apk`
 - `android/app/build/outputs/apk/release/app-release.apk` (Gradle output)
-- `build-out/apk/app-release-<abi>.apk` (copied by `scripts/build-android.sh`; gitignored)
+- `build-out/apk/app-release-<abi>.apk` (copied by `scripts/android/build-android.sh`; gitignored)
 - `build-out/logs/build-<abi>.log` (build logs; gitignored)
 
 #### Step 4: Start Emulator and Install
 
 ```bash
 # Start emulator (waits for full boot)
-./scripts/android-emulator.sh start
+./scripts/android/android-emulator.sh start
 
 # Install the APK
-./scripts/android-emulator.sh install android/app/build/outputs/apk/debug/app-x86_64-debug.apk
+./scripts/android/android-emulator.sh install android/app/build/outputs/apk/debug/app-x86_64-debug.apk
 
 # Launch the app
-./scripts/android-emulator.sh launch
+./scripts/android/android-emulator.sh launch
 ```
 
 #### Step 5: Verify TFLite Integration
 
 ```bash
 # Monitor logs for AI module initialization
-./scripts/android-emulator.sh logcat
+./scripts/android/android-emulator.sh logcat
 
 # Look for this message:
 # [ICON_AI] super-resolution model loaded
@@ -158,15 +158,15 @@ Output per architecture:
 | `npm run generate-model`                      | Generate TFLite model if needed       |
 | `npm run generate-model:force`                | Force model regeneration              |
 | `npm run prebuild:android`                    | Generate native Android project       |
-| `./scripts/build-android.sh`                  | Build all archs (sequential)          |
-| `./scripts/build-android.sh --dev --watch`    | Quick dev build + install + launch    |
-| `./scripts/build-android.sh --arch x86_64`    | Build specific arch                   |
-| `./scripts/verify-android.sh --watch`         | Full verification with log monitoring |
-| `./scripts/android-emulator.sh start`         | Start the emulator                    |
-| `./scripts/android-emulator.sh install <apk>` | Install APK to emulator               |
-| `./scripts/android-emulator.sh launch`        | Launch the app                        |
-| `./scripts/android-emulator.sh logcat`        | Monitor app logs                      |
-| `./scripts/android-emulator.sh status`        | Check emulator status                 |
+| `./scripts/android/build-android.sh`                  | Build all archs (sequential)          |
+| `./scripts/android/build-android.sh --dev --watch`    | Quick dev build + install + launch    |
+| `./scripts/android/build-android.sh --arch x86_64`    | Build specific arch                   |
+| `./scripts/android/verify-android.sh --watch`         | Full verification with log monitoring |
+| `./scripts/android/android-emulator.sh start`         | Start the emulator                    |
+| `./scripts/android/android-emulator.sh install <apk>` | Install APK to emulator               |
+| `./scripts/android/android-emulator.sh launch`        | Launch the app                        |
+| `./scripts/android/android-emulator.sh logcat`        | Monitor app logs                      |
+| `./scripts/android/android-emulator.sh status`        | Check emulator status                 |
 
 ---
 
@@ -237,7 +237,7 @@ EAS build configuration was removed:
 | Script                        | Purpose                                                 |
 | ----------------------------- | ------------------------------------------------------- |
 | `scripts/generate-model.js`   | Model generation with `--force` optional switch         |
-| `scripts/build-android.sh`    | Interactive Android build with arch selection + monitor |
+| `scripts/android/build-android.sh`    | Interactive Android build with arch selection + monitor |
 | `scripts/build-monitor.sh`    | Live build monitor with stall/error detection           |
 | `scripts/prebuild-ios.sh`     | iOS prebuild for macOS environments                     |
 | `scripts/verify-android.sh`   | Full verification: build + install + launch + log watch |

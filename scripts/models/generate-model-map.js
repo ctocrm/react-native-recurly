@@ -18,10 +18,11 @@
 const fs = require("fs");
 const path = require("path");
 
-const modelDir = path.join(__dirname, "..", "assets", "models");
+const modelDir = path.join(__dirname, "..", "..", "assets", "models");
 const registryPath = path.join(modelDir, "model_registry.json");
 const outFile = path.join(
   __dirname,
+  "..",
   "..",
   "src",
   "services",

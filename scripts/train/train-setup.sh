@@ -25,7 +25,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 VENV_PATH="$PROJECT_ROOT/.venv"
 VENV_PYTHON="$VENV_PATH/bin/python"
 
@@ -72,9 +72,9 @@ elif [ "$MODE" = "gpu" ] && [ "$GPU_AVAILABLE" = "no" ]; then
 fi
 
 if [ "$MODE" = "gpu" ]; then
-    REQUIREMENTS="$PROJECT_ROOT/requirements-gpu.txt"
+    REQUIREMENTS="$SCRIPT_DIR/requirements-gpu.txt"
 else
-    REQUIREMENTS="$PROJECT_ROOT/requirements-cpu.txt"
+    REQUIREMENTS="$SCRIPT_DIR/requirements-cpu.txt"
 fi
 [ -f "$REQUIREMENTS" ] || fail "Requirements file not found: $REQUIREMENTS"
 log "Using requirements: $(basename "$REQUIREMENTS")"
