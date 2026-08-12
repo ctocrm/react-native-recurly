@@ -161,11 +161,11 @@ npm run build:android:x86_64:cache
 | ----------------------------------- | -------------------------------- |
 | `scripts/train_fsrcnn_multi.py`     | Sharp production                 |
 | `scripts/train_espcn_multi.py`      | Fast production                  |
-| `scripts/train.sh`                  | Wrapper (isolate, multi-GPU env) |
+| `scripts/train/train.sh`                  | Wrapper (isolate, multi-GPU env) |
 | `scripts/train_fsrcnn.py`           | Redirect → multi                 |
 | `scripts/train_espcn_fast.py`       | Redirect → multi                 |
 | `scripts/train_espcn_perceptual.py` | Redirect → multi                 |
-| `scripts/train-setup.sh`            | venv / GPU deps                  |
+| `scripts/train/train-setup.sh`            | venv / GPU deps                  |
 
 ### npm commands
 
@@ -179,7 +179,7 @@ npm run train:models:sharp:force:model -- 16_192   # if args passthrough works
 npm run train:map
 ```
 
-Equivalent: `bash scripts/train.sh --both --force`
+Equivalent: `bash scripts/train/train.sh --both --force`
 
 ### Data
 
@@ -256,9 +256,9 @@ From the original training fiasco (constant gray / worse than bicubic):
 6. Resume: omit `--force` → `[SKIP]` existing tflite
 
 ```bash
-USE_MULTI_GPU=false bash scripts/train.sh --both --force   # single GPU
-TRAIN_ISOLATE=false bash scripts/train.sh --both --force # in-process + release
-bash scripts/train.sh --fast --force --model 48_240      # one model
+USE_MULTI_GPU=false bash scripts/train/train.sh --both --force   # single GPU
+TRAIN_ISOLATE=false bash scripts/train/train.sh --both --force # in-process + release
+bash scripts/train/train.sh --fast --force --model 48_240      # one model
 ```
 
 Expect: `MirroredStrategy with 2 GPUs`, `Subprocess isolate 16->32`, `[SKIP] … exists`
@@ -458,7 +458,7 @@ Illustration-friendly; can redraw curves; leash each hop or accept brand drift.
 | `src/services/iconProcessing.ts` | Runtime + hybrid  |
 | `scripts/train_fsrcnn_multi.py`  | Sharp trainer     |
 | `scripts/train_espcn_multi.py`   | Fast trainer      |
-| `scripts/train.sh`               | npm train backend |
+| `scripts/train/train.sh`               | npm train backend |
 | `package.json` `train:*`         | Commands          |
 | `GARBAGE_REPORT.md`              | Project autopsy   |
 | `CATASTROPHE_ANALYSIS*.md`       | Gray/black era    |
@@ -485,7 +485,7 @@ Levers unchanged. Both ESPCN and FSRCNN still required for every size the app sh
 
 ## Full matrix = POC policy (canonical)
 
-- **Train:** `bash scripts/train.sh --both --force` → **`assets/models/` only**
+- **Train:** `bash scripts/train/train.sh --both --force` → **`assets/models/` only**
 - **Audit before train:** `python scripts/audit_full_matrix_policy.py` (must exit 0)
 - Recipe: `train_levers.py` + brand-safe loss + ESPCN scale≥8 capacity; app hybrid t=0.25 in `iconProcessing.ts`
 - Do **not** use side dirs (`models_poc_*`) for app weights

@@ -3,13 +3,13 @@
 # Builds one arch at a time (sequential) with live monitoring
 #
 # Usage:
-#   ./scripts/build-android.sh                    # Self-contained build, all archs (default)
-#   ./scripts/build-android.sh --arch x86_64      # Build a specific arch (self-contained)
-#   ./scripts/build-android.sh --arch x86_64 --install   # Build + install on emulator
-#   ./scripts/build-android.sh --arch x86_64 --device pixel_6a  # Use specific AVD
-#   ./scripts/build-android.sh --dev              # Dev client: x86_64 + expo start + install + launch
-#   ./scripts/build-android.sh --dev --watch      # Dev client with live monitor + expo server
-#   ./scripts/build-android.sh --parallel N       # Build all with N workers
+#   ./scripts/android/build-android.sh                    # Self-contained build, all archs (default)
+#   ./scripts/android/build-android.sh --arch x86_64      # Build a specific arch (self-contained)
+#   ./scripts/android/build-android.sh --arch x86_64 --install   # Build + install on emulator
+#   ./scripts/android/build-android.sh --arch x86_64 --device pixel_6a  # Use specific AVD
+#   ./scripts/android/build-android.sh --dev              # Dev client: x86_64 + expo start + install + launch
+#   ./scripts/android/build-android.sh --dev --watch      # Dev client with live monitor + expo server
+#   ./scripts/android/build-android.sh --parallel N       # Build all with N workers
 #
 # Modes:
 #   (default)  Self-contained release-style APK: the JS bundle is embedded via

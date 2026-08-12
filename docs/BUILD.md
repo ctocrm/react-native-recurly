@@ -33,7 +33,6 @@ Options:
   --arch all|x86_64|arm64-v8a|armeabi-v7a|x86   Architecture to build (default: all)
   --dev                                         Quick dev mode (x86_64 + install + launch)
   --parallel N                                  Workers per arch (default: 1)
-  --force-model                                 Force model regeneration
   --watch                                       Enable live monitoring
   --clean                                       Clean prebuild
 ```
@@ -236,12 +235,12 @@ EAS build configuration was removed:
 
 | Script                        | Purpose                                                 |
 | ----------------------------- | ------------------------------------------------------- |
-| `scripts/generate-model.js`   | Model generation with `--force` optional switch         |
+| `scripts/models/generate-model.js`   | Model generation with `--force` optional switch         |
 | `scripts/android/build-android.sh`    | Interactive Android build with arch selection + monitor |
-| `scripts/build-monitor.sh`    | Live build monitor with stall/error detection           |
-| `scripts/prebuild-ios.sh`     | iOS prebuild for macOS environments                     |
-| `scripts/verify-android.sh`   | Full verification: build + install + launch + log watch |
-| `scripts/android-emulator.sh` | Emulator management (start/stop/install/launch/logcat)  |
+| `scripts/android/build-monitor.sh`    | Live build monitor with stall/error detection           |
+| `scripts/android/prebuild-ios.sh`     | iOS prebuild for macOS environments                     |
+| `scripts/android/verify-android.sh`   | Full verification: build + install + launch + log watch |
+| `scripts/android/android-emulator.sh` | Emulator management (start/stop/install/launch/logcat)  |
 
 ---
 

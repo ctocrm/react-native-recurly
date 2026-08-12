@@ -39,7 +39,7 @@ This is the living execution plan for app-side quality and reliability **without
 **Goal:** Stop hand-maintaining a model registry; generate map from on-disk TFLite assets; picker/persist must not race or double-notify.
 
 ### Done
-- [x] `scripts/generate-model-map.js` → `assets/models/model_map.json` (+ registry if needed)
+- [x] `scripts/models/generate-model-map.js` → `assets/models/model_map.json` (+ registry if needed)
 - [x] App loads catalog from generated map (`MODEL_CATALOG` / model loader path)
 - [x] Removed / stopped relying on hand-edited registry as source of truth
 - [x] Silent multi-step cache writes + single notify where needed
@@ -48,7 +48,7 @@ This is the living execution plan for app-side quality and reliability **without
 - [x] Build + emulator smoke (no crash)
 
 ### Key paths
-- `scripts/generate-model-map.js`, `scripts/generate-model-registry.js`
+- `scripts/models/generate-model-map.js`, `scripts/models/generate-model-registry.js`
 - `assets/models/*`
 - Icon picker / cache write paths under `src/` + `services/database.ts`
 
@@ -250,7 +250,7 @@ emu_*.png
 
 - [x] Delete artifacts listed above
 - [x] Extend `.gitignore`
-- [x] Point `scripts/build-android.sh` (or successor) at `build-out/apk/`
+- [x] Point `scripts/android/build-android.sh` at `build-out/apk/`
 - [x] **Gate A:** `tsc` + `build:android:x86_64` + emu smoke
 
 ---

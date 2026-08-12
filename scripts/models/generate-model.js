@@ -3,10 +3,10 @@
  * Multi-model generation script for super-resolution models.
  *
  * Requires a pre-configured Python virtual environment at `.venv/` in the
- * project root. Run `bash scripts/train-setup.sh` to create it.
+ * project root. Run `bash scripts/train/train-setup.sh` to create it.
  *
  * Usage:
- *   node scripts/generate-model.js [--force] [--model=N] [--input-size=N]
+ *   node scripts/models/generate-model.js [--force] [--model=N] [--input-size=N]
  *     [--output-dir=PATH] [--quality=fast|sharp] [--no-perceptual]
  *
  * Options:
@@ -74,7 +74,7 @@ function main() {
       "[MODEL] Python virtual environment not found, running setup...",
     );
     try {
-      execFileSync("bash", ["scripts/train-setup.sh"], {
+      execFileSync("bash", ["scripts/train/train-setup.sh"], {
         stdio: "inherit",
         cwd: path.join(__dirname, "..", ".."),
       });
@@ -83,7 +83,7 @@ function main() {
       console.error("[MODEL] Failed to auto-setup venv:", err);
       console.error("");
       console.error("[MODEL] Run the setup script manually:");
-      console.error("  bash scripts/train-setup.sh");
+      console.error("  bash scripts/train/train-setup.sh");
       console.error("");
       console.error("[MODEL] Or via npm:");
       console.error("  npm run train:setup");

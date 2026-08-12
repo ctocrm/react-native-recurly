@@ -7,7 +7,7 @@
  * It is safe to run at any time and is idempotent.
  *
  * Usage:
- *   node scripts/generate-model-registry.js
+ *   node scripts/models/generate-model-registry.js
  *
  * The resulting registry is written to `assets/models/model_registry.json`.
  * Known epochs are preserved from an existing registry; for new files they
