@@ -1,7 +1,7 @@
 # Product plan — icons, crawl, DB, sync (no training)
 
 **Last updated:** 2026-08-11  
-**Status:** Phases **1–5 complete** (built + emu smoke). Phase **5.5** in progress (A–E done; F next). Phase **6** after cleanup. **Training frozen.**
+**Status:** Phases **1–5.5 complete**. Phase **6** (ship polish) unblocked. **Training frozen.**
 
 This is the living execution plan for app-side quality and reliability **without** retraining TFLite models. AI upscale strategy remains frozen in [`docs/AI_UPSCALING.md`](./AI_UPSCALING.md) (now under `docs/`).
 
@@ -148,7 +148,7 @@ Constants + copy: `services/db/syncScope.ts`
 
 ---
 
-## Phase 5.5 — Professional cleanup ⬜
+## Phase 5.5 — Professional cleanup ✅
 
 **Goal:** Make the repo look and feel like a professional product — no root junk, coherent folders/imports, clean docs — **without breaking the app**. Same gate loop as other phases after each risky tranche.
 
@@ -203,7 +203,7 @@ app.config.js / app.json
 | **C** | Merge `components/` → `src/components/` | Medium | **Done** |
 | **D** | `services` / `lib` / `constants` under `src/` + aliases | High | Open |
 | **E** | `scripts/{android,train,models}` layout | Low–med | **Done** |
-| **F** | README / import consistency / this plan | Low | Open |
+| **F** | README + plan status + import polish | Low | **Done** |
 
 **Rule:** gate after **A**, **C**, **D**, **E** (full build). Never combine D with A untested.
 
@@ -342,10 +342,10 @@ scripts/
 
 ### 5.5-F — Code/docs polish (no feature work)
 
-- [ ] Consistent `@/` imports only
-- [ ] Professional README (Setup, Scripts, Docs, short architecture)
-- [ ] This `plan.md` status → 5.5 **Done**; Phase 6 unblocked
-- [ ] Drop dead exports only if found after moves
+- [x] Consistent `@/` imports only (package-local `./` kept)
+- [x] Professional README (Setup, Scripts, Docs, short architecture)
+- [x] This `plan.md` status → 5.5 **Done**; Phase 6 unblocked
+- [x] Drop dead exports only if found after moves (none required)
 
 ---
 
@@ -433,3 +433,5 @@ npm run build:android:x86_64   # install + launch on emu when self-contained
 | 2026-08-11 | **5.5-C done:** components merged into `src/components/`; gate passed |
 | 2026-08-11 | **5.5-D done:** lib/services/constants → src/; aliases `@/*`→src+root, `@assets/*`; gate passed |
 | 2026-08-11 | **5.5-E done:** scripts/{android,train,models,poc}; train:registry OK; gate passed |
+| 2026-08-11 | **5.5-F done:** README rewrite; `@/` imports; Phase 5.5 complete; Phase 6 unblocked |
+| 2026-08-11 | **Phase 5.5 complete** |

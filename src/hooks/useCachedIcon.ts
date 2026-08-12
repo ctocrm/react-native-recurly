@@ -8,8 +8,8 @@ import {
   addCacheUpdateListener,
   addLoadingListener,
   isIconLoading,
-} from "../services/iconLoadingRegistry";
-import { mimeForFormat, upscaleIconIfSmall } from "../services/iconUpscaler";
+} from "@/services/iconLoadingRegistry";
+import { mimeForFormat, upscaleIconIfSmall } from "@/services/iconUpscaler";
 
 export type IconStatus =
   "placeholder" | "loading" | "cached" | "error" | "no_icon";

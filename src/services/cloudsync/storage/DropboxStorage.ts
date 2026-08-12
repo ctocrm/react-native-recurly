@@ -1,6 +1,6 @@
 import * as FileSystem from "expo-file-system/legacy";
 import * as SecureStore from "expo-secure-store";
-import { CloudStorageProvider } from "../types";
+import { CloudStorageProvider } from "@/services/cloudsync/types";
 
 const DROPBOX_API_BASE = "https://api.dropboxapi.com/2";
 const DROPBOX_CONTENT_BASE = "https://content.dropboxapi.com/2";

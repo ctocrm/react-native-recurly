@@ -1,6 +1,6 @@
 import * as FileSystem from "expo-file-system/legacy";
 import * as SecureStore from "expo-secure-store";
-import { CloudStorageProvider } from "../types";
+import { CloudStorageProvider } from "@/services/cloudsync/types";
 
 export class OwnCloudNextcloudStorage implements CloudStorageProvider {
   private tokens: any = null;
