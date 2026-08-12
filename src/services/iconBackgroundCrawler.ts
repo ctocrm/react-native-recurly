@@ -48,9 +48,18 @@ const MAX_LIBRARY_CANDIDATES = 50;
 const MAX_SPIDERED_URLS = 40;
 const MAX_SPIDERED_ICONS = 40;
 const MAX_WEB_SEARCH_RESULTS = 50;
-/** How many discovered URLs to fetch immediately (rest go to queue). */
-/** Fetch more candidates up-front so picker fills without waiting on queue alone. */
-const IMMEDIATE_FETCH_BATCH = 40;
+/** How many high-quality candidates to fetch before returning work to the queue. */
+const IMMEDIATE_FETCH_BATCH = 2;
+/**
+ * Each download includes base64 conversion, image validation, and database
+ * writes. Keep this deliberately small so a crawl cannot monopolize the JS
+ * runtime while the user is navigating or typing.
+ */
+const DOWNLOAD_CONCURRENCY = 2;
+/** Reject arbitrary web images before their bytes are copied into a JS string. */
+const MAX_ICON_DOWNLOAD_BYTES = 1_500_000;
+const BASE64_CONVERSION_CHUNK_BYTES = 8_192;
+const BASE64_CONVERSION_YIELD_BYTES = 65_536;
 /** Max <img> candidates from official homepage scrape. */
 const MAX_OFFICIAL_SITE_IMGS = 20;
 
@@ -95,6 +104,11 @@ function parseRetryAfterMs(header: string | null): number | undefined {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+/** Give React Native a turn to render/respond between background work batches. */
+function yieldToUi(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
 async function downloadImageAsBase64(
@@ -162,10 +176,33 @@ async function downloadImageAsBase64(
         console.log(`[FETCH] EMPTY body ${url}`);
         return false;
       }
+      // A search result is untrusted. Converting a multi-megabyte response to a
+      // JS binary string is both unnecessary for an app icon and a common UI
+      // stall on mobile devices.
+      if (arrayBuffer.byteLength > MAX_ICON_DOWNLOAD_BYTES) {
+        console.log(
+          `[FETCH] SKIP oversized icon ${url} (${arrayBuffer.byteLength} bytes)`,
+        );
+        return false;
+      }
       const uint8Array = new Uint8Array(arrayBuffer);
       let binary = "";
-      for (let i = 0; i < uint8Array.byteLength; i++) {
-        binary += String.fromCharCode(uint8Array[i]);
+      for (
+        let i = 0;
+        i < uint8Array.byteLength;
+        i += BASE64_CONVERSION_CHUNK_BYTES
+      ) {
+        const end = Math.min(
+          i + BASE64_CONVERSION_CHUNK_BYTES,
+          uint8Array.byteLength,
+        );
+        binary += String.fromCharCode(...uint8Array.subarray(i, end));
+        if (
+          end < uint8Array.byteLength &&
+          end % BASE64_CONVERSION_YIELD_BYTES === 0
+        ) {
+          await yieldToUi();
+        }
       }
       const b64 = btoa(binary);
       console.log(`[FETCH] SUCCESS: ${url} (${b64.length} bytes)`);
@@ -252,10 +289,9 @@ async function downloadImageAsBase64(
 // relying on the one-shot icon_crawl_queue, which a prior crawl may have
 // already consumed. Directly downloads the pending URLs, then promotes the
 // best fetched icon to the cache so re-searches actually recover.
-// Process pending downloads in small bounded chunks (mirrors the first-5
-// batching used for newly discovered URLs) so retries stay rate-limited and
-// don't open unbounded parallel network/DB work.
-const RETRY_BATCH_SIZE = 5;
+// Process pending downloads in small bounded chunks so retries stay
+// rate-limited and do not monopolize the JS runtime.
+const RETRY_BATCH_SIZE = DOWNLOAD_CONCURRENCY;
 
 async function retryPendingDownloads(
   iconKey: string,
@@ -279,6 +315,7 @@ async function retryPendingDownloads(
         if (ok) await markUrlAsCrawled(p.originalUrl);
       }),
     );
+    await yieldToUi();
   }
   await promoteFirstIconToCache(iconKey);
 }
@@ -816,10 +853,16 @@ export async function findIconUrls(iconKey: string): Promise<void> {
     const immediate = orderedFetch.slice(0, IMMEDIATE_FETCH_BATCH);
     const rest = orderedFetch.slice(IMMEDIATE_FETCH_BATCH);
 
-    // Fetch first batch in parallel
-    await Promise.all(
-      immediate.map((u) => fetchAndSaveUrl(u.url, u.source, iconKey, u.format)),
-    );
+    // Fetch only a couple of high-quality candidates right away. Each fetch
+    // performs CPU-heavy base64/image validation work, so unlimited parallelism
+    // makes the app look frozen despite the network calls themselves being async.
+    for (let i = 0; i < immediate.length; i += DOWNLOAD_CONCURRENCY) {
+      const batch = immediate.slice(i, i + DOWNLOAD_CONCURRENCY);
+      await Promise.all(
+        batch.map((u) => fetchAndSaveUrl(u.url, u.source, iconKey, u.format)),
+      );
+      await yieldToUi();
+    }
 
     // For remaining URLs, queue via the old method but also try fetching now
     if (rest.length > 0) {
@@ -939,6 +982,9 @@ export async function processIconQueue(): Promise<void> {
               await markUrlAsCrawled(c.url);
               console.log(`[QUEUE] Fetched ${c.url}`);
             }
+            // Downloads include image decoding/validation. Explicitly yield so
+            // this detached worker remains cooperative with UI interactions.
+            await yieldToUi();
           }
 
           // After fetching, set best *valid* icon as cached (skip empty/transparent)

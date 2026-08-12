@@ -522,8 +522,10 @@ export async function upscaleIconAi(
       return upscaleIconIfSmall(base64, format, true);
     }
 
-    // Run the selected super-resolution model
-    const out: Float32Array[] = await model.runSync([rgbIn]);
+    // `runSync` executes the native inference call synchronously and can block
+    // the JavaScript/UI runtime for the duration of a larger model. Keep the
+    // user-triggered upscale responsive by using fast-tflite's async API.
+    const out: Float32Array[] = await model.run([rgbIn]);
     const outBytes = out?.[0];
     const outW = modelInfo.outputSize;
     const outH = modelInfo.outputSize;
