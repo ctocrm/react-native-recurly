@@ -3,7 +3,8 @@
  * Persists rate limit state to SecureStore so it survives app restarts.
  * Falls back to in-memory-only if SecureStore is unavailable.
  *
- * Prevents hammering domains that have returned 429 (or 403) responses.
+ * Prevents hammering domains that have returned 429 responses.
+ * 403 is NOT treated as rate-limit (hotlink/bot blocks are per-URL).
  * Uses an escalating cooldown ladder: 30s → 2min → 5min → 15min → 1hr → 4hr
  */
 

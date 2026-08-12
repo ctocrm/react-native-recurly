@@ -277,7 +277,50 @@ function extractIconsFromHtml(html: string, pageUrl: string): ExtractedIcon[] {
     }
   }
 
-  // 6. Common paths — large / vector first (order also helps consumers that take head)
+  // 6. Logo-like <img> tags (homepage brand marks often only appear here)
+  const imgTagRegex =
+    /<img\b[^>]*(?:src|data-src)\s*=\s*["']([^"']+)["'][^>]*>/gi;
+  let imgCount = 0;
+  const MAX_LOGO_IMGS = 12;
+  while (
+    (match = imgTagRegex.exec(html)) !== null &&
+    imgCount < MAX_LOGO_IMGS
+  ) {
+    const tag = match[0].toLowerCase();
+    const href = match[1];
+    const blob = `${tag} ${href}`.toLowerCase();
+    // Require logo/brand/icon signal in tag or URL — not every raster on the page
+    const looksLogo =
+      blob.includes("logo") ||
+      blob.includes("brand") ||
+      /(^|[^a-z])icon([^a-z]|$)/i.test(blob) ||
+      blob.includes("apple-touch") ||
+      /\/(?:logo|brand|icon|favicon)[^/]*\.(?:svg|png|webp|ico)/i.test(href);
+    if (!looksLogo) continue;
+    // Skip obvious non-icons
+    if (
+      blob.includes("avatar") ||
+      blob.includes("hero") ||
+      blob.includes("banner") ||
+      blob.includes("sprite") ||
+      blob.includes("tracking") ||
+      blob.includes("1x1")
+    ) {
+      continue;
+    }
+    const rawUrl = resolveUrl(href, pageUrl);
+    if (!seen.has(rawUrl)) {
+      seen.add(rawUrl);
+      icons.push({
+        url: rawUrl,
+        format: detectImageFormat(rawUrl),
+        source: "img_logo",
+      });
+      imgCount++;
+    }
+  }
+
+  // 7. Common paths — large / vector first (order also helps consumers that take head)
   const commonPaths = [
     "/favicon.svg",
     "/apple-touch-icon.png",
@@ -336,8 +379,8 @@ export async function extractIconsFromUrls(
   const allIcons: ExtractedIcon[] = [];
   const seenUrls = new Set<string>();
 
-  // Take top 10 URLs to crawl (most relevant ones)
-  const crawlUrls = urls.slice(0, 10);
+  // Crawl more pages when the caller already capped the list
+  const crawlUrls = urls.slice(0, Math.min(urls.length, 40));
 
   // Process with concurrency limit of 3
   const CONCURRENCY = 3;
