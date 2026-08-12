@@ -1,7 +1,7 @@
 # Product plan — icons, crawl, DB, sync (no training)
 
 **Last updated:** 2026-08-11  
-**Status:** Phases **1–5 complete** (built + emu smoke). Phase **5.5** in progress (A–B done; C next). Phase **6** after cleanup. **Training frozen.**
+**Status:** Phases **1–5 complete** (built + emu smoke). Phase **5.5** in progress (A–C done; D next). Phase **6** after cleanup. **Training frozen.**
 
 This is the living execution plan for app-side quality and reliability **without** retraining TFLite models. AI upscale strategy remains frozen in [`docs/AI_UPSCALING.md`](./AI_UPSCALING.md) (now under `docs/`).
 
@@ -200,7 +200,7 @@ app.config.js / app.json
 | ------- | ---- | ---- | ------ |
 | **A** | Artifacts + `.gitignore` + APK output dir | Low | **Done** |
 | **B** | Docs → `docs/`, delete stubs/autopsy | Low | **Done** |
-| **C** | Merge `components/` → `src/components/` | Medium | Open |
+| **C** | Merge `components/` → `src/components/` | Medium | **Done** |
 | **D** | `services` / `lib` / `constants` under `src/` + aliases | High | Open |
 | **E** | `scripts/{android,train,models}` layout | Low–med | Open |
 | **F** | README / import consistency / this plan | Low | Open |
@@ -294,9 +294,9 @@ emu_*.png
 
 Do **not** change global `@/*` mapping in this tranche (lower blast radius). Alias cleanup lands in D.
 
-- [ ] Merge component trees
-- [ ] Update all imports
-- [ ] **Gate C**
+- [x] Merge component trees
+- [x] Update all imports
+- [x] **Gate C**
 
 ---
 
@@ -430,3 +430,4 @@ npm run build:android:x86_64   # install + launch on emu when self-contained
 | 2026-08-11 | **Phase 5.5** inserted: professional cleanup (artifacts, docs, src layout) between Phase 5 and Phase 6 |
 | 2026-08-11 | **5.5-A done:** artifacts removed, gitignore, APKs→`build-out/apk/`, gate passed |
 | 2026-08-11 | **5.5-B done:** docs under `docs/`; stubs/autopsy removed |
+| 2026-08-11 | **5.5-C done:** components merged into `src/components/`; gate passed |

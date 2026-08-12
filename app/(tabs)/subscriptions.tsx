@@ -1,5 +1,5 @@
-import ListHeading from "@/components/ListHeading";
-import SubscriptionCard from "@/components/SubscriptionCard";
+import ListHeading from "@/src/components/ListHeading";
+import SubscriptionCard from "@/src/components/SubscriptionCard";
 import "@/global.css";
 import EditSubscriptionModal from "@/src/components/EditSubscriptionModal";
 import SubscriptionIconPickerModal from "@/src/components/SubscriptionIconPickerModal";

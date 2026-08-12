@@ -1,6 +1,6 @@
-import ListHeading from "@/components/ListHeading";
-import SubscriptionCard from "@/components/SubscriptionCard";
-import UpcomingSubscriptionCard from "@/components/UpcomingSubscriptionCard";
+import ListHeading from "@/src/components/ListHeading";
+import SubscriptionCard from "@/src/components/SubscriptionCard";
+import UpcomingSubscriptionCard from "@/src/components/UpcomingSubscriptionCard";
 import { icons } from "@/constants/icons";
 import images from "@/constants/images";
 import "@/global.css";
