@@ -209,7 +209,7 @@ export function getModelForUpscale(
 /**
  * Brand-safe hybrid (Ace POC 2026-08-08): bilin owns stroke mass; model is a
  * residual. Base t≈0.25 for mid/large LR; tiny favicons need stronger model mix
- * or thumbs look identical to bilinear. See AI_UPSCALING.md.
+ * or thumbs look identical to bilinear. See docs/AI_UPSCALING.md.
  */
 const BRAND_SAFE_LERP_T = 0.25;
 const BRAND_SAFE_MAX_DARKEN = 0.12;

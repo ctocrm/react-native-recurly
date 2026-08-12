@@ -1,6 +1,6 @@
 # Welcome to your Expo app 👋
 
-**Roadmap:** see [`plan.md`](./plan.md) (phases 1–5 done, 6 ship polish). AI/train: [`AI_UPSCALING.md`](./AI_UPSCALING.md).
+**Roadmap:** [`docs/plan.md`](./docs/plan.md) (phases 1–5 done; **5.5** cleanup in progress; 6 ship polish). AI/train: [`docs/AI_UPSCALING.md`](./docs/AI_UPSCALING.md). Native build: [`docs/BUILD.md`](./docs/BUILD.md).
 
 This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
 
@@ -120,3 +120,12 @@ Join our community of developers creating universal apps.
 
 - [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
 - [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+
+## Docs
+
+| Doc | Role |
+| --- | ---- |
+| [`docs/plan.md`](./docs/plan.md) | Execution phases (living board) |
+| [`docs/AI_UPSCALING.md`](./docs/AI_UPSCALING.md) | AI train/inference SSOT (training frozen) |
+| [`docs/BUILD.md`](./docs/BUILD.md) | Native Android build without EAS |
+

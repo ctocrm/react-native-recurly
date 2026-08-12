@@ -1,9 +1,9 @@
 # Product plan — icons, crawl, DB, sync (no training)
 
 **Last updated:** 2026-08-11  
-**Status:** Phases **1–5 complete** (built + emu smoke). Phase **5.5** in progress (A done; B next). Phase **6** after cleanup. **Training frozen.**
+**Status:** Phases **1–5 complete** (built + emu smoke). Phase **5.5** in progress (A–B done; C next). Phase **6** after cleanup. **Training frozen.**
 
-This is the living execution plan for app-side quality and reliability **without** retraining TFLite models. AI upscale strategy remains frozen in [`AI_UPSCALING.md`](./AI_UPSCALING.md) (path may move under `docs/` in Phase 5.5).
+This is the living execution plan for app-side quality and reliability **without** retraining TFLite models. AI upscale strategy remains frozen in [`docs/AI_UPSCALING.md`](./AI_UPSCALING.md) (now under `docs/`).
 
 ---
 
@@ -199,7 +199,7 @@ app.config.js / app.json
 | Tranche | Name | Risk | Status |
 | ------- | ---- | ---- | ------ |
 | **A** | Artifacts + `.gitignore` + APK output dir | Low | **Done** |
-| **B** | Docs → `docs/`, delete stubs/autopsy | Low | Open |
+| **B** | Docs → `docs/`, delete stubs/autopsy | Low | **Done** |
 | **C** | Merge `components/` → `src/components/` | Medium | Open |
 | **D** | `services` / `lib` / `constants` under `src/` + aliases | High | Open |
 | **E** | `scripts/{android,train,models}` layout | Low–med | Open |
@@ -274,10 +274,10 @@ emu_*.png
 
 **Keep at root:** `AGENTS.md`, `CLAUDE.md` (agent tooling).
 
-- [ ] Create `docs/`, move keepers, fix links
-- [ ] Delete stubs / autopsy / legacy task-progress
-- [ ] README links → `docs/…`
-- [ ] Gate B optional full build; at least link check + `tsc`
+- [x] Create `docs/`, move keepers, fix links
+- [x] Delete stubs / autopsy / legacy task-progress
+- [x] README links → `docs/…`
+- [x] Gate B: link check + `tsc`
 
 ---
 
@@ -395,7 +395,7 @@ scripts/
 
 | Area | Rule |
 | ---- | ---- |
-| **Training** | Frozen — see `AI_UPSCALING.md` §2. Entry remains `npm run train:models:force` only when explicitly unfrozen. |
+| **Training** | Frozen — see `docs/AI_UPSCALING.md` §2. Entry remains `npm run train:models:force` only when explicitly unfrozen. |
 | **Inference hybrid** | `bilin + 0.25 · clamp(residual)` — brand-safe defaults in `iconProcessing.ts` |
 | **TFLite export** | Float32 only — never default quant |
 
@@ -415,10 +415,10 @@ npm run build:android:x86_64   # install + launch on emu when self-contained
 
 | Doc | Role |
 | --- | ---- |
-| [`plan.md`](./plan.md) | **This file** — execution phases (→ `docs/plan.md` after 5.5-B) |
-| [`AI_UPSCALING.md`](./AI_UPSCALING.md) | AI/train/inference SSOT (→ `docs/` after 5.5-B) |
-| [`README.md`](./README.md) | App overview / scripts (stays root) |
-| [`BUILD.md`](./BUILD.md) | Android build (→ `docs/`; `BUILD_FULL` folded then removed in 5.5-B) |
+| [`docs/plan.md`](./plan.md) | **This file** — execution phases  |
+| [`docs/AI_UPSCALING.md`](./AI_UPSCALING.md) | AI/train/inference SSOT  |
+| [`README.md`](../README.md) | App overview / scripts (stays root) |
+| [`docs/BUILD.md`](./BUILD.md) | Android build  (`BUILD_FULL` removed) |
 
 ---
 
@@ -429,3 +429,4 @@ npm run build:android:x86_64   # install + launch on emu when self-contained
 | 2026-08-11 | Phases 1–5 implemented and smoke-tested; `plan.md` created as living board |
 | 2026-08-11 | **Phase 5.5** inserted: professional cleanup (artifacts, docs, src layout) between Phase 5 and Phase 6 |
 | 2026-08-11 | **5.5-A done:** artifacts removed, gitignore, APKs→`build-out/apk/`, gate passed |
+| 2026-08-11 | **5.5-B done:** docs under `docs/`; stubs/autopsy removed |

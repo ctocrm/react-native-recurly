@@ -20,7 +20,7 @@
 #   bash scripts/train.sh --fast                          # fast only
 #   bash scripts/train.sh --sharp --force --model 16_64   # sharp force, specific model
 #
-# GPU / memory env (see AI_UPSCALING.md):
+# GPU / memory env (see docs/AI_UPSCALING.md):
 #   USE_MULTI_GPU=true|false   default true when 2+ GPUs (data-parallel; peak VRAM ≈ 1 card)
 #   TRAIN_ISOLATE=true|false   default true — one subprocess per model (frees VRAM on exit)
 #   Resume failed only: omit --force so existing .tflite files are skipped
