@@ -155,6 +155,8 @@ From GARBAGE_REPORT.md:
 - `sharpen_icons.py`
 
 ### 3.7 Branches left lying around
+
+
 k
 
 From GARBAGE_REPORT.md:
@@ -198,5 +200,5 @@ From GARBAGE_REPORT.md:
 10. **Never claim a fix without building and testing on an emulator**
 11. **Never touch unrelated files when fixing one issue**
 12. **Read all history before making any changes**
-13. **Test with 20+ real, diverse subscriptions**
+13. **Test with 5+ real, diverse subscriptions**
 14. **If 3 consecutive fix attempts fail, stop and escalate to the user**
