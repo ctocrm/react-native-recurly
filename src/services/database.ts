@@ -16,21 +16,21 @@ import {
   getOrCreateDbKey,
   openDatabase,
 } from "./db/connection";
+import { SYNC_LOCAL_ONLY_TABLES } from "./db/syncScope";
 
 export {
   closeDatabase,
   getCurrentUserId,
   getDatabase,
-  openDatabase,
+  openDatabase
 } from "./db/connection";
 export { SCHEMA_VERSION } from "./db/schema";
 export {
   BACKUP_FULL_USER_COPY,
   SYNC_LOCAL_ONLY_TABLES,
   SYNC_SCOPE_USER_COPY,
-  SYNC_USER_TABLES,
+  SYNC_USER_TABLES
 } from "./db/syncScope";
-import { SYNC_LOCAL_ONLY_TABLES } from "./db/syncScope";
 
 // ---------------------------------------------------------------------------
 // CRUD: Subscriptions
@@ -330,8 +330,7 @@ export async function setCachedIcon(
   if (silent) return;
   // Notify listeners that cache has been updated (dynamic import to avoid circular deps)
   setTimeout(async () => {
-    const { notifyCacheUpdate } =
-      await import("./iconLoadingRegistry");
+    const { notifyCacheUpdate } = await import("./iconLoadingRegistry");
     notifyCacheUpdate();
   }, 0);
 }
@@ -464,8 +463,7 @@ export async function replaceIconWithAiUpscale(
     originalHeight,
   );
   setTimeout(async () => {
-    const { notifyCacheUpdate } =
-      await import("./iconLoadingRegistry");
+    const { notifyCacheUpdate } = await import("./iconLoadingRegistry");
     notifyCacheUpdate();
   }, 0);
 }
@@ -510,7 +508,132 @@ export async function getCrawlResults(
 }
 
 // ---------------------------------------------------------------------------
-// Universal Crawled URLs History (for deduplication across all icon searches)
+// Per-icon crawl sessions
+// ---------------------------------------------------------------------------
+
+export type IconCrawlSessionStatus =
+  | "idle"
+  | "discovering"
+  | "fetching"
+  | "deep_search"
+  | "waiting_for_rate_limit"
+  | "complete"
+  | "partial"
+  | "failed";
+
+export interface IconCrawlSession {
+  iconKey: string;
+  status: IconCrawlSessionStatus;
+  detail: string | null;
+  discoveredCount: number;
+  downloadedCount: number;
+  rejectedCount: number;
+  deferredCount: number;
+  spideredPages: number;
+  startedAt: string | null;
+  updatedAt: string | null;
+  completedAt: string | null;
+}
+
+export interface IconCrawlSessionUpdate {
+  status?: IconCrawlSessionStatus;
+  detail?: string | null;
+  discoveredCount?: number;
+  downloadedCount?: number;
+  rejectedCount?: number;
+  deferredCount?: number;
+  spideredPages?: number;
+  completed?: boolean;
+}
+
+export async function beginIconCrawlSession(iconKey: string): Promise<void> {
+  const db = getDatabase();
+  await db.runAsync(
+    `INSERT INTO icon_crawl_sessions (
+       icon_key, status, detail, discovered_count, downloaded_count,
+       rejected_count, deferred_count, spidered_pages, started_at, updated_at,
+       completed_at
+     ) VALUES (?, 'discovering', 'Starting discovery', 0, 0, 0, 0, 0,
+       datetime('now'), datetime('now'), NULL)
+     ON CONFLICT(icon_key) DO UPDATE SET
+       status = 'discovering', detail = 'Starting discovery',
+       discovered_count = 0, downloaded_count = 0, rejected_count = 0,
+       deferred_count = 0, spidered_pages = 0,
+       started_at = datetime('now'), updated_at = datetime('now'),
+       completed_at = NULL`,
+    iconKey,
+  );
+}
+
+export async function updateIconCrawlSession(
+  iconKey: string,
+  update: IconCrawlSessionUpdate,
+): Promise<void> {
+  const db = getDatabase();
+  const completedAt = update.completed ? "datetime('now')" : "completed_at";
+  const status = update.status ?? "discovering";
+  await db.runAsync(
+    `UPDATE icon_crawl_sessions SET
+       status = ?, detail = ?,
+       discovered_count = COALESCE(?, discovered_count),
+       downloaded_count = COALESCE(?, downloaded_count),
+       rejected_count = COALESCE(?, rejected_count),
+       deferred_count = COALESCE(?, deferred_count),
+       spidered_pages = COALESCE(?, spidered_pages),
+       updated_at = datetime('now'), completed_at = ${completedAt}
+     WHERE icon_key = ?`,
+    status,
+    update.detail ?? null,
+    update.discoveredCount ?? null,
+    update.downloadedCount ?? null,
+    update.rejectedCount ?? null,
+    update.deferredCount ?? null,
+    update.spideredPages ?? null,
+    iconKey,
+  );
+}
+
+export async function getIconCrawlSession(
+  iconKey: string,
+): Promise<IconCrawlSession | null> {
+  const db = getDatabase();
+  const row = await db.getFirstAsync<{
+    icon_key: string;
+    status: IconCrawlSessionStatus;
+    detail: string | null;
+    discovered_count: number;
+    downloaded_count: number;
+    rejected_count: number;
+    deferred_count: number;
+    spidered_pages: number;
+    started_at: string | null;
+    updated_at: string | null;
+    completed_at: string | null;
+  }>(
+    `SELECT icon_key, status, detail, discovered_count, downloaded_count,
+       rejected_count, deferred_count, spidered_pages, started_at, updated_at,
+       completed_at
+     FROM icon_crawl_sessions WHERE icon_key = ?`,
+    iconKey,
+  );
+  if (!row) return null;
+  return {
+    iconKey: row.icon_key,
+    status: row.status,
+    detail: row.detail,
+    discoveredCount: row.discovered_count,
+    downloadedCount: row.downloaded_count,
+    rejectedCount: row.rejected_count,
+    deferredCount: row.deferred_count,
+    spideredPages: row.spidered_pages,
+    startedAt: row.started_at,
+    updatedAt: row.updated_at,
+    completedAt: row.completed_at,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Universal Crawled URLs History (telemetry / revisit scheduling only)
 // ---------------------------------------------------------------------------
 
 export async function markUrlAsCrawled(url: string): Promise<void> {
@@ -1135,8 +1258,7 @@ export async function mergeIconCacheFromBackup(
     }
     if (merged > 0) {
       setTimeout(async () => {
-        const { notifyCacheUpdate } =
-          await import("./iconLoadingRegistry");
+        const { notifyCacheUpdate } = await import("./iconLoadingRegistry");
         notifyCacheUpdate();
       }, 0);
     }
@@ -1201,11 +1323,11 @@ export async function clearIconCache(): Promise<void> {
     await db.execAsync("DELETE FROM icon_cache");
     await db.execAsync("DELETE FROM icon_crawl_results");
     await db.execAsync("DELETE FROM icon_crawl_queue");
+    await db.execAsync("DELETE FROM icon_crawl_sessions");
   });
   // Notify listeners so in-memory cache state is invalidated.
   setTimeout(async () => {
-    const { notifyCacheUpdate } =
-      await import("./iconLoadingRegistry");
+    const { notifyCacheUpdate } = await import("./iconLoadingRegistry");
     notifyCacheUpdate();
   }, 0);
 }
@@ -1219,6 +1341,7 @@ export async function clearCrawlHistory(): Promise<void> {
   const db = getDatabase();
   await db.withTransactionAsync(async () => {
     await db.execAsync("DELETE FROM crawled_urls");
+    await db.execAsync("DELETE FROM icon_crawl_sessions");
     // icon_reports is created lazily; swallow errors if it doesn't exist yet.
     try {
       await db.execAsync("DELETE FROM icon_reports");
@@ -1228,8 +1351,7 @@ export async function clearCrawlHistory(): Promise<void> {
   });
   // Reset persisted rate-limit cooldowns (SecureStore + in-memory).
   try {
-    const { clearAllRateLimits } =
-      await import("./rateLimitTracker");
+    const { clearAllRateLimits } = await import("./rateLimitTracker");
     await clearAllRateLimits();
   } catch {
     /* rate-limit module unavailable */

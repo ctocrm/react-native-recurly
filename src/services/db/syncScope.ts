@@ -17,6 +17,7 @@ export const SYNC_USER_TABLES = [
 export const SYNC_LOCAL_ONLY_TABLES = [
   "icon_crawl_results",
   "icon_crawl_queue",
+  "icon_crawl_sessions",
   "crawled_urls",
   "icon_reports",
 ] as const;

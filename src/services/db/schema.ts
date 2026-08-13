@@ -5,7 +5,7 @@
 import type { SQLiteDatabase } from "expo-sqlite";
 
 /** Bump when adding a migration. Stored in PRAGMA user_version. */
-export const SCHEMA_VERSION = 8;
+export const SCHEMA_VERSION = 9;
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS subscriptions (
@@ -47,6 +47,24 @@ CREATE TABLE IF NOT EXISTS icon_crawl_queue (
   last_attempt_at   TEXT,
   created_at        TEXT DEFAULT (datetime('now'))
 );
+
+-- One durable, per-icon-key view of the crawler. Candidate rows themselves
+-- remain in icon_crawl_results; this table makes progress and partial results
+-- observable without treating a universal URL-history row as ownership.
+CREATE TABLE IF NOT EXISTS icon_crawl_sessions (
+  icon_key          TEXT PRIMARY KEY,
+  status            TEXT NOT NULL DEFAULT 'idle',
+  detail            TEXT,
+  discovered_count  INTEGER NOT NULL DEFAULT 0,
+  downloaded_count  INTEGER NOT NULL DEFAULT 0,
+  rejected_count    INTEGER NOT NULL DEFAULT 0,
+  deferred_count    INTEGER NOT NULL DEFAULT 0,
+  spidered_pages    INTEGER NOT NULL DEFAULT 0,
+  started_at        TEXT DEFAULT (datetime('now')),
+  updated_at        TEXT DEFAULT (datetime('now')),
+  completed_at      TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_icon_crawl_sessions_status ON icon_crawl_sessions(status);
 
 CREATE TABLE IF NOT EXISTS icon_crawl_results (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -124,7 +142,7 @@ async function columnNames(
  * Idempotent migrations for DBs created before SCHEMA_SQL included all tables.
  * Order is fixed; each step is safe to re-run.
  */
-export const MIGRATIONS: Array<(db: SQLiteDatabase) => Promise<void>> = [
+export const MIGRATIONS: ((db: SQLiteDatabase) => Promise<void>)[] = [
   // 1: icon_crawl_results
   async (db) => {
     if (!(await tableExists(db, "icon_crawl_results"))) {
@@ -235,9 +253,7 @@ export const MIGRATIONS: Array<(db: SQLiteDatabase) => Promise<void>> = [
     } else {
       const names = await columnNames(db, "icon_reports");
       if (!names.includes("comment")) {
-        await db.execAsync(
-          "ALTER TABLE icon_reports ADD COLUMN comment TEXT",
-        );
+        await db.execAsync("ALTER TABLE icon_reports ADD COLUMN comment TEXT");
       }
     }
   },
@@ -258,6 +274,28 @@ export const MIGRATIONS: Array<(db: SQLiteDatabase) => Promise<void>> = [
       ON icon_crawl_results(icon_key, original_url)
       WHERE original_url IS NOT NULL AND original_url != '';
     `);
+  },
+  // 9: durable per-icon crawl progress / terminal state.
+  async (db) => {
+    if (!(await tableExists(db, "icon_crawl_sessions"))) {
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS icon_crawl_sessions (
+          icon_key          TEXT PRIMARY KEY,
+          status            TEXT NOT NULL DEFAULT 'idle',
+          detail            TEXT,
+          discovered_count  INTEGER NOT NULL DEFAULT 0,
+          downloaded_count  INTEGER NOT NULL DEFAULT 0,
+          rejected_count    INTEGER NOT NULL DEFAULT 0,
+          deferred_count    INTEGER NOT NULL DEFAULT 0,
+          spidered_pages    INTEGER NOT NULL DEFAULT 0,
+          started_at        TEXT DEFAULT (datetime('now')),
+          updated_at        TEXT DEFAULT (datetime('now')),
+          completed_at      TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_icon_crawl_sessions_status
+        ON icon_crawl_sessions(status);
+      `);
+    }
   },
 ];
 

@@ -166,6 +166,41 @@ function detectFormat(url: string): ImageSearchResult["format"] {
 }
 
 /**
+ * Search engines are optional enrichment, not the only route to an official
+ * site. These deterministic origins retain the pre-4b03 fallback behavior
+ * and make official favicon/manifest/page extraction possible when search HTML
+ * is blocked by an anti-bot response.
+ */
+export function getOfficialDomainGuesses(brand: string): string[] {
+  const compact = brand
+    .toLowerCase()
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/g, "");
+  const hyphenated = brand
+    .toLowerCase()
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+  if (compact.length < 2) return [];
+
+  const domains = new Set<string>([
+    `https://${compact}.com`,
+    `https://www.${compact}.com`,
+  ]);
+  if (hyphenated && hyphenated !== compact) {
+    domains.add(`https://${hyphenated}.com`);
+    domains.add(`https://www.${hyphenated}.com`);
+  }
+  // These are intentionally a small, deterministic supplement—not an
+  // unbounded TLD sweep that would waste requests for every new subscription.
+  for (const tld of ["io", "app", "co", "net", "org", "ca"]) {
+    domains.add(`https://${compact}.${tld}`);
+    domains.add(`https://www.${compact}.${tld}`);
+  }
+  return [...domains];
+}
+
+/**
  * DuckDuckGo image search - most reliable for scraping.
  * Uses the standard image search URL pattern.
  * FIXED: Added multiple extraction patterns for DDG's various HTML formats.
@@ -1022,6 +1057,40 @@ export async function searchForLinksToSpider(brand: string): Promise<string[]> {
   const allLinks: string[] = [];
   const seenLinks = new Set<string>();
 
+  const addLink = (raw: string | null | undefined) => {
+    if (!raw) return;
+    let url = raw.trim();
+    if (!url) return;
+    if (url.startsWith("//")) url = `https:${url}`;
+    if (!/^https?:\/\//i.test(url)) return;
+    try {
+      const parsed = new URL(url);
+      const host = parsed.hostname.replace(/^www\./, "").toLowerCase();
+      if (
+        /(?:^|\.)(google|bing|duckduckgo|yandex)\./.test(host) ||
+        /(?:^|\.)(facebook|instagram|linkedin|twitter|x|youtube)\./.test(host)
+      ) {
+        return;
+      }
+      // Include the origin as well as a relevant result path. Brand assets
+      // often live on the home page while search results point to pricing/blog.
+      for (const candidate of [parsed.origin, parsed.href]) {
+        if (!seenLinks.has(candidate)) {
+          seenLinks.add(candidate);
+          allLinks.push(candidate);
+        }
+      }
+    } catch {
+      // Invalid search result; ignore it.
+    }
+  };
+
+  const deterministicOrigins = getOfficialDomainGuesses(brand);
+  deterministicOrigins.forEach(addLink);
+  console.log(
+    `[SEARCH_ENGINE] Added ${deterministicOrigins.length} deterministic official-site guesses for "${brand}"`,
+  );
+
   // Prefer server-rendered HTML (SPA shell has almost no result links).
   const response = await fetchWithTimeout(
     `https://html.duckduckgo.com/html/?q=${encodeURIComponent(brand)}`,
@@ -1031,12 +1100,7 @@ export async function searchForLinksToSpider(brand: string): Promise<string[]> {
   if (response && response.ok) {
     const html = await response.text();
     const uddg = extractDuckDuckGoUddgLinks(html);
-    for (const url of uddg) {
-      if (!seenLinks.has(url)) {
-        seenLinks.add(url);
-        allLinks.push(url);
-      }
-    }
+    for (const url of uddg) addLink(url);
     if (allLinks.length === 0) {
       const linkMatches = html.matchAll(
         /<a[^>]+href\s*=\s*["']([^"']+)["'][^>]*>/gi,
@@ -1049,10 +1113,7 @@ export async function searchForLinksToSpider(brand: string): Promise<string[]> {
           !url.includes("duckduckgo.com") &&
           !url.includes("google.com")
         ) {
-          if (!seenLinks.has(url)) {
-            seenLinks.add(url);
-            allLinks.push(url);
-          }
+          addLink(url);
         }
       }
     }
@@ -1063,7 +1124,10 @@ export async function searchForLinksToSpider(brand: string): Promise<string[]> {
 
   // If fetch returned 0 links, consider using WebView as fallback
   // This happens when anti-bot measures block the fetch response
-  if (allLinks.length === 0) {
+  // The deterministic guesses mean `allLinks` is intentionally non-empty even
+  // when HTTP search is blocked. Still run the WebView route so mobile gets
+  // real result links rather than guesses alone.
+  if (allLinks.length <= deterministicOrigins.length * 2) {
     console.log(
       `[SEARCH_ENGINE] Fetch returned 0 links, trying WebView fallback for "${brand}"`,
     );
@@ -1073,13 +1137,8 @@ export async function searchForLinksToSpider(brand: string): Promise<string[]> {
         const webViewLinks =
           await webViewModule.searchForLinksWithWebView(brand);
         for (const link of webViewLinks) {
-          if (
-            !seenLinks.has(link) &&
-            link.startsWith("http") &&
-            !link.includes("duckduckgo.com")
-          ) {
-            seenLinks.add(link);
-            allLinks.push(link);
+          if (link.startsWith("http") && !link.includes("duckduckgo.com")) {
+            addLink(link);
           }
         }
         console.log(
@@ -1094,5 +1153,5 @@ export async function searchForLinksToSpider(brand: string): Promise<string[]> {
   console.log(
     `[SEARCH_ENGINE] ===== searchForLinksToSpider done for "${brand}": ${allLinks.length} links =====`,
   );
-  return allLinks.slice(0, 30);
+  return allLinks.slice(0, 80);
 }

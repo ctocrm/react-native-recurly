@@ -85,6 +85,58 @@ function resolveUrl(href: string, baseUrl: string): string {
   }
 }
 
+function extractManifestUrls(html: string, pageUrl: string): string[] {
+  const manifests = new Set<string>();
+  const linkTags = html.match(/<link\b[^>]*>/gi) ?? [];
+  for (const tag of linkTags) {
+    const rel = tag.match(/\brel\s*=\s*["']([^"']+)["']/i)?.[1] ?? "";
+    const href = tag.match(/\bhref\s*=\s*["']([^"']+)["']/i)?.[1];
+    if (!href || !/(^|\s)manifest(\s|$)/i.test(rel)) continue;
+    manifests.add(resolveUrl(href, pageUrl));
+  }
+  return [...manifests];
+}
+
+async function extractIconsFromManifest(
+  manifestUrl: string,
+): Promise<ExtractedIcon[]> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const response = await fetch(manifestUrl, {
+      signal: controller.signal,
+      headers: { Accept: "application/manifest+json, application/json, */*" },
+    });
+    if (!response.ok) return [];
+    const manifest = (await response.json()) as {
+      icons?: { src?: string; sizes?: string; type?: string }[];
+    };
+    const icons: ExtractedIcon[] = [];
+    for (const icon of manifest.icons ?? []) {
+      if (!icon.src) continue;
+      const url = resolveUrl(icon.src, manifestUrl);
+      const size = icon.sizes
+        ?.match(/(\d+)x(\d+)/)
+        ?.slice(1)
+        .map(Number);
+      icons.push({
+        url,
+        format: detectImageFormat(
+          icon.type?.includes("svg") ? `${url}.svg` : url,
+        ),
+        source: "web_manifest",
+        width: size?.[0],
+        height: size?.[1],
+      });
+    }
+    return icons;
+  } catch {
+    return [];
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /**
  * Extract all icon-related URLs from a page's HTML.
  */
@@ -390,7 +442,12 @@ export async function extractIconsFromUrls(
       batch.map(async (pageUrl) => {
         const html = await fetchPage(pageUrl);
         if (!html) return [];
-        return extractIconsFromHtml(html, pageUrl);
+        const pageIcons = extractIconsFromHtml(html, pageUrl);
+        const manifests = extractManifestUrls(html, pageUrl);
+        const manifestIcons = (
+          await Promise.all(manifests.slice(0, 3).map(extractIconsFromManifest))
+        ).flat();
+        return [...pageIcons, ...manifestIcons];
       }),
     );
 

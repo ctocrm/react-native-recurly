@@ -1,20 +1,21 @@
 import { icons } from "@/constants/icons";
 import {
+  beginIconCrawlSession,
   dequeueIcon,
   enqueueIconScrape,
   getCachedIcon,
   getCrawlResults,
   getQueuedIcons,
-  isUrlAlreadyCrawled,
-  isUrlAlreadyCrawledBatch,
   markUrlAsCrawled,
   saveCrawlResult,
   setCachedIcon,
+  updateIconCrawlSession,
 } from "@/services/database";
 import { extractFavicon } from "@/services/faviconExtractor";
 import { extractIconsFromUrls } from "@/services/htmlIconExtractor";
 import {
   notifyCacheUpdate,
+  setIconCrawlProgress,
   setIconLoading,
 } from "@/services/iconLoadingRegistry";
 import {
@@ -44,10 +45,22 @@ let queueRerunRequested = false;
 /** In-flight crawls so double-tap Search does not stack workers for same key. */
 const activeCrawls = new Set<string>();
 
-const MAX_LIBRARY_CANDIDATES = 50;
-const MAX_SPIDERED_URLS = 40;
-const MAX_SPIDERED_ICONS = 40;
-const MAX_WEB_SEARCH_RESULTS = 50;
+/**
+ * Explicit mobile-safe deep-discovery policy. These caps are deliberately
+ * high enough to retain source diversity, while bounding hostile/misleading
+ * web results so discovery cannot consume all network, battery, or JS time.
+ */
+export const ICON_CRAWL_POLICY = Object.freeze({
+  libraryCandidates: 120,
+  officialSiteImages: 50,
+  webSearchResults: 150,
+  spideredPages: 80,
+  spideredIcons: 160,
+});
+const MAX_LIBRARY_CANDIDATES = ICON_CRAWL_POLICY.libraryCandidates;
+const MAX_SPIDERED_URLS = ICON_CRAWL_POLICY.spideredPages;
+const MAX_SPIDERED_ICONS = ICON_CRAWL_POLICY.spideredIcons;
+const MAX_WEB_SEARCH_RESULTS = ICON_CRAWL_POLICY.webSearchResults;
 /** How many high-quality candidates to fetch before returning work to the queue. */
 const IMMEDIATE_FETCH_BATCH = 2;
 /**
@@ -61,7 +74,117 @@ const MAX_ICON_DOWNLOAD_BYTES = 1_500_000;
 const BASE64_CONVERSION_CHUNK_BYTES = 8_192;
 const BASE64_CONVERSION_YIELD_BYTES = 65_536;
 /** Max <img> candidates from official homepage scrape. */
-const MAX_OFFICIAL_SITE_IMGS = 20;
+const MAX_OFFICIAL_SITE_IMGS = ICON_CRAWL_POLICY.officialSiteImages;
+
+type CrawlCandidate = { url: string; source: string; format: string };
+
+interface CrawlCounts {
+  discovered: number;
+  downloaded: number;
+  rejected: number;
+  deferred: number;
+  spideredPages: number;
+}
+
+async function reportCrawlProgress(
+  iconKey: string,
+  status:
+    | "discovering"
+    | "fetching"
+    | "deep_search"
+    | "waiting_for_rate_limit"
+    | "complete"
+    | "partial"
+    | "failed",
+  detail: string,
+  counts: CrawlCounts,
+  completed = false,
+): Promise<void> {
+  await updateIconCrawlSession(iconKey, {
+    status,
+    detail,
+    discoveredCount: counts.discovered,
+    downloadedCount: counts.downloaded,
+    rejectedCount: counts.rejected,
+    deferredCount: counts.deferred,
+    spideredPages: counts.spideredPages,
+    completed,
+  });
+  setIconCrawlProgress(iconKey, {
+    status,
+    detail,
+    discoveredCount: counts.discovered,
+    downloadedCount: counts.downloaded,
+    rejectedCount: counts.rejected,
+    deferredCount: counts.deferred,
+    spideredPages: counts.spideredPages,
+  });
+}
+
+/**
+ * Reject HTML/JSON/error documents served from image-looking URLs before they
+ * enter the picker. URL extensions are useful discovery hints, not validation.
+ */
+function detectDownloadedIconFormat(
+  bytes: Uint8Array,
+  contentType: string | null,
+  fallbackFormat: string,
+): string | null {
+  const normalizedType = contentType?.split(";")[0].trim().toLowerCase() ?? "";
+  if (
+    normalizedType.includes("text/html") ||
+    normalizedType.includes("application/json")
+  ) {
+    return null;
+  }
+  const hasPngSignature =
+    bytes.length >= 8 &&
+    bytes[0] === 0x89 &&
+    bytes[1] === 0x50 &&
+    bytes[2] === 0x4e &&
+    bytes[3] === 0x47;
+  const hasJpegSignature =
+    bytes.length >= 3 &&
+    bytes[0] === 0xff &&
+    bytes[1] === 0xd8 &&
+    bytes[2] === 0xff;
+  const hasGifSignature =
+    bytes.length >= 6 &&
+    String.fromCharCode(...bytes.subarray(0, 6)).startsWith("GIF");
+  const hasIcoSignature =
+    bytes.length >= 4 &&
+    bytes[0] === 0 &&
+    bytes[1] === 0 &&
+    bytes[2] === 1 &&
+    bytes[3] === 0;
+  const hasWebpSignature =
+    bytes.length >= 12 &&
+    String.fromCharCode(...bytes.subarray(0, 4)) === "RIFF" &&
+    String.fromCharCode(...bytes.subarray(8, 12)) === "WEBP";
+  const textHead = String.fromCharCode(
+    ...bytes.subarray(0, Math.min(bytes.length, 512)),
+  );
+  const hasSvg = /<svg[\s>]/i.test(textHead);
+
+  if (hasSvg || normalizedType === "image/svg+xml")
+    return hasSvg ? "svg" : null;
+  if (hasPngSignature) return "png";
+  if (hasJpegSignature) return "jpeg";
+  if (hasGifSignature) return "gif";
+  if (hasIcoSignature) return "ico";
+  if (hasWebpSignature) return "webp";
+
+  // Some icon CDNs use application/octet-stream for legitimate image files.
+  // Only accept a known image MIME when the URL supplied a supported format.
+  if (normalizedType.startsWith("image/")) {
+    return ["svg", "png", "ico", "jpg", "jpeg", "webp", "gif"].includes(
+      fallbackFormat,
+    )
+      ? fallbackFormat
+      : null;
+  }
+  return null;
+}
 
 function detectUrlFormat(url: string): string {
   const clean = url.toLowerCase().split("?")[0].split("#")[0];
@@ -109,6 +232,13 @@ function sleep(ms: number): Promise<void> {
 /** Give React Native a turn to render/respond between background work batches. */
 function yieldToUi(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+/** Wait without blocking JS until the shared bounded download worker is idle. */
+async function waitForQueueIdle(): Promise<void> {
+  while (isProcessingQueue) {
+    await sleep(100);
+  }
 }
 
 async function downloadImageAsBase64(
@@ -186,6 +316,17 @@ async function downloadImageAsBase64(
         return false;
       }
       const uint8Array = new Uint8Array(arrayBuffer);
+      const format = detectDownloadedIconFormat(
+        uint8Array,
+        response.headers.get("Content-Type"),
+        detectUrlFormat(url),
+      );
+      if (!format) {
+        console.log(
+          `[FETCH] REJECT non-image response ${url} (content-type=${response.headers.get("Content-Type") ?? "unknown"})`,
+        );
+        return false;
+      }
       let binary = "";
       for (
         let i = 0;
@@ -207,7 +348,6 @@ async function downloadImageAsBase64(
       const b64 = btoa(binary);
       console.log(`[FETCH] SUCCESS: ${url} (${b64.length} bytes)`);
 
-      const format = detectUrlFormat(url);
       // Reject empty / blank / fully-transparent images before they enter the DB.
       if (!isBase64IconValid(b64, format)) {
         console.log(
@@ -476,10 +616,69 @@ async function fetchAndSaveUrl(
   return false;
 }
 
+/**
+ * Start the high-confidence candidates immediately. Deep search continues to
+ * expand the same persistent per-icon collection; it never gates first icons.
+ */
+async function fetchInitialCandidates(
+  iconKey: string,
+  candidates: CrawlCandidate[],
+  counts: CrawlCounts,
+): Promise<Set<string>> {
+  const immediate = sortUrlsByQuality(candidates).slice(
+    0,
+    IMMEDIATE_FETCH_BATCH,
+  );
+  const attempted = new Set(immediate.map((candidate) => candidate.url));
+  if (immediate.length === 0) return attempted;
+
+  await reportCrawlProgress(
+    iconKey,
+    "fetching",
+    `Fetching ${immediate.length} high-confidence icon candidates`,
+    counts,
+  );
+  for (let i = 0; i < immediate.length; i += DOWNLOAD_CONCURRENCY) {
+    const batch = immediate.slice(i, i + DOWNLOAD_CONCURRENCY);
+    const outcomes = await Promise.all(
+      batch.map((candidate) =>
+        fetchAndSaveUrl(
+          candidate.url,
+          candidate.source,
+          iconKey,
+          candidate.format,
+        ),
+      ),
+    );
+    counts.downloaded += outcomes.filter(Boolean).length;
+    counts.rejected += outcomes.filter((result) => !result).length;
+    await reportCrawlProgress(
+      iconKey,
+      "fetching",
+      `Found ${counts.discovered} candidates; ${counts.downloaded} valid icons saved`,
+      counts,
+    );
+    await yieldToUi();
+  }
+
+  // Let the durable worker continue with the rest while web/spider discovery
+  // is still running. It has its own bounded, yielding download loop.
+  await enqueueIconScrape(iconKey, undefined);
+  void processIconQueue().catch(console.error);
+  return attempted;
+}
+
 // PHASE 1: Find URLs to download (LOCAL + LIBRARIES + CDN + FAVICON + SEARCH + SPIDER)
 // This is called when user types or taps search - spinner stops after this returns
 export async function findIconUrls(iconKey: string): Promise<void> {
   console.log(`[SEARCH] ===== STARTING SEARCH for ${iconKey} =====`);
+  const counts: CrawlCounts = {
+    discovered: 0,
+    downloaded: 0,
+    rejected: 0,
+    deferred: 0,
+    spideredPages: 0,
+  };
 
   const existing = await getCrawlResults(iconKey);
   const existingUrls = new Set(
@@ -494,7 +693,7 @@ export async function findIconUrls(iconKey: string): Promise<void> {
   }
 
   // Track URLs we need to fetch immediately
-  const urlsToFetch: { url: string; source: string; format: string }[] = [];
+  const urlsToFetch: CrawlCandidate[] = [];
 
   // TIER 0: Discover official website - smarter first step
   // Use a simple text search to find the brand's official site
@@ -594,6 +793,7 @@ export async function findIconUrls(iconKey: string): Promise<void> {
       await saveCrawlResult(iconKey, "", op.source, op.format, u);
       urlsToFetch.push({ url: u, source: op.source, format: op.format });
       existingUrls.add(u);
+      counts.discovered++;
     }
 
     // Scrape official site for images
@@ -659,6 +859,7 @@ export async function findIconUrls(iconKey: string): Promise<void> {
             });
             existingUrls.add(imgUrl);
             added++;
+            counts.discovered++;
           }
           console.log(
             `[SEARCH] TIER 0.5: Found ${imgMatches.length} imgs, queued ${added} on official site`,
@@ -674,16 +875,12 @@ export async function findIconUrls(iconKey: string): Promise<void> {
   console.log(`[SEARCH] TIER 1: Library CDNs`);
   const libraryIcons = await findAllIconSources(iconKey);
   console.log(`[SEARCH] TIER 1: Found ${libraryIcons.length} library icons`);
-  const alreadyCrawledLibraries = await isUrlAlreadyCrawledBatch(
-    libraryIcons.slice(0, MAX_LIBRARY_CANDIDATES).map((i) => i.url),
-  );
-
-  // Add library URLs to crawl_results AND queue for immediate fetch
+  // Candidates belong to an icon key. Universal URL history is telemetry, not
+  // ownership: a valid library URL fetched for one subscription must still be
+  // saved and selectable for another subscription with the same candidate.
+  // Add library URLs to crawl_results AND queue for immediate fetch.
   for (const libIcon of libraryIcons.slice(0, MAX_LIBRARY_CANDIDATES)) {
-    if (
-      !existingUrls.has(libIcon.url) &&
-      !alreadyCrawledLibraries.has(libIcon.url)
-    ) {
+    if (!existingUrls.has(libIcon.url)) {
       await saveCrawlResult(
         iconKey,
         "",
@@ -696,6 +893,8 @@ export async function findIconUrls(iconKey: string): Promise<void> {
         source: libIcon.source,
         format: libIcon.format,
       });
+      existingUrls.add(libIcon.url);
+      counts.discovered++;
     }
   }
 
@@ -715,14 +914,31 @@ export async function findIconUrls(iconKey: string): Promise<void> {
       source: "favicon",
       format: faviconResult.format,
     });
+    existingUrls.add(faviconResult.url);
+    counts.discovered++;
     console.log(`[SEARCH] TIER 2: Found favicon URL`);
   } else {
     console.log(`[SEARCH] TIER 2: No favicon found`);
   }
 
+  // Fetch curated/official candidates before unreliable web discovery. This
+  // keeps maximum-search behavior without making first results wait on DDG,
+  // Bing, Google, or a multi-page spider crawl.
+  const immediatelyAttempted = await fetchInitialCandidates(
+    iconKey,
+    urlsToFetch,
+    counts,
+  );
+
   // TIER 3: Multi-engine image/dork search (direct logo URLs) + page links to spider
   // Restored searchAllSources — removed in 1a7cf9c and left as dead code.
   console.log(`[SEARCH] TIER 3: Image/dork search + links to spider`);
+  await reportCrawlProgress(
+    iconKey,
+    "deep_search",
+    `Continuing deep search after ${counts.downloaded} valid icons`,
+    counts,
+  );
   const isSearchEngineHost = (u: string) =>
     /google\.|bing\.|duckduckgo\.|yandex\./i.test(u);
 
@@ -774,6 +990,7 @@ export async function findIconUrls(iconKey: string): Promise<void> {
       urlsToFetch.push({ url: result.url, source: src, format: fmt });
       existingUrls.add(result.url);
       directAdded++;
+      counts.discovered++;
     }
   }
   console.log(`[SEARCH] TIER 3: Queued ${directAdded} direct image URLs`);
@@ -786,6 +1003,7 @@ export async function findIconUrls(iconKey: string): Promise<void> {
     urlsToFetch.push({ url: linkUrl, source: "web_search", format: fmt });
     existingUrls.add(linkUrl);
     directAdded++;
+    counts.discovered++;
   };
 
   // Non-image search hits → spider candidates; image-like → direct fetch
@@ -807,16 +1025,11 @@ export async function findIconUrls(iconKey: string): Promise<void> {
   // SPIDER: Extract icons from link pages - FIND URLs
   console.log(`[SEARCH] SPIDER: Processing ${linkUrls.length} links`);
   if (linkUrls.length > 0) {
-    const uncrawledLinks = (
-      await Promise.all(
-        linkUrls
-          .slice(0, MAX_SPIDERED_URLS)
-          .map(async (u) => ((await isUrlAlreadyCrawled(u)) ? null : u)),
-      )
-    ).filter((u): u is string => u !== null);
+    const uncrawledLinks = linkUrls.slice(0, MAX_SPIDERED_URLS);
 
     if (uncrawledLinks.length > 0) {
       console.log(`[SEARCH] SPIDER: Fetching ${uncrawledLinks.length} pages`);
+      counts.spideredPages += uncrawledLinks.length;
       const spideredIcons = await extractIconsFromUrls(uncrawledLinks, iconKey);
       console.log(`[SEARCH] SPIDER: Found ${spideredIcons.length} icon URLs`);
       for (const icon of spideredIcons.slice(0, MAX_SPIDERED_ICONS)) {
@@ -834,22 +1047,32 @@ export async function findIconUrls(iconKey: string): Promise<void> {
             format: icon.format,
           });
           existingUrls.add(icon.url);
+          counts.discovered++;
         }
       }
     }
   }
 
   console.log(`[SEARCH] Search completed for ${iconKey}`);
+  await reportCrawlProgress(
+    iconKey,
+    "fetching",
+    `Discovered ${counts.discovered} candidates across all sources`,
+    counts,
+  );
 
   // START IMMEDIATE FETCH of discovered URLs in parallel
   // This replaces the old queue-based approach which had race conditions
   // High-quality sources first so the first batch is not all tiny favicons
-  const orderedFetch = sortUrlsByQuality(urlsToFetch);
+  const orderedFetch = sortUrlsByQuality(
+    urlsToFetch.filter((candidate) => !immediatelyAttempted.has(candidate.url)),
+  );
   console.log(
     `[SEARCH] Immediately fetching ${orderedFetch.length} URLs (quality-ordered)`,
   );
   if (orderedFetch.length > 0) {
-    // Fetch first batch immediately (user gets instant feedback)
+    // Fetch a bounded next batch; the early batch already gave the picker a
+    // head start before deep search completed.
     const immediate = orderedFetch.slice(0, IMMEDIATE_FETCH_BATCH);
     const rest = orderedFetch.slice(IMMEDIATE_FETCH_BATCH);
 
@@ -858,9 +1081,11 @@ export async function findIconUrls(iconKey: string): Promise<void> {
     // makes the app look frozen despite the network calls themselves being async.
     for (let i = 0; i < immediate.length; i += DOWNLOAD_CONCURRENCY) {
       const batch = immediate.slice(i, i + DOWNLOAD_CONCURRENCY);
-      await Promise.all(
+      const outcomes = await Promise.all(
         batch.map((u) => fetchAndSaveUrl(u.url, u.source, iconKey, u.format)),
       );
+      counts.downloaded += outcomes.filter(Boolean).length;
+      counts.rejected += outcomes.filter((result) => !result).length;
       await yieldToUi();
     }
 
@@ -913,6 +1138,12 @@ export async function findIconUrls(iconKey: string): Promise<void> {
   }
 
   console.log(`[SEARCH] ===== FINISHED SEARCH for ${iconKey} =====`);
+  await reportCrawlProgress(
+    iconKey,
+    "fetching",
+    `Deep discovery complete: ${counts.discovered} candidates, ${counts.downloaded} saved so far`,
+    counts,
+  );
 }
 
 // Background fetch worker — processes queued downloads
@@ -968,7 +1199,6 @@ export async function processIconQueue(): Promise<void> {
           );
 
           for (const c of candidates) {
-            if (await isUrlAlreadyCrawled(c.url)) continue;
             if (await isDomainRateLimited(c.url)) {
               console.log(`[QUEUE] Skip rate-limited ${c.url}`);
               continue;
@@ -1135,6 +1365,11 @@ export async function startIconCrawl(
   // self-sustaining in the background without startIconCrawl awaiting the
   // queue directly.
   await enqueueIconScrape(iconKey, subscriptionId);
+  await beginIconCrawlSession(iconKey);
+  setIconCrawlProgress(iconKey, {
+    status: "discovering",
+    detail: "Discovering icon sources",
+  });
 
   // Flag the icon as "loading" for the FULL crawl duration. This is the
   // crawl-wide loading state — only startIconCrawl clears it, never the
@@ -1148,9 +1383,42 @@ export async function startIconCrawl(
       // so we only enqueue work here and let it run; promoteFirstIconToCache
       // still runs to auto-assign the first fetched icon to the subscription.
       await findIconUrls(iconKey);
+      // `findIconUrls` deliberately starts the shared worker without awaiting
+      // it, so the UI can receive early icons. Completion, however, must only
+      // be reported after that worker has reached an idle terminal state.
+      await waitForQueueIdle();
       await promoteFirstIconToCache(iconKey);
+      const finalResults = await getCrawlResults(iconKey);
+      const saved = finalResults.filter((result) => Boolean(result.imageData));
+      const remaining = finalResults.filter((result) => !result.imageData);
+      const finalCounts: CrawlCounts = {
+        discovered: finalResults.length,
+        downloaded: saved.length,
+        rejected: 0,
+        deferred: remaining.length,
+        spideredPages: 0,
+      };
+      const terminalStatus = remaining.length > 0 ? "partial" : "complete";
+      await reportCrawlProgress(
+        iconKey,
+        terminalStatus,
+        remaining.length > 0
+          ? `${saved.length} valid icons saved; ${remaining.length} candidates remain retryable`
+          : `${saved.length} valid icons saved from ${finalResults.length} candidates`,
+        finalCounts,
+        true,
+      );
     } catch (err) {
       console.error(`[CRAWL] Error crawling ${iconKey}:`, err);
+      await updateIconCrawlSession(iconKey, {
+        status: "failed",
+        detail: err instanceof Error ? err.message : "Crawler failed",
+        completed: true,
+      });
+      setIconCrawlProgress(iconKey, {
+        status: "failed",
+        detail: "Crawler failed; saved candidates can be retried",
+      });
     } finally {
       // Only clear the crawl-wide loading flag from here, never from the
       // per-item completion in processIconQueue.

@@ -1,6 +1,7 @@
 import { icons } from "@/constants/icons";
 import {
   deleteCachedIcon,
+  getIconCrawlSession,
   replaceIconWithAiUpscale,
   saveCrawlResult,
   setCachedIcon,
@@ -12,6 +13,7 @@ import {
 import {
   addCacheUpdateListener,
   addLoadingListener,
+  getIconCrawlProgress,
   isIconLoading,
 } from "@/services/iconLoadingRegistry";
 import {
@@ -87,6 +89,7 @@ const SubscriptionIconPickerModal = ({
   const posthog = usePostHog();
   const [availableIcons, setAvailableIcons] = useState<PickerIcon[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [crawlDetail, setCrawlDetail] = useState<string | null>(null);
   const [rateLimitedDomains, setRateLimitedDomains] = useState<string[]>([]);
   // Toggle to reveal reported ("incorrect") icons.
   const [showIncorrect, setShowIncorrect] = useState(false);
@@ -119,6 +122,29 @@ const SubscriptionIconPickerModal = ({
 
   useEffect(() => {
     latestKeyRef.current = iconKey;
+  }, [iconKey]);
+
+  const refreshCrawlDetail = useCallback(async () => {
+    if (!iconKey) {
+      setCrawlDetail(null);
+      return;
+    }
+    const requestKey = iconKey;
+    const live = getIconCrawlProgress(iconKey);
+    if (live) {
+      if (isMounted.current && latestKeyRef.current === requestKey) {
+        setCrawlDetail(live.detail);
+      }
+      return;
+    }
+    const persisted = await getIconCrawlSession(iconKey);
+    if (!isMounted.current || latestKeyRef.current !== requestKey) return;
+    if (!persisted) {
+      setCrawlDetail(null);
+      return;
+    }
+    const summary = `${persisted.detail ?? "Icon crawl"} (${persisted.downloadedCount} saved${persisted.deferredCount ? `, ${persisted.deferredCount} retryable` : ""})`;
+    setCrawlDetail(summary);
   }, [iconKey]);
 
   // Poll rate-limited domains for the red indicator
@@ -299,19 +325,21 @@ const SubscriptionIconPickerModal = ({
     if (visible && iconKey) {
       loadIcons();
       setIsSearching(isIconLoading(iconKey));
+      void refreshCrawlDetail();
     }
     return () => {
       isMounted.current = false;
     };
-  }, [visible, iconKey, loadIcons]);
+  }, [visible, iconKey, loadIcons, refreshCrawlDetail]);
 
   useEffect(() => {
     const unsubscribeLoading = addLoadingListener(() => {
       if (!isMounted.current || !iconKey) return;
       setIsSearching(isIconLoading(iconKey));
+      void refreshCrawlDetail();
     });
     return unsubscribeLoading;
-  }, [iconKey]);
+  }, [iconKey, refreshCrawlDetail]);
 
   useEffect(() => {
     const unsubscribeCache = addCacheUpdateListener(() => {
@@ -862,6 +890,11 @@ const SubscriptionIconPickerModal = ({
                 <Text className="font-sans-medium text-accent">
                   {isSearching ? "Searching..." : "Search for Icon Online"}
                 </Text>
+                {crawlDetail && (
+                  <Text className="mt-0.5 px-4 text-center text-[10px] text-muted-foreground">
+                    {crawlDetail}
+                  </Text>
+                )}
                 {/* Red rate-limit indicator */}
                 {rateLimitedDomains.length > 0 && (
                   <Text className="mt-0.5 text-[10px] text-red-500">
