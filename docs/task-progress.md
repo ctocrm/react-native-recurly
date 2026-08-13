@@ -1,0 +1,6 @@
+- [x] Tranche A: Characterize and freeze current downstream icon pipeline, capture HEAD crawler baseline
+- [ ] Tranche B: Official-domain discovery
+- [ ] Tranche C: First-party extraction
+- [ ] Tranche D: Provenance-aware acceptance and ranking
+- [ ] Tranche E: Resilience, terminal state and cache ownership
+- [ ] Tranche F: Full end-to-end acceptance
