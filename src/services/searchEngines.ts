@@ -166,38 +166,18 @@ function detectFormat(url: string): ImageSearchResult["format"] {
 }
 
 /**
- * Search engines are optional enrichment, not the only route to an official
- * site. These deterministic origins retain the pre-4b03 fallback behavior
- * and make official favicon/manifest/page extraction possible when search HTML
- * is blocked by an anti-bot response.
+ * Provider-independent domain discovery with confidence scoring.
+ * Delegates to domainDiscovery module which uses web search to discover
+ * official domains. Falls back to deterministic guesses if search fails.
  */
-export function getOfficialDomainGuesses(brand: string): string[] {
-  const compact = brand
-    .toLowerCase()
-    .replace(/&/g, "and")
-    .replace(/[^a-z0-9]+/g, "");
-  const hyphenated = brand
-    .toLowerCase()
-    .replace(/&/g, "and")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
-  if (compact.length < 2) return [];
-
-  const domains = new Set<string>([
-    `https://${compact}.com`,
-    `https://www.${compact}.com`,
-  ]);
-  if (hyphenated && hyphenated !== compact) {
-    domains.add(`https://${hyphenated}.com`);
-    domains.add(`https://www.${hyphenated}.com`);
-  }
-  // These are intentionally a small, deterministic supplement—not an
-  // unbounded TLD sweep that would waste requests for every new subscription.
-  for (const tld of ["io", "app", "co", "net", "org", "ca"]) {
-    domains.add(`https://${compact}.${tld}`);
-    domains.add(`https://www.${compact}.${tld}`);
-  }
-  return [...domains];
+export async function getOfficialDomainGuesses(
+  brand: string,
+): Promise<
+  { url: string; confidence: "high" | "medium" | "low"; reason: string }[]
+> {
+  const { getOfficialDomainGuesses: getGuesses } =
+    await import("./domain/domainDiscovery");
+  return getGuesses(brand);
 }
 
 /**
@@ -1085,8 +1065,8 @@ export async function searchForLinksToSpider(brand: string): Promise<string[]> {
     }
   };
 
-  const deterministicOrigins = getOfficialDomainGuesses(brand);
-  deterministicOrigins.forEach(addLink);
+  const deterministicOrigins = await getOfficialDomainGuesses(brand);
+  deterministicOrigins.forEach(({ url }) => addLink(url));
   console.log(
     `[SEARCH_ENGINE] Added ${deterministicOrigins.length} deterministic official-site guesses for "${brand}"`,
   );
