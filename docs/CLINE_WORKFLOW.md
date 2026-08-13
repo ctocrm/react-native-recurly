@@ -1,11 +1,18 @@
 # Cline Workflow — jsmastery Project
 
 **Last updated:** 2026-08-12  
-**Purpose:** The standard phased workflow for all Cline tasks in this project. Follows the principles in `.clinerules` and `docs/LESSONS_LEARNED.md`.
+**Purpose:** Human-readable documentation for the jsmastery repair process.
+
+> **This file is documentation, not the Cline-managed Workflow.**
+> The native workspace Workflow discovered by Cline lives at `.clinerules/workflows/jsmastery-repair-loop.md` and is available in **Manage Cline Rules & Workflows**. Invoke that managed workflow when you want Cline to execute this process.
+
+The always-on safeguards live in `.clinerules/00-core-safeguards.md`. Detailed on-demand repair guidance lives in `.cline/skills/jsmastery-repair/SKILL.md`. Historical evidence is recorded in `docs/LESSONS_LEARNED.md`.
 
 ---
 
 ## Main Loop
+
+The native workflow is authoritative for execution details. Its core phase order is:
 
 Each phase follows this loop until the phase is complete:
 
@@ -33,7 +40,7 @@ Each phase follows this loop until the phase is complete:
 └──────┬──────┘
        │
 ┌──────▼──────┐
-│  6. Test    │  ← Test on device with 20+ real subscriptions
+│  6. Test    │  ← Test on device with 5+ real subscriptions
 └──────┬──────┘
        │
 ┌──────▼──────┐
@@ -75,7 +82,8 @@ Each phase follows this loop until the phase is complete:
 
 ### Step 4: Commit
 
-- `git add -A && git commit -m "descriptive message"`
+- Review `git status` and stage only the files belonging to the current issue.
+- Commit the focused change with a descriptive message.
 - Commit before building so you can always revert.
 
 ### Step 5: Build + Emulator
@@ -87,7 +95,7 @@ Each phase follows this loop until the phase is complete:
 ### Step 6: Test
 
 - Test the actual user-facing behavior on the device.
-- Test with 20+ real, diverse subscriptions (rare companies, not just Netflix/Spotify).
+- Test with 5+ real, diverse subscriptions (rare companies, not just Netflix/Spotify).
 - Verify icon quality is brand-correct, not random images.
 - **Do not claim success without this step.**
 
@@ -100,7 +108,7 @@ Each phase follows this loop until the phase is complete:
 
 ### Step 8: Commit
 
-- `git add -A && git commit -m "docs: update plan after [phase]"`
+- Review `git status`, stage only the documentation/hygiene changes produced by the current phase, and commit them separately when appropriate.
 
 ---
 
@@ -120,7 +128,7 @@ npm run build:android:x86_64   # install + launch on emu when self-contained
 
 ## 3-Strike Safeguard Loop
 
-If 3 consecutive fix attempts fail (the fix doesn't work on the emulator), **STOP immediately**:
+If 3 consecutive implementation attempts fail validation for the same root issue, **STOP immediately**. Do not make a fourth speculative fix:
 
 ```
 ┌─────────────────────────────────┐
@@ -198,17 +206,6 @@ If 3 consecutive fix attempts fail (the fix doesn't work on the emulator), **STO
 
 **Frozen (do not reopen casually):**
 
-| ------- | ------ | -------- | ------ |
-| **1** | Registry → map + picker/persist | Done | tsc, x86_64 build, emu launch |
-| **2** | Visual without training (iconQuality + source order) | Done | same + scorer smoke |
-| **3** | Crawl reliability | Done | same |
-| **4** | DB split / schema hygiene | Done | same |
-| **5** | Sync honesty | Done | same |
-| **5.5** | Professional cleanup (artifacts, docs, structure) | Done | gate after each tranche |
-| **6** | Ship polish | Open (after 5.5) | full smoke + doc pass |
-
-**Frozen (do not reopen casually):**
-
 - Training — see `docs/AI_UPSCALING.md` §2. Entry remains `npm run train:models:force` only when explicitly unfrozen.
 - Inference hybrid — `bilin + 0.25 · clamp(residual)` — brand-safe defaults in `iconProcessing.ts`
 - TFLite export — Float32 only — never default quant
@@ -217,8 +214,22 @@ If 3 consecutive fix attempts fail (the fix doesn't work on the emulator), **STO
 
 ## Standard Gate (every phase / risky tranche)
 
+Use the current commands from `package.json` and `docs/BUILD.md`; do not rely on stale remembered command names. The normal baseline includes:
+
 ```bash
 npx tsc --noEmit
 npm run build:android:x86_64   # install + launch on emu when self-contained
 # logcat: Running "main", no RN fatal; crawler may start
 ```
+
+A successful gate is still not proof of a user-facing fix. The actual reproduction must pass on emulator/device.
+
+---
+
+## Cline customization layers
+
+- **Always-on Rule:** `.clinerules/00-core-safeguards.md` — compact non-negotiable behavior.
+- **Managed Workflow:** `.clinerules/workflows/jsmastery-repair-loop.md` — user-invoked phased repair and three-strike recovery process.
+- **Project Skill:** `.cline/skills/jsmastery-repair/SKILL.md` — detailed repair knowledge loaded by Cline only when relevant.
+- **This document:** human-readable explanation/reference only.
+- **Hooks:** deliberately not added in this tranche. The project confirmed that this Cline lineage supports `.clinerules/hooks/`, but did not establish the installed 4.1.6 hook execution/input/exit contract strongly enough to add blocking automation safely. A hook should only be added after that contract is verified; speculative guard automation would itself violate the safeguards.

@@ -72,6 +72,25 @@ The user said: _"just check the git history before we started the upscale."_ The
 
 After each cycle of frustration, the user asked the AI to "read all history" — essentially demanding a full context reset. The AI kept treating this as a fresh start instead of learning from the previous failures, so the same mistakes repeated.
 
+### 2.12 Implementing a plausible interpretation instead of the requested native feature
+
+On Aug 12, the user asked for a custom **Cline Workflow** for the repair loop. The AI created `docs/CLINE_WORKFLOW.md` and described the job as complete. When the user opened Cline's **Manage Cline Rules & Workflows** UI, no workflow appeared.
+
+The mistake was not Markdown syntax; it was failure to verify intent and product semantics. A document that describes a workflow is not a Cline-managed Workflow. Investigation of Cline's own issue history established that this Cline lineage discovers local workflows from `.clinerules/workflows/*.md`, enables/disables them in the Rules & Workflows UI, and exposes them as slash-invokable workflows.
+
+**Lesson:** when the user names a product feature such as Workflow, Rule, Hook, Skill, MCP, plugin, command, or checkpoint, verify what that native feature currently means and where it is discovered before implementing anything. Do not silently substitute a generic artifact because it seems semantically similar.
+
+### 2.13 Repeating failed tool mechanisms during the safeguard investigation itself
+
+While investigating Cline's current customization formats, the AI reproduced the same failure class it was trying to prevent:
+
+- Shell commands containing encoded `<` / `&&` arrived as `<` / `&&` and failed.
+- Instead of changing mechanism immediately every time, multiple attempts were spent on variants of the same shell path.
+- Identical `list_files` and MCP calls were emitted more than once in a response, triggering the tool-loop safeguard.
+- Useful progress resumed only after switching mechanisms: filesystem tools instead of shell discovery, then browser MCP and Cline's GitHub issue history instead of unauthenticated code search.
+
+**Lesson:** after the first infrastructure/tool failure, diagnose the mechanism. Never resend an identical call just because the previous result was unusable. After two failures on one path, change tools/strategy; after three, stop that path.
+
 ---
 
 ## 3. Project-Specific Mistakes (jsmastery)
@@ -157,8 +176,6 @@ From GARBAGE_REPORT.md:
 ### 3.7 Branches left lying around
 
 
-k
-
 From GARBAGE_REPORT.md:
 
 - Working tree: **~4.2 GB** (excl. deps)
@@ -202,3 +219,5 @@ From GARBAGE_REPORT.md:
 12. **Read all history before making any changes**
 13. **Test with 5+ real, diverse subscriptions**
 14. **If 3 consecutive fix attempts fail, stop and escalate to the user**
+15. **Verify the semantics and storage/discovery format of named product features before implementing them**
+16. **After a tool/infrastructure failure, diagnose and change mechanism instead of repeating the same call**
