@@ -80,32 +80,28 @@ describe("iconQuality (pure functions)", () => {
     });
 
     it("scores ai_upscale and subscription highest", () => {
-      expect(
-        scoreIconQuality({
-          source: "ai_upscale",
-          format: "png",
-          originalUrl: "https://example.com/icon.png",
-        }),
-      ).toBeGreaterThan(
-        scoreIconQuality({
-          source: "ai_upscale",
-          format: "png",
-          originalUrl: "https://example.com/icon.png",
-        }) + 1000,
-      );
-      expect(
-        scoreIconQuality({
-          source: "subscription",
-          format: "png",
-          originalUrl: "https://example.com/icon.png",
-        }),
-      ).toBeGreaterThan(
-        scoreIconQuality({
-          source: "ai_upscale",
-          format: "png",
-          originalUrl: "https://example.com/icon.png",
-        }) - 5000,
-      );
+      // Characterization of CURRENT behavior (Tranche A baseline):
+      // ai_upscale gets +10000, subscription gets +5000, so the
+      // current ordering is ai_upscale > subscription > everything else.
+      const ai = scoreIconQuality({
+        source: "ai_upscale",
+        format: "png",
+        originalUrl: "https://example.com/icon.png",
+      });
+      const manual = scoreIconQuality({
+        source: "subscription",
+        format: "png",
+        originalUrl: "https://example.com/icon.png",
+      });
+      const plain = scoreIconQuality({
+        source: "web_search",
+        format: "png",
+        originalUrl: "https://example.com/icon.png",
+      });
+      expect(ai).toBe(10080);
+      expect(manual).toBe(5080);
+      expect(ai).toBeGreaterThan(manual);
+      expect(manual).toBeGreaterThan(plain);
     });
   });
 

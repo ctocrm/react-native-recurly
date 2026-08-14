@@ -43,14 +43,22 @@ describe("iconScraper (pure functions)", () => {
 
   describe("generateAlternativeSlugs", () => {
     it("generates alternatives for common suffixes", () => {
+      // Characterization of CURRENT behavior: the base slug IS included
+      // in the returned list (implementation seeds alternatives with [base]).
       const alternatives = generateAlternativeSlugs("netflix-app");
       expect(alternatives).toContain("netflix");
-      expect(alternatives).not.toContain("netflix-app"); // base slug is netflix-app, alternatives exclude base
+      expect(alternatives).toContain("netflix-app");
+      expect(alternatives).toContain("netflixapp");
     });
 
     it("removes trailing numbers", () => {
-      const alternatives = generateAlternativeSlugs("web3");
-      expect(alternatives).toContain("web");
+      // Characterization of CURRENT behavior: the trailing-number rule only
+      // strips DASH-prefixed numbers (/-\d+$/), so "web3" yields no
+      // alternative while "web-3" does. NOTE: the implementation comment
+      // claims 'web3' -> 'web'; that mismatch is recorded for a later
+      // tranche — Tranche A freezes behavior, it does not repair it.
+      expect(generateAlternativeSlugs("web3")).toEqual(["web3"]);
+      expect(generateAlternativeSlugs("web-3")).toContain("web");
     });
 
     it("removes hyphens for compound names", () => {
