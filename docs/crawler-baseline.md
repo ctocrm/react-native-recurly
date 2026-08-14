@@ -100,9 +100,32 @@ Provider failure ≠ "brand has no icons"; baseline shows search degrading silen
 
 No crawler/discovery/picker/upscale behavior was changed. Training untouched.
 
+## Verification status (honest split)
+
+**Verified end-to-end on emulator (HEAD fb65af6):**
+
+- Build/install/launch — app runs, no RN fatal
+- Crawler discovery smoke (netflix) — full tier pipeline captured in logs
+- Long-press picker smoke — picker opens via real interaction, renders candidates
+- Progressive publication — picker grew 6 → 32 → 50 → 55 icons while open (background queue keeps publishing; this is also the pollution vector)
+- Characterization tests runnable — `npx jest` 20/20 PASS, `npx tsc --noEmit` PASS
+
+**NOT verified (explicitly unverified, not claimed):**
+
+- Selection → card persistence smoke (user stopped before selecting)
+- Low-resolution → Upscale eligibility integration smoke
+- Picker close/reopen + app kill/relaunch persistence smoke
+- Additional diverse brands (Spotify, GitHub, Linear, 1Password, Miro, Toggl Track, Backblaze)
+- Per-candidate original dimensions (F7)
+
 ## Open evidence gaps for later tranches
 
 1. Per-candidate original dimensions (needs offline URL probe or diagnostics)
-2. Which exact sources produced the 6 → 32 visible picker tiles (needs DB-level provenance dump or picker logging)
+2. Which exact sources produced the 6 → 55 visible picker tiles (needs DB-level provenance dump or picker logging)
 3. 368-byte simple-icons netflix.svg — verify whether truncated/stub
-4. Remaining 4+ diverse brands baseline (Spotify, GitHub, Linear, 1Password, Miro, Toggl Track, Backblaze) — continuing with user driving UI
+4. Remaining 4+ diverse brands baseline (Spotify, GitHub, Linear, 1Password, Miro, Toggl Track, Backblaze)
+5. Selection/persistence/upscale/relaunch smokes from the verification list above
+
+## Screenshot evidence
+
+- `docs/test-screens/tranche-a-01-picker-netflix-50icons.png` — picker open, "50 icons available", AI Upscale Quality UI (Fast/Sharp), report (Wrong/Broken) UI, "Show broken/Show incorrect" toggles, "Use Default Icon"
