@@ -96,8 +96,14 @@ grep -E "TIER 0|Ranked official|rejected|FETCH|PICKER|COLLECTION" /tmp/crawl.log
 ## Known gotchas in this app
 
 - CreateSubscriptionModal: Name field autocomplete shows a suggestion row that
-  overlaps the Price field; selecting it focuses Price (numeric keyboard).
-- The Create button sits at the sheet bottom, partially under the nav bar;
-  scroll the sheet up before tapping it.
+  overlaps the Price field; selecting it focuses Price (numeric keyboard) and
+  auto-selects a Category.
+- The Create button is `disabled` until BOTH name and a numeric price are set
+  (formValid). A tap that "does nothing" usually means price is still empty.
+- The Create button ([53,2208][1028,2348]) is overlapped at its BOTTOM by the
+  native Android navigation overlay. Tapping the uiautomator center (y=2278) or
+  lower (y>=2300) hits the overlay/dead space and does nothing or goes home.
+  **Tap the uncovered TOP slice, e.g. (540,2240)** — that registers the press.
+  Verified: this created the spotify subscription end-to-end.
 - DDG web search is CAPTCHA/bot-blocked in this environment, so TIER 0 official
   discovery often sees 0 links and falls back to deterministic guesses (expected).
