@@ -830,17 +830,79 @@ npm run build:android:x86_64   # install + launch on emu when self-contained
 
 ---
 
+## UI Improvements — post-Major-Fix (2026-08-14)
+
+Four user-requested UI improvements, executed one phase at a time. **Phase 0
+(docs + generic skill) MUST complete before any build/emulator verification**,
+because every later visual gate uses the generic emulator skill loop.
+
+### Phase 0 — Documentation & generic skill (no code, no build)
+
+- [ ] Append this UI-Improvements section to `docs/plan.md` (done by this edit).
+- [ ] Write `docs/CODEBASE.md`: full current-codebase overview (tabs, modals,
+      components, services, context, theme, models, icon-pipeline contracts).
+- [ ] Rewrite `.cline/skills/emulator-ui-driving/SKILL.md` to be **generic**:
+      invariant = every UI-affecting adb command (`input tap/swipe/text/keyevent`,
+      `am start/force-stop`) is immediately followed by `adb exec-out screencap`
+      read back via vision and asserted before the next UI command. Keep generic
+      techniques (uiautomator-for-bounds, 1080x2400 space, nav bar ~y>2320,
+      keyboard/dropdown dismissal, long-press = `input swipe X Y X Y 800`).
+      NO button-specific coordinates.
+
+### Phase 1 — Native navigation overlay fix
+
+- Inset-aware bottom padding (`useSafeAreaInsets().bottom` + tab-bar height) on
+  all four tabs and inside `CreateSubscriptionModal` + `SubscriptionIconPickerModal`
+  sheets so primary buttons sit above the nav overlay.
+- Gates: tsc/jest/lint → build → emulator (skill loop): each tab + both modals,
+  assert primary button fully visible above nav bar; scroll list bottoms.
+
+### Phase 2 — Add-subscription "+" on Subscriptions page
+
+- Header row (title + `icons.add` Pressable) opening the existing
+  `CreateSubscriptionModal` (replicate index.tsx wiring).
+- Gates: programmatic → build → emulator (skill loop): "+" present, modal opens,
+  created sub appears in list.
+
+### Phase 3 — Insights chart stays in bounds
+
+- Wrap "Estimated Monthly Spend" bar row in a horizontal `ScrollView` inside the
+  card; fixed min-width per bar; condense/hide per-bar value labels for >3-month
+  periods so 6mo/1yr scroll within the card.
+- Gates: programmatic → build → emulator (skill loop): cycle This Month→3→6→Year,
+  assert no overflow of the card border.
+
+### Phase 4 — Connect Google/Apple to scan subscriptions
+
+- New "Connected Accounts" section in Settings using `expo-auth-session` (already
+  a dep) for Google + Apple sign-in; tokens in `expo-secure-store`; a
+  "Scan for subscriptions" import action (Gmail/wallet receipt scanner = later
+  server phase; now an import stub + manual prefill).
+- Honest limit: no public client API reads other apps' Wallet/App-Store subs.
+- Gates: programmatic → build → emulator (skill loop): Connect opens OAuth sheet,
+  connected state persists.
+
+### UI cross-cutting rules
+
+- One phase at a time; commit per phase; never carry a regression forward.
+- Every visual gate uses the generic skill loop (UI adb → screenshot → vision assert).
+- Update `docs/CODEBASE.md` + this file as phases land.
+
+---
+
 ## Changelog (plan)
 
-| Date       | Note                                                                                                                                                                            |
-| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-08-11 | Phases 1–5 implemented and smoke-tested; `plan.md` created as living board                                                                                                      |
-| 2026-08-11 | **Phase 5.5** inserted: professional cleanup (artifacts, docs, src layout) between Phase 5 and Phase 6                                                                          |
-| 2026-08-11 | **5.5-A done:** artifacts removed, gitignore, APKs→`build-out/apk/`, gate passed                                                                                                |
-| 2026-08-11 | **5.5-B done:** docs under `docs/`; stubs/autopsy removed                                                                                                                       |
-| 2026-08-11 | **5.5-C done:** components merged into `src/components/`; gate passed                                                                                                           |
-| 2026-08-11 | **5.5-D done:** lib/services/constants → src/; aliases `@/*`→src+root, `@assets/*`; gate passed                                                                                 |
-| 2026-08-11 | **5.5-E done:** scripts/{android,train,models,poc}; train:registry OK; gate passed                                                                                              |
-| 2026-08-11 | **5.5-F done:** README rewrite; `@/` imports; Phase 5.5 complete; Phase 6 unblocked                                                                                             |
-| 2026-08-11 | **Phase 5.5 complete**                                                                                                                                                          |
-| 2026-08-13 | **MAJOR FIX inserted:** crawler → picker → card/cache → upscale recovery is now the blocking pre-Phase-6 work; full-pipeline contracts and cross-layer regression gates defined |
+| Date       | Note                                                                                                                                                                                   |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-08-11 | Phases 1–5 implemented and smoke-tested; `plan.md` created as living board                                                                                                             |
+| 2026-08-11 | **Phase 5.5** inserted: professional cleanup (artifacts, docs, src layout) between Phase 5 and Phase 6                                                                                 |
+| 2026-08-11 | **5.5-A done:** artifacts removed, gitignore, APKs→`build-out/apk/`, gate passed                                                                                                       |
+| 2026-08-11 | **5.5-B done:** docs under `docs/`; stubs/autopsy removed                                                                                                                              |
+| 2026-08-11 | **5.5-C done:** components merged into `src/components/`; gate passed                                                                                                                  |
+| 2026-08-11 | **5.5-D done:** lib/services/constants → src/; aliases `@/*`→src+root, `@assets/*`; gate passed                                                                                        |
+| 2026-08-11 | **5.5-E done:** scripts/{android,train,models,poc}; train:registry OK; gate passed                                                                                                     |
+| 2026-08-11 | **5.5-F done:** README rewrite; `@/` imports; Phase 5.5 complete; Phase 6 unblocked                                                                                                    |
+| 2026-08-11 | **Phase 5.5 complete**                                                                                                                                                                 |
+| 2026-08-13 | **MAJOR FIX inserted:** crawler → picker → card/cache → upscale recovery is now the blocking pre-Phase-6 work; full-pipeline contracts and cross-layer regression gates defined        |
+| 2026-08-14 | **MAJOR FIX complete (Tranches A–F):** provenance precision gating removed picker pollution; lifecycle/ownership/stale-gen added; verified on-device with real companies               |
+| 2026-08-14 | **UI Improvements inserted:** nav-overlay fix, Subscriptions "+", insights chart bounds, connect Google/Apple; Phase 0 (docs + generic skill) precedes all build/emulator verification |
