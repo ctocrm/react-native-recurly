@@ -11,6 +11,7 @@ import {
   setCachedIcon,
   updateIconCrawlSession,
 } from "@/services/database";
+import { rankOfficialDomainCandidates } from "@/services/domain/domainDiscovery";
 import { extractFavicon } from "@/services/faviconExtractor";
 import { extractIconsFromUrls } from "@/services/htmlIconExtractor";
 import {
@@ -717,34 +718,32 @@ export async function findIconUrls(iconKey: string): Promise<void> {
 
     if (response.ok) {
       const html = await response.text();
-      // DDG web results use different structure - try multiple patterns
-      const patterns = [
-        /<a[^>]+class="result__a"[^>]*href\s*=\s*["'](https?:\/\/[^"']+)["']/i,
-        /<a[^>]+href\s*=\s*["'](https?:\/\/[^"']+)"[^>]*class="result__a"/i,
-        /<div[^>]*class="result__body"[^>]*>[\s\S]*?<a[^>]+href\s*=\s*["'](https?:\/\/[^"']+)["']/i,
-        /<a[^>]+class="result__a"[^>]*href="([^"]+)"/i,
-      ];
-      for (const pattern of patterns) {
-        const match = html.match(pattern);
-        if (match) {
-          officialSiteUrl = match[1];
-          console.log(
-            `[SEARCH] TIER 0: Found official site: ${officialSiteUrl}`,
-          );
-          break;
-        }
-      }
-      // If no match, try generic link extraction
-      if (!officialSiteUrl) {
-        const linkMatch = html.match(
-          /<a[^>]+href\s*=\s*["'](https?:\/\/[^"']+)["'][^>]*>/i,
+      // Collect ALL result links, then rank them by brand agreement instead of
+      // trusting the first link (Tranche A F1/F11: first-link pulled wikipedia,
+      // app stores, and unrelated sites as the "official" domain).
+      const candidateUrls: string[] = [];
+      const linkRe = /<a[^>]+href\s*=\s*["'](https?:\/\/[^"']+)["'][^>]*>/gi;
+      let m: RegExpExecArray | null;
+      while ((m = linkRe.exec(html)) !== null) candidateUrls.push(m[1]);
+
+      const ranking = rankOfficialDomainCandidates(iconKey, candidateUrls);
+      if (ranking.best) {
+        officialSiteUrl = ranking.best.url;
+        console.log(
+          `[SEARCH] TIER 0: Ranked official site: ${officialSiteUrl} (${ranking.best.confidence}, ${ranking.best.reason})`,
         );
-        if (linkMatch) {
-          officialSiteUrl = linkMatch[1];
-          console.log(
-            `[SEARCH] TIER 0: Found official site (fallback): ${officialSiteUrl}`,
-          );
-        }
+      } else {
+        console.log(
+          `[SEARCH] TIER 0: no confident official domain among ${candidateUrls.length} links`,
+        );
+      }
+      if (ranking.rejected.length > 0) {
+        console.log(
+          `[SEARCH] TIER 0: rejected ${ranking.rejected.length} non-brand hosts: ${ranking.rejected
+            .slice(0, 5)
+            .map((r) => `${r.host}(${r.reason})`)
+            .join(", ")}`,
+        );
       }
     } else if (response.status === 429) {
       // Only 429 cools down DDG; 403 is common bot challenge, not a domain ban
