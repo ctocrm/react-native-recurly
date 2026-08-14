@@ -1,3 +1,8 @@
+---
+name: emulator-ui-driving
+description: Drive the jsmastery Android emulator UI reliably via adb (input tap/swipe/text, uiautomator dumps) with a screenshot read back via vision after EVERY action. Use for real-UI verification (add subscription, open icon picker by long-press, submit forms) and capturing on-device crawler/picker logs. Encodes coordinate-space, keyboard, dropdown, and nav-bar gotchas.
+---
+
 # Skill: Emulator UI Driving (adb + screenshot + vision)
 
 Drive the running Android emulator's UI reliably with `adb`, verifying EVERY
