@@ -12,6 +12,11 @@ import {
   updateIconCrawlSession,
 } from "@/services/database";
 import { rankOfficialDomainCandidates } from "@/services/domain/domainDiscovery";
+import {
+  classifyCandidate,
+  isTrustedProvenance,
+  officialHostsForBrand,
+} from "@/services/domain/provenance";
 import { extractFavicon } from "@/services/faviconExtractor";
 import { extractIconsFromUrls } from "@/services/htmlIconExtractor";
 import {
@@ -700,6 +705,7 @@ export async function findIconUrls(iconKey: string): Promise<void> {
   // Use a simple text search to find the brand's official site
   console.log(`[SEARCH] TIER 0: Discovering official website`);
   let officialSiteUrl: string | null = null;
+  let officialHosts = officialHostsForBrand(iconKey);
   try {
     const ddgUrl = "https://duckduckgo.com";
     const controller = new AbortController();
@@ -729,6 +735,7 @@ export async function findIconUrls(iconKey: string): Promise<void> {
       const ranking = rankOfficialDomainCandidates(iconKey, candidateUrls);
       if (ranking.best) {
         officialSiteUrl = ranking.best.url;
+        officialHosts = officialHostsForBrand(iconKey, ranking.best.host);
         console.log(
           `[SEARCH] TIER 0: Ranked official site: ${officialSiteUrl} (${ranking.best.confidence}, ${ranking.best.reason})`,
         );
@@ -815,19 +822,20 @@ export async function findIconUrls(iconKey: string): Promise<void> {
               /src=["']([^"']+\.(?:svg|png|jpg|jpeg|ico|webp))["']/gi,
             ) ||
             [];
-          // Prefer logo/icon-looking assets first
-          const ranked = [...imgMatches].sort((a, b) => {
-            const score = (s: string) => {
-              const l = s.toLowerCase();
-              let n = 0;
-              if (l.includes("logo")) n += 5;
-              if (l.includes("icon") || l.includes("brand")) n += 3;
-              if (l.includes("apple-touch") || l.includes("512")) n += 2;
-              if (l.includes("avatar") || l.includes("hero")) n -= 2;
-              return n;
-            };
-            return score(b) - score(a);
-          });
+          // Tranche C: only keep <img> with a real logo/brand signal. Removes
+          // unconstrained generic page-image pollution (menu chrome, avatars).
+          const imgScore = (s: string) => {
+            const l = s.toLowerCase();
+            let n = 0;
+            if (l.includes("logo")) n += 5;
+            if (l.includes("icon") || l.includes("brand")) n += 3;
+            if (l.includes("apple-touch") || l.includes("512")) n += 2;
+            if (l.includes("avatar") || l.includes("hero")) n -= 2;
+            return n;
+          };
+          const ranked = [...imgMatches]
+            .filter((mm) => imgScore(mm) > 0)
+            .sort((a, b) => imgScore(b) - imgScore(a));
           let added = 0;
           for (const match of ranked) {
             if (added >= MAX_OFFICIAL_SITE_IMGS) break;
@@ -978,9 +986,21 @@ export async function findIconUrls(iconKey: string): Promise<void> {
   );
 
   let directAdded = 0;
+  let untrustedRejected = 0;
   for (const result of searchResults.slice(0, MAX_WEB_SEARCH_RESULTS)) {
     if (existingUrls.has(result.url)) continue;
     if (isSearchEngineHost(result.url)) continue;
+
+    // Tranche D: gate publication on provenance. Arbitrary-domain images with no
+    // brand evidence (random pictures) are rejected even if they look like images.
+    if (
+      !isTrustedProvenance(
+        classifyCandidate(iconKey, officialHosts, result.url).prov,
+      )
+    ) {
+      untrustedRejected++;
+      continue;
+    }
 
     if (looksLikeDirectImage(result.url)) {
       const fmt = result.format || detectUrlFormat(result.url);
@@ -992,7 +1012,9 @@ export async function findIconUrls(iconKey: string): Promise<void> {
       counts.discovered++;
     }
   }
-  console.log(`[SEARCH] TIER 3: Queued ${directAdded} direct image URLs`);
+  console.log(
+    `[SEARCH] TIER 3: Queued ${directAdded} direct image URLs; rejected ${untrustedRejected} untrusted-provenance URLs`,
+  );
 
   const linkUrls: string[] = [];
   const queueDirectFromLink = async (linkUrl: string) => {
@@ -1022,9 +1044,21 @@ export async function findIconUrls(iconKey: string): Promise<void> {
   }
 
   // SPIDER: Extract icons from link pages - FIND URLs
-  console.log(`[SEARCH] SPIDER: Processing ${linkUrls.length} links`);
-  if (linkUrls.length > 0) {
-    const uncrawledLinks = linkUrls.slice(0, MAX_SPIDERED_URLS);
+  // Tranche D: only spider first-party (official-host) pages. Arbitrary pages
+  // contribute their OWN favicon/og:image/logo and pollute the picker.
+  const officialLinks = linkUrls.filter((u) => {
+    try {
+      const h = new URL(u).hostname.replace(/^www\./, "").toLowerCase();
+      return officialHosts.has(h);
+    } catch {
+      return false;
+    }
+  });
+  console.log(
+    `[SEARCH] SPIDER: Processing ${officialLinks.length} official-host links (of ${linkUrls.length})`,
+  );
+  if (officialLinks.length > 0) {
+    const uncrawledLinks = officialLinks.slice(0, MAX_SPIDERED_URLS);
 
     if (uncrawledLinks.length > 0) {
       console.log(`[SEARCH] SPIDER: Fetching ${uncrawledLinks.length} pages`);
