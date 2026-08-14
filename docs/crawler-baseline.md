@@ -105,18 +105,19 @@ No crawler/discovery/picker/upscale behavior was changed. Training untouched.
 **Verified end-to-end on emulator (HEAD fb65af6):**
 
 - Build/install/launch — app runs, no RN fatal
-- Crawler discovery smoke (netflix) — full tier pipeline captured in logs
+- Crawler discovery smoke — netflix + 3 uncommon brands (Le Devoir, Ace Hardware, Ground News), full tier pipelines captured in logs
 - Long-press picker smoke — picker opens via real interaction, renders candidates
 - Progressive publication — picker grew 6 → 32 → 50 → 55 icons while open (background queue keeps publishing; this is also the pollution vector)
 - Characterization tests runnable — `npx jest` 20/20 PASS, `npx tsc --noEmit` PASS
+- **Selection → card persistence → kill/relaunch (VERIFIED)** — user selected an icon for Ace Hardware in the picker, closed it; app force-stopped and relaunched via adb; `[COLLECTION] Found cached icon for ace-hardware` after relaunch and user confirms the card shows the selected icon. Manual-selection + lifecycle contracts hold at baseline.
+- Picker stale-state across subscription switch observed (F9) — transient, resolved to correct collection
 
 **NOT verified (explicitly unverified, not claimed):**
 
-- Selection → card persistence smoke (user stopped before selecting)
-- Low-resolution → Upscale eligibility integration smoke
-- Picker close/reopen + app kill/relaunch persistence smoke
-- Additional diverse brands (Spotify, GitHub, Linear, 1Password, Miro, Toggl Track, Backblaze)
+- Low-resolution → Upscale eligibility integration smoke (no upscale run performed)
+- 5th diverse brand for the baseline set (4 tested: netflix, le-devoir, ace-hardware, ground-news)
 - Per-candidate original dimensions (F7)
+- Full 8-brand acceptance list (Tranche F scope, not Tranche A)
 
 ## Open evidence gaps for later tranches
 
