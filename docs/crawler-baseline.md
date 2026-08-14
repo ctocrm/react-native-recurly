@@ -129,3 +129,23 @@ No crawler/discovery/picker/upscale behavior was changed. Training untouched.
 ## Screenshot evidence
 
 - `docs/test-screens/tranche-a-01-picker-netflix-50icons.png` — picker open, "50 icons available", AI Upscale Quality UI (Fast/Sharp), report (Wrong/Broken) UI, "Show broken/Show incorrect" toggles, "Use Default Icon"
+
+## Multi-brand baseline (Le Devoir, Ace Hardware, Ground News — user-driven adds)
+
+### F9 — Picker stale-state across subscription switch (transient, user-confirmed)
+
+User opened pickers for the new subscriptions and initially saw the netflix tile set. Picker modal is a single shared instance (`iconPickerSubscription` state in subscriptions.tsx); `availableIcons` keeps the previous brand's tiles until the new key's `getIconCollection` completes (guarded by `latestKeyRef`, but the old list stays visible during the load). User later saw the correct per-brand collection → resolved transiently. 30 `[PICKER] Loaded … for le-devoir` reloads confirm the picker did load le-devoir's own collection. Recorded as a picker-state characterization item (async gap between shared modal state and per-key load), not fixed in this tranche.
+
+### F10 — ace-hardware: brand-correct favicon auto-assigned (the one success)
+
+- `https://acehardware.com/favicon.ico` (1192 bytes) fetched 23:06:15 → `[CRAWL] Auto-assigned first valid icon for ace-hardware (source=favicon)` at 23:10:19. User confirms the card shows the correct Ace icon.
+- Pollution alongside it from official-site generic `<img>` scraping: `header-circle-user-regular.svg` (fetched 4+ times), `home.svg`, `star-double.svg` (ace.com menu chrome).
+
+### F11 — ground-news: brand-correct asset landed under a PREFIX key
+
+- `https://groundnews.com/apple-touch-icon.png` (5332 bytes — brand-correct) fetched 23:07:43, during the `ground-ne` prefix crawl, i.e. before `ground-news` was fully typed/created. The `ground-news` picker (2 icons, user: "no real icons found") never showed it — evidence consistent with the favicon bytes being saved under the prefix icon_key and the final key's crawl skipping the already-seen URL (crawled_urls is universal telemetry).
+- Later ground-news fetches: app-store / googlePlayStore badges, mashable-logo.svg, forbes-logo.svg (publisher logos on their homepage) — generic `<img>` pollution even on the official domain.
+
+### F12 — le-devoir: nothing usable (extraction gap, not fetch gap)
+
+- Only brand-relevant lead: `https://en.wikipedia.org/wiki/File:Logo_Le_Devoir.svg` from duckduckgo_images — a Wikipedia **file description page**, not the file. Fetch correctly REJECTED it (text/html). No "wiki file page → upload.wikimedia.org actual file" resolution exists → le-devoir picker ends with no real icons (user-confirmed).
