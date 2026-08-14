@@ -150,3 +150,10 @@ User opened pickers for the new subscriptions and initially saw the netflix tile
 ### F12 — le-devoir: nothing usable (extraction gap, not fetch gap)
 
 - Only brand-relevant lead: `https://en.wikipedia.org/wiki/File:Logo_Le_Devoir.svg` from duckduckgo_images — a Wikipedia **file description page**, not the file. Fetch correctly REJECTED it (text/html). No "wiki file page → upload.wikimedia.org actual file" resolution exists → le-devoir picker ends with no real icons (user-confirmed).
+
+### F13 — Upscale-eligibility smoke (assistant-driven via adb + vision, PARTIAL)
+
+- Ace Hardware picker (3 icons): 2 blank tiles + red ACE logo tile. ACE tile shows a "Clear White BG" corrective chip (white-bg detection works).
+- The ACE favicon is a small .ico (1192 bytes) but `getIconCollection` calls `upscaleIconIfSmall` on view, so the displayed tile is already upscaled — no raw low-res tile exposed a distinct per-tile "Upscale" action in this session.
+- The always-present "AI Upscale Quality" (Fast/Sharp) selector is the upscale UI; Ground News picker also showed it.
+- Contract #9 (small raster exposes Upscale based on ORIGINAL dimensions) is therefore only partially observable through the picker as currently built, because collection pre-upscales. Re-verify in a later tranche with a raw small raster that is not pre-upscaled, or by reading originalWidth/Height from the DB. Recorded as partial, not failed.
