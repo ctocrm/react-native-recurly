@@ -1,5 +1,10 @@
 import { icons } from "@/constants/icons";
 import {
+  CrawlGenerationRegistry,
+  canAutoAssignCache,
+  terminalStatusFor,
+} from "@/services/crawlLifecycle";
+import {
   beginIconCrawlSession,
   dequeueIcon,
   enqueueIconScrape,
@@ -674,10 +679,16 @@ async function fetchInitialCandidates(
   return attempted;
 }
 
+/** Per-key crawl generations for stale-cancellation (Tranche E). */
+const crawlGens = new CrawlGenerationRegistry();
+
 // PHASE 1: Find URLs to download (LOCAL + LIBRARIES + CDN + FAVICON + SEARCH + SPIDER)
-// This is called when user types or taps search - spinner stops after this returns
-export async function findIconUrls(iconKey: string): Promise<void> {
+// This is called when user types or taps search - spinner stops after this returns.
+// Returns the number of provider failures so the caller can report a truthful
+// terminal status (a provider outage must not read as a clean "complete").
+export async function findIconUrls(iconKey: string): Promise<number> {
   console.log(`[SEARCH] ===== STARTING SEARCH for ${iconKey} =====`);
+  let providerFailures = 0;
   const counts: CrawlCounts = {
     discovered: 0,
     downloaded: 0,
@@ -755,8 +766,11 @@ export async function findIconUrls(iconKey: string): Promise<void> {
     } else if (response.status === 429) {
       // Only 429 cools down DDG; 403 is common bot challenge, not a domain ban
       await recordRateLimit(ddgUrl);
+    } else {
+      providerFailures++;
     }
   } catch (err: any) {
+    providerFailures++;
     if (err.name !== "AbortError") {
       console.log(`[SEARCH] TIER 0: Error finding official site: ${err}`);
     } else {
@@ -966,6 +980,7 @@ export async function findIconUrls(iconKey: string): Promise<void> {
 
   const [searchResults, linkResults] = await Promise.all([
     searchAllSources(iconKey).catch((e) => {
+      providerFailures++;
       console.log(
         `[SEARCH] TIER 3: searchAllSources failed:`,
         e instanceof Error ? e.message : e,
@@ -973,6 +988,7 @@ export async function findIconUrls(iconKey: string): Promise<void> {
       return [] as Awaited<ReturnType<typeof searchAllSources>>;
     }),
     searchForLinksToSpider(iconKey).catch((e) => {
+      providerFailures++;
       console.log(
         `[SEARCH] TIER 3: searchForLinksToSpider failed:`,
         e instanceof Error ? e.message : e,
@@ -1177,6 +1193,7 @@ export async function findIconUrls(iconKey: string): Promise<void> {
     `Deep discovery complete: ${counts.discovered} candidates, ${counts.downloaded} saved so far`,
     counts,
   );
+  return providerFailures;
 }
 
 // Background fetch worker — processes queued downloads
@@ -1252,10 +1269,10 @@ export async function processIconQueue(): Promise<void> {
 
           // After fetching, set best *valid* icon as cached (skip empty/transparent)
           const cached = await getCachedIcon(item.icon_key);
-          if (
-            !cached?.imageData ||
-            !isBase64IconValid(cached.imageData, cached.format)
-          ) {
+          const cachedValid =
+            !!cached?.imageData &&
+            isBase64IconValid(cached.imageData, cached.format);
+          if (canAutoAssignCache(!!cached?.imageData, cachedValid)) {
             const all = await getCrawlResults(item.icon_key);
             const withData = all.filter(
               (r) => r.imageData && isBase64IconValid(r.imageData, r.format),
@@ -1320,11 +1337,10 @@ export async function processIconQueue(): Promise<void> {
 export async function promoteFirstIconToCache(iconKey: string): Promise<void> {
   try {
     const cached = await getCachedIcon(iconKey);
-    // Keep existing cache only if it is still a usable (non-empty) icon.
-    if (
-      cached?.imageData &&
-      isBase64IconValid(cached.imageData, cached.format)
-    ) {
+    const cachedValid =
+      !!cached?.imageData && isBase64IconValid(cached.imageData, cached.format);
+    // Tranche E explicit ownership: never overwrite a valid (chosen) cache.
+    if (!canAutoAssignCache(!!cached?.imageData, cachedValid)) {
       return;
     }
 
@@ -1392,6 +1408,7 @@ export async function startIconCrawl(
     return;
   }
   activeCrawls.add(iconKey);
+  const gen = crawlGens.begin(iconKey);
 
   // Durable DB record — this is what makes the search persistent/observable.
   // enqueueIconScrape also kicks off the fetch worker, so the crawl is
@@ -1415,11 +1432,13 @@ export async function startIconCrawl(
       // findIconUrls triggers background queue processing as it discovers URLs,
       // so we only enqueue work here and let it run; promoteFirstIconToCache
       // still runs to auto-assign the first fetched icon to the subscription.
-      await findIconUrls(iconKey);
+      const providerFailures = await findIconUrls(iconKey);
       // `findIconUrls` deliberately starts the shared worker without awaiting
       // it, so the UI can receive early icons. Completion, however, must only
       // be reported after that worker has reached an idle terminal state.
       await waitForQueueIdle();
+      // Stale-cancellation: a newer crawl for this key owns publication now.
+      if (!crawlGens.isCurrent(iconKey, gen)) return;
       await promoteFirstIconToCache(iconKey);
       const finalResults = await getCrawlResults(iconKey);
       const saved = finalResults.filter((result) => Boolean(result.imageData));
@@ -1431,13 +1450,17 @@ export async function startIconCrawl(
         deferred: remaining.length,
         spideredPages: 0,
       };
-      const terminalStatus = remaining.length > 0 ? "partial" : "complete";
+      const terminalStatus = terminalStatusFor(
+        saved.length,
+        remaining.length,
+        providerFailures,
+      );
       await reportCrawlProgress(
         iconKey,
         terminalStatus,
-        remaining.length > 0
-          ? `${saved.length} valid icons saved; ${remaining.length} candidates remain retryable`
-          : `${saved.length} valid icons saved from ${finalResults.length} candidates`,
+        terminalStatus === "complete"
+          ? `${saved.length} valid icons saved from ${finalResults.length} candidates`
+          : `${saved.length} valid icons saved; ${remaining.length} retryable; ${providerFailures} provider failure(s)`,
         finalCounts,
         true,
       );
