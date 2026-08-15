@@ -1,8 +1,10 @@
+import CreateSubscriptionModal from "@/components/CreateSubscriptionModal";
 import EditSubscriptionModal from "@/components/EditSubscriptionModal";
 import ListHeading from "@/components/ListHeading";
 import SubscriptionCard from "@/components/SubscriptionCard";
 import SubscriptionIconPickerModal from "@/components/SubscriptionIconPickerModal";
 import SubscriptionStatsModal from "@/components/SubscriptionStatsModal";
+import { icons } from "@/constants/icons";
 import { useSubscriptions } from "@/context/SubscriptionContext";
 import "@/global.css";
 import { useBottomClearance } from "@/hooks/useBottomClearance";
@@ -11,7 +13,14 @@ import { useLocalSearchParams } from "expo-router";
 import { styled } from "nativewind";
 import { usePostHog } from "posthog-react-native";
 import React, { useEffect, useMemo, useState } from "react";
-import { FlatList, Pressable, Text, TextInput, View } from "react-native";
+import {
+  FlatList,
+  Image,
+  Pressable,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { SafeAreaView as RNSafeAreaView } from "react-native-safe-area-context";
 
 const SafeAreaView = styled(RNSafeAreaView);
@@ -24,6 +33,7 @@ const Subscriptions = () => {
   const { filter: initialFilter } = useLocalSearchParams<{ filter?: string }>();
   const {
     subscriptions,
+    addSubscription,
     updateSubscription,
     deleteSubscription,
     updateSubscriptionStatus,
@@ -48,6 +58,7 @@ const Subscriptions = () => {
   const [iconPickerSubscription, setIconPickerSubscription] =
     useState<Subscription | null>(null);
   const [iconPickerVisible, setIconPickerVisible] = useState(false);
+  const [createModalVisible, setCreateModalVisible] = useState(false);
 
   useEffect(() => {
     posthog.capture("subscriptions_viewed");
@@ -141,6 +152,15 @@ const Subscriptions = () => {
     refreshSubscriptions();
   };
 
+  const handleAddSubscriptionTap = () => {
+    posthog.capture("subscriptions_add_subscription_tapped");
+    setCreateModalVisible(true);
+  };
+
+  const handleCreateSubscription = async (subscription: Subscription) => {
+    await addSubscription(subscription);
+  };
+
   return (
     <SafeAreaView className="flex-1 bg-background p-5">
       <FlatList
@@ -148,6 +168,18 @@ const Subscriptions = () => {
         keyboardDismissMode="on-drag"
         ListHeaderComponent={
           <>
+            <View className="mb-5 flex-row items-center justify-between">
+              <Text className="text-3xl font-sans-bold text-primary">
+                Subscriptions
+              </Text>
+              <Pressable
+                onPress={handleAddSubscriptionTap}
+                accessibilityLabel="Add subscription"
+                accessibilityRole="button"
+              >
+                <Image source={icons.add} className="home-add-icon" />
+              </Pressable>
+            </View>
             <View className="mb-5">
               <TextInput
                 className="rounded-2xl border border-border bg-card px-4 py-4 text-base font-sans-medium text-primary"
@@ -249,6 +281,12 @@ const Subscriptions = () => {
           </Text>
         }
         contentContainerStyle={{ paddingBottom: tabListPadding }}
+      />
+
+      <CreateSubscriptionModal
+        visible={createModalVisible}
+        onClose={() => setCreateModalVisible(false)}
+        onCreate={handleCreateSubscription}
       />
 
       {/* Edit Modal */}
