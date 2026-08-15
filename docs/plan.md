@@ -2,7 +2,7 @@
 
 **Last updated:** 2026-08-14
 
-**Status:** Phases **1–5.5 complete**. **MAJOR FIX (Tranches A–F) complete on-device.** **UI Improvements Phase 0 complete** (`2adcbbc`). Next is Phase 1 (nav overlay) only after this plan. Phase 6 remains later ship polish. Training frozen.
+**Status:** Phases **1–5.5 complete**. **MAJOR FIX (Tranches A–F) complete on-device.** **UI Improvements Phase 0 complete** (`ba66478`). Next is Phase 1 (nav overlay) only after this plan. Phase 6 remains later ship polish. Training frozen.
 
 This is the living execution plan for app-side quality and reliability **without** retraining TFLite models. AI upscale strategy remains frozen in [`docs/AI_UPSCALING.md`](./AI_UPSCALING.md) (now under `docs/`).
 
@@ -852,7 +852,7 @@ The predecessor claimed Phase 0 done after commit `56bd161`. That commit only ap
 
 | Phase | Name                             | Status               | Touches                                                                          | Must not touch                            |
 | ----- | -------------------------------- | -------------------- | -------------------------------------------------------------------------------- | ----------------------------------------- |
-| **0** | Docs + generic emulator skill    | **Done (`2adcbbc`)** | `docs/plan.md`, `docs/CODEBASE.md`, `.cline/skills/emulator-ui-driving/SKILL.md` | App source, models, crawler               |
+| **0** | Docs + generic emulator skill    | **Done (`ba66478`)** | `docs/plan.md`, `docs/CODEBASE.md`, `.cline/skills/emulator-ui-driving/SKILL.md` | App source, models, crawler               |
 | **1** | Native nav overlay               | Not started          | Tab list padding; Create + picker (+ shared sheets) inset padding                | Crawler, models, schema                   |
 | **2** | Subscriptions `+`                | Not started          | `app/(tabs)/subscriptions.tsx` + existing modal wiring                           | New create flow, crawler                  |
 | **3** | Insights chart bounds            | Not started          | `app/(tabs)/insights.tsx` Estimated Monthly Spend row                            | Period-chip `ScrollView`; other tabs      |
@@ -902,7 +902,7 @@ A static pass or a successful build is **not** a completed phase.
   - Generic techniques only: live `wm size`, uiautomator bounds, nav-bar dead zone, keyboard/dropdown dismissal, long-press = `input swipe X Y X Y 800`.
   - **No button-specific coordinates.**
 - [x] Revert leftover Phase-1 import-only dirty diffs if present (`subscriptions.tsx`, safeguards one-liner).
-- [x] Commit Phase 0 docs/skill only (`2adcbbc`). **Do not start Phase 1 in the same commit.**
+- [x] Commit Phase 0 docs/skill only (`ba66478`). **Do not start Phase 1 in the same commit.**
 
 #### Phase 0 acceptance
 
