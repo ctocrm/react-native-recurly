@@ -278,57 +278,59 @@ const Insights = () => {
               </Text>
             </View>
 
-            <View className="rounded-2xl border border-border bg-muted p-5">
+            <View className="overflow-hidden rounded-2xl border border-border bg-muted p-5">
               <ScrollView
                 horizontal
-                showsHorizontalScrollIndicator={false}
-                className="insights-chart-scroll"
+                nestedScrollEnabled
+                showsHorizontalScrollIndicator={monthlyChartData.length > 3}
+                className="insights-chart-scroll w-full"
+                contentContainerStyle={{
+                  flexDirection: "row",
+                  alignItems: "flex-end",
+                  paddingRight: 8,
+                }}
               >
-                <View className="flex-row items-end">
-                  {monthlyChartData.map((data) => {
-                    const barHeight =
-                      maxChartAmount > 0
-                        ? (data.amount / maxChartAmount) * 120
-                        : 0;
-                    const showValue = monthlyChartData.length <= 3;
+                {monthlyChartData.map((data) => {
+                  const barHeight =
+                    maxChartAmount > 0
+                      ? (data.amount / maxChartAmount) * 120
+                      : 0;
+                  const showValue = monthlyChartData.length <= 3;
 
-                    return (
-                      <View
-                        key={data.label}
-                        className="insights-chart-bar-container"
-                        style={{ minWidth: 48 }}
-                      >
-                        {showValue ? (
-                          <Text className="insights-chart-value">
-                            {formatCurrency(data.amount)}
-                          </Text>
-                        ) : null}
-                        <View
-                          className="insights-chart-bar-bg"
-                          style={{ height: 120 }}
-                        >
-                          <View
-                            className="insights-chart-bar"
-                            style={{
-                              height: barHeight as any,
-                              backgroundColor:
-                                data.label ===
-                                monthlyChartData[monthlyChartData.length - 1]
-                                  ?.label
-                                  ? "#ea7a53"
-                                  : data.estimated
-                                    ? "#f7d44c"
-                                    : "#ea7a53",
-                            }}
-                          />
-                        </View>
-                        <Text className="insights-chart-label">
-                          {data.label}
+                  return (
+                    <View
+                      key={data.label}
+                      className="insights-chart-bar-container"
+                      style={{ width: 56 }}
+                    >
+                      {showValue ? (
+                        <Text className="insights-chart-value">
+                          {formatCurrency(data.amount)}
                         </Text>
+                      ) : null}
+                      <View
+                        className="insights-chart-bar-bg"
+                        style={{ height: 120 }}
+                      >
+                        <View
+                          className="insights-chart-bar"
+                          style={{
+                            height: barHeight as any,
+                            backgroundColor:
+                              data.label ===
+                              monthlyChartData[monthlyChartData.length - 1]
+                                ?.label
+                                ? "#ea7a53"
+                                : data.estimated
+                                  ? "#f7d44c"
+                                  : "#ea7a53",
+                          }}
+                        />
                       </View>
-                    );
-                  })}
-                </View>
+                      <Text className="insights-chart-label">{data.label}</Text>
+                    </View>
+                  );
+                })}
               </ScrollView>
             </View>
 
