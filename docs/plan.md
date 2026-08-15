@@ -2,7 +2,7 @@
 
 **Last updated:** 2026-08-14
 
-**Status:** Phases **1–5.5 complete**. **MAJOR FIX (Tranches A–F) complete on-device.** **UI Improvements Phase 0–1 complete** (`ba66478`, `e4e383e`). Next is Phase 2 (Subscriptions `+`). Phase 6 remains later ship polish. Training frozen.
+**Status:** Phases **1–5.5 complete**. **MAJOR FIX (Tranches A–F) complete on-device.** **UI Improvements Phase 0–2 complete** (`ba66478`, `e4e383e`, `77a83bb`). Next is Phase 3 (Insights chart bounds). Phase 6 remains later ship polish. Training frozen.
 
 This is the living execution plan for app-side quality and reliability **without** retraining TFLite models. AI upscale strategy remains frozen in [`docs/AI_UPSCALING.md`](./AI_UPSCALING.md) (now under `docs/`).
 
@@ -32,7 +32,7 @@ This is the living execution plan for app-side quality and reliability **without
 | **5**   | Sync honesty                                           | **Done**                  | same                                |
 | **5.5** | Professional cleanup (artifacts, docs, structure)      | **Done**                  | complete                            |
 | **MF**  | Icon crawler → picker → upscale pipeline recovery      | **Done (A–F on-device)**  | full cross-layer gate every tranche |
-| **UI**  | Post-Major-Fix UI improvements                         | **Phases 0–1 done**       | skill loop after Phase 0            |
+| **UI**  | Post-Major-Fix UI improvements                         | **Phases 0–2 done**       | skill loop after Phase 0            |
 | **6**   | Ship polish                                            | **After UI Improvements** | full smoke + doc pass               |
 
 ---
@@ -833,7 +833,7 @@ npm run build:android:x86_64   # install + launch on emu when self-contained
 
 ## UI Improvements — post-Major-Fix (2026-08-14)
 
-**Status:** Phases 0–1 complete (`ba66478`, `e4e383e`). Next is Phase 2 (Subscriptions `+`). Phase 6 ship polish stays after UI Phases 2–4.
+**Status:** Phases 0–2 complete (`ba66478`, `e4e383e`, `77a83bb`). Next is Phase 3 (Insights chart bounds). Phase 6 ship polish stays after UI Phases 3–4.
 
 Four user-requested improvements, one phase at a time. Current-code map: [`docs/CODEBASE.md`](./CODEBASE.md). Visual gates use [`.cline/skills/emulator-ui-driving/SKILL.md`](../.cline/skills/emulator-ui-driving/SKILL.md).
 
@@ -854,7 +854,7 @@ The predecessor claimed Phase 0 done after commit `56bd161`. That commit only ap
 | ----- | -------------------------------- | -------------------- | -------------------------------------------------------------------------------- | ----------------------------------------- |
 | **0** | Docs + generic emulator skill    | **Done (`ba66478`)** | `docs/plan.md`, `docs/CODEBASE.md`, `.cline/skills/emulator-ui-driving/SKILL.md` | App source, models, crawler               |
 | **1** | Native nav overlay               | **Done (`e4e383e`)** | Tab list padding; Create + picker (+ shared sheets) inset padding                | Crawler, models, schema                   |
-| **2** | Subscriptions `+`                | Not started          | `app/(tabs)/subscriptions.tsx` + existing modal wiring                           | New create flow, crawler                  |
+| **2** | Subscriptions `+`                | **Done (`77a83bb`)** | `app/(tabs)/subscriptions.tsx` + existing modal wiring                           | New create flow, crawler                  |
 | **3** | Insights chart bounds            | Not started          | `app/(tabs)/insights.tsx` Estimated Monthly Spend row                            | Period-chip `ScrollView`; other tabs      |
 | **4** | Connect Google/Apple (stub scan) | Not started          | Settings + small auth/import module                                              | Real Wallet/Gmail scan; crawler; training |
 
@@ -954,16 +954,16 @@ Needed clearance is approximately `tabBar.height + max(insets.bottom, tabBar.hor
 
 ---
 
-### Phase 2 — Add-subscription `+` on Subscriptions ⬜
+### Phase 2 — Add-subscription `+` on Subscriptions ✅
 
 **Goal:** Subscriptions tab can create a sub without routing back to Home.
 
 #### Tasks
 
-- [ ] Add a header row matching Home: title + `icons.add` `Pressable`.
-- [ ] Wire the existing `CreateSubscriptionModal` (`visible` / `onClose` / `onCreate` → `addSubscription` from `useSubscriptions`), same as `app/(tabs)/index.tsx`.
-- [ ] Keep search + All/Upcoming filters.
-- [ ] After Phase 1, the new header must not collide with anything; the modal inherits Phase 1 inset.
+- [x] Add a header row matching Home: title + `icons.add` `Pressable`.
+- [x] Wire the existing `CreateSubscriptionModal` (`visible` / `onClose` / `onCreate` → `addSubscription` from `useSubscriptions`), same as `app/(tabs)/index.tsx`.
+- [x] Keep search + All/Upcoming filters.
+- [x] After Phase 1, the new header must not collide with anything; the modal inherits Phase 1 inset.
 
 #### Programmatic gate
 
@@ -1068,3 +1068,4 @@ There is **no** public client API that reads other apps’ Google Wallet / Play 
 | 2026-08-14 | **MAJOR FIX complete (Tranches A–F):** provenance precision gating removed picker pollution; lifecycle/ownership/stale-gen added; verified on-device with real companies               |
 | 2026-08-14 | **UI Improvements inserted:** nav-overlay fix, Subscriptions "+", insights chart bounds, connect Google/Apple; Phase 0 (docs + generic skill) precedes all build/emulator verification |
 | 2026-08-15 | **UI Phase 1 done (`e4e383e`):** `useBottomClearance()` on all four tab lists + colliding sheets; emulator visual gate passed (Create/picker/Sign Out above nav)                       |
+| 2026-08-15 | **UI Phase 2 done (`77a83bb`):** Subscriptions tab `+` reuses CreateSubscriptionModal; created Crunchyroll $7.99 on-device                                                             |
