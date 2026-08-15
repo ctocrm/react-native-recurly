@@ -2,7 +2,7 @@
 
 **Last updated:** 2026-08-14
 
-**Status:** Phases **1–5.5 complete**. **MAJOR FIX (Tranches A–F) complete on-device.** **UI Improvements Phase 0 complete** (`ba66478`). Next is Phase 1 (nav overlay) only after this plan. Phase 6 remains later ship polish. Training frozen.
+**Status:** Phases **1–5.5 complete**. **MAJOR FIX (Tranches A–F) complete on-device.** **UI Improvements Phase 0–1 complete** (`ba66478`, `e4e383e`). Next is Phase 2 (Subscriptions `+`). Phase 6 remains later ship polish. Training frozen.
 
 This is the living execution plan for app-side quality and reliability **without** retraining TFLite models. AI upscale strategy remains frozen in [`docs/AI_UPSCALING.md`](./AI_UPSCALING.md) (now under `docs/`).
 
@@ -32,7 +32,7 @@ This is the living execution plan for app-side quality and reliability **without
 | **5**   | Sync honesty                                           | **Done**                  | same                                |
 | **5.5** | Professional cleanup (artifacts, docs, structure)      | **Done**                  | complete                            |
 | **MF**  | Icon crawler → picker → upscale pipeline recovery      | **Done (A–F on-device)**  | full cross-layer gate every tranche |
-| **UI**  | Post-Major-Fix UI improvements                         | **Phase 0 done**          | skill loop after Phase 0            |
+| **UI**  | Post-Major-Fix UI improvements                         | **Phases 0–1 done**       | skill loop after Phase 0            |
 | **6**   | Ship polish                                            | **After UI Improvements** | full smoke + doc pass               |
 
 ---
@@ -833,7 +833,7 @@ npm run build:android:x86_64   # install + launch on emu when self-contained
 
 ## UI Improvements — post-Major-Fix (2026-08-14)
 
-**Status:** Phase 0 docs/skill written; commit is the last Phase 0 task. **No app/UI code in this commit.** Phase 6 ship polish stays after UI Phases 1–4.
+**Status:** Phases 0–1 complete (`ba66478`, `e4e383e`). Next is Phase 2 (Subscriptions `+`). Phase 6 ship polish stays after UI Phases 2–4.
 
 Four user-requested improvements, one phase at a time. Current-code map: [`docs/CODEBASE.md`](./CODEBASE.md). Visual gates use [`.cline/skills/emulator-ui-driving/SKILL.md`](../.cline/skills/emulator-ui-driving/SKILL.md).
 
@@ -853,7 +853,7 @@ The predecessor claimed Phase 0 done after commit `56bd161`. That commit only ap
 | Phase | Name                             | Status               | Touches                                                                          | Must not touch                            |
 | ----- | -------------------------------- | -------------------- | -------------------------------------------------------------------------------- | ----------------------------------------- |
 | **0** | Docs + generic emulator skill    | **Done (`ba66478`)** | `docs/plan.md`, `docs/CODEBASE.md`, `.cline/skills/emulator-ui-driving/SKILL.md` | App source, models, crawler               |
-| **1** | Native nav overlay               | Not started          | Tab list padding; Create + picker (+ shared sheets) inset padding                | Crawler, models, schema                   |
+| **1** | Native nav overlay               | **Done (`e4e383e`)** | Tab list padding; Create + picker (+ shared sheets) inset padding                | Crawler, models, schema                   |
 | **2** | Subscriptions `+`                | Not started          | `app/(tabs)/subscriptions.tsx` + existing modal wiring                           | New create flow, crawler                  |
 | **3** | Insights chart bounds            | Not started          | `app/(tabs)/insights.tsx` Estimated Monthly Spend row                            | Period-chip `ScrollView`; other tabs      |
 | **4** | Connect Google/Apple (stub scan) | Not started          | Settings + small auth/import module                                              | Real Wallet/Gmail scan; crawler; training |
@@ -915,7 +915,7 @@ A static pass or a successful build is **not** a completed phase.
 
 ---
 
-### Phase 1 — Native navigation overlay ⬜
+### Phase 1 — Native navigation overlay ✅
 
 **Goal:** Primary actions and list tails sit above the floating tab bar **and** the Android software nav. Create Subscription is tappable at its real center, not a leftover sliver.
 
@@ -932,11 +932,11 @@ Needed clearance is approximately `tabBar.height + max(insets.bottom, tabBar.hor
 
 #### Tasks
 
-- [ ] Add a single shared bottom-offset helper (or inline the same formula) from `useSafeAreaInsets()` + `components.tabBar`. Do not invent a `pb-25` token unless the theme scale is updated in the same change.
-- [ ] Apply it to list `contentContainerStyle` on Home, Subscriptions, Insights, Settings (replace the no-op `pb-25`).
-- [ ] Apply it to pinned/footer actions in `CreateSubscriptionModal` and `SubscriptionIconPickerModal`.
-- [ ] Apply the same inset to other sheets that share `.modal-container` / `pb-5` if their last button is similarly covered (`EditSubscriptionModal`, `SubscriptionStatsModal`, `ConfirmModal` as needed). One issue: overlay collision. Do not restyle unrelated chrome.
-- [ ] Do **not** start Phase 2 (`+` button) in this commit.
+- [x] Add a single shared bottom-offset helper (or inline the same formula) from `useSafeAreaInsets()` + `components.tabBar`. Do not invent a `pb-25` token unless the theme scale is updated in the same change.
+- [x] Apply it to list `contentContainerStyle` on Home, Subscriptions, Insights, Settings (replace the no-op `pb-25`).
+- [x] Apply it to pinned/footer actions in `CreateSubscriptionModal` and `SubscriptionIconPickerModal`.
+- [x] Apply the same inset to other sheets that share `.modal-container` / `pb-5` if their last button is similarly covered (`EditSubscriptionModal`, `SubscriptionStatsModal`, `ConfirmModal` as needed). One issue: overlay collision. Do not restyle unrelated chrome.
+- [x] Do **not** start Phase 2 (`+` button) in this commit.
 
 #### Programmatic gate
 
@@ -1067,3 +1067,4 @@ There is **no** public client API that reads other apps’ Google Wallet / Play 
 | 2026-08-13 | **MAJOR FIX inserted:** crawler → picker → card/cache → upscale recovery is now the blocking pre-Phase-6 work; full-pipeline contracts and cross-layer regression gates defined        |
 | 2026-08-14 | **MAJOR FIX complete (Tranches A–F):** provenance precision gating removed picker pollution; lifecycle/ownership/stale-gen added; verified on-device with real companies               |
 | 2026-08-14 | **UI Improvements inserted:** nav-overlay fix, Subscriptions "+", insights chart bounds, connect Google/Apple; Phase 0 (docs + generic skill) precedes all build/emulator verification |
+| 2026-08-15 | **UI Phase 1 done (`e4e383e`):** `useBottomClearance()` on all four tab lists + colliding sheets; emulator visual gate passed (Create/picker/Sign Out above nav)                       |
