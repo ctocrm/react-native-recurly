@@ -6,6 +6,8 @@ These are mandatory invariants for every Cline task in this project. The detaile
 
 - Before acting, identify the user's actual requested outcome, not merely a plausible interpretation of their words.
 - When the user names a product/tool feature such as a Cline Workflow, Rule, Hook, Skill, MCP, plugin, command, or checkpoint, verify that feature's current semantics and discovery/storage format before implementing it.
+- Do not invent paths, discovery directories, or storage formats for native Cline features. If you have not read the actual location (or the user has not shown it), say you do not know. Do not present a guess as fact.
+- Global Skills live at `/home/d/.agents/skills/<name>/SKILL.md`. That path was established by user evidence, not inference. Do not put Global Skills in `Documents/Cline/Skills` or claim a directory is the Global Skills location without listing it first.
 - Do not silently substitute a generic artifact for a native feature. Example: a markdown document describing a workflow is not a Cline Workflow.
 - Resolve intent from the code, project history, documentation, and surrounding context first. If materially different interpretations remain and they lead to different work, ask the user before editing.
 - Do not ask unnecessary questions when the intent can be established from available evidence.

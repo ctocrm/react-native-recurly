@@ -1,6 +1,6 @@
 ---
 name: emulator-ui-driving
-description: Drive any Android emulator/device UI via adb. Generic invariant: EVERY adb command that affects the UI (input tap/swipe/text/keyevent, am start/force-stop, orientation) is immediately followed by a screenshot, read back via vision, and asserted before the next UI command. No app-specific or button-specific instructions.
+description: Drive Android emulator UI via adb. Every UI-affecting adb command is followed by a screenshot then vision assert before the next UI command. No app-specific or button-specific instructions.
 ---
 
 # Skill: Emulator UI Driving (generic)
@@ -45,8 +45,7 @@ not need a screenshot. A command that changes pixels does.
 
 1. `adb shell wm size` — use the live size. Do not assume a resolution.
 2. `adb shell uiautomator dump /sdcard/ui.xml`
-3. Read the dump. Match `text=` or `content-desc=`. Parse
-   `bounds="[x1,y1][x2,y2]"`. Tap the center: `((x1+x2)/2, (y1+y2)/2)`.
+3. Read the dump. Match `text=` or `content-desc=`. Parse `bounds="[x1,y1][x2,y2]"`. Tap the center: `((x1+x2)/2, (y1+y2)/2)`.
 4. Screenshot + vision-assert.
 
 Never bake a control's x,y into this skill. Never write "tap Add Subscription
