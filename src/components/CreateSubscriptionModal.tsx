@@ -1,4 +1,5 @@
 import { icons } from "@/constants/icons";
+import { useBottomClearance } from "@/hooks/useBottomClearance";
 import { searchLogos } from "@/lib/resolveLogo";
 import { getCachedIcon } from "@/services/database";
 import {
@@ -59,6 +60,7 @@ const CreateSubscriptionModal = ({
   onClose,
   onCreate,
 }: CreateSubscriptionModalProps) => {
+  const { sheetPadding } = useBottomClearance();
   const posthog = usePostHog();
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
@@ -398,7 +400,7 @@ const CreateSubscriptionModal = ({
             </ScrollView>
 
             {/* Submit pinned outside ScrollView so it stays tappable */}
-            <View className="px-5 pb-5 pt-2">
+            <View className="px-5 pt-2" style={{ paddingBottom: sheetPadding }}>
               <Pressable
                 className={clsx(
                   "auth-button",

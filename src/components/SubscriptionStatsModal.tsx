@@ -1,3 +1,4 @@
+import { useBottomClearance } from "@/hooks/useBottomClearance";
 import { formatCurrency } from "@/lib/utils";
 import dayjs from "dayjs";
 import React from "react";
@@ -16,6 +17,7 @@ const SubscriptionStatsModal = ({
   onClose,
   onRenew,
 }: SubscriptionStatsModalProps) => {
+  const { sheetPadding } = useBottomClearance();
   if (!subscription) return null;
 
   const now = dayjs();
@@ -79,6 +81,7 @@ const SubscriptionStatsModal = ({
       <Pressable className="flex-1 bg-black/50" onPress={onClose}>
         <Pressable
           className="mt-auto rounded-t-3xl bg-background p-5"
+          style={{ paddingBottom: sheetPadding }}
           onPress={(e) => e.stopPropagation()}
         >
           {/* Handle */}

@@ -1,3 +1,4 @@
+import { useBottomClearance } from "@/hooks/useBottomClearance";
 import React, { useCallback, useEffect, useState } from "react";
 import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 
@@ -30,6 +31,7 @@ const ConflictResolutionModal = ({
   onResolve,
   onCancel,
 }: ConflictResolutionModalProps) => {
+  const { sheetPadding } = useBottomClearance();
   const [currentIdx, setCurrentIdx] = useState(0);
   const [applyToAll, setApplyToAll] = useState(false);
   const [mergeOverwrite, setMergeOverwrite] = useState(false);
@@ -144,6 +146,7 @@ const ConflictResolutionModal = ({
         <Pressable className="modal-overlay" onPress={onCancel}>
           <Pressable
             className="modal-container"
+            style={{ paddingBottom: sheetPadding }}
             onPress={(e) => e.stopPropagation()}
           >
             {/* Header */}

@@ -1,10 +1,11 @@
+import EditSubscriptionModal from "@/components/EditSubscriptionModal";
 import ListHeading from "@/components/ListHeading";
 import SubscriptionCard from "@/components/SubscriptionCard";
-import "@/global.css";
-import EditSubscriptionModal from "@/components/EditSubscriptionModal";
 import SubscriptionIconPickerModal from "@/components/SubscriptionIconPickerModal";
 import SubscriptionStatsModal from "@/components/SubscriptionStatsModal";
 import { useSubscriptions } from "@/context/SubscriptionContext";
+import "@/global.css";
+import { useBottomClearance } from "@/hooks/useBottomClearance";
 import clsx from "clsx";
 import { useLocalSearchParams } from "expo-router";
 import { styled } from "nativewind";
@@ -18,6 +19,7 @@ const SafeAreaView = styled(RNSafeAreaView);
 const FILTER_OPTIONS = ["All", "Upcoming"] as const;
 
 const Subscriptions = () => {
+  const { tabListPadding } = useBottomClearance();
   const posthog = usePostHog();
   const { filter: initialFilter } = useLocalSearchParams<{ filter?: string }>();
   const {
@@ -246,7 +248,7 @@ const Subscriptions = () => {
                 : "No subscription yet."}
           </Text>
         }
-        contentContainerClassName="pb-25"
+        contentContainerStyle={{ paddingBottom: tabListPadding }}
       />
 
       {/* Edit Modal */}

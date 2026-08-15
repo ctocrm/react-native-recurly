@@ -1,6 +1,7 @@
 import { icons } from "@/constants/icons";
-import { formatCurrency } from "@/lib/utils";
 import { useSubscriptions } from "@/context/SubscriptionContext";
+import { useBottomClearance } from "@/hooks/useBottomClearance";
+import { formatCurrency } from "@/lib/utils";
 import { styled } from "nativewind";
 import { usePostHog } from "posthog-react-native";
 import React, { useEffect, useMemo, useState } from "react";
@@ -57,6 +58,7 @@ const categoryColors: Record<string, string> = {
 };
 
 const Insights = () => {
+  const { tabListPadding } = useBottomClearance();
   const posthog = usePostHog();
   const { subscriptions } = useSubscriptions();
   const [selectedPeriod, setSelectedPeriod] = useState<Period>("This Month");
@@ -162,7 +164,8 @@ const Insights = () => {
   return (
     <SafeAreaView className="flex-1 bg-background">
       <FlatList
-        contentContainerClassName="px-5 pb-25"
+        contentContainerClassName="px-5"
+        contentContainerStyle={{ paddingBottom: tabListPadding }}
         ListHeaderComponent={
           <>
             {/* Header */}

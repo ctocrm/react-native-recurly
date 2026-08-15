@@ -1,4 +1,5 @@
 import { icons } from "@/constants/icons";
+import { useBottomClearance } from "@/hooks/useBottomClearance";
 import { searchLogos } from "@/lib/resolveLogo";
 import { getCachedIcon } from "@/services/database";
 import { startIconCrawl } from "@/services/iconBackgroundCrawler";
@@ -59,6 +60,7 @@ const EditSubscriptionModal = ({
   onClose,
   onSave,
 }: EditSubscriptionModalProps) => {
+  const { sheetPadding } = useBottomClearance();
   const posthog = usePostHog();
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
@@ -239,6 +241,7 @@ const EditSubscriptionModal = ({
         <Pressable className="modal-overlay" onPress={onClose}>
           <Pressable
             className="modal-container"
+            style={{ paddingBottom: sheetPadding }}
             onPress={(e) => e.stopPropagation()}
           >
             {/* Header */}

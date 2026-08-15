@@ -1,10 +1,24 @@
-import images from "@/constants/images";
 import ConfirmModal from "@/components/ConfirmModal";
 import ConflictResolutionModal from "@/components/ConflictResolutionModal";
+import images from "@/constants/images";
 import { useCloudSync } from "@/context/CloudSyncContext";
 import { useDatabase } from "@/context/DatabaseProvider";
 import { useIconCache } from "@/context/IconCacheContext";
 import { useSubscriptions } from "@/context/SubscriptionContext";
+import { useBottomClearance } from "@/hooks/useBottomClearance";
+import {
+  BACKUP_FULL_USER_COPY,
+  clearCrawlHistory,
+  clearIconCache,
+  executeImportActions,
+  executeNonConflictingImport,
+  exportBackup,
+  getIconCacheStats,
+  importBackup,
+  SYNC_SCOPE_USER_COPY,
+  type IconCacheStats,
+  type ImportScanResult,
+} from "@/services/database";
 import { useClerk, useUser } from "@clerk/expo";
 import * as DocumentPicker from "expo-document-picker";
 import * as Sharing from "expo-sharing";
@@ -21,25 +35,13 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView as RNSafeAreaView } from "react-native-safe-area-context";
-import {
-  clearCrawlHistory,
-  clearIconCache,
-  executeImportActions,
-  executeNonConflictingImport,
-  BACKUP_FULL_USER_COPY,
-  exportBackup,
-  SYNC_SCOPE_USER_COPY,
-  getIconCacheStats,
-  importBackup,
-  type IconCacheStats,
-  type ImportScanResult,
-} from "@/services/database";
 
 type ClearTarget = "iconCache" | "crawlHistory" | null;
 
 const SafeAreaView = styled(RNSafeAreaView);
 
 const Settings = () => {
+  const { tabListPadding } = useBottomClearance();
   const { signOut } = useClerk();
   const { user } = useUser();
   const posthog = usePostHog();
@@ -418,7 +420,8 @@ const Settings = () => {
       if (result.success && result.synced) {
         Alert.alert(
           "Synced",
-          result.message || "Subscriptions, preferences, and chosen icons are up to date. Crawl history stays on this device.",
+          result.message ||
+            "Subscriptions, preferences, and chosen icons are up to date. Crawl history stays on this device.",
         );
         posthog.capture("cloud_sync_completed");
       } else if (!result.success) {
@@ -457,7 +460,8 @@ const Settings = () => {
   return (
     <SafeAreaView className="flex-1 bg-background">
       <ScrollView
-        contentContainerClassName="p-5 pb-25"
+        contentContainerClassName="p-5"
+        contentContainerStyle={{ paddingBottom: tabListPadding }}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         showsVerticalScrollIndicator={false}

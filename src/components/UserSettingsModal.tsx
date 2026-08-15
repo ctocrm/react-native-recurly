@@ -1,12 +1,14 @@
 import images from "@/constants/images";
 import { useSubscriptions } from "@/context/SubscriptionContext";
+import { useBottomClearance } from "@/hooks/useBottomClearance";
+import { setPreference } from "@/services/database";
 import { useUser } from "@clerk/expo";
 import * as DocumentPicker from "expo-document-picker";
 import { readAsStringAsync } from "expo-file-system/legacy";
 import React, { useEffect, useState } from "react";
 import {
-  Alert,
   ActivityIndicator,
+  Alert,
   Image,
   Modal,
   Pressable,
@@ -15,7 +17,6 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { setPreference } from "@/services/database";
 
 interface UserSettingsModalProps {
   visible: boolean;
@@ -23,6 +24,7 @@ interface UserSettingsModalProps {
 }
 
 const UserSettingsModal = ({ visible, onClose }: UserSettingsModalProps) => {
+  const { sheetPadding } = useBottomClearance();
   const { user } = useUser();
   const { notificationEnabled, setNotificationEnabled } = useSubscriptions();
 
@@ -55,7 +57,10 @@ const UserSettingsModal = ({ visible, onClose }: UserSettingsModalProps) => {
 
     // Validate required fields
     if (!firstName.trim() && !lastName.trim() && !avatarUrl) {
-      Alert.alert("Error", "Please enter at least a first name, last name, or select an avatar.");
+      Alert.alert(
+        "Error",
+        "Please enter at least a first name, last name, or select an avatar.",
+      );
       return;
     }
 
@@ -75,7 +80,10 @@ const UserSettingsModal = ({ visible, onClose }: UserSettingsModalProps) => {
           await user?.setProfileImage({ file: avatarUrl });
         } catch (profileImageError) {
           console.error("Failed to update profile image:", profileImageError);
-          Alert.alert("Warning", "Profile updated but failed to update avatar. Please try again.");
+          Alert.alert(
+            "Warning",
+            "Profile updated but failed to update avatar. Please try again.",
+          );
         }
       }
 
@@ -169,6 +177,7 @@ const UserSettingsModal = ({ visible, onClose }: UserSettingsModalProps) => {
       <Pressable className="flex-1 bg-black/50" onPress={onClose}>
         <Pressable
           className="mt-auto rounded-t-3xl bg-background p-5"
+          style={{ paddingBottom: sheetPadding }}
           onPress={(e) => e.stopPropagation()}
         >
           {/* Handle */}
@@ -264,7 +273,11 @@ const UserSettingsModal = ({ visible, onClose }: UserSettingsModalProps) => {
               <Text className="auth-button-text text-primary">
                 {saving ? (
                   <>
-                    <ActivityIndicator size="small" color="#fff" style={{ marginRight: 8 }} />
+                    <ActivityIndicator
+                      size="small"
+                      color="#fff"
+                      style={{ marginRight: 8 }}
+                    />
                     Saving...
                   </>
                 ) : (

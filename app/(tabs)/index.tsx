@@ -1,16 +1,17 @@
-import ListHeading from "@/components/ListHeading";
-import SubscriptionCard from "@/components/SubscriptionCard";
-import UpcomingSubscriptionCard from "@/components/UpcomingSubscriptionCard";
-import { icons } from "@/constants/icons";
-import images from "@/constants/images";
-import "@/global.css";
-import { formatCurrency } from "@/lib/utils";
 import CreateSubscriptionModal from "@/components/CreateSubscriptionModal";
 import EditSubscriptionModal from "@/components/EditSubscriptionModal";
+import ListHeading from "@/components/ListHeading";
+import SubscriptionCard from "@/components/SubscriptionCard";
 import SubscriptionIconPickerModal from "@/components/SubscriptionIconPickerModal";
 import SubscriptionStatsModal from "@/components/SubscriptionStatsModal";
+import UpcomingSubscriptionCard from "@/components/UpcomingSubscriptionCard";
 import UserSettingsModal from "@/components/UserSettingsModal";
+import { icons } from "@/constants/icons";
+import images from "@/constants/images";
 import { useSubscriptions } from "@/context/SubscriptionContext";
+import "@/global.css";
+import { useBottomClearance } from "@/hooks/useBottomClearance";
+import { formatCurrency } from "@/lib/utils";
 import { useUser } from "@clerk/expo";
 import dayjs from "dayjs";
 import { useRouter } from "expo-router";
@@ -26,6 +27,7 @@ const App = () => {
   const router = useRouter();
   const { user } = useUser();
   const posthog = usePostHog();
+  const { tabListPadding } = useBottomClearance();
   const [expandedSubscriptionId, setExpandedSubscriptionId] = useState<
     string | null
   >(null);
@@ -266,7 +268,7 @@ const App = () => {
         ListEmptyComponent={
           <Text className="home-empty-state">No subscription yet.</Text>
         }
-        contentContainerClassName="pb-25"
+        contentContainerStyle={{ paddingBottom: tabListPadding }}
       />
 
       <CreateSubscriptionModal

@@ -1,4 +1,5 @@
 import { icons } from "@/constants/icons";
+import { useBottomClearance } from "@/hooks/useBottomClearance";
 import {
   deleteCachedIcon,
   getIconCrawlSession,
@@ -86,6 +87,7 @@ const SubscriptionIconPickerModal = ({
   onClose,
   onIconChange,
 }: IconPickerProps) => {
+  const { sheetPadding } = useBottomClearance();
   const posthog = usePostHog();
   const [availableIcons, setAvailableIcons] = useState<PickerIcon[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -764,7 +766,10 @@ const SubscriptionIconPickerModal = ({
     >
       <View className="flex-1 justify-end">
         <Pressable className="flex-1 bg-black/50" onPress={onClose} />
-        <View className="rounded-t-3xl bg-background p-5">
+        <View
+          className="rounded-t-3xl bg-background p-5"
+          style={{ paddingBottom: sheetPadding }}
+        >
           <View className="mb-4 flex-row items-center justify-between">
             <Text className="text-lg font-sans-bold text-primary">
               Choose Icon
