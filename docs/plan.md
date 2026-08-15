@@ -1,8 +1,8 @@
 # Product plan — icons, crawl, DB, sync (no training)
 
-**Last updated:** 2026-08-13
+**Last updated:** 2026-08-14
 
-**Status:** Phases **1–5.5 complete**. **MAJOR FIX — icon crawler → picker → upscale recovery is OPEN and blocks Phase 6. Training frozen.**
+**Status:** Phases **1–5.5 complete**. **MAJOR FIX (Tranches A–F) complete on-device.** **UI Improvements Phase 0 complete** (`2adcbbc`). Next is Phase 1 (nav overlay) only after this plan. Phase 6 remains later ship polish. Training frozen.
 
 This is the living execution plan for app-side quality and reliability **without** retraining TFLite models. AI upscale strategy remains frozen in [`docs/AI_UPSCALING.md`](./AI_UPSCALING.md) (now under `docs/`).
 
@@ -23,16 +23,17 @@ This is the living execution plan for app-side quality and reliability **without
 
 ## Phase board
 
-| Phase   | Name                                                   | Status                   | Gate                                |
-| ------- | ------------------------------------------------------ | ------------------------ | ----------------------------------- |
-| **1**   | Registry → map + picker/persist                        | **Done**                 | `tsc`, x86_64 build, emu launch     |
-| **2**   | Visual without training (`iconQuality` + source order) | **Done**                 | same + scorer smoke                 |
-| **3**   | Crawl reliability                                      | **Done**                 | same                                |
-| **4**   | DB split / schema hygiene                              | **Done**                 | same                                |
-| **5**   | Sync honesty                                           | **Done**                 | same                                |
-| **5.5** | Professional cleanup (artifacts, docs, structure)      | **Done**                 | complete                            |
-| **MF**  | Icon crawler → picker → upscale pipeline recovery      | **OPEN — blocking**      | full cross-layer gate every tranche |
-| **6**   | Ship polish                                            | **Blocked by Major Fix** | full smoke + doc pass               |
+| Phase   | Name                                                   | Status                    | Gate                                |
+| ------- | ------------------------------------------------------ | ------------------------- | ----------------------------------- |
+| **1**   | Registry → map + picker/persist                        | **Done**                  | `tsc`, x86_64 build, emu launch     |
+| **2**   | Visual without training (`iconQuality` + source order) | **Done**                  | same + scorer smoke                 |
+| **3**   | Crawl reliability                                      | **Done**                  | same                                |
+| **4**   | DB split / schema hygiene                              | **Done**                  | same                                |
+| **5**   | Sync honesty                                           | **Done**                  | same                                |
+| **5.5** | Professional cleanup (artifacts, docs, structure)      | **Done**                  | complete                            |
+| **MF**  | Icon crawler → picker → upscale pipeline recovery      | **Done (A–F on-device)**  | full cross-layer gate every tranche |
+| **UI**  | Post-Major-Fix UI improvements                         | **Phase 0 done**          | skill loop after Phase 0            |
+| **6**   | Ship polish                                            | **After UI Improvements** | full smoke + doc pass               |
 
 ---
 
@@ -382,9 +383,9 @@ scripts/
 
 ---
 
-## MAJOR FIX — Icon crawler → picker → upscale pipeline recovery 🚨
+## MAJOR FIX — Icon crawler → picker → upscale pipeline recovery ✅
 
-**Status:** **OPEN — BLOCKS PHASE 6.** This is a correctness/recovery project, not ordinary ship polish.
+**Status:** **Done (Tranches A–F on-device, 2026-08-14).** Frozen contracts still apply to later UI work. Phase 6 ship polish waits on UI Improvements.
 
 **Why this is a major fix:** crawler discovery, picker behavior, card/cache state, and upscaling are one coupled icon pipeline. Project history repeatedly fixed one layer while breaking another, then continued forward and recreated the same failures. This repair is not complete when search returns URLs, when images download, when TypeScript passes, or when the app builds. It is complete only when the full user-facing icon pipeline works end-to-end without regressing its downstream contracts.
 
@@ -832,61 +833,221 @@ npm run build:android:x86_64   # install + launch on emu when self-contained
 
 ## UI Improvements — post-Major-Fix (2026-08-14)
 
-Four user-requested UI improvements, executed one phase at a time. **Phase 0
-(docs + generic skill) MUST complete before any build/emulator verification**,
-because every later visual gate uses the generic emulator skill loop.
+**Status:** Phase 0 docs/skill written; commit is the last Phase 0 task. **No app/UI code in this commit.** Phase 6 ship polish stays after UI Phases 1–4.
 
-### Phase 0 — Documentation & generic skill (no code, no build)
+Four user-requested improvements, one phase at a time. Current-code map: [`docs/CODEBASE.md`](./CODEBASE.md). Visual gates use [`.cline/skills/emulator-ui-driving/SKILL.md`](../.cline/skills/emulator-ui-driving/SKILL.md).
 
-- [ ] Append this UI-Improvements section to `docs/plan.md` (done by this edit).
-- [ ] Write `docs/CODEBASE.md`: full current-codebase overview (tabs, modals,
-      components, services, context, theme, models, icon-pipeline contracts).
-- [ ] Rewrite `.cline/skills/emulator-ui-driving/SKILL.md` to be **generic**:
-      invariant = every UI-affecting adb command (`input tap/swipe/text/keyevent`,
-      `am start/force-stop`) is immediately followed by `adb exec-out screencap`
-      read back via vision and asserted before the next UI command. Keep generic
-      techniques (uiautomator-for-bounds, 1080x2400 space, nav bar ~y>2320,
-      keyboard/dropdown dismissal, long-press = `input swipe X Y X Y 800`).
-      NO button-specific coordinates.
+### Why Phase 0 exists
 
-### Phase 1 — Native navigation overlay fix
+The predecessor claimed Phase 0 done after commit `56bd161`. That commit only appended a thin stub, an 83-line overview, and a skill rewrite. The Phase 0 boxes were still unchecked. A “full current-codebase overview” and a Major-Fix-style plan with per-task programmatic **and** visual gates were not actually delivered. This rewrite is the real Phase 0.
 
-- Inset-aware bottom padding (`useSafeAreaInsets().bottom` + tab-bar height) on
-  all four tabs and inside `CreateSubscriptionModal` + `SubscriptionIconPickerModal`
-  sheets so primary buttons sit above the nav overlay.
-- Gates: tsc/jest/lint → build → emulator (skill loop): each tab + both modals,
-  assert primary button fully visible above nav bar; scroll list bottoms.
+### Observed product problems (evidence, not guesses)
 
-### Phase 2 — Add-subscription "+" on Subscriptions page
+1. **Native nav overlay / dead tap zone.** Floating tab bar is `position: "absolute"` with `bottom: Math.max(insets.bottom, 20)` and height 72 (`app/(tabs)/_layout.tsx`). Lists use `contentContainerClassName="pb-25"`, but `global.css` / `theme.ts` spacing jumps **24 → 30** — there is **no `--spacing-25`**, so that class is a no-op. Create sheet pins submit at `px-5 pb-5` (`CreateSubscriptionModal.tsx`). On-device, the Create button center sits under the Android nav; only the uncovered top slice is tappable.
+2. **Subscriptions has no add control.** Home header `icons.add` opens `CreateSubscriptionModal`. `app/(tabs)/subscriptions.tsx` has search/filters/cards only.
+3. **Insights chart overflows.** “Estimated Monthly Spend” is a non-scrolling `flex-row` (`insights-chart-scroll` is a class name, not a `ScrollView`). Period chips below _are_ in a `ScrollView`. 6-month / Year add more labeled bars than the card width.
+4. **No Google/Apple scan path.** Settings has Clerk account + cloud _file_ sync (Drive/Dropbox/…). There is no connected-account scan. Honest limit: no public client API reads other apps’ Wallet / Play / App Store subscriptions.
 
-- Header row (title + `icons.add` Pressable) opening the existing
-  `CreateSubscriptionModal` (replicate index.tsx wiring).
-- Gates: programmatic → build → emulator (skill loop): "+" present, modal opens,
-  created sub appears in list.
+### UI board
 
-### Phase 3 — Insights chart stays in bounds
+| Phase | Name                             | Status               | Touches                                                                          | Must not touch                            |
+| ----- | -------------------------------- | -------------------- | -------------------------------------------------------------------------------- | ----------------------------------------- |
+| **0** | Docs + generic emulator skill    | **Done (`2adcbbc`)** | `docs/plan.md`, `docs/CODEBASE.md`, `.cline/skills/emulator-ui-driving/SKILL.md` | App source, models, crawler               |
+| **1** | Native nav overlay               | Not started          | Tab list padding; Create + picker (+ shared sheets) inset padding                | Crawler, models, schema                   |
+| **2** | Subscriptions `+`                | Not started          | `app/(tabs)/subscriptions.tsx` + existing modal wiring                           | New create flow, crawler                  |
+| **3** | Insights chart bounds            | Not started          | `app/(tabs)/insights.tsx` Estimated Monthly Spend row                            | Period-chip `ScrollView`; other tabs      |
+| **4** | Connect Google/Apple (stub scan) | Not started          | Settings + small auth/import module                                              | Real Wallet/Gmail scan; crawler; training |
 
-- Wrap "Estimated Monthly Spend" bar row in a horizontal `ScrollView` inside the
-  card; fixed min-width per bar; condense/hide per-bar value labels for >3-month
-  periods so 6mo/1yr scroll within the card.
-- Gates: programmatic → build → emulator (skill loop): cycle This Month→3→6→Year,
-  assert no overflow of the card border.
+### Shared gates (Phases 1–4)
 
-### Phase 4 — Connect Google/Apple to scan subscriptions
+**Programmatic (every implementation phase):**
 
-- New "Connected Accounts" section in Settings using `expo-auth-session` (already
-  a dep) for Google + Apple sign-in; tokens in `expo-secure-store`; a
-  "Scan for subscriptions" import action (Gmail/wallet receipt scanner = later
-  server phase; now an import stub + manual prefill).
-- Honest limit: no public client API reads other apps' Wallet/App-Store subs.
-- Gates: programmatic → build → emulator (skill loop): Connect opens OAuth sheet,
-  connected state persists.
+```text
+npx tsc --noEmit
+npm test
+npx expo lint          # 0 new errors
+```
+
+Then `npm run build:android:x86_64` (install + launch). Logcat: `Running "main"`, no RN fatal.
+
+**Visual (every implementation phase), via the generic skill:**
+
+```text
+every UI-affecting adb command
+→ adb exec-out screencap
+→ read screenshot + vision assert
+→ only then the next UI command
+```
+
+Locate targets with uiautomator bounds. Do not hardcode button coordinates in the skill or in this plan.
+
+A static pass or a successful build is **not** a completed phase.
+
+**Icon-pipeline smoke after any phase that rebuilds the app:** long-press a card icon still opens the picker; a selected icon still shows on the card. Do not reopen crawler search work here.
+
+---
+
+### Phase 0 — Documentation & generic skill (no app code, no build) ⬜
+
+**Goal:** Agents can implement Phases 1–4 from this plan + `docs/CODEBASE.md` without rediscovering the tree. Visual gates have a generic skill before any emulator work.
+
+#### Tasks
+
+- [x] Append a UI-Improvements section to this file (first stub in `56bd161`).
+- [x] Replace that stub with this detailed phase plan (tasks, files, programmatic + visual gates).
+- [x] Rewrite `docs/CODEBASE.md` as a real current-code map (routes, padding facts, every component, providers, services, frozen contracts, build scripts).
+- [x] Keep `.cline/skills/emulator-ui-driving/SKILL.md` generic:
+  - YAML frontmatter `name: emulator-ui-driving` (Cline discovery).
+  - Invariant: every UI-affecting adb command (`input tap/swipe/text/keyevent`, `am start/force-stop`) is followed by screencap + vision assert.
+  - Generic techniques only: live `wm size`, uiautomator bounds, nav-bar dead zone, keyboard/dropdown dismissal, long-press = `input swipe X Y X Y 800`.
+  - **No button-specific coordinates.**
+- [x] Revert leftover Phase-1 import-only dirty diffs if present (`subscriptions.tsx`, safeguards one-liner).
+- [x] Commit Phase 0 docs/skill only (`2adcbbc`). **Do not start Phase 1 in the same commit.**
+
+#### Phase 0 acceptance
+
+- This section has per-phase tasks and both gate types (not a four-bullet stub).
+- `docs/CODEBASE.md` names the actual files, the `pb-25` / missing spacing-25 fact, Create-button collision, insights non-scrolling bar row, and provider nesting.
+- Skill has frontmatter, the invariant, and zero hardcoded control coordinates.
+- `git status` shows no accidental app-source edits from the predecessor loop.
+
+**No build / no emulator in Phase 0.** That was an explicit user constraint.
+
+---
+
+### Phase 1 — Native navigation overlay ⬜
+
+**Goal:** Primary actions and list tails sit above the floating tab bar **and** the Android software nav. Create Subscription is tappable at its real center, not a leftover sliver.
+
+#### Root cause (from code)
+
+```text
+tabBar.bottom = max(insets.bottom, 20)
+tabBar.height = 72
+list clearance class pb-25 → undefined token
+modal submit pb-5 = 20px
+```
+
+Needed clearance is approximately `tabBar.height + max(insets.bottom, tabBar.horizontalInset)` plus a small gap — applied as **style padding**, not a missing NativeWind token.
+
+#### Tasks
+
+- [ ] Add a single shared bottom-offset helper (or inline the same formula) from `useSafeAreaInsets()` + `components.tabBar`. Do not invent a `pb-25` token unless the theme scale is updated in the same change.
+- [ ] Apply it to list `contentContainerStyle` on Home, Subscriptions, Insights, Settings (replace the no-op `pb-25`).
+- [ ] Apply it to pinned/footer actions in `CreateSubscriptionModal` and `SubscriptionIconPickerModal`.
+- [ ] Apply the same inset to other sheets that share `.modal-container` / `pb-5` if their last button is similarly covered (`EditSubscriptionModal`, `SubscriptionStatsModal`, `ConfirmModal` as needed). One issue: overlay collision. Do not restyle unrelated chrome.
+- [ ] Do **not** start Phase 2 (`+` button) in this commit.
+
+#### Programmatic gate
+
+- `tsc` / `jest` / lint as above.
+- Build + install + launch.
+
+#### Visual gate (skill loop)
+
+1. Launch app → screenshot: running UI, nav bar visible.
+2. Home: scroll list to end → last card is above the tab pill, not under nav.
+3. Open Create from Home `+` → screenshot: **Create Subscription** label fully visible; tap **center** of that button → modal submits / closes. A tap that only works on the top sliver is a fail.
+4. Subscriptions / Insights / Settings: scroll to end → same clearance.
+5. Long-press a card icon → picker sheet footer (Upscale / report chips) fully above nav; tap center of a footer control works.
+6. Icon-pipeline smoke: picker still opens; no RN fatal.
+
+---
+
+### Phase 2 — Add-subscription `+` on Subscriptions ⬜
+
+**Goal:** Subscriptions tab can create a sub without routing back to Home.
+
+#### Tasks
+
+- [ ] Add a header row matching Home: title + `icons.add` `Pressable`.
+- [ ] Wire the existing `CreateSubscriptionModal` (`visible` / `onClose` / `onCreate` → `addSubscription` from `useSubscriptions`), same as `app/(tabs)/index.tsx`.
+- [ ] Keep search + All/Upcoming filters.
+- [ ] After Phase 1, the new header must not collide with anything; the modal inherits Phase 1 inset.
+
+#### Programmatic gate
+
+- Same static + build gate.
+- No new create-service; reuse context.
+
+#### Visual gate (skill loop)
+
+1. Open Subscriptions tab → screenshot: `+` visible and tappable (not under status bar / not off-screen).
+2. Tap `+` → Create sheet opens.
+3. Create a named sub (type name, dismiss keyboard, tap Create **center**) → sheet closes; new row is in the list.
+4. Home still has its `+`; both entry points create the same kind of row.
+
+---
+
+### Phase 3 — Insights chart stays in bounds ⬜
+
+**Goal:** 6-month and 1-year Estimated Monthly Spend bars stay inside the card. Overflow is a fail.
+
+#### Root cause (from code)
+
+`app/(tabs)/insights.tsx` maps `monthlyChartData` in a `View` with `className="insights-chart-scroll flex-row items-end justify-between"`. That is **not** a `ScrollView`. Every bar has an `insights-chart-value` label. Period chips underneath already scroll.
+
+#### Tasks
+
+- [ ] Make the **bar row** (not the period chips) a horizontal `ScrollView` inside the card.
+- [ ] Give each bar a fixed min-width so 6/12 bars do not squash or spill.
+- [ ] Condense or hide per-bar value labels when `selectedPeriod` has more than 3 points (6mo / Year).
+- [ ] Do not change category bars or the summary card unless they share the overflow (they should not).
+
+#### Programmatic gate
+
+- Same static + build gate.
+
+#### Visual gate (skill loop)
+
+1. Open Insights → screenshot This Month: bars inside the card border.
+2. Tap `3 Months` → screenshot: still inside.
+3. Tap `6 Months` → screenshot: **no bar, value, or label crosses the card border**. Horizontal scroll is allowed; overflow is not.
+4. Tap `Year` → same assertion.
+5. Cycle back to This Month → layout recovers.
+
+---
+
+### Phase 4 — Connect Google / Apple and scan (honest stub) ⬜
+
+**Goal:** Settings grows a Connected Accounts section. User can start Google and Apple sign-in and see connected state persist. “Scan for subscriptions” is an **import stub** (manual prefill / “coming soon” with honest copy), not a fake Wallet reader.
+
+#### Honest limit (do not lie in UI)
+
+There is **no** public client API that reads other apps’ Google Wallet / Play Billing / App Store subscriptions. Gmail/receipt scanning is a later server phase. This phase must say that.
+
+#### Tasks
+
+- [ ] New Settings section “Connected Accounts” below Account / before or beside Cloud Sync (Cloud Sync is file backup, not this).
+- [ ] Use already-present `expo-auth-session` (~7.0.11) and `expo-secure-store` (15.0.8).
+- [ ] Google + Apple connect buttons; store tokens in secure store; show connected / disconnected.
+- [ ] “Scan for subscriptions” action: stub that either prefills the create modal from a local/manual list or explains the later server scanner. **Do not** invent parsed Wallet rows.
+- [ ] Disconnect clears the stored token.
+- [ ] Do not add crawler or training work.
+
+#### Programmatic gate
+
+- Same static + build gate.
+- No new native OAuth client secrets committed. If emulator cannot complete the real IdP sheet, say **unverified** rather than claiming success.
+
+#### Visual gate (skill loop)
+
+1. Open Settings → screenshot: Connected Accounts section visible above the nav overlay (Phase 1 still holds).
+2. Tap Connect Google → OAuth / system sheet appears **or** a documented emulator limitation is recorded. Do not tap through a broken WebView blindly.
+3. After a successful connect (if the environment allows): section shows connected; kill/relaunch → still connected.
+4. Scan action opens the stub UI (not a crash, not a fabricated subscription list).
+5. Disconnect returns to disconnected copy.
+
+---
 
 ### UI cross-cutting rules
 
-- One phase at a time; commit per phase; never carry a regression forward.
-- Every visual gate uses the generic skill loop (UI adb → screenshot → vision assert).
-- Update `docs/CODEBASE.md` + this file as phases land.
+- One phase at a time. Commit the phase. Do not start the next phase in the same commit.
+- Never carry a regression forward (`overlay fixed, create broken`).
+- Every visual gate uses the generic skill loop. No button coordinates in the skill.
+- Update `docs/CODEBASE.md` and this file when a phase lands.
+- Training stays frozen. Do not modify `scripts/train/` or `assets/models/*`.
+- Three-strike safeguard still applies to each UI root issue.
 
 ---
 

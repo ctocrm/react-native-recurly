@@ -16,12 +16,15 @@ Never chain blind UI commands. Layout shifts (keyboard, dropdowns, scroll,
 modals), so coordinates go stale between commands. One UI action → one
 screenshot → one assertion → next action.
 
-## Coordinate space facts (this device)
+## Coordinate space facts (re-read, do not hardcode a button)
 
-- `adb shell wm size` = `1080x2400`; screenshots are `1080x2400`; `uiautomator`
-  bounds and `input tap` share this space.
-- The software nav bar occupies the bottom (~y>2320). Tapping there sends the
-  app HOME. Keep taps above ~2300, or scroll content so the target is clear.
+- Always re-read `adb shell wm size`. On the current Pixel-class AVD this is
+  typically `1080x2400`; screenshots, `uiautomator` bounds, and `input tap`
+  share that space. If `wm size` differs, use the live size.
+- The software nav bar occupies the bottom strip (on 1080x2400, ~y>2320).
+  Tapping there sends the app HOME. Keep taps above the nav, or scroll the
+  target fully on-screen first.
+- Never bake a control's x,y into this skill. Locate via uiautomator each time.
 
 ## Locating targets (never guess by eye)
 
@@ -47,9 +50,11 @@ screenshot → one assertion → next action.
 
 ```
 adb shell am force-stop <pkg>
+adb exec-out screencap -p > /tmp/stopped.png   # assert app is gone
 adb logcat -c
 adb shell monkey -p <pkg> -c android.intent.category.LAUNCHER 1
 sleep 8                      # RN boot
+adb exec-out screencap -p > /tmp/launched.png  # assert running UI
 adb logcat -d -s ReactNativeJS > /tmp/log.txt
 ```
 
