@@ -42,7 +42,7 @@ app/_layout.tsx
 | Tabs layout   | `app/(tabs)/_layout.tsx`              | Clerk-gated `<Tabs>`; floating pill tab bar; mounts `HiddenSearchWebView`                                | Tab bar is **`position: "absolute"`** with `bottom: Math.max(insets.bottom, tabBar.horizontalInset)` (`horizontalInset` = 20). Height 72, radius 32, icon frame 48 (`src/constants/theme.ts` `components.tabBar`). | n/a                                                                         |
 | Home          | `app/(tabs)/index.tsx`                | Monthly spend, upcoming, preview list, header `icons.add`                                                | `SafeAreaView` + `p-5`. List uses `contentContainerClassName="pb-25"`.                                                                                                                                             | Header `+` opens `CreateSubscriptionModal` via `addSubscription` then crawl |
 | Subscriptions | `app/(tabs)/subscriptions.tsx`        | Full list: search, All/Upcoming, expand/edit/delete/stats, header `+`, **long-press card icon → picker** | `SafeAreaView` + `p-5`. List uses `useBottomClearance()`. Header `+` opens the same `CreateSubscriptionModal` as Home.                                                                                             | Header `+` → `addSubscription` then crawl                                   |
-| Insights      | `app/(tabs)/insights.tsx`             | Spend summary, category bars, **Estimated Monthly Spend** chart + period chips                           | `SafeAreaView` + `p-5`. Chart is a non-scrolling `flex-row` (`insights-chart-scroll` is a class name, not a `ScrollView`). Period chips _are_ in a `ScrollView`.                                                   | n/a                                                                         |
+| Insights      | `app/(tabs)/insights.tsx`             | Spend summary, category bars, **Estimated Monthly Spend** chart + period chips                           | `SafeAreaView` + `p-5`. Bar row is a horizontal `ScrollView` (`minWidth: 48`); value labels hide when more than 3 points. Period chips remain a separate `ScrollView`.                                             | n/a                                                                         |
 | Settings      | `app/(tabs)/settings.tsx`             | Profile, Account, Cloud Sync, Backup/Restore, Cache & Crawl clear, Sign out                              | `SafeAreaView` + `p-5`. **Phase 4 adds Connected Accounts.**                                                                                                                                                       | n/a                                                                         |
 | Detail        | `app/subscriptions/[id].tsx`          | Single subscription                                                                                      | Standard                                                                                                                                                                                                           | n/a                                                                         |
 
@@ -159,11 +159,9 @@ NativeWind v5 + `global.css` (`@theme` spacing tokens listed above). Component c
 Insights chart structure today (`app/(tabs)/insights.tsx`):
 
 - Title “Estimated Monthly Spend”
-- A **non-scrolling** `View` with `className="insights-chart-scroll flex-row items-end justify-between"` mapping one bar per projected month
-- Value labels on every bar (`insights-chart-value`)
+- A **horizontal `ScrollView`** for the bar row (`minWidth: 48` per bar)
+- Value labels only when there are 3 or fewer points
 - Period chips (`This Month` / `3 Months` / `6 Months` / `Year`) in a **separate** horizontal `ScrollView` below the card
-
-That is why 6-month / 1-year bars escape the card: more bars + labels than the card width, and the bar row is not itself a `ScrollView`.
 
 ---
 
