@@ -1,81 +1,80 @@
 ---
 name: emulator-ui-driving
-description: Drive the jsmastery Android emulator UI reliably via adb (input tap/swipe/text/keyevent, am start/force-stop, uiautomator dumps). Generic invariant: EVERY adb command that affects the UI must be followed by a screenshot read back via vision and asserted before the next UI command. Use for any real-UI verification or on-device log capture.
+description: Drive any Android emulator/device UI via adb. Generic invariant: EVERY adb command that affects the UI (input tap/swipe/text/keyevent, am start/force-stop, orientation) is immediately followed by a screenshot, read back via vision, and asserted before the next UI command. No app-specific or button-specific instructions.
 ---
 
-# Skill: Emulator UI Driving (generic adb + screenshot + vision)
+# Skill: Emulator UI Driving (generic)
+
+Use this whenever you drive an Android emulator or device with adb and need to
+prove the UI actually changed.
 
 ## The invariant (non-negotiable)
 
-> **Every** adb command that affects the UI (`input tap/swipe/text/keyevent`,
-> `am start/force-stop`, orientation change, etc.) is IMMEDIATELY followed by
-> `adb exec-out screencap -p > /tmp/x.png`, read back via vision, and the
-> expected state is asserted **before** issuing the next UI command.
+> **Every** adb command that affects the UI is IMMEDIATELY followed by a
+> screenshot, the screenshot is read back, and the expected state is asserted
+> **before** the next UI command.
 
-Never chain blind UI commands. Layout shifts (keyboard, dropdowns, scroll,
-modals), so coordinates go stale between commands. One UI action → one
-screenshot → one assertion → next action.
+UI-affecting commands include, at minimum:
 
-## Coordinate space facts (re-read, do not hardcode a button)
+- `adb shell input tap`
+- `adb shell input swipe`
+- `adb shell input text`
+- `adb shell input keyevent`
+- `adb shell am start` / `am force-stop`
+- `adb shell monkey` (launcher)
+- orientation / wm size changes
 
-- Always re-read `adb shell wm size`. On the current Pixel-class AVD this is
-  typically `1080x2400`; screenshots, `uiautomator` bounds, and `input tap`
-  share that space. If `wm size` differs, use the live size.
-- The software nav bar occupies the bottom strip (on 1080x2400, ~y>2320).
-  Tapping there sends the app HOME. Keep taps above the nav, or scroll the
-  target fully on-screen first.
-- Never bake a control's x,y into this skill. Locate via uiautomator each time.
+Never chain blind UI commands. Keyboards, dropdowns, scrolls, and modals move
+layout, so coordinates go stale. One UI action → one screenshot → one
+assertion → next action.
 
-## Locating targets (never guess by eye)
+A command that only reads state (`uiautomator dump`, `wm size`, `logcat`) does
+not need a screenshot. A command that changes pixels does.
 
-1. `adb shell uiautomator dump /sdcard/ui.xml`
-2. `adb shell cat /sdcard/ui.xml | grep -oE 'content-desc="TARGET"[^>]*bounds="\[[0-9,]+\]\[[0-9,]+\]"'`
-   (or `text="TARGET"`).
-3. Parse `bounds="[x1,y1][x2,y2]"`; center = `((x1+x2)/2,(y1+y2)/2)`; tap center.
-4. Screenshot + vision-assert the result.
-
-## Common techniques (generic)
-
-- **Dismiss keyboard** after typing: `adb shell input keyevent KEYCODE_BACK`,
-  then screenshot (keyboard covers bottom buttons and shifts layout).
-- **Dismiss/resolve autocomplete dropdowns** before tapping other controls
-  (they intercept taps).
-- **Long-press** = `adb shell input swipe X Y X Y 800` (hold ~800ms).
-- **Type** = `adb shell input text "..."` (tap the field first to focus).
-- **Scroll** a list/sheet = `adb shell input swipe X Y1 X Y2 300`.
-
-## Recipes
-
-### Launch fresh + capture logs
+## Loop
 
 ```
-adb shell am force-stop <pkg>
-adb exec-out screencap -p > /tmp/stopped.png   # assert app is gone
-adb logcat -c
-adb shell monkey -p <pkg> -c android.intent.category.LAUNCHER 1
-sleep 8                      # RN boot
-adb exec-out screencap -p > /tmp/launched.png  # assert running UI
-adb logcat -d -s ReactNativeJS > /tmp/log.txt
+1. Locate the target (uiautomator dump + bounds, or a prior screenshot).
+2. Issue ONE UI-affecting adb command.
+3. adb exec-out screencap -p > /tmp/after.png
+4. Read the screenshot and assert the expected change.
+5. Only then issue the next UI command.
 ```
 
-### Screenshot + read
+## Locating targets (never guess a button)
 
-```
-adb exec-out screencap -p > /tmp/s.png   # then read_file /tmp/s.png
-```
+1. `adb shell wm size` — use the live size. Do not assume a resolution.
+2. `adb shell uiautomator dump /sdcard/ui.xml`
+3. Read the dump. Match `text=` or `content-desc=`. Parse
+   `bounds="[x1,y1][x2,y2]"`. Tap the center: `((x1+x2)/2, (y1+y2)/2)`.
+4. Screenshot + vision-assert.
 
-### Tap a located target
+Never bake a control's x,y into this skill. Never write "tap Add Subscription
+at 540,2240" or any other app-specific recipe here.
 
-```
-adb shell input tap CX CY
-adb exec-out screencap -p > /tmp/after.png   # then read + assert
-```
+## Generic techniques
+
+- **Keyboard:** after `input text`, a BACK keyevent is often needed; then
+  screenshot (the keyboard covers bottom controls and shifts layout).
+- **Dropdowns / autocomplete:** they intercept taps. Resolve or dismiss them,
+  screenshot, then tap the real target.
+- **Long-press:** `adb shell input swipe X Y X Y 800` (hold ~800ms).
+- **Scroll:** `adb shell input swipe X Y1 X Y2 300`.
+- **Nav / gesture bar:** the bottom strip of the screen is system UI. A tap
+  there usually leaves the app. If a target is under it, scroll first, then
+  re-locate.
 
 ## Failure handling
 
-- A tap that "does nothing" or goes HOME landed in dead space / nav bar.
-  Re-dump uiautomator and re-screenshot; do NOT repeat the same coordinate.
-- If a target is under the nav bar, scroll the sheet/list up first, then
-  re-locate and tap.
+- A tap that does nothing, or sends the app HOME, landed in dead space or
+  system UI. Re-dump uiautomator and re-screenshot. Do **not** repeat the
+  same coordinate.
 - After two failed attempts at the same interaction, change strategy
-  (different anchor, scroll, or uiautomator re-dump) rather than retrying.
+  (scroll, different anchor, re-dump). After three, stop and report.
+
+## Out of scope
+
+This skill does **not** contain app-specific flows (which button to press,
+which package to launch, which screen to open). Those belong in the current
+task or project plan. This skill only defines the adb → screenshot → verify
+loop.
