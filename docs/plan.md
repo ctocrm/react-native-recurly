@@ -1,8 +1,8 @@
 # Product plan — icons, crawl, DB, sync (no training)
 
-**Last updated:** 2026-08-14
+**Last updated:** 2026-08-15
 
-**Status:** Phases **1–5.5 complete**. **MAJOR FIX (Tranches A–F) complete on-device.** **UI Improvements Phase 0–3 complete** (`ba66478`, `e4e383e`, `77a83bb`, `913b08f`). Next is Phase 4 (Connect Google/Apple stub). Phase 6 remains later ship polish. Training frozen.
+**Status:** Phases **1–5.5 complete**. **MAJOR FIX (Tranches A–F) complete on-device.** **UI Improvements Phase 0–3 complete** (`ba66478`, `e4e383e`, `77a83bb`, `913b08f`). Next is Phase 4 (email receipt scan). Phase 6 remains later ship polish. Training frozen.
 
 This is the living execution plan for app-side quality and reliability **without** retraining TFLite models. AI upscale strategy remains frozen in [`docs/AI_UPSCALING.md`](./AI_UPSCALING.md) (now under `docs/`).
 
@@ -833,7 +833,7 @@ npm run build:android:x86_64   # install + launch on emu when self-contained
 
 ## UI Improvements — post-Major-Fix (2026-08-14)
 
-**Status:** Phases 0–3 complete (`ba66478`, `e4e383e`, `77a83bb`, `913b08f`). Next is Phase 4 (Connect Google/Apple stub). Phase 6 ship polish stays after UI Phase 4.
+**Status:** Phases 0–3 complete (`ba66478`, `e4e383e`, `77a83bb`, `913b08f`). Next is Phase 4 (email receipt scan). Phase 6 ship polish stays after UI Phase 4.
 
 Four user-requested improvements, one phase at a time. Current-code map: [`docs/CODEBASE.md`](./CODEBASE.md). Visual gates use [`.cline/skills/emulator-ui-driving/SKILL.md`](../.cline/skills/emulator-ui-driving/SKILL.md).
 
@@ -846,17 +846,17 @@ The predecessor claimed Phase 0 done after commit `56bd161`. That commit only ap
 1. **Native nav overlay / dead tap zone.** Floating tab bar is `position: "absolute"` with `bottom: Math.max(insets.bottom, 20)` and height 72 (`app/(tabs)/_layout.tsx`). Lists use `contentContainerClassName="pb-25"`, but `global.css` / `theme.ts` spacing jumps **24 → 30** — there is **no `--spacing-25`**, so that class is a no-op. Create sheet pins submit at `px-5 pb-5` (`CreateSubscriptionModal.tsx`). On-device, the Create button center sits under the Android nav; only the uncovered top slice is tappable.
 2. **Subscriptions has no add control.** Home header `icons.add` opens `CreateSubscriptionModal`. `app/(tabs)/subscriptions.tsx` has search/filters/cards only.
 3. **Insights chart overflows.** “Estimated Monthly Spend” is a non-scrolling `flex-row` (`insights-chart-scroll` is a class name, not a `ScrollView`). Period chips below _are_ in a `ScrollView`. 6-month / Year add more labeled bars than the card width.
-4. **No Google/Apple scan path.** Settings has Clerk account + cloud _file_ sync (Drive/Dropbox/…). There is no connected-account scan. Honest limit: no public client API reads other apps’ Wallet / Play / App Store subscriptions.
+4. **No email receipt scan.** Settings has Clerk account + cloud _file_ sync (Drive/Dropbox/…). There is no mailbox connect/scan. SSO “manage all my subscriptions” catalogs have no public client API (backburner).
 
 ### UI board
 
-| Phase | Name                             | Status               | Touches                                                                          | Must not touch                            |
-| ----- | -------------------------------- | -------------------- | -------------------------------------------------------------------------------- | ----------------------------------------- |
-| **0** | Docs + generic emulator skill    | **Done (`ba66478`)** | `docs/plan.md`, `docs/CODEBASE.md`, `.cline/skills/emulator-ui-driving/SKILL.md` | App source, models, crawler               |
-| **1** | Native nav overlay               | **Done (`e4e383e`)** | Tab list padding; Create + picker (+ shared sheets) inset padding                | Crawler, models, schema                   |
-| **2** | Subscriptions `+`                | **Done (`77a83bb`)** | `app/(tabs)/subscriptions.tsx` + existing modal wiring                           | New create flow, crawler                  |
-| **3** | Insights chart bounds            | **Done (`913b08f`)** | `app/(tabs)/insights.tsx` Estimated Monthly Spend row                            | Period-chip `ScrollView`; other tabs      |
-| **4** | Connect Google/Apple (stub scan) | Not started          | Settings + small auth/import module                                              | Real Wallet/Gmail scan; crawler; training |
+| Phase | Name                          | Status               | Touches                                                                          | Must not touch                       |
+| ----- | ----------------------------- | -------------------- | -------------------------------------------------------------------------------- | ------------------------------------ |
+| **0** | Docs + generic emulator skill | **Done (`ba66478`)** | `docs/plan.md`, `docs/CODEBASE.md`, `.cline/skills/emulator-ui-driving/SKILL.md` | App source, models, crawler          |
+| **1** | Native nav overlay            | **Done (`e4e383e`)** | Tab list padding; Create + picker (+ shared sheets) inset padding                | Crawler, models, schema              |
+| **2** | Subscriptions `+`             | **Done (`77a83bb`)** | `app/(tabs)/subscriptions.tsx` + existing modal wiring                           | New create flow, crawler             |
+| **3** | Insights chart bounds         | **Done (`913b08f`)** | `app/(tabs)/insights.tsx` Estimated Monthly Spend row                            | Period-chip `ScrollView`; other tabs |
+| **4** | Email receipt scan            | Not started          | Settings email-scan list + mail OAuth/IMAP module                                | SSO catalogs, crawler, training      |
 
 ### Shared gates (Phases 1–4)
 
@@ -1008,35 +1008,70 @@ Needed clearance is approximately `tabBar.height + max(insets.bottom, tabBar.hor
 
 ---
 
-### Phase 4 — Connect Google / Apple and scan (honest stub) ⬜
+### Phase 4 — Email receipt scan ⬜
 
-**Goal:** Settings grows a Connected Accounts section. User can start Google and Apple sign-in and see connected state persist. “Scan for subscriptions” is an **import stub** (manual prefill / “coming soon” with honest copy), not a fake Wallet reader.
+**Goal:** Settings lists mailboxes the user can connect **natively**. Scan reads receipts/invoices and offers import candidates. Connect without scan is not a product. Hollow Google/Apple SSO Connect is **not** this phase.
 
-#### Honest limit (do not lie in UI)
+**Rule:** a branded row exists only if that provider has a documented third-party OAuth/mail API. Everything else is the last **IMAP / IMAPS** row. Do not put a fake Connect logo on iCloud or Proton.
 
-There is **no** public client API that reads other apps’ Google Wallet / Play Billing / App Store subscriptions. Gmail/receipt scanning is a later server phase. This phase must say that.
+#### Native list (branded Connect)
+
+| Row                        | Stack                                                                                                |
+| -------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Gmail                      | Google OAuth + Gmail API                                                                             |
+| Google Workspace           | same Google OAuth, work account                                                                      |
+| Outlook                    | Microsoft OAuth + Graph mail                                                                         |
+| Office 365 / Microsoft 365 | same Graph stack; own row                                                                            |
+| Yahoo Mail                 | Yahoo OAuth (XOAUTH2). If new-app OAuth is closed, drop the row to IMAP — do not ship a dead button. |
+| AOL                        | same Yahoo/AOL identity stack                                                                        |
+| Zoho Mail                  | Zoho OAuth + Mail API                                                                                |
+| Fastmail                   | Fastmail OAuth + JMAP                                                                                |
+| IMAP / IMAPS               | last row only (iCloud, Proton, and anyone else)                                                      |
+
+#### Honest limits (must stay in the UI)
+
+- Not every merchant emails a parseable receipt. Scan will miss some subscriptions.
+- iCloud and Proton have no Gmail-style third-party inbox OAuth → user picks IMAP.
+- Play Billing / StoreKit / Google-Apple-Microsoft “Manage subscriptions” catalogs are **not** available as a client API. Do not scrape those dashboards.
 
 #### Tasks
 
-- [ ] New Settings section “Connected Accounts” below Account / before or beside Cloud Sync (Cloud Sync is file backup, not this).
-- [ ] Use already-present `expo-auth-session` (~7.0.11) and `expo-secure-store` (15.0.8).
-- [ ] Google + Apple connect buttons; store tokens in secure store; show connected / disconnected.
-- [ ] “Scan for subscriptions” action: stub that either prefills the create modal from a local/manual list or explains the later server scanner. **Do not** invent parsed Wallet rows.
-- [ ] Disconnect clears the stored token.
-- [ ] Do not add crawler or training work.
+- [ ] Settings section **Email scan** (not mixed into Cloud Sync).
+- [ ] Provider interface: `id`, native connect, persist in secure store, disconnect, `scan()` → import candidates.
+- [ ] Branded rows above; IMAP/IMAPS last. No branded iCloud/Proton.
+- [ ] Receipt-parse fixtures (sample emails). Do not invent rows.
+- [ ] No crawler or training work. No committed OAuth client secrets.
+
+#### Test split
+
+- Agent drives UI, opens the OAuth sheet or IMAP form, then **stops**.
+- User completes that one login (password / 2FA / app password). Agent never types credentials.
+- After the user says done: Scan → candidate list → import one row → persist after relaunch → Disconnect.
+- Minimum live gates: one OAuth mailbox (Gmail is enough) + one IMAP. Other branded rows: sheet opens, or mark **unverified**.
 
 #### Programmatic gate
 
 - Same static + build gate.
-- No new native OAuth client secrets committed. If emulator cannot complete the real IdP sheet, say **unverified** rather than claiming success.
+- Receipt-parse unit tests. If an IdP sheet cannot complete on emulator, say **unverified**.
 
 #### Visual gate (skill loop)
 
-1. Open Settings → screenshot: Connected Accounts section visible above the nav overlay (Phase 1 still holds).
-2. Tap Connect Google → OAuth / system sheet appears **or** a documented emulator limitation is recorded. Do not tap through a broken WebView blindly.
-3. After a successful connect (if the environment allows): section shows connected; kill/relaunch → still connected.
-4. Scan action opens the stub UI (not a crash, not a fabricated subscription list).
-5. Disconnect returns to disconnected copy.
+1. Settings → Email scan list visible above the nav overlay.
+2. Each branded row starts that provider’s OAuth (not an IMAP form).
+3. IMAP row opens host/user/password (or app password).
+4. After a user-completed login: Scan shows candidates or an honest empty/miss; import one; relaunch persists; Disconnect clears.
+
+---
+
+### Backburner (not Phase 4)
+
+Parked until a documented API exists. Do not implement as Connect-without-scan.
+
+- SSO “pay OpenRouter with GitHub / Google / Apple login” merchant catalogs
+- GitHub’s own billing / Copilot / usage APIs (GitHub products only, not third-party SaaS)
+- Android Play Billing / iOS StoreKit **device-wide** Manage Subscriptions (those APIs are this-app IAP only)
+- LinkedIn / Meta / Microsoft MSA “all my subscriptions” catalogs
+- Hidden-WebView scrape of logged-in billing dashboards
 
 ---
 
@@ -1070,3 +1105,4 @@ There is **no** public client API that reads other apps’ Google Wallet / Play 
 | 2026-08-15 | **UI Phase 1 done (`e4e383e`):** `useBottomClearance()` on all four tab lists + colliding sheets; emulator visual gate passed (Create/picker/Sign Out above nav)                       |
 | 2026-08-15 | **UI Phase 2 done (`77a83bb`):** Subscriptions tab `+` reuses CreateSubscriptionModal; created Crunchyroll $7.99 on-device                                                             |
 | 2026-08-15 | **UI Phase 3 done (`913b08f`):** Insights bar row is a horizontal ScrollView; 6-month/Year stay inside the card; labels hide after 3 points                                            |
+| 2026-08-15 | **UI Phase 4 rewritten:** email receipt scan only (native mail OAuth + IMAP last). Hollow Google/Apple SSO Connect dropped. SSO catalogs / Play / StoreKit parked in Backburner.       |
