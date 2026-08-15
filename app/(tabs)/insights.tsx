@@ -279,45 +279,57 @@ const Insights = () => {
             </View>
 
             <View className="rounded-2xl border border-border bg-muted p-5">
-              <View className="insights-chart-scroll flex-row items-end justify-between">
-                {monthlyChartData.map((data) => {
-                  const barHeight =
-                    maxChartAmount > 0
-                      ? (data.amount / maxChartAmount) * 120
-                      : 0;
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                className="insights-chart-scroll"
+              >
+                <View className="flex-row items-end">
+                  {monthlyChartData.map((data) => {
+                    const barHeight =
+                      maxChartAmount > 0
+                        ? (data.amount / maxChartAmount) * 120
+                        : 0;
+                    const showValue = monthlyChartData.length <= 3;
 
-                  return (
-                    <View
-                      key={data.label}
-                      className="insights-chart-bar-container"
-                    >
-                      <Text className="insights-chart-value">
-                        {formatCurrency(data.amount)}
-                      </Text>
+                    return (
                       <View
-                        className="insights-chart-bar-bg"
-                        style={{ height: 120 }}
+                        key={data.label}
+                        className="insights-chart-bar-container"
+                        style={{ minWidth: 48 }}
                       >
+                        {showValue ? (
+                          <Text className="insights-chart-value">
+                            {formatCurrency(data.amount)}
+                          </Text>
+                        ) : null}
                         <View
-                          className="insights-chart-bar"
-                          style={{
-                            height: barHeight as any,
-                            backgroundColor:
-                              data.label ===
-                              monthlyChartData[monthlyChartData.length - 1]
-                                ?.label
-                                ? "#ea7a53"
-                                : data.estimated
-                                  ? "#f7d44c"
-                                  : "#ea7a53",
-                          }}
-                        />
+                          className="insights-chart-bar-bg"
+                          style={{ height: 120 }}
+                        >
+                          <View
+                            className="insights-chart-bar"
+                            style={{
+                              height: barHeight as any,
+                              backgroundColor:
+                                data.label ===
+                                monthlyChartData[monthlyChartData.length - 1]
+                                  ?.label
+                                  ? "#ea7a53"
+                                  : data.estimated
+                                    ? "#f7d44c"
+                                    : "#ea7a53",
+                            }}
+                          />
+                        </View>
+                        <Text className="insights-chart-label">
+                          {data.label}
+                        </Text>
                       </View>
-                      <Text className="insights-chart-label">{data.label}</Text>
-                    </View>
-                  );
-                })}
-              </View>
+                    );
+                  })}
+                </View>
+              </ScrollView>
             </View>
 
             {/* Period selector chips */}
