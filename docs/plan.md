@@ -2,7 +2,7 @@
 
 **Last updated:** 2026-08-15
 
-**Status:** Phases **1–5.5 complete**. **MAJOR FIX (Tranches A–F) complete on-device.** **UI Improvements Phase 0–3 complete** (`ba66478`, `e4e383e`, `77a83bb`, `913b08f`). Next is Phase 4 (email receipt scan). Phase 6 remains later ship polish. Training frozen.
+**Status:** Phases **1–5.5 complete**. **MAJOR FIX (Tranches A–F) complete on-device.** **UI Improvements Phase 0–3 complete** (`ba66478`, `e4e383e`, `77a83bb`, `913b08f`). Next is Phase 4 (email receipt scan), then Phase 5 (subscription dependency graph). Phase 6 remains later ship polish. Training frozen.
 
 This is the living execution plan for app-side quality and reliability **without** retraining TFLite models. AI upscale strategy remains frozen in [`docs/AI_UPSCALING.md`](./AI_UPSCALING.md) (now under `docs/`).
 
@@ -833,7 +833,7 @@ npm run build:android:x86_64   # install + launch on emu when self-contained
 
 ## UI Improvements — post-Major-Fix (2026-08-14)
 
-**Status:** Phases 0–3 complete (`ba66478`, `e4e383e`, `77a83bb`, `913b08f`). Next is Phase 4 (email receipt scan). Phase 6 ship polish stays after UI Phase 4.
+**Status:** Phases 0–3 complete (`ba66478`, `e4e383e`, `77a83bb`, `913b08f`). Next is Phase 4 (email receipt scan), then Phase 5 (subscription dependency graph). Phase 6 ship polish stays after UI Phase 5.
 
 Four user-requested improvements, one phase at a time. Current-code map: [`docs/CODEBASE.md`](./CODEBASE.md). Visual gates use [`.cline/skills/emulator-ui-driving/SKILL.md`](../.cline/skills/emulator-ui-driving/SKILL.md).
 
@@ -857,6 +857,7 @@ The predecessor claimed Phase 0 done after commit `56bd161`. That commit only ap
 | **2** | Subscriptions `+`             | **Done (`77a83bb`)** | `app/(tabs)/subscriptions.tsx` + existing modal wiring                           | New create flow, crawler             |
 | **3** | Insights chart bounds         | **Done (`913b08f`)** | `app/(tabs)/insights.tsx` Estimated Monthly Spend row                            | Period-chip `ScrollView`; other tabs |
 | **4** | Email receipt scan            | Not started          | Settings email-scan list + mail OAuth/IMAP module                                | SSO catalogs, crawler, training      |
+| **5** | Subscription dependency graph | Not started          | Subscriptions List/Graph toggle + `dependsOn` links                              | Email scan implementation, crawler   |
 
 ### Shared gates (Phases 1–4)
 
@@ -1075,6 +1076,44 @@ Do **not** re-run icon-crawler gates or a 7-provider screenshot marathon in one 
 
 ---
 
+### Phase 5 — Subscription dependency graph ⬜
+
+**Starts after Phase 4 can import rows.** Do not build this in the email-scan phase. Email scan will **not** invent the graph: a Proton receipt for GitHub does not prove “Proton was registered with Tuta” or “Porkbun domains sit under Tuta.”
+
+**Motivating chain (user evidence, not auto-inferred):**
+
+```text
+Tuta
+ ├─ Porkbun (domains)
+ └─ Proton  (Tuta as recovery/reference)
+      ├─ GitHub
+      ├─ Akamai / Linode
+      ├─ xAI
+      └─ LinkedIn
+```
+
+Branches = identity/billing roots (Tuta vs Gmail vs Workspace). Color per root. Layout like a visual git tree (parent left/top, children down the branch).
+
+#### Honest limit
+
+The graph needs an explicit **depends-on / registered-with** link. Manual first. Later optional hints from “same mailbox / same domain” — never auto-wire without confirm.
+
+#### Tasks
+
+- [ ] Optional `dependsOn` / `registeredWith` on a subscription (or a small link table). Versioned schema if needed.
+- [ ] Subscriptions tab: **List | Graph** toggle. Graph is a view of existing rows + links, not a second store.
+- [ ] Honest empty state until the user (or a later confirmed hint) sets parents.
+- [ ] Do not implement in the same commit as Phase 4.
+
+#### Visual gate (when this phase starts)
+
+1. List still works; toggle to Graph.
+2. Unlinked rows: empty/honest “no links yet,” not a fake tree.
+3. After the user sets Tuta → Proton → GitHub (or fixture data): colored branches match the chain.
+4. Toggle back to List: same rows, no data loss.
+
+---
+
 ### Backburner (not Phase 4)
 
 Parked until a documented API exists. Do not implement as Connect-without-scan.
@@ -1119,3 +1158,4 @@ Parked until a documented API exists. Do not implement as Connect-without-scan.
 | 2026-08-15 | **UI Phase 3 done (`913b08f`):** Insights bar row is a horizontal ScrollView; 6-month/Year stay inside the card; labels hide after 3 points                                            |
 | 2026-08-15 | **UI Phase 4 rewritten:** email receipt scan only (native mail OAuth + IMAP last). Hollow Google/Apple SSO Connect dropped. SSO catalogs / Play / StoreKit parked in Backburner.       |
 | 2026-08-15 | **UI Phase 4 test split:** Gmail connect+empty Scan; Workspace/Outlook full scan; Tuta/Proton via IMAP; other branded rows connect-only. Gmail ≠ Workspace.                            |
+| 2026-08-15 | **UI Phase 5 parked:** Subscriptions List/Graph toggle; explicit depends-on links (Tuta→Porkbun/Proton→GitHub…). After email scan. Do not auto-infer from receipts.                    |
