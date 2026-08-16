@@ -1042,12 +1042,24 @@ Needed clearance is approximately `tabBar.height + max(insets.bottom, tabBar.hor
 - [ ] Receipt-parse fixtures (sample emails). Do not invent rows.
 - [ ] No crawler or training work. No committed OAuth client secrets.
 
-#### Test split
+#### Test split (token-cheap)
 
-- Agent drives UI, opens the OAuth sheet or IMAP form, then **stops**.
-- User completes that one login (password / 2FA / app password). Agent never types credentials.
-- After the user says done: Scan → candidate list → import one row → persist after relaunch → Disconnect.
-- Minimum live gates: one OAuth mailbox (Gmail is enough) + one IMAP. Other branded rows: sheet opens, or mark **unverified**.
+Consumer Gmail and Google Workspace are **not** the same login. They can share one Gmail API parser. Proton and Tuta are **not** branded native rows — they use **IMAP / IMAPS**. Tuta IMAP may be paid/limited; if it cannot IMAP, record that. Do not add a fake Tuta button.
+
+Agent drives to the OAuth sheet or IMAP form, then **stops**. User completes that one login. Agent never types credentials. One provider per Act session.
+
+Cheap, no live mail: receipt-parse unit tests on fixture emails (covers the shared scan brain once).
+
+| Account                    | What we test                | Why                                                                               |
+| -------------------------- | --------------------------- | --------------------------------------------------------------------------------- |
+| Normal Gmail (no receipts) | **Connect + empty Scan**    | Proves Google OAuth + honest miss. Stop. No import. Does **not** prove Workspace. |
+| Google Workspace           | **Full scan**               | Real Google receipts + work-domain / admin consent. Import one.                   |
+| Outlook                    | **Full scan**               | Different stack (Graph). Import one.                                              |
+| Tuta (IMAP)                | **Full scan if IMAP works** | Inbox that has subscriptions.                                                     |
+| Proton (IMAP)              | **Connect + short Scan**    | Same IMAP path as Tuta. Skip a second long import if Tuta already imported.       |
+| Yahoo, AOL, Zoho, Fastmail | **Connect sheet only**      | Same scan brain already covered. Do not live-scan these.                          |
+
+Do **not** re-run icon-crawler gates or a 7-provider screenshot marathon in one chat.
 
 #### Programmatic gate
 
@@ -1057,9 +1069,9 @@ Needed clearance is approximately `tabBar.height + max(insets.bottom, tabBar.hor
 #### Visual gate (skill loop)
 
 1. Settings → Email scan list visible above the nav overlay.
-2. Each branded row starts that provider’s OAuth (not an IMAP form).
-3. IMAP row opens host/user/password (or app password).
-4. After a user-completed login: Scan shows candidates or an honest empty/miss; import one; relaunch persists; Disconnect clears.
+2. Each branded row starts that provider’s OAuth (not an IMAP form). Gmail vs Workspace are separate Connect rows.
+3. IMAP row opens host/user/password (or app password). Proton and Tuta use this row.
+4. Live order: Gmail connect + empty Scan first; then Workspace full scan; Outlook full scan; Tuta IMAP scan if it works; Proton IMAP connect/short scan. Other branded rows: sheet opens only.
 
 ---
 
@@ -1106,3 +1118,4 @@ Parked until a documented API exists. Do not implement as Connect-without-scan.
 | 2026-08-15 | **UI Phase 2 done (`77a83bb`):** Subscriptions tab `+` reuses CreateSubscriptionModal; created Crunchyroll $7.99 on-device                                                             |
 | 2026-08-15 | **UI Phase 3 done (`913b08f`):** Insights bar row is a horizontal ScrollView; 6-month/Year stay inside the card; labels hide after 3 points                                            |
 | 2026-08-15 | **UI Phase 4 rewritten:** email receipt scan only (native mail OAuth + IMAP last). Hollow Google/Apple SSO Connect dropped. SSO catalogs / Play / StoreKit parked in Backburner.       |
+| 2026-08-15 | **UI Phase 4 test split:** Gmail connect+empty Scan; Workspace/Outlook full scan; Tuta/Proton via IMAP; other branded rows connect-only. Gmail ≠ Workspace.                            |
