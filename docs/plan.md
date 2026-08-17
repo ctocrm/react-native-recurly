@@ -1,8 +1,8 @@
 # Product plan — icons, crawl, DB, sync (no training)
 
-**Last updated:** 2026-08-15
+**Last updated:** 2026-08-17
 
-**Status:** Phases **1–5.5 complete**. **MAJOR FIX (Tranches A–F) complete on-device.** **UI Improvements Phase 0–3 complete** (`ba66478`, `e4e383e`, `77a83bb`, `913b08f`). Next is Phase 4 (email receipt scan), then Phase 5 (subscription dependency graph). Phase 6 remains later ship polish. Training frozen.
+**Status:** Phases **1–5.5 complete**. **MAJOR FIX (Tranches A–F) complete on-device.** **UI Improvements Phase 0–3 complete** (`ba66478`, `e4e383e`, `77a83bb`, `913b08f`). Next is Phase 4 (email account scan), then Phase 5 (subscription dependency graph). Phase 6 remains later ship polish. Training frozen.
 
 This is the living execution plan for app-side quality and reliability **without** retraining TFLite models. AI upscale strategy remains frozen in [`docs/AI_UPSCALING.md`](./AI_UPSCALING.md) (now under `docs/`).
 
@@ -833,7 +833,7 @@ npm run build:android:x86_64   # install + launch on emu when self-contained
 
 ## UI Improvements — post-Major-Fix (2026-08-14)
 
-**Status:** Phases 0–3 complete (`ba66478`, `e4e383e`, `77a83bb`, `913b08f`). Next is Phase 4 (email receipt scan), then Phase 5 (subscription dependency graph). Phase 6 ship polish stays after UI Phase 5.
+**Status:** Phases 0–3 complete (`ba66478`, `e4e383e`, `77a83bb`, `913b08f`). Next is Phase 4 (email account scan), then Phase 5 (subscription dependency graph). Phase 6 ship polish stays after UI Phase 5.
 
 Four user-requested improvements, one phase at a time. Current-code map: [`docs/CODEBASE.md`](./CODEBASE.md). Visual gates use [`.cline/skills/emulator-ui-driving/SKILL.md`](../.cline/skills/emulator-ui-driving/SKILL.md).
 
@@ -846,7 +846,7 @@ The predecessor claimed Phase 0 done after commit `56bd161`. That commit only ap
 1. **Native nav overlay / dead tap zone.** Floating tab bar is `position: "absolute"` with `bottom: Math.max(insets.bottom, 20)` and height 72 (`app/(tabs)/_layout.tsx`). Lists use `contentContainerClassName="pb-25"`, but `global.css` / `theme.ts` spacing jumps **24 → 30** — there is **no `--spacing-25`**, so that class is a no-op. Create sheet pins submit at `px-5 pb-5` (`CreateSubscriptionModal.tsx`). On-device, the Create button center sits under the Android nav; only the uncovered top slice is tappable.
 2. **Subscriptions has no add control.** Home header `icons.add` opens `CreateSubscriptionModal`. `app/(tabs)/subscriptions.tsx` has search/filters/cards only.
 3. **Insights chart overflows.** “Estimated Monthly Spend” is a non-scrolling `flex-row` (`insights-chart-scroll` is a class name, not a `ScrollView`). Period chips below _are_ in a `ScrollView`. 6-month / Year add more labeled bars than the card width.
-4. **No email receipt scan.** Settings has Clerk account + cloud _file_ sync (Drive/Dropbox/…). There is no mailbox connect/scan. SSO “manage all my subscriptions” catalogs have no public client API (backburner).
+4. **No email account scan.** Settings has Clerk account + cloud _file_ sync (Drive/Dropbox/…). There is no mailbox connect/scan. A subscription is an account (including $0), not only a receipt. SSO catalogs have no public client API (backburner).
 
 ### UI board
 
@@ -856,7 +856,7 @@ The predecessor claimed Phase 0 done after commit `56bd161`. That commit only ap
 | **1** | Native nav overlay            | **Done (`e4e383e`)** | Tab list padding; Create + picker (+ shared sheets) inset padding                | Crawler, models, schema              |
 | **2** | Subscriptions `+`             | **Done (`77a83bb`)** | `app/(tabs)/subscriptions.tsx` + existing modal wiring                           | New create flow, crawler             |
 | **3** | Insights chart bounds         | **Done (`913b08f`)** | `app/(tabs)/insights.tsx` Estimated Monthly Spend row                            | Period-chip `ScrollView`; other tabs |
-| **4** | Email receipt scan            | Not started          | Settings email-scan list + mail OAuth/IMAP module                                | SSO catalogs, crawler, training      |
+| **4** | Email account scan            | Not started          | Settings email-scan list + mail OAuth/IMAP + scan cache                          | SSO catalogs, crawler, training      |
 | **5** | Subscription dependency graph | Not started          | Subscriptions List/Graph toggle + `dependsOn` links                              | Email scan implementation, crawler   |
 
 ### Shared gates (Phases 1–4)
@@ -1009,70 +1009,131 @@ Needed clearance is approximately `tabBar.height + max(insets.bottom, tabBar.hor
 
 ---
 
-### Phase 4 — Email receipt scan ⬜
+### Phase 4 — Email account scan ⬜
 
-**Goal:** Settings lists mailboxes the user can connect **natively**. Scan reads receipts/invoices and offers import candidates. Connect without scan is not a product. Hollow Google/Apple SSO Connect is **not** this phase.
+**Goal:** Settings lists mailboxes the user can connect **natively**. Scan incrementally maps **accounts** (including $0) into a cached candidate set. The user reviews and imports. Connect without a working `scan()` is not a product. Hollow Google/Apple SSO Connect is **not** this phase.
 
-**Rule:** a branded row exists only if that provider has a documented third-party OAuth/mail API. Everything else is the last **IMAP / IMAPS** row. Do not put a fake Connect logo on iCloud or Proton.
+A **subscription is an account**, not a charge. A bill is optional evidence.
+
+**Rule:** a branded row exists only if that provider has a documented third-party OAuth/mail API. Everything else is the last **IMAP / IMAPS** row. Do not put a fake Connect logo on iCloud, Proton, or Tuta.
 
 #### Native list (branded Connect)
 
 | Row                        | Stack                                                                                                |
 | -------------------------- | ---------------------------------------------------------------------------------------------------- |
 | Gmail                      | Google OAuth + Gmail API                                                                             |
-| Google Workspace           | same Google OAuth, work account                                                                      |
+| Google Workspace           | same API, work account / admin consent — **not** the same login as consumer Gmail                    |
 | Outlook                    | Microsoft OAuth + Graph mail                                                                         |
 | Office 365 / Microsoft 365 | same Graph stack; own row                                                                            |
 | Yahoo Mail                 | Yahoo OAuth (XOAUTH2). If new-app OAuth is closed, drop the row to IMAP — do not ship a dead button. |
 | AOL                        | same Yahoo/AOL identity stack                                                                        |
 | Zoho Mail                  | Zoho OAuth + Mail API                                                                                |
 | Fastmail                   | Fastmail OAuth + JMAP                                                                                |
-| IMAP / IMAPS               | last row only (iCloud, Proton, and anyone else)                                                      |
+| IMAP / IMAPS               | last row: iCloud, Proton, Tuta, everyone else                                                        |
+
+Tuta IMAP may be paid/limited. If it cannot IMAP, record that. Do not add a Tuta button.
+
+#### Architecture (toggle ≠ scan)
+
+```text
+Connect (OAuth or IMAP form)
+  → incremental SCAN (network + classify + cache)
+  → CACHED MAP (messages + merchant rollups)
+  → DISPLAY FILTERS (recurring / sparse / free)
+  → user IMPORT into subscriptions
+```
+
+- **Scan** writes the cache. First connect fetches the union of account / security / recurring-bill / sparse-bill subjects (recency + count cap). Later scans fetch only **newer than `lastCursor`**. Re-parse an old message only on a parser-version bump.
+- **Toggle** only filters the cache. Flipping Recurring / Sparse / Free **does not** hit the network.
+- **Import** is an explicit tap. Scan never auto-creates subscriptions.
+
+Provider interface: `id`, `connect()`, persist in secure store, `disconnect()`, incremental `scan()`, cursor. Shared parser does not know Gmail vs IMAP.
+
+Normalized message: `{ mailboxId, messageId, from, subject, date, text?, attachments[] }`.
+
+Cache keys: `(mailboxId, messageId)` plus merchant rollup `(mailboxId, merchantKey)`.
+
+#### Classify — subject first
+
+Subject (plus From) can create a candidate. Body and attachments run **only** for money classes.
+
+| Subject class      | Examples                                                 | Candidate?            | Body / PDF? |
+| ------------------ | -------------------------------------------------------- | --------------------- | ----------- |
+| **Account**        | welcome, registered, verify email, account created       | Yes → free / unknown  | No          |
+| **Security**       | password reset, login alert, new device, 2FA             | Yes → merchant exists | No          |
+| **Recurring bill** | subscription, renewal, membership, billed monthly/yearly | Yes                   | **Yes**     |
+| **Sparse / usage** | invoice, usage, statement, IAP, order, one-off receipt   | Yes                   | **Yes**     |
+| **Drop**           | newsletter, shipping-only, OTP with no account language  | No                    | No          |
+
+**From domain** names the merchant (`noreply@github.com` → GitHub). Strip `noreply`, `billing`, `invoice`, `mail`.
+
+**Money parse (recurring + sparse only):** prefer `text/plain`, else HTML stripped to text; then attachments named like `invoice.pdf` / `receipt.pdf` / `statement.pdf` (skip images/logos). First clear amount + currency. Recurring cues: `/mo`, `annual`, `renews`. Usage cues: `usage`, `overage`, `this period`. If PDF text extract is too expensive in Phase 4: keep “invoice attached, amount unknown” — do not invent a total or force $0.
+
+Amazon Prime **renewal** → recurring. “Your Amazon.com order” → sparse. Same merchant, **two kinds**. Scan does not smash them into one row. Phase 5 graph can link them later if the user says so.
+
+#### Merchant rollup
+
+- Welcome + later invoice → **one** GitHub row; invoice upgrades free → paid.
+- $0 / missing amount is valid.
+- Recurring without amount stays **recurring, amount unknown** — not silently free.
+- Free = only account/security evidence, never a charge.
+- Sparse = charge without membership cadence.
+
+Candidate: `merchant, kind (recurring | sparse | free), amount?, currency?, cadence?, nextDate?, mailbox, evidence, confidence`.
+
+#### Display filters (not scan controls)
+
+Cached map holds all three kinds. Default view: **Recurring on**; Sparse and Free off. Changing filters only changes the list.
 
 #### Honest limits (must stay in the UI)
 
-- Not every merchant emails a parseable receipt. Scan will miss some subscriptions.
-- iCloud and Proton have no Gmail-style third-party inbox OAuth → user picks IMAP.
+- Not every merchant emails a parseable receipt or even a welcome.
+- iCloud / Proton / Tuta → IMAP, not branded OAuth.
 - Play Billing / StoreKit / Google-Apple-Microsoft “Manage subscriptions” catalogs are **not** available as a client API. Do not scrape those dashboards.
+- Scan does not infer Tuta → Proton → GitHub.
+- Agent never types passwords. Stops at the OAuth/IMAP sheet.
 
 #### Tasks
 
 - [ ] Settings section **Email scan** (not mixed into Cloud Sync).
-- [ ] Provider interface: `id`, native connect, persist in secure store, disconnect, `scan()` → import candidates.
-- [ ] Branded rows above; IMAP/IMAPS last. No branded iCloud/Proton.
-- [ ] Receipt-parse fixtures (sample emails). Do not invent rows.
-- [ ] No crawler or training work. No committed OAuth client secrets.
+- [ ] Provider interface + incremental scan cache + cursor.
+- [ ] Shared subject-first classifier; body/PDF only for money classes.
+- [ ] Display filters: Recurring / Sparse / Free (default Recurring). Toggle does not refetch.
+- [ ] Branded rows above; IMAP/IMAPS last. No branded iCloud/Proton/Tuta.
+- [ ] Fixtures (welcome, reset, renewal, usage invoice, order, PDF, newsletter). Do not invent rows.
+- [ ] No crawler or training work. No committed OAuth client secrets. No LLM in Phase 4.
 
 #### Test split (token-cheap)
 
-Consumer Gmail and Google Workspace are **not** the same login. They can share one Gmail API parser. Proton and Tuta are **not** branded native rows — they use **IMAP / IMAPS**. Tuta IMAP may be paid/limited; if it cannot IMAP, record that. Do not add a fake Tuta button.
+Consumer Gmail and Google Workspace are **not** the same login. They can share one Gmail API parser. Proton and Tuta use **IMAP / IMAPS**.
 
 Agent drives to the OAuth sheet or IMAP form, then **stops**. User completes that one login. Agent never types credentials. One provider per Act session.
 
-Cheap, no live mail: receipt-parse unit tests on fixture emails (covers the shared scan brain once).
+Cheap, no live mail: classifier fixtures (covers the shared scan brain once).
 
-| Account                    | What we test                | Why                                                                               |
-| -------------------------- | --------------------------- | --------------------------------------------------------------------------------- |
-| Normal Gmail (no receipts) | **Connect + empty Scan**    | Proves Google OAuth + honest miss. Stop. No import. Does **not** prove Workspace. |
-| Google Workspace           | **Full scan**               | Real Google receipts + work-domain / admin consent. Import one.                   |
-| Outlook                    | **Full scan**               | Different stack (Graph). Import one.                                              |
-| Tuta (IMAP)                | **Full scan if IMAP works** | Inbox that has subscriptions.                                                     |
-| Proton (IMAP)              | **Connect + short Scan**    | Same IMAP path as Tuta. Skip a second long import if Tuta already imported.       |
-| Yahoo, AOL, Zoho, Fastmail | **Connect sheet only**      | Same scan brain already covered. Do not live-scan these.                          |
+| Account                    | What we test                                            | Why                                                                                  |
+| -------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Normal Gmail (no receipts) | **Connect + Scan**; default recurring view empty/honest | Proves Google OAuth + honest miss. Free filter may show account mail. Not Workspace. |
+| Google Workspace           | **Full scan**                                           | Real Google receipts + work-domain / admin consent. Import one.                      |
+| Outlook                    | **Full scan**                                           | Different stack (Graph). Import one.                                                 |
+| Tuta (IMAP)                | **Full scan if IMAP works**                             | Inbox that has subscriptions.                                                        |
+| Proton (IMAP)              | **Connect + short Scan**                                | Same IMAP path as Tuta. Skip a second long import if Tuta already imported.          |
+| Yahoo, AOL, Zoho, Fastmail | **Connect sheet only**                                  | Same scan brain already covered. Do not live-scan these.                             |
 
 Do **not** re-run icon-crawler gates or a 7-provider screenshot marathon in one chat.
 
 #### Programmatic gate
 
 - Same static + build gate.
-- Receipt-parse unit tests. If an IdP sheet cannot complete on emulator, say **unverified**.
+- Classifier + rollup unit tests. If an IdP sheet cannot complete on emulator, say **unverified**.
 
 #### Visual gate (skill loop)
 
 1. Settings → Email scan list visible above the nav overlay.
 2. Each branded row starts that provider’s OAuth (not an IMAP form). Gmail vs Workspace are separate Connect rows.
 3. IMAP row opens host/user/password (or app password). Proton and Tuta use this row.
-4. Live order: Gmail connect + empty Scan first; then Workspace full scan; Outlook full scan; Tuta IMAP scan if it works; Proton IMAP connect/short scan. Other branded rows: sheet opens only.
+4. After Scan: default list is recurring only; Sparse/Free toggles change the view without a new fetch.
+5. Live order: Gmail connect + empty recurring Scan first; then Workspace full scan; Outlook full scan; Tuta IMAP scan if it works; Proton IMAP connect/short scan. Other branded rows: sheet opens only.
 
 ---
 
@@ -1159,3 +1220,4 @@ Parked until a documented API exists. Do not implement as Connect-without-scan.
 | 2026-08-15 | **UI Phase 4 rewritten:** email receipt scan only (native mail OAuth + IMAP last). Hollow Google/Apple SSO Connect dropped. SSO catalogs / Play / StoreKit parked in Backburner.       |
 | 2026-08-15 | **UI Phase 4 test split:** Gmail connect+empty Scan; Workspace/Outlook full scan; Tuta/Proton via IMAP; other branded rows connect-only. Gmail ≠ Workspace.                            |
 | 2026-08-15 | **UI Phase 5 parked:** Subscriptions List/Graph toggle; explicit depends-on links (Tuta→Porkbun/Proton→GitHub…). After email scan. Do not auto-infer from receipts.                    |
+| 2026-08-17 | **UI Phase 4 scan strategy:** account≠bill; incremental cache + cursor; subject-first classify; body/PDF only for money; display filters (default recurring) do not refetch.           |
