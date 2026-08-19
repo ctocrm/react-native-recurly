@@ -1,6 +1,6 @@
 # Product plan — icons, crawl, DB, sync (no training)
 
-**Last updated:** 2026-08-17
+**Last updated:** 2026-08-18
 
 **Status:** Phases **1–5.5 complete**. **MAJOR FIX (Tranches A–F) complete on-device.** **UI Improvements Phase 0–3 complete** (`ba66478`, `e4e383e`, `77a83bb`, `913b08f`). Next is Phase 4 (email account scan), then Phase 5 (subscription dependency graph). Phase 6 remains later ship polish. Training frozen.
 
@@ -1097,10 +1097,10 @@ Cached map holds all three kinds. Default view: **Recurring on**; Sparse and Fre
 
 - [ ] Settings section **Email scan** (not mixed into Cloud Sync).
 - [ ] Provider interface + incremental scan cache + cursor.
-- [ ] Shared subject-first classifier; body/PDF only for money classes.
-- [ ] Display filters: Recurring / Sparse / Free (default Recurring). Toggle does not refetch.
+- [x] Shared subject-first classifier; body/PDF only for money classes. (`src/services/emailscan/`)
+- [x] Display-filter function: Recurring / Sparse / Free (default Recurring). Toggle does not refetch. Settings toggles still pending.
 - [ ] Branded rows above; IMAP/IMAPS last. No branded iCloud/Proton/Tuta.
-- [ ] Fixtures (welcome, reset, renewal, usage invoice, order, PDF, newsletter). Do not invent rows.
+- [x] Fixtures (welcome, reset, renewal, usage invoice, order, PDF, newsletter). Do not invent rows.
 - [ ] No crawler or training work. No committed OAuth client secrets. No LLM in Phase 4.
 
 #### Test split (token-cheap)
@@ -1111,14 +1111,14 @@ Agent drives to the OAuth sheet or IMAP form, then **stops**. User completes tha
 
 Cheap, no live mail: classifier fixtures (covers the shared scan brain once).
 
-| Account                    | What we test                                            | Why                                                                                  |
-| -------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| Normal Gmail (no receipts) | **Connect + Scan**; default recurring view empty/honest | Proves Google OAuth + honest miss. Free filter may show account mail. Not Workspace. |
-| Google Workspace           | **Full scan**                                           | Real Google receipts + work-domain / admin consent. Import one.                      |
-| Outlook                    | **Full scan**                                           | Different stack (Graph). Import one.                                                 |
-| Tuta (IMAP)                | **Full scan if IMAP works**                             | Inbox that has subscriptions.                                                        |
-| Proton (IMAP)              | **Connect + short Scan**                                | Same IMAP path as Tuta. Skip a second long import if Tuta already imported.          |
-| Yahoo, AOL, Zoho, Fastmail | **Connect sheet only**                                  | Same scan brain already covered. Do not live-scan these.                             |
+| Account                    | What we test                                            | Why                                                                                                                                             |
+| -------------------------- | ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Normal Gmail (no receipts) | **Connect + Scan**; default recurring view empty/honest | Proves Google OAuth + honest miss. Free filter may show account mail. Not Workspace.                                                            |
+| Google Workspace           | **Full scan**                                           | Real Google receipts + work-domain / admin consent. Import one.                                                                                 |
+| Outlook                    | **Full scan**                                           | Different stack (Graph). Import one.                                                                                                            |
+| Tuta (IMAP)                | **Full scan if IMAP works**                             | Inbox that has subscriptions.                                                                                                                   |
+| Proton (IMAP)              | **Connect + short Scan**                                | Same IMAP path as Tuta. Skip a second long import if Tuta already imported.                                                                     |
+| Yahoo, AOL, Zoho, Fastmail | **Connect sheet only** in Phase 4 Act sessions          | **Implement fully** (real `connect`/`scan`/cursor, shared classifier). Live connect+scan stays **unverified**. Do not ship a dead Yahoo button. |
 
 Do **not** re-run icon-crawler gates or a 7-provider screenshot marathon in one chat.
 
@@ -1200,24 +1200,25 @@ Parked until a documented API exists. Do not implement as Connect-without-scan.
 
 ## Changelog (plan)
 
-| Date       | Note                                                                                                                                                                                   |
-| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-08-11 | Phases 1–5 implemented and smoke-tested; `plan.md` created as living board                                                                                                             |
-| 2026-08-11 | **Phase 5.5** inserted: professional cleanup (artifacts, docs, src layout) between Phase 5 and Phase 6                                                                                 |
-| 2026-08-11 | **5.5-A done:** artifacts removed, gitignore, APKs→`build-out/apk/`, gate passed                                                                                                       |
-| 2026-08-11 | **5.5-B done:** docs under `docs/`; stubs/autopsy removed                                                                                                                              |
-| 2026-08-11 | **5.5-C done:** components merged into `src/components/`; gate passed                                                                                                                  |
-| 2026-08-11 | **5.5-D done:** lib/services/constants → src/; aliases `@/*`→src+root, `@assets/*`; gate passed                                                                                        |
-| 2026-08-11 | **5.5-E done:** scripts/{android,train,models,poc}; train:registry OK; gate passed                                                                                                     |
-| 2026-08-11 | **5.5-F done:** README rewrite; `@/` imports; Phase 5.5 complete; Phase 6 unblocked                                                                                                    |
-| 2026-08-11 | **Phase 5.5 complete**                                                                                                                                                                 |
-| 2026-08-13 | **MAJOR FIX inserted:** crawler → picker → card/cache → upscale recovery is now the blocking pre-Phase-6 work; full-pipeline contracts and cross-layer regression gates defined        |
-| 2026-08-14 | **MAJOR FIX complete (Tranches A–F):** provenance precision gating removed picker pollution; lifecycle/ownership/stale-gen added; verified on-device with real companies               |
-| 2026-08-14 | **UI Improvements inserted:** nav-overlay fix, Subscriptions "+", insights chart bounds, connect Google/Apple; Phase 0 (docs + generic skill) precedes all build/emulator verification |
-| 2026-08-15 | **UI Phase 1 done (`e4e383e`):** `useBottomClearance()` on all four tab lists + colliding sheets; emulator visual gate passed (Create/picker/Sign Out above nav)                       |
-| 2026-08-15 | **UI Phase 2 done (`77a83bb`):** Subscriptions tab `+` reuses CreateSubscriptionModal; created Crunchyroll $7.99 on-device                                                             |
-| 2026-08-15 | **UI Phase 3 done (`913b08f`):** Insights bar row is a horizontal ScrollView; 6-month/Year stay inside the card; labels hide after 3 points                                            |
-| 2026-08-15 | **UI Phase 4 rewritten:** email receipt scan only (native mail OAuth + IMAP last). Hollow Google/Apple SSO Connect dropped. SSO catalogs / Play / StoreKit parked in Backburner.       |
-| 2026-08-15 | **UI Phase 4 test split:** Gmail connect+empty Scan; Workspace/Outlook full scan; Tuta/Proton via IMAP; other branded rows connect-only. Gmail ≠ Workspace.                            |
-| 2026-08-15 | **UI Phase 5 parked:** Subscriptions List/Graph toggle; explicit depends-on links (Tuta→Porkbun/Proton→GitHub…). After email scan. Do not auto-infer from receipts.                    |
-| 2026-08-17 | **UI Phase 4 scan strategy:** account≠bill; incremental cache + cursor; subject-first classify; body/PDF only for money; display filters (default recurring) do not refetch.           |
+| Date       | Note                                                                                                                                                                                                                                                                             |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-08-11 | Phases 1–5 implemented and smoke-tested; `plan.md` created as living board                                                                                                                                                                                                       |
+| 2026-08-11 | **Phase 5.5** inserted: professional cleanup (artifacts, docs, src layout) between Phase 5 and Phase 6                                                                                                                                                                           |
+| 2026-08-11 | **5.5-A done:** artifacts removed, gitignore, APKs→`build-out/apk/`, gate passed                                                                                                                                                                                                 |
+| 2026-08-11 | **5.5-B done:** docs under `docs/`; stubs/autopsy removed                                                                                                                                                                                                                        |
+| 2026-08-11 | **5.5-C done:** components merged into `src/components/`; gate passed                                                                                                                                                                                                            |
+| 2026-08-11 | **5.5-D done:** lib/services/constants → src/; aliases `@/*`→src+root, `@assets/*`; gate passed                                                                                                                                                                                  |
+| 2026-08-11 | **5.5-E done:** scripts/{android,train,models,poc}; train:registry OK; gate passed                                                                                                                                                                                               |
+| 2026-08-11 | **5.5-F done:** README rewrite; `@/` imports; Phase 5.5 complete; Phase 6 unblocked                                                                                                                                                                                              |
+| 2026-08-11 | **Phase 5.5 complete**                                                                                                                                                                                                                                                           |
+| 2026-08-13 | **MAJOR FIX inserted:** crawler → picker → card/cache → upscale recovery is now the blocking pre-Phase-6 work; full-pipeline contracts and cross-layer regression gates defined                                                                                                  |
+| 2026-08-14 | **MAJOR FIX complete (Tranches A–F):** provenance precision gating removed picker pollution; lifecycle/ownership/stale-gen added; verified on-device with real companies                                                                                                         |
+| 2026-08-14 | **UI Improvements inserted:** nav-overlay fix, Subscriptions "+", insights chart bounds, connect Google/Apple; Phase 0 (docs + generic skill) precedes all build/emulator verification                                                                                           |
+| 2026-08-15 | **UI Phase 1 done (`e4e383e`):** `useBottomClearance()` on all four tab lists + colliding sheets; emulator visual gate passed (Create/picker/Sign Out above nav)                                                                                                                 |
+| 2026-08-15 | **UI Phase 2 done (`77a83bb`):** Subscriptions tab `+` reuses CreateSubscriptionModal; created Crunchyroll $7.99 on-device                                                                                                                                                       |
+| 2026-08-15 | **UI Phase 3 done (`913b08f`):** Insights bar row is a horizontal ScrollView; 6-month/Year stay inside the card; labels hide after 3 points                                                                                                                                      |
+| 2026-08-15 | **UI Phase 4 rewritten:** email receipt scan only (native mail OAuth + IMAP last). Hollow Google/Apple SSO Connect dropped. SSO catalogs / Play / StoreKit parked in Backburner.                                                                                                 |
+| 2026-08-15 | **UI Phase 4 test split:** Gmail connect+empty Scan; Workspace/Outlook full scan; Tuta/Proton via IMAP; other branded rows connect-only. Gmail ≠ Workspace.                                                                                                                      |
+| 2026-08-15 | **UI Phase 5 parked:** Subscriptions List/Graph toggle; explicit depends-on links (Tuta→Porkbun/Proton→GitHub…). After email scan. Do not auto-infer from receipts.                                                                                                              |
+| 2026-08-17 | **UI Phase 4 scan strategy:** account≠bill; incremental cache + cursor; subject-first classify; body/PDF only for money; display filters (default recurring) do not refetch.                                                                                                     |
+| 2026-08-18 | **UI Phase 4 scan brain:** subject-first classifier + rollup + display-filter function + fixtures/unit tests in `src/services/emailscan/`. No Settings UI, OAuth, or live mail yet. Yahoo/AOL/Zoho/Fastmail stay fully wired when providers land; live-scan deferred/unverified. |
