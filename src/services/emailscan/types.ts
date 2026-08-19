@@ -85,3 +85,80 @@ export const DEFAULT_DISPLAY_FILTERS: DisplayFilters = {
   sparse: false,
   free: false,
 };
+
+/** First-connect recency cap. Later scans use the cursor, not this. */
+export const INITIAL_SCAN_LIMIT = 500;
+
+export type MailAuthKind = "oauth" | "imap";
+
+export interface MailProviderCatalogEntry {
+  id: MailProviderId;
+  label: string;
+  branded: boolean;
+  auth: MailAuthKind;
+  /**
+   * Live connect+scan in the cheap Phase 4 matrix.
+   * False means implement fully, mark unverified — not a stub.
+   */
+  liveScanInPhase4: boolean;
+  note?: string;
+}
+
+export interface ScanCursor {
+  mailboxId: string;
+  lastMessageDate: string | null;
+  lastMessageId: string | null;
+  parserVersion: number;
+}
+
+export interface CachedMessage {
+  message: NormalizedMessage;
+  classified: ClassifiedMessage;
+  parserVersion: number;
+}
+
+export interface MailboxScanState {
+  mailboxId: string;
+  providerId: MailProviderId;
+  cursor: ScanCursor;
+  messages: Record<string, CachedMessage>;
+}
+
+export interface FetchSince {
+  date: string;
+  messageId: string;
+}
+
+export interface MessageFetcher {
+  fetchMessages(opts: {
+    mailboxId: string;
+    since: FetchSince | null;
+    limit: number;
+  }): Promise<NormalizedMessage[]>;
+}
+
+export interface ScanCacheStore {
+  getMailbox(mailboxId: string): MailboxScanState | undefined;
+  saveMailbox(state: MailboxScanState): void;
+  clearMailbox(mailboxId: string): void;
+}
+
+export interface IncrementalScanResult {
+  mailboxId: string;
+  candidates: ScanCandidate[];
+  fetched: number;
+  reparsed: number;
+  cursor: ScanCursor;
+}
+
+/**
+ * Mail provider contract. Shared classifier does not know Gmail vs IMAP.
+ * connect() persists tokens in secure store; scan() is incremental.
+ */
+export interface MailProvider {
+  id: MailProviderId;
+  connect(): Promise<void>;
+  disconnect(): Promise<void>;
+  isConnected(): Promise<boolean>;
+  scan(opts?: { mailboxId?: string }): Promise<IncrementalScanResult>;
+}

@@ -1096,7 +1096,7 @@ Cached map holds all three kinds. Default view: **Recurring on**; Sparse and Fre
 #### Tasks
 
 - [ ] Settings section **Email scan** (not mixed into Cloud Sync).
-- [ ] Provider interface + incremental scan cache + cursor.
+- [x] Provider interface + incremental scan cache + cursor (`MailProvider`, in-memory `ScanCacheStore`, `runIncrementalScan`). SQLite persist + live `connect()` still pending with Settings.
 - [x] Shared subject-first classifier; body/PDF only for money classes. (`src/services/emailscan/`)
 - [x] Display-filter function: Recurring / Sparse / Free (default Recurring). Toggle does not refetch. Settings toggles still pending.
 - [ ] Branded rows above; IMAP/IMAPS last. No branded iCloud/Proton/Tuta.
@@ -1222,3 +1222,4 @@ Parked until a documented API exists. Do not implement as Connect-without-scan.
 | 2026-08-15 | **UI Phase 5 parked:** Subscriptions List/Graph toggle; explicit depends-on links (Tuta→Porkbun/Proton→GitHub…). After email scan. Do not auto-infer from receipts.                                                                                                              |
 | 2026-08-17 | **UI Phase 4 scan strategy:** account≠bill; incremental cache + cursor; subject-first classify; body/PDF only for money; display filters (default recurring) do not refetch.                                                                                                     |
 | 2026-08-18 | **UI Phase 4 scan brain:** subject-first classifier + rollup + display-filter function + fixtures/unit tests in `src/services/emailscan/`. No Settings UI, OAuth, or live mail yet. Yahoo/AOL/Zoho/Fastmail stay fully wired when providers land; live-scan deferred/unverified. |
+| 2026-08-18 | **UI Phase 4 provider/cursor:** catalog (IMAP last; no fake iCloud/Proton/Tuta) + incremental scan engine (cursor, parser-version reparse, display filters do not refetch). Still no Settings UI or live OAuth.                                                                  |
