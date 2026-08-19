@@ -850,14 +850,14 @@ The predecessor claimed Phase 0 done after commit `56bd161`. That commit only ap
 
 ### UI board
 
-| Phase | Name                          | Status               | Touches                                                                          | Must not touch                       |
-| ----- | ----------------------------- | -------------------- | -------------------------------------------------------------------------------- | ------------------------------------ |
-| **0** | Docs + generic emulator skill | **Done (`ba66478`)** | `docs/plan.md`, `docs/CODEBASE.md`, `.cline/skills/emulator-ui-driving/SKILL.md` | App source, models, crawler          |
-| **1** | Native nav overlay            | **Done (`e4e383e`)** | Tab list padding; Create + picker (+ shared sheets) inset padding                | Crawler, models, schema              |
-| **2** | Subscriptions `+`             | **Done (`77a83bb`)** | `app/(tabs)/subscriptions.tsx` + existing modal wiring                           | New create flow, crawler             |
-| **3** | Insights chart bounds         | **Done (`913b08f`)** | `app/(tabs)/insights.tsx` Estimated Monthly Spend row                            | Period-chip `ScrollView`; other tabs |
-| **4** | Email account scan            | Not started          | Settings email-scan list + mail OAuth/IMAP + scan cache                          | SSO catalogs, crawler, training      |
-| **5** | Subscription dependency graph | Not started          | Subscriptions List/Graph toggle + `dependsOn` links                              | Email scan implementation, crawler   |
+| Phase | Name                          | Status                               | Touches                                                                          | Must not touch                       |
+| ----- | ----------------------------- | ------------------------------------ | -------------------------------------------------------------------------------- | ------------------------------------ |
+| **0** | Docs + generic emulator skill | **Done (`ba66478`)**                 | `docs/plan.md`, `docs/CODEBASE.md`, `.cline/skills/emulator-ui-driving/SKILL.md` | App source, models, crawler          |
+| **1** | Native nav overlay            | **Done (`e4e383e`)**                 | Tab list padding; Create + picker (+ shared sheets) inset padding                | Crawler, models, schema              |
+| **2** | Subscriptions `+`             | **Done (`77a83bb`)**                 | `app/(tabs)/subscriptions.tsx` + existing modal wiring                           | New create flow, crawler             |
+| **3** | Insights chart bounds         | **Done (`913b08f`)**                 | `app/(tabs)/insights.tsx` Estimated Monthly Spend row                            | Period-chip `ScrollView`; other tabs |
+| **4** | Email account scan            | **Code landed; emulator unverified** | Settings email-scan list + mail OAuth/IMAP + scan cache                          | SSO catalogs, crawler, training      |
+| **5** | Subscription dependency graph | Not started                          | Subscriptions List/Graph toggle + `dependsOn` links                              | Email scan implementation, crawler   |
 
 ### Shared gates (Phases 1–4)
 
@@ -1095,13 +1095,14 @@ Cached map holds all three kinds. Default view: **Recurring on**; Sparse and Fre
 
 #### Tasks
 
-- [ ] Settings section **Email scan** (not mixed into Cloud Sync).
-- [x] Provider interface + incremental scan cache + cursor (`MailProvider`, in-memory `ScanCacheStore`, `runIncrementalScan`). SQLite persist + live `connect()` still pending with Settings.
+- [x] Settings section **Email scan** (not mixed into Cloud Sync).
+- [x] Provider interface + incremental scan cache + cursor (`MailProvider`, in-memory `ScanCacheStore`, `runIncrementalScan`). SQLite persist (`mail_mailboxes` / `mail_messages`, schema v10, local-only).
 - [x] Shared subject-first classifier; body/PDF only for money classes. (`src/services/emailscan/`)
-- [x] Display-filter function: Recurring / Sparse / Free (default Recurring). Toggle does not refetch. Settings toggles still pending.
-- [ ] Branded rows above; IMAP/IMAPS last. No branded iCloud/Proton/Tuta.
+- [x] Display-filter function: Recurring / Sparse / Free (default Recurring). Toggle does not refetch. Settings toggles filter the cache only.
+- [x] Branded rows above; IMAP/IMAPS last. No branded iCloud/Proton/Tuta.
 - [x] Fixtures (welcome, reset, renewal, usage invoice, order, PDF, newsletter). Do not invent rows.
-- [ ] No crawler or training work. No committed OAuth client secrets. No LLM in Phase 4.
+- [x] No crawler or training work. No committed OAuth client secrets. No LLM in Phase 4.
+- [ ] **Emulator visual gate** (user-driven): Gmail connect+empty Scan; Workspace/Outlook full scan; Tuta/Proton via IMAP. Agent stops at the sheet.
 
 #### Test split (token-cheap)
 
@@ -1223,3 +1224,4 @@ Parked until a documented API exists. Do not implement as Connect-without-scan.
 | 2026-08-17 | **UI Phase 4 scan strategy:** account≠bill; incremental cache + cursor; subject-first classify; body/PDF only for money; display filters (default recurring) do not refetch.                                                                                                     |
 | 2026-08-18 | **UI Phase 4 scan brain:** subject-first classifier + rollup + display-filter function + fixtures/unit tests in `src/services/emailscan/`. No Settings UI, OAuth, or live mail yet. Yahoo/AOL/Zoho/Fastmail stay fully wired when providers land; live-scan deferred/unverified. |
 | 2026-08-18 | **UI Phase 4 provider/cursor:** catalog (IMAP last; no fake iCloud/Proton/Tuta) + incremental scan engine (cursor, parser-version reparse, display filters do not refetch). Still no Settings UI or live OAuth.                                                                  |
+| 2026-08-18 | **UI Phase 4 Settings + persist:** Email scan section, schema v10 local-only cache, honest OAuth/IMAP connect. IMAP fetch and Yahoo/AOL/Zoho/Fastmail live-scan remain unverified. No emulator gate yet. No mail client IDs in `.env`.                                           |

@@ -5,7 +5,7 @@
 import type { SQLiteDatabase } from "expo-sqlite";
 
 /** Bump when adding a migration. Stored in PRAGMA user_version. */
-export const SCHEMA_VERSION = 9;
+export const SCHEMA_VERSION = 10;
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS subscriptions (
@@ -106,6 +106,32 @@ CREATE TABLE IF NOT EXISTS preferences (
 );
 
 INSERT OR IGNORE INTO preferences (key, value) VALUES ('notification_enabled', 'true');
+
+CREATE TABLE IF NOT EXISTS mail_mailboxes (
+  id                 TEXT PRIMARY KEY,
+  provider_id        TEXT NOT NULL,
+  label              TEXT,
+  last_message_date  TEXT,
+  last_message_id    TEXT,
+  parser_version     INTEGER NOT NULL DEFAULT 1,
+  created_at         TEXT DEFAULT (datetime('now')),
+  updated_at         TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS mail_messages (
+  mailbox_id         TEXT NOT NULL,
+  message_id         TEXT NOT NULL,
+  from_addr          TEXT NOT NULL,
+  subject            TEXT NOT NULL,
+  date               TEXT NOT NULL,
+  body_text          TEXT,
+  html               TEXT,
+  attachments_json   TEXT,
+  classified_json    TEXT NOT NULL,
+  parser_version     INTEGER NOT NULL,
+  PRIMARY KEY (mailbox_id, message_id)
+);
+CREATE INDEX IF NOT EXISTS idx_mail_messages_mailbox ON mail_messages(mailbox_id);
 
 CREATE TABLE IF NOT EXISTS sync_metadata (
   id                     INTEGER PRIMARY KEY CHECK (id = 1),
@@ -294,6 +320,41 @@ export const MIGRATIONS: ((db: SQLiteDatabase) => Promise<void>)[] = [
         );
         CREATE INDEX IF NOT EXISTS idx_icon_crawl_sessions_status
         ON icon_crawl_sessions(status);
+      `);
+    }
+  },
+  // 10: email-scan cache (local-only; not cloud-synced).
+  async (db) => {
+    if (!(await tableExists(db, "mail_mailboxes"))) {
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS mail_mailboxes (
+          id                 TEXT PRIMARY KEY,
+          provider_id        TEXT NOT NULL,
+          label              TEXT,
+          last_message_date  TEXT,
+          last_message_id    TEXT,
+          parser_version     INTEGER NOT NULL DEFAULT 1,
+          created_at         TEXT DEFAULT (datetime('now')),
+          updated_at         TEXT DEFAULT (datetime('now'))
+        );
+      `);
+    }
+    if (!(await tableExists(db, "mail_messages"))) {
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS mail_messages (
+          mailbox_id         TEXT NOT NULL,
+          message_id         TEXT NOT NULL,
+          from_addr          TEXT NOT NULL,
+          subject            TEXT NOT NULL,
+          date               TEXT NOT NULL,
+          body_text          TEXT,
+          html               TEXT,
+          attachments_json   TEXT,
+          classified_json    TEXT NOT NULL,
+          parser_version     INTEGER NOT NULL,
+          PRIMARY KEY (mailbox_id, message_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_mail_messages_mailbox ON mail_messages(mailbox_id);
       `);
     }
   },

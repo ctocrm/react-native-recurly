@@ -20,6 +20,8 @@ export const SYNC_LOCAL_ONLY_TABLES = [
   "icon_crawl_sessions",
   "crawled_urls",
   "icon_reports",
+  "mail_mailboxes",
+  "mail_messages",
 ] as const;
 
 /** Short copy for Settings / alerts. */

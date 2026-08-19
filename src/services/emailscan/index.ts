@@ -10,9 +10,12 @@ export type {
     DisplayFilters,
     IncrementalScanResult,
     MailAttachment,
-    MailAuthKind, MailboxScanState, MailProvider,
+    MailAuthKind,
+    MailboxScanState,
+    MailProvider,
     MailProviderCatalogEntry,
-    MailProviderId, MessageFetcher,
+    MailProviderId,
+    MessageFetcher,
     NormalizedMessage,
     ScanCacheStore,
     ScanCandidate,
@@ -50,7 +53,8 @@ export {
 
 export {
     brandedConnectRows,
-    imapConnectRow, MAIL_PROVIDER_CATALOG
+    imapConnectRow,
+    MAIL_PROVIDER_CATALOG
 } from "./catalog";
 
 export {
@@ -59,3 +63,4 @@ export {
     runIncrementalScan
 } from "./scan";
 
+export { candidateToSubscription } from "./importCandidate";
