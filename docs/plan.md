@@ -1150,7 +1150,7 @@ Scan-brain / Settings **code landed** but Phase 4 remains **NOT done** until H1�
 - [x] Display-filter function: Recurring / Sparse / Free (default Recurring). Toggle does not refetch.
 - [x] Fixtures (welcome, reset, renewal, usage invoice, order, PDF, newsletter). Do not invent rows.
 - [x] No crawler or training work. No committed OAuth client secrets. No LLM in Phase 4.
-- [ ] **H1 — Honesty (catalog + copy + tests).** Drop Yahoo/AOL branded OAuth. IMAP note without Proton/Tuta. IMAP `liveScanInPhase4: false`. Settings/IMAP-sheet copy factual (Proton/Tuta are **not** IMAP; they will be branded client-REST rows in H4/H5). Tests must not lock Yahoo/AOL as branded OAuth. **H1 code is a later commit; this docs commit is plan-only.**
+- [x] **H1 — Honesty (catalog + copy + tests).** Drop Yahoo/AOL branded OAuth. IMAP note without Proton/Tuta. IMAP `liveScanInPhase4: false`. Settings/IMAP-sheet copy factual (Proton/Tuta are **not** IMAP; they will be branded client-REST rows in H4/H5). Tests must not lock Yahoo/AOL as branded OAuth.
 - [ ] **H2 — Native IMAP socket** (not JS-only Expo). Then live-scan for **documented public hosts only** (iCloud / Yahoo / AOL / custom). Still not Proton/Tuta.
 - [ ] **H3 — HTTPS completeness**, one provider at a time: Zoho Mail HTTP fetcher; dedicated mail client ids (not Drive/OneDrive); verify Google/Microsoft token exchange; Fastmail query vs subject-union; Office 365 live-scan flag.
 - [ ] **H4 — Proton client API.** Native SRP + OpenPGP + Proton HTTP (`mail/v4` list/get) → shared classifier. Password (+ 2FA) sheet. Not IMAP, not Bridge. Live-scan when crypto works.

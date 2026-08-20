@@ -20,7 +20,6 @@ import {
   connectImapAndRecord,
   createMailProvider,
   oauthClientId,
-  yahooShouldFallBackToImap,
 } from "@/services/emailscan/providers";
 import { useUser } from "@clerk/expo";
 import { useCallback, useEffect, useState } from "react";
@@ -89,14 +88,6 @@ export default function EmailScanSection() {
 
   const handleConnect = async (id: MailProviderId) => {
     if (id === "imap") {
-      setImapOpen(true);
-      return;
-    }
-    if (id === "yahoo" && yahooShouldFallBackToImap()) {
-      Alert.alert(
-        "Yahoo OAuth unavailable",
-        "New-app Yahoo OAuth is closed. Use IMAP / IMAPS — not a dead button.",
-      );
       setImapOpen(true);
       return;
     }
@@ -215,8 +206,9 @@ export default function EmailScanSection() {
         $0). Scan never auto-creates rows. I stop at the OAuth/IMAP sheet.
       </Text>
       <Text className="text-xs font-sans-medium text-muted-foreground mb-3">
-        Not every merchant emails a receipt. iCloud / Proton / Tuta use IMAP —
-        no fake logos. Play / StoreKit catalogs are not this phase.
+        Not every merchant emails a receipt. IMAP is iCloud, Yahoo, AOL, or a
+        custom host — not Proton or Tuta. Play / StoreKit catalogs are not this
+        phase.
       </Text>
 
       <View className="gap-2 mb-4">
@@ -236,11 +228,9 @@ export default function EmailScanSection() {
                   <Text className="text-xs font-sans-medium text-muted-foreground">
                     {row.auth === "imap"
                       ? "Host / user / app password"
-                      : row.id === "yahoo" && yahooShouldFallBackToImap()
-                        ? "OAuth closed — use IMAP"
-                        : isOn
-                          ? "Connected"
-                          : "OAuth"}
+                      : isOn
+                        ? "Connected"
+                        : "OAuth"}
                     {!row.liveScanInPhase4 && row.branded
                       ? " · live-scan unverified"
                       : ""}
@@ -380,7 +370,9 @@ export default function EmailScanSection() {
               IMAP / IMAPS
             </Text>
             <Text className="text-xs font-sans-medium text-muted-foreground mb-4">
-              iCloud, Proton, Tuta, and everyone else. Agent never types this.
+              Public IMAP only: iCloud (imap.mail.me.com), Yahoo
+              (imap.mail.yahoo.com), AOL (imap.aol.com), or a custom host. Not
+              Proton or Tuta. Agent never types this.
             </Text>
             <TextInput
               className="rounded-xl border border-border bg-card p-3 mb-2 text-primary"

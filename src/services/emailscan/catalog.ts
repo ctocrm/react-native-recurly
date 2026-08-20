@@ -1,6 +1,7 @@
 /**
- * Native Connect catalog. Branded row only if a documented mail API exists.
- * Yahoo/AOL/Zoho/Fastmail are fully wired later; live-scan unverified.
+ * Native Connect catalog. Branded OAuth only if a documented mail API exists.
+ * Yahoo/AOL are public IMAP (not branded OAuth). Proton/Tuta are not IMAP
+ * (client REST in H4/H5). IMAP fetch is unverified on this Expo client.
  */
 import type { MailProviderCatalogEntry } from "./types";
 
@@ -37,28 +38,12 @@ export const MAIL_PROVIDER_CATALOG: MailProviderCatalogEntry[] = [
     note: "Own branded row; live Graph path is Outlook in Phase 4.",
   },
   {
-    id: "yahoo",
-    label: "Yahoo Mail",
-    branded: true,
-    auth: "oauth",
-    liveScanInPhase4: false,
-    note: "If new-app OAuth is closed, drop this row to IMAP. No dead button.",
-  },
-  {
-    id: "aol",
-    label: "AOL",
-    branded: true,
-    auth: "oauth",
-    liveScanInPhase4: false,
-    note: "Same Yahoo/AOL identity stack. Implement fully; live-scan unverified.",
-  },
-  {
     id: "zoho",
     label: "Zoho Mail",
     branded: true,
     auth: "oauth",
     liveScanInPhase4: false,
-    note: "Implement fully; live-scan unverified.",
+    note: "OAuth + Mail API. HTTP fetcher in H3.",
   },
   {
     id: "fastmail",
@@ -66,15 +51,15 @@ export const MAIL_PROVIDER_CATALOG: MailProviderCatalogEntry[] = [
     branded: true,
     auth: "oauth",
     liveScanInPhase4: false,
-    note: "Fastmail OAuth + JMAP. Implement fully; live-scan unverified.",
+    note: "Fastmail OAuth + JMAP. Live-scan when client id exists.",
   },
   {
     id: "imap",
     label: "IMAP / IMAPS",
     branded: false,
     auth: "imap",
-    liveScanInPhase4: true,
-    note: "Last row. iCloud, Proton, Tuta, everyone else. No fake logos.",
+    liveScanInPhase4: false,
+    note: "Last row. Public IMAP only: iCloud, Yahoo, AOL, custom hosts. Not Proton or Tuta.",
   },
 ];
 

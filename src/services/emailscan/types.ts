@@ -10,8 +10,6 @@ export type MailProviderId =
   | "workspace"
   | "outlook"
   | "office365"
-  | "yahoo"
-  | "aol"
   | "zoho"
   | "fastmail"
   | "imap";

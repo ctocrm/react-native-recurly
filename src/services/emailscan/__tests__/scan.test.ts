@@ -42,19 +42,22 @@ describe("emailscan catalog", () => {
     expect(brandedConnectRows().map((r) => r.id)).not.toContain("imap");
   });
 
-  it("does not invent branded iCloud / Proton / Tuta rows", () => {
+  it("does not invent branded iCloud / Proton / Tuta / Yahoo / AOL rows", () => {
     const ids = MAIL_PROVIDER_CATALOG.map((r) => r.id);
     expect(ids).not.toEqual(
-      expect.arrayContaining(["icloud", "proton", "tuta"]),
+      expect.arrayContaining(["icloud", "proton", "tuta", "yahoo", "aol"]),
     );
   });
 
-  it("keeps Yahoo/AOL/Zoho/Fastmail as real rows with live-scan deferred", () => {
-    for (const id of ["yahoo", "aol", "zoho", "fastmail"] as const) {
+  it("keeps Zoho/Fastmail branded OAuth with live-scan deferred; IMAP last and not live", () => {
+    for (const id of ["zoho", "fastmail"] as const) {
       const row = MAIL_PROVIDER_CATALOG.find((r) => r.id === id);
       expect(row?.branded).toBe(true);
+      expect(row?.auth).toBe("oauth");
       expect(row?.liveScanInPhase4).toBe(false);
     }
+    expect(imapConnectRow().liveScanInPhase4).toBe(false);
+    expect(imapConnectRow().note).toMatch(/Not Proton or Tuta/);
   });
 });
 

@@ -111,13 +111,6 @@ export function oauthClientId(providerId: MailProviderId): string | undefined {
         present(process.env.EXPO_PUBLIC_MICROSOFT_MAIL_CLIENT_ID) ||
         present(process.env.EXPO_PUBLIC_ONEDRIVE_CLIENT_ID)
       );
-    case "yahoo":
-      return present(process.env.EXPO_PUBLIC_YAHOO_CLIENT_ID);
-    case "aol":
-      return (
-        present(process.env.EXPO_PUBLIC_AOL_CLIENT_ID) ||
-        present(process.env.EXPO_PUBLIC_YAHOO_CLIENT_ID)
-      );
     case "zoho":
       return present(process.env.EXPO_PUBLIC_ZOHO_CLIENT_ID);
     case "fastmail":
@@ -125,10 +118,6 @@ export function oauthClientId(providerId: MailProviderId): string | undefined {
     default:
       return undefined;
   }
-}
-
-export function yahooShouldFallBackToImap(): boolean {
-  return !oauthClientId("yahoo");
 }
 
 interface OAuthSpec {
@@ -160,14 +149,6 @@ function oauthSpec(providerId: MailProviderId): OAuthSpec {
         tokenEndpoint:
           "https://login.microsoftonline.com/common/oauth2/v2.0/token",
         scopes: ["Mail.Read", "offline_access", "User.Read"],
-      };
-    case "yahoo":
-    case "aol":
-      return {
-        authorizationEndpoint:
-          "https://api.login.yahoo.com/oauth2/request_auth",
-        tokenEndpoint: "https://api.login.yahoo.com/oauth2/get_token",
-        scopes: ["mail-r"],
       };
     case "zoho":
       return {
@@ -546,11 +527,6 @@ export function createMailProvider(
     async connect() {
       if (providerId === "imap") {
         throw new MailConnectError("IMAP uses the IMAP form, not OAuth");
-      }
-      if (providerId === "yahoo" && yahooShouldFallBackToImap()) {
-        throw new MailConnectError(
-          "Yahoo OAuth is not available for new apps. Use IMAP / IMAPS.",
-        );
       }
       await promptOAuth(providerId, userId);
     },
