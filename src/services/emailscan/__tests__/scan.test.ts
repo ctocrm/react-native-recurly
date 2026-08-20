@@ -56,7 +56,7 @@ describe("emailscan catalog", () => {
       expect(row?.auth).toBe("oauth");
       expect(row?.liveScanInPhase4).toBe(false);
     }
-    expect(imapConnectRow().liveScanInPhase4).toBe(false);
+    expect(imapConnectRow().liveScanInPhase4).toBe(true);
     expect(imapConnectRow().note).toMatch(/Not Proton or Tuta/);
   });
 });

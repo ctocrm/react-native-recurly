@@ -2,8 +2,8 @@
  * Live mail providers. Shared classifier does not live here.
  * Tokens go in SecureStore. No client secrets in source.
  *
- * IMAP has no TCP sockets in this Expo client: connect persists
- * credentials, scan() is honest-unverified until a native IMAP path exists.
+ * IMAP scan uses the Android MailImap SSL socket (H2). Public hosts only.
+ * Not Proton. Not Tuta.
  */
 import * as AuthSession from "expo-auth-session";
 import * as SecureStore from "expo-secure-store";
@@ -488,11 +488,21 @@ async function fetcherFor(
   mailboxId: string,
 ): Promise<MessageFetcher> {
   if (providerId === "imap") {
+    const creds = await loadImapCredentials(mailboxId);
+    if (!creds) {
+      throw new MailConnectError("IMAP is not connected");
+    }
+    const { createImapFetcher } = await import("./imapNative");
+    const inner = createImapFetcher(creds, mailboxId);
     return {
-      async fetchMessages() {
-        throw new MailScanUnverifiedError(
-          "IMAP fetch needs a native socket stack. Connect is stored; scan is unverified on this Expo client.",
-        );
+      async fetchMessages(opts) {
+        try {
+          return await inner.fetchMessages(opts);
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : "IMAP fetch failed";
+          throw new MailScanUnverifiedError(message);
+        }
       },
     };
   }

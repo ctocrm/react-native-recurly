@@ -1,7 +1,7 @@
 /**
  * Native Connect catalog. Branded OAuth only if a documented mail API exists.
  * Yahoo/AOL are public IMAP (not branded OAuth). Proton/Tuta are not IMAP
- * (client REST in H4/H5). IMAP fetch is unverified on this Expo client.
+ * (client REST in H4/H5). IMAP fetch uses the Android SSL socket.
  */
 import type { MailProviderCatalogEntry } from "./types";
 
@@ -58,8 +58,8 @@ export const MAIL_PROVIDER_CATALOG: MailProviderCatalogEntry[] = [
     label: "IMAP / IMAPS",
     branded: false,
     auth: "imap",
-    liveScanInPhase4: false,
-    note: "Last row. Public IMAP only: iCloud, Yahoo, AOL, custom hosts. Not Proton or Tuta.",
+    liveScanInPhase4: true,
+    note: "Last row. Public IMAP only: iCloud, Yahoo, AOL, custom hosts. Native SSL socket. Not Proton or Tuta.",
   },
 ];
 

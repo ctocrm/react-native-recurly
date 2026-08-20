@@ -186,7 +186,7 @@ export default function EmailScanSection() {
       setImapOpen(false);
       setImapPass("");
       setStatus(
-        "IMAP credentials stored. Scan is unverified on this Expo client (no native IMAP socket).",
+        "IMAP credentials stored. Scan uses the native Android SSL socket (public hosts only).",
       );
     } catch (error) {
       Alert.alert(

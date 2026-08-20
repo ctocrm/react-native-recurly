@@ -13,6 +13,10 @@ module.exports = {
       posthogProjectToken: process.env.POSTHOG_PROJECT_TOKEN,
       posthogHost: process.env.POSTHOG_HOST || "https://us.i.posthog.com",
     },
+    plugins: [
+      ...(appJson.expo.plugins || []),
+      "react-native-fast-tflite",
+      "./plugins/mail-imap/withMailImap",
+    ],
   },
-  plugins: ["react-native-fast-tflite"],
 };
