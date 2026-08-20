@@ -36,17 +36,30 @@ describe("emailscan catalog", () => {
     expect(ids[ids.length - 1]).toBe("imap");
     expect(imapConnectRow().branded).toBe(false);
     expect(imapConnectRow().auth).toBe("imap");
-    expect(
-      brandedConnectRows().every((r) => r.branded && r.auth === "oauth"),
-    ).toBe(true);
+    expect(brandedConnectRows().every((r) => r.branded)).toBe(true);
     expect(brandedConnectRows().map((r) => r.id)).not.toContain("imap");
+    const oauthIds = brandedConnectRows()
+      .filter((r) => r.auth === "oauth")
+      .map((r) => r.id);
+    expect(oauthIds).toEqual([
+      "gmail",
+      "workspace",
+      "outlook",
+      "office365",
+      "zoho",
+      "fastmail",
+    ]);
   });
 
-  it("does not invent branded iCloud / Proton / Tuta / Yahoo / AOL rows", () => {
+  it("does not invent branded iCloud / Yahoo / AOL rows; Proton/Tuta are password not IMAP", () => {
     const ids = MAIL_PROVIDER_CATALOG.map((r) => r.id);
-    expect(ids).not.toEqual(
-      expect.arrayContaining(["icloud", "proton", "tuta", "yahoo", "aol"]),
-    );
+    expect(ids).not.toEqual(expect.arrayContaining(["icloud", "yahoo", "aol"]));
+    const proton = MAIL_PROVIDER_CATALOG.find((r) => r.id === "proton");
+    const tuta = MAIL_PROVIDER_CATALOG.find((r) => r.id === "tuta");
+    expect(proton?.branded).toBe(true);
+    expect(proton?.auth).toBe("password");
+    expect(tuta?.branded).toBe(true);
+    expect(tuta?.auth).toBe("password");
   });
 
   it("keeps Zoho/Fastmail/Office365 branded OAuth with live HTTP fetchers", () => {

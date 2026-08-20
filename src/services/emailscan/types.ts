@@ -12,6 +12,8 @@ export type MailProviderId =
   | "office365"
   | "zoho"
   | "fastmail"
+  | "proton"
+  | "tuta"
   | "imap";
 
 export type SubjectClass =
@@ -87,7 +89,7 @@ export const DEFAULT_DISPLAY_FILTERS: DisplayFilters = {
 /** First-connect recency cap. Later scans use the cursor, not this. */
 export const INITIAL_SCAN_LIMIT = 500;
 
-export type MailAuthKind = "oauth" | "imap";
+export type MailAuthKind = "oauth" | "imap" | "password";
 
 export interface MailProviderCatalogEntry {
   id: MailProviderId;

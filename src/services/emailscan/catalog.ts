@@ -54,6 +54,22 @@ export const MAIL_PROVIDER_CATALOG: MailProviderCatalogEntry[] = [
     note: "Fastmail OAuth + JMAP subject-union query.",
   },
   {
+    id: "proton",
+    label: "Proton Mail",
+    branded: true,
+    auth: "password",
+    liveScanInPhase4: true,
+    note: "Client REST + SRP + OpenPGP. Not IMAP, not Bridge, not OAuth.",
+  },
+  {
+    id: "tuta",
+    label: "Tuta",
+    branded: true,
+    auth: "password",
+    liveScanInPhase4: true,
+    note: "Client REST + on-device decrypt. FAQ-invited, no public docs. Not IMAP.",
+  },
+  {
     id: "imap",
     label: "IMAP / IMAPS",
     branded: false,

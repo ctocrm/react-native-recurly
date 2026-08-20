@@ -18,6 +18,7 @@ import {
   MailConnectError,
   MailScanUnverifiedError,
   connectImapAndRecord,
+  connectPasswordMailAndRecord,
   createMailProvider,
   oauthClientId,
 } from "@/services/emailscan/providers";
@@ -53,6 +54,12 @@ export default function EmailScanSection() {
   const [imapUser, setImapUser] = useState("");
   const [imapPass, setImapPass] = useState("");
   const [imapPort, setImapPort] = useState("993");
+  const [passwordKind, setPasswordKind] = useState<"proton" | "tuta" | null>(
+    null,
+  );
+  const [passwordUser, setPasswordUser] = useState("");
+  const [passwordPass, setPasswordPass] = useState("");
+  const [passwordTotp, setPasswordTotp] = useState("");
   const [status, setStatus] = useState<string | null>(null);
 
   const refreshConnected = useCallback(async () => {
@@ -89,6 +96,10 @@ export default function EmailScanSection() {
   const handleConnect = async (id: MailProviderId) => {
     if (id === "imap") {
       setImapOpen(true);
+      return;
+    }
+    if (id === "proton" || id === "tuta") {
+      setPasswordKind(id);
       return;
     }
     if (!oauthClientId(id)) {
@@ -196,6 +207,51 @@ export default function EmailScanSection() {
     }
   };
 
+  const submitPasswordMail = async () => {
+    if (!passwordKind) return;
+    if (!passwordUser.trim() || !passwordPass.trim()) {
+      Alert.alert(
+        passwordKind === "proton" ? "Proton Mail" : "Tuta",
+        "Email and password are required.",
+      );
+      return;
+    }
+    try {
+      const mailboxId = await connectPasswordMailAndRecord(passwordKind, {
+        username: passwordUser.trim(),
+        password: passwordPass,
+        totp: passwordTotp.trim() || undefined,
+      });
+      setConnected((prev) => ({ ...prev, [passwordKind]: true }));
+      setActiveMailbox(mailboxId);
+      setPasswordKind(null);
+      setPasswordPass("");
+      setPasswordTotp("");
+      setStatus(
+        passwordKind === "proton"
+          ? "Proton credentials stored. Scan uses client REST + SRP (not IMAP, not Bridge)."
+          : "Tuta credentials stored. Scan uses client REST (FAQ-invited, not IMAP).",
+      );
+    } catch (error) {
+      Alert.alert(
+        passwordKind === "proton" ? "Proton Mail" : "Tuta",
+        error instanceof Error ? error.message : "Failed to store login",
+      );
+    }
+  };
+
+  const authLabel = (rowAuth: string, isOn: boolean) => {
+    if (rowAuth === "imap") return "Host / user / app password";
+    if (rowAuth === "password") return isOn ? "Connected" : "Password (+ 2FA)";
+    return isOn ? "Connected" : "OAuth";
+  };
+
+  const connectLabel = (rowAuth: string) => {
+    if (rowAuth === "imap") return "IMAP form";
+    if (rowAuth === "password") return "Password";
+    return "Connect";
+  };
+
   return (
     <View className="auth-card mb-5">
       <Text className="text-base font-sans-semibold text-primary mb-3">
@@ -203,11 +259,13 @@ export default function EmailScanSection() {
       </Text>
       <Text className="text-xs font-sans-medium text-muted-foreground mb-3">
         Connect a mailbox, then scan. A subscription is an account (including
-        $0). Scan never auto-creates rows. I stop at the OAuth/IMAP sheet.
+        $0). Scan never auto-creates rows. I stop at the OAuth / IMAP / Proton /
+        Tuta sheet.
       </Text>
       <Text className="text-xs font-sans-medium text-muted-foreground mb-3">
         Not every merchant emails a receipt. IMAP is iCloud, Yahoo, AOL, or a
-        custom host — not Proton or Tuta. Play / StoreKit catalogs are not this
+        custom host — not Proton or Tuta. Proton and Tuta use password login
+        against their client REST APIs. Play / StoreKit catalogs are not this
         phase.
       </Text>
 
@@ -226,11 +284,7 @@ export default function EmailScanSection() {
                     {row.label}
                   </Text>
                   <Text className="text-xs font-sans-medium text-muted-foreground">
-                    {row.auth === "imap"
-                      ? "Host / user / app password"
-                      : isOn
-                        ? "Connected"
-                        : "OAuth"}
+                    {authLabel(row.auth, isOn)}
                     {!row.liveScanInPhase4 && row.branded
                       ? " · live-scan unverified"
                       : ""}
@@ -245,7 +299,7 @@ export default function EmailScanSection() {
                   disabled={busy}
                 >
                   <Text className="text-xs font-sans-bold text-white">
-                    {row.auth === "imap" ? "IMAP form" : "Connect"}
+                    {connectLabel(row.auth)}
                   </Text>
                 </Pressable>
                 <Pressable
@@ -413,6 +467,73 @@ export default function EmailScanSection() {
             <Pressable
               className="items-center rounded-2xl bg-muted py-4"
               onPress={() => setImapOpen(false)}
+            >
+              <Text className="text-base font-sans-bold text-primary">
+                Cancel
+              </Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <Modal
+        visible={passwordKind !== null}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setPasswordKind(null)}
+      >
+        <Pressable
+          className="flex-1 bg-black/50"
+          onPress={() => setPasswordKind(null)}
+        >
+          <Pressable
+            className="mt-auto rounded-t-3xl bg-background p-5"
+            style={{ paddingBottom: sheetPadding }}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <Text className="text-xl font-sans-bold text-primary mb-2">
+              {passwordKind === "proton" ? "Proton Mail" : "Tuta"}
+            </Text>
+            <Text className="text-xs font-sans-medium text-muted-foreground mb-4">
+              {passwordKind === "proton"
+                ? "Password (+ optional 2FA). Client REST + SRP. Not IMAP, not Bridge, not OAuth. Agent never types this."
+                : "Password login. Client REST (FAQ-invited, no public docs). Not IMAP. Agent never types this."}
+            </Text>
+            <TextInput
+              className="rounded-xl border border-border bg-card p-3 mb-2 text-primary"
+              placeholder="Email"
+              autoCapitalize="none"
+              keyboardType="email-address"
+              value={passwordUser}
+              onChangeText={setPasswordUser}
+            />
+            <TextInput
+              className="rounded-xl border border-border bg-card p-3 mb-2 text-primary"
+              placeholder="Password"
+              secureTextEntry
+              value={passwordPass}
+              onChangeText={setPasswordPass}
+            />
+            {passwordKind === "proton" && (
+              <TextInput
+                className="rounded-xl border border-border bg-card p-3 mb-4 text-primary"
+                placeholder="2FA code (if enabled)"
+                keyboardType="number-pad"
+                value={passwordTotp}
+                onChangeText={setPasswordTotp}
+              />
+            )}
+            <Pressable
+              className="mb-3 items-center rounded-2xl bg-accent py-4"
+              onPress={submitPasswordMail}
+            >
+              <Text className="text-base font-sans-bold text-white">
+                Save login
+              </Text>
+            </Pressable>
+            <Pressable
+              className="items-center rounded-2xl bg-muted py-4"
+              onPress={() => setPasswordKind(null)}
             >
               <Text className="text-base font-sans-bold text-primary">
                 Cancel

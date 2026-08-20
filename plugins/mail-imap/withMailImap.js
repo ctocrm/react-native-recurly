@@ -20,7 +20,12 @@ function withMailImap(config) {
         "app/src/main/java/com/ctocrm/jsmastery/imap",
       );
       fs.mkdirSync(destDir, { recursive: true });
-      for (const file of ["ImapModule.kt", "ImapPackage.kt"]) {
+      for (const file of [
+        "ImapModule.kt",
+        "ImapPackage.kt",
+        "ProtonModule.kt",
+        "TutaModule.kt",
+      ]) {
         const src = path.join(SRC_DIR, file);
         const dest = path.join(destDir, file);
         fs.copyFileSync(src, dest);

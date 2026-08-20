@@ -7,7 +7,11 @@ import com.facebook.react.uimanager.ViewManager
 
 class ImapPackage : ReactPackage {
   override fun createNativeModules(reactContext: ReactApplicationContext): List<NativeModule> {
-    return listOf(ImapModule(reactContext))
+    return listOf(
+      ImapModule(reactContext),
+      ProtonModule(reactContext),
+      TutaModule(reactContext),
+    )
   }
 
   override fun createViewManagers(

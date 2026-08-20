@@ -79,6 +79,37 @@ async function saveTokens(
   );
 }
 
+function passwordKey(providerId: "proton" | "tuta", mailboxId: string): string {
+  return `mail_password_${providerId}_${mailboxId}`;
+}
+
+export interface PasswordMailCredentials {
+  username: string;
+  password: string;
+  totp?: string;
+}
+
+export async function savePasswordMailCredentials(
+  providerId: "proton" | "tuta",
+  mailboxId: string,
+  creds: PasswordMailCredentials,
+): Promise<void> {
+  await SecureStore.setItemAsync(
+    passwordKey(providerId, mailboxId),
+    JSON.stringify(creds),
+  );
+}
+
+export async function loadPasswordMailCredentials(
+  providerId: "proton" | "tuta",
+  mailboxId: string,
+): Promise<PasswordMailCredentials | null> {
+  const raw = await SecureStore.getItemAsync(
+    passwordKey(providerId, mailboxId),
+  );
+  return raw ? (JSON.parse(raw) as PasswordMailCredentials) : null;
+}
+
 export async function saveImapCredentials(
   mailboxId: string,
   creds: ImapCredentials,
@@ -587,6 +618,27 @@ async function fetcherFor(
       },
     };
   }
+  if (providerId === "proton" || providerId === "tuta") {
+    const creds = await loadPasswordMailCredentials(providerId, mailboxId);
+    if (!creds) {
+      throw new MailConnectError(`${providerId} is not connected`);
+    }
+    const { createPasswordMailFetcher } = await import("./imapNative");
+    const inner = createPasswordMailFetcher(providerId, creds, mailboxId);
+    return {
+      async fetchMessages(opts) {
+        try {
+          return await inner.fetchMessages(opts);
+        } catch (error) {
+          const message =
+            error instanceof Error
+              ? error.message
+              : `${providerId} fetch failed`;
+          throw new MailScanUnverifiedError(message);
+        }
+      },
+    };
+  }
   const tokens = await loadTokens(providerId, userId);
   if (!tokens?.accessToken) {
     throw new MailConnectError("Not connected");
@@ -622,14 +674,32 @@ export function createMailProvider(
       if (providerId === "imap") {
         throw new MailConnectError("IMAP uses the IMAP form, not OAuth");
       }
+      if (providerId === "proton" || providerId === "tuta") {
+        throw new MailConnectError(
+          `${providerId} uses the password sheet, not OAuth`,
+        );
+      }
       await promptOAuth(providerId, userId);
     },
     async disconnect() {
+      if (providerId === "proton" || providerId === "tuta") {
+        await SecureStore.deleteItemAsync(
+          passwordKey(providerId, mailboxIdFor(providerId)),
+        );
+        return;
+      }
       await SecureStore.deleteItemAsync(tokenKey(providerId, userId));
     },
     async isConnected() {
       if (providerId === "imap") {
         const creds = await loadImapCredentials(mailboxIdFor("imap"));
+        return !!creds;
+      }
+      if (providerId === "proton" || providerId === "tuta") {
+        const creds = await loadPasswordMailCredentials(
+          providerId,
+          mailboxIdFor(providerId),
+        );
         return !!creds;
       }
       const tokens = await loadTokens(providerId, userId);
@@ -657,6 +727,27 @@ export async function connectImapAndRecord(
   await saveMailboxAsync({
     mailboxId,
     providerId: "imap",
+    cursor: {
+      mailboxId,
+      lastMessageDate: null,
+      lastMessageId: null,
+      parserVersion: 1,
+    },
+    messages: {},
+  });
+  return mailboxId;
+}
+
+export async function connectPasswordMailAndRecord(
+  providerId: "proton" | "tuta",
+  creds: PasswordMailCredentials,
+): Promise<string> {
+  const mailboxId = mailboxIdFor(providerId);
+  await savePasswordMailCredentials(providerId, mailboxId, creds);
+  const { saveMailboxAsync } = await import("./persist");
+  await saveMailboxAsync({
+    mailboxId,
+    providerId,
     cursor: {
       mailboxId,
       lastMessageDate: null,
