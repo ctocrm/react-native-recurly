@@ -393,6 +393,71 @@ export function createGraphFetcher(
   };
 }
 
+export function createZohoFetcher(
+  accessToken: string,
+  mailboxId: string,
+): MessageFetcher {
+  return {
+    async fetchMessages({ since, limit }) {
+      const accRes = await fetch("https://mail.zoho.com/api/accounts", {
+        headers: { Authorization: `Zoho-oauthtoken ${accessToken}` },
+      });
+      if (!accRes.ok) {
+        throw new MailScanUnverifiedError(
+          `Zoho accounts failed (${accRes.status})`,
+        );
+      }
+      const accJson = (await accRes.json()) as {
+        data?: { accountId?: string }[];
+      };
+      const accountId = accJson.data?.[0]?.accountId;
+      if (!accountId) {
+        throw new MailScanUnverifiedError("Zoho session missing account");
+      }
+      const searchKey = since?.date
+        ? `after:${since.date.slice(0, 10)}`
+        : "subject:welcome OR subject:subscription OR subject:renewal OR subject:invoice OR subject:receipt OR subject:password OR subject:order";
+      const params = new URLSearchParams({
+        searchKey,
+        limit: String(Math.min(limit, 50)),
+      });
+      const res = await fetch(
+        `https://mail.zoho.com/api/accounts/${accountId}/messages/search?${params}`,
+        { headers: { Authorization: `Zoho-oauthtoken ${accessToken}` } },
+      );
+      if (!res.ok) {
+        throw new MailScanUnverifiedError(`Zoho search failed (${res.status})`);
+      }
+      const json = (await res.json()) as {
+        data?: {
+          messageId?: string;
+          fromAddress?: string;
+          sender?: string;
+          subject?: string;
+          receivedTime?: string | number;
+          summary?: string;
+        }[];
+      };
+      return (json.data || []).map((m) => {
+        const received =
+          typeof m.receivedTime === "number"
+            ? new Date(m.receivedTime).toISOString()
+            : m.receivedTime || new Date().toISOString();
+        return {
+          mailboxId,
+          messageId: String(m.messageId || ""),
+          from: m.sender
+            ? `${m.sender} <${m.fromAddress || ""}>`
+            : m.fromAddress || "",
+          subject: m.subject || "",
+          date: received,
+          text: m.summary,
+        };
+      });
+    },
+  };
+}
+
 export function createJmapFetcher(
   accessToken: string,
   mailboxId: string,
@@ -420,7 +485,23 @@ export function createJmapFetcher(
             accountId,
             filter: since?.date
               ? { after: since.date }
-              : { text: "subscription" },
+              : {
+                  operator: "OR",
+                  conditions: [
+                    { subject: "welcome" },
+                    { subject: "registered" },
+                    { subject: "verify" },
+                    { subject: "subscription" },
+                    { subject: "renewal" },
+                    { subject: "membership" },
+                    { subject: "invoice" },
+                    { subject: "receipt" },
+                    { subject: "statement" },
+                    { subject: "password" },
+                    { subject: "login" },
+                    { subject: "order" },
+                  ],
+                },
             sort: [{ property: "receivedAt", isAscending: false }],
             limit: Math.min(limit, 50),
           },
@@ -518,6 +599,9 @@ async function fetcherFor(
   }
   if (providerId === "fastmail") {
     return createJmapFetcher(tokens.accessToken, mailboxId);
+  }
+  if (providerId === "zoho") {
+    return createZohoFetcher(tokens.accessToken, mailboxId);
   }
   return {
     async fetchMessages() {

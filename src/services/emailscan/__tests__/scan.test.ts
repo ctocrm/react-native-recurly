@@ -49,12 +49,12 @@ describe("emailscan catalog", () => {
     );
   });
 
-  it("keeps Zoho/Fastmail branded OAuth with live-scan deferred; IMAP last and not live", () => {
-    for (const id of ["zoho", "fastmail"] as const) {
+  it("keeps Zoho/Fastmail/Office365 branded OAuth with live HTTP fetchers", () => {
+    for (const id of ["zoho", "fastmail", "office365"] as const) {
       const row = MAIL_PROVIDER_CATALOG.find((r) => r.id === id);
       expect(row?.branded).toBe(true);
       expect(row?.auth).toBe("oauth");
-      expect(row?.liveScanInPhase4).toBe(false);
+      expect(row?.liveScanInPhase4).toBe(true);
     }
     expect(imapConnectRow().liveScanInPhase4).toBe(true);
     expect(imapConnectRow().note).toMatch(/Not Proton or Tuta/);
