@@ -1,8 +1,8 @@
 # Product plan — icons, crawl, DB, sync (no training)
 
-**Last updated:** 2026-08-18
+**Last updated:** 2026-08-20
 
-**Status:** Phases **1–5.5 complete**. **MAJOR FIX (Tranches A–F) complete on-device.** **UI Improvements Phase 0–3 complete** (`ba66478`, `e4e383e`, `77a83bb`, `913b08f`). Next is Phase 4 (email account scan), then Phase 5 (subscription dependency graph). Phase 6 remains later ship polish. Training frozen.
+**Status:** Phases **1–5.5 complete**. **MAJOR FIX (Tranches A–F) complete on-device.** **UI Improvements Phase 0–3 complete** (`ba66478`, `e4e383e`, `77a83bb`, `913b08f`). **UI Phase 4 (email account scan) is NOT done.** Classifier/Settings code exists, but the provider catalog and copy contradict official mail-API docs (Proton/Tuta are not IMAP; Yahoo/AOL branded OAuth is wrong; IMAP fetch has no native socket). Next: honesty remedy H1 (catalog + copy), then H2/H3. Phase 5 (subscription dependency graph) starts only after Phase 4 can import rows. Phase 6 remains later ship polish. Training frozen.
 
 This is the living execution plan for app-side quality and reliability **without** retraining TFLite models. AI upscale strategy remains frozen in [`docs/AI_UPSCALING.md`](./AI_UPSCALING.md) (now under `docs/`).
 
@@ -23,17 +23,17 @@ This is the living execution plan for app-side quality and reliability **without
 
 ## Phase board
 
-| Phase   | Name                                                   | Status                    | Gate                                |
-| ------- | ------------------------------------------------------ | ------------------------- | ----------------------------------- |
-| **1**   | Registry → map + picker/persist                        | **Done**                  | `tsc`, x86_64 build, emu launch     |
-| **2**   | Visual without training (`iconQuality` + source order) | **Done**                  | same + scorer smoke                 |
-| **3**   | Crawl reliability                                      | **Done**                  | same                                |
-| **4**   | DB split / schema hygiene                              | **Done**                  | same                                |
-| **5**   | Sync honesty                                           | **Done**                  | same                                |
-| **5.5** | Professional cleanup (artifacts, docs, structure)      | **Done**                  | complete                            |
-| **MF**  | Icon crawler → picker → upscale pipeline recovery      | **Done (A–F on-device)**  | full cross-layer gate every tranche |
-| **UI**  | Post-Major-Fix UI improvements                         | **Phases 0–3 done**       | skill loop after Phase 0            |
-| **6**   | Ship polish                                            | **After UI Improvements** | full smoke + doc pass               |
+| Phase   | Name                                                   | Status                                | Gate                                |
+| ------- | ------------------------------------------------------ | ------------------------------------- | ----------------------------------- |
+| **1**   | Registry → map + picker/persist                        | **Done**                              | `tsc`, x86_64 build, emu launch     |
+| **2**   | Visual without training (`iconQuality` + source order) | **Done**                              | same + scorer smoke                 |
+| **3**   | Crawl reliability                                      | **Done**                              | same                                |
+| **4**   | DB split / schema hygiene                              | **Done**                              | same                                |
+| **5**   | Sync honesty                                           | **Done**                              | same                                |
+| **5.5** | Professional cleanup (artifacts, docs, structure)      | **Done**                              | complete                            |
+| **MF**  | Icon crawler → picker → upscale pipeline recovery      | **Done (A–F on-device)**              | full cross-layer gate every tranche |
+| **UI**  | Post-Major-Fix UI improvements                         | **Phases 0–3 done; Phase 4 NOT done** | skill loop after Phase 0            |
+| **6**   | Ship polish                                            | **After UI Improvements**             | full smoke + doc pass               |
 
 ---
 
@@ -833,7 +833,7 @@ npm run build:android:x86_64   # install + launch on emu when self-contained
 
 ## UI Improvements — post-Major-Fix (2026-08-14)
 
-**Status:** Phases 0–3 complete (`ba66478`, `e4e383e`, `77a83bb`, `913b08f`). Next is Phase 4 (email account scan), then Phase 5 (subscription dependency graph). Phase 6 ship polish stays after UI Phase 5.
+**Status:** Phases 0–3 complete (`ba66478`, `e4e383e`, `77a83bb`, `913b08f`). **Phase 4 (email account scan) is NOT done.** Scan-brain + Settings code landed (`4cc7a87`, `b52e2c6`, `0d6fa10`) but the provider catalog and UI copy contradict official mail-API docs. Do not treat that code as Phase 4 complete. Phase 5 starts only after Phase 4 can import rows. Phase 6 ship polish stays after UI Phase 5.
 
 Four user-requested improvements, one phase at a time. Current-code map: [`docs/CODEBASE.md`](./CODEBASE.md). Visual gates use [`.cline/skills/emulator-ui-driving/SKILL.md`](../.cline/skills/emulator-ui-driving/SKILL.md).
 
@@ -850,14 +850,14 @@ The predecessor claimed Phase 0 done after commit `56bd161`. That commit only ap
 
 ### UI board
 
-| Phase | Name                          | Status                               | Touches                                                                          | Must not touch                       |
-| ----- | ----------------------------- | ------------------------------------ | -------------------------------------------------------------------------------- | ------------------------------------ |
-| **0** | Docs + generic emulator skill | **Done (`ba66478`)**                 | `docs/plan.md`, `docs/CODEBASE.md`, `.cline/skills/emulator-ui-driving/SKILL.md` | App source, models, crawler          |
-| **1** | Native nav overlay            | **Done (`e4e383e`)**                 | Tab list padding; Create + picker (+ shared sheets) inset padding                | Crawler, models, schema              |
-| **2** | Subscriptions `+`             | **Done (`77a83bb`)**                 | `app/(tabs)/subscriptions.tsx` + existing modal wiring                           | New create flow, crawler             |
-| **3** | Insights chart bounds         | **Done (`913b08f`)**                 | `app/(tabs)/insights.tsx` Estimated Monthly Spend row                            | Period-chip `ScrollView`; other tabs |
-| **4** | Email account scan            | **Code landed; emulator unverified** | Settings email-scan list + mail OAuth/IMAP + scan cache                          | SSO catalogs, crawler, training      |
-| **5** | Subscription dependency graph | Not started                          | Subscriptions List/Graph toggle + `dependsOn` links                              | Email scan implementation, crawler   |
+| Phase | Name                          | Status               | Touches                                                                          | Must not touch                       |
+| ----- | ----------------------------- | -------------------- | -------------------------------------------------------------------------------- | ------------------------------------ |
+| **0** | Docs + generic emulator skill | **Done (`ba66478`)** | `docs/plan.md`, `docs/CODEBASE.md`, `.cline/skills/emulator-ui-driving/SKILL.md` | App source, models, crawler          |
+| **1** | Native nav overlay            | **Done (`e4e383e`)** | Tab list padding; Create + picker (+ shared sheets) inset padding                | Crawler, models, schema              |
+| **2** | Subscriptions `+`             | **Done (`77a83bb`)** | `app/(tabs)/subscriptions.tsx` + existing modal wiring                           | New create flow, crawler             |
+| **3** | Insights chart bounds         | **Done (`913b08f`)** | `app/(tabs)/insights.tsx` Estimated Monthly Spend row                            | Period-chip `ScrollView`; other tabs |
+| **4** | Email account scan            | **NOT done**         | Settings email-scan list + mail OAuth/IMAP + scan cache                          | SSO catalogs, crawler, training      |
+| **5** | Subscription dependency graph | Not started          | Subscriptions List/Graph toggle + `dependsOn` links                              | Email scan implementation, crawler   |
 
 ### Shared gates (Phases 1–4)
 
@@ -1015,23 +1015,60 @@ Needed clearance is approximately `tabBar.height + max(insets.bottom, tabBar.hor
 
 A **subscription is an account**, not a charge. A bill is optional evidence.
 
-**Rule:** a branded row exists only if that provider has a documented third-party OAuth/mail API. Everything else is the last **IMAP / IMAPS** row. Do not put a fake Connect logo on iCloud, Proton, or Tuta.
+**Phase 4 is NOT done.** Scan-brain, catalog, Settings UI, and SQLite persist landed (`4cc7a87`, `b52e2c6`, `0d6fa10`) but **must not be treated as complete**. On 2026-08-19 official provider docs were read. They contradict the shipped catalog and copy (Proton/Tuta as IMAP; Yahoo/AOL as branded OAuth). Desktop Proton Bridge / tunnels are **not** a product and must not be used to fake a test.
 
-#### Native list (branded Connect)
+**Rule:** a branded Connect row exists only if that provider has a documented **HTTPS mail API + OAuth** (or equivalent) that a third-party **mobile** app can use. Public IMAP hosts use the last **IMAP / IMAPS** row. Providers with **no** third-party mailbox API on mobile (Proton Mail, Tuta) are **not** IMAP and **not** branded Connect — honest UI copy only. Do not put a fake Connect logo on iCloud, Proton, or Tuta.
 
-| Row                        | Stack                                                                                                |
-| -------------------------- | ---------------------------------------------------------------------------------------------------- |
-| Gmail                      | Google OAuth + Gmail API                                                                             |
-| Google Workspace           | same API, work account / admin consent — **not** the same login as consumer Gmail                    |
-| Outlook                    | Microsoft OAuth + Graph mail                                                                         |
-| Office 365 / Microsoft 365 | same Graph stack; own row                                                                            |
-| Yahoo Mail                 | Yahoo OAuth (XOAUTH2). If new-app OAuth is closed, drop the row to IMAP — do not ship a dead button. |
-| AOL                        | same Yahoo/AOL identity stack                                                                        |
-| Zoho Mail                  | Zoho OAuth + Mail API                                                                                |
-| Fastmail                   | Fastmail OAuth + JMAP                                                                                |
-| IMAP / IMAPS               | last row: iCloud, Proton, Tuta, everyone else                                                        |
+#### Native list (official docs, 2026-08-19)
 
-Tuta IMAP may be paid/limited. If it cannot IMAP, record that. Do not add a Tuta button.
+Branded OAuth (HTTPS mail APIs):
+
+| Row                        | Stack / source                                                                                                                                          |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Gmail                      | Gmail API `users.messages.list` / `get` + `gmail.readonly`. [Gmail API overview](https://developers.google.com/workspace/gmail/api/guides)              |
+| Google Workspace           | **Same Gmail API**, work login / admin consent — **not** the same login as consumer Gmail                                                               |
+| Outlook                    | Microsoft Graph delegated `Mail.Read` → `GET https://graph.microsoft.com/v1.0/me/messages`. Use `Mail.Read`, not `Mail.ReadBasic`                       |
+| Office 365 / Microsoft 365 | Same Graph API, work/school tenant. Own branded row                                                                                                     |
+| Zoho Mail                  | Documented OAuth 2.0 + Mail API. [Zoho OAuth 2.0](https://www.zoho.com/mail/help/api/using-oauth-2.html)                                                |
+| Fastmail                   | OAuth `https://api.fastmail.com/oauth/authorize` + token `https://api.fastmail.com/oauth/refresh` + JMAP. [Fastmail API](https://www.fastmail.com/dev/) |
+
+Last row — IMAP / IMAPS (no logos). **Public IMAP hosts only:**
+
+| Host use              | Documented path                                                                                                                                 |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| iCloud                | IMAP `imap.mail.me.com:993` SSL + app-specific password. **No POP.** No public mail API. [Apple 102525](https://support.apple.com/en-us/102525) |
+| Yahoo Mail            | New-app **mailbox OAuth is closed**. App password + IMAP `imap.mail.yahoo.com`. [Yahoo IMAP](https://help.yahoo.com/kb/SLN4075.html)            |
+| AOL                   | Same Yahoo/AOL identity stack. IMAP `imap.aol.com`. No branded OAuth row                                                                        |
+| Custom / other public | Generic host / user / app password                                                                                                              |
+
+**Not connectable (honest UI sentence, not a button, not IMAP):**
+
+| Provider    | Fact                                                                                                                                                                                                                                                                           |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Proton Mail | **No** public REST/IMAP/JMAP/OAuth mail API for third-party mobile apps. Bridge is **desktop-only** local IMAP/SMTP. Official mobile path is Proton’s own apps. [Bridge](https://proton.me/mail/bridge), [IMAP/SMTP setup](https://proton.me/support/imap-smtp-and-pop3-setup) |
+| Tuta        | **No** IMAP/POP/SMTP for third-party clients, **no paid exception**, no public mail-read API. Own web/desktop/Android/iOS only. [Support](https://tuta.com/support#imap), [security](https://tuta.com/security)                                                                |
+
+**Hard product rules**
+
+- Never ask users to install Proton Mail Bridge or make tunnels (`127.0.0.1`, `10.0.2.2`, `adb reverse`). `127.0.0.1` on the emulator is not the PC.
+- Yahoo and AOL **lose** branded OAuth rows (no dead Connect).
+- This Expo client still has **no IMAP TCP**. IMAP connect may store credentials; **IMAP fetch is unverified** until a native socket exists. That is a real gap, not a pass.
+- Do not IMAP-pretend Proton or Tuta.
+
+**Shipped code vs this matrix (`0d6fa10`) — still wrong until H1**
+
+| Location                                     | What it says / does                          | Fact                                           |
+| -------------------------------------------- | -------------------------------------------- | ---------------------------------------------- |
+| `catalog.ts` IMAP note                       | “iCloud, **Proton, Tuta**, everyone else”    | Proton/Tuta are **not** public IMAP            |
+| `EmailScanSection.tsx`                       | “iCloud / **Proton / Tuta** use IMAP”        | False                                          |
+| `catalog.ts` Yahoo + AOL                     | `branded: true`, `auth: "oauth"`             | Mail OAuth closed; path is IMAP + app password |
+| `catalog.ts` IMAP `liveScanInPhase4`         | `true`                                       | IMAP fetch cannot run on this client           |
+| `providers.ts` `yahooShouldFallBackToImap()` | Falls back only if env client id **missing** | OAuth is closed **even with** a client id      |
+| `scan.test.ts`                               | Asserts Yahoo/AOL stay branded               | Locks the mistake in                           |
+
+Keep (aligned): Gmail/Workspace Gmail API; Outlook/M365 Graph; Fastmail OAuth+JMAP endpoints; Zoho branded OAuth _row_; IMAP `scan()` throws `MailScanUnverifiedError`; no branded Proton/Tuta/iCloud logos; shared classifier.
+
+Partial (later H3, not H1): Zoho has no HTTP fetcher yet; Google/Microsoft client ids fall back to Drive/OneDrive env keys; Fastmail first query is narrower than the subject-union scan.
 
 #### Architecture (toggle ≠ scan)
 
@@ -1088,38 +1125,50 @@ Cached map holds all three kinds. Default view: **Recurring on**; Sparse and Fre
 #### Honest limits (must stay in the UI)
 
 - Not every merchant emails a parseable receipt or even a welcome.
-- iCloud / Proton / Tuta → IMAP, not branded OAuth.
+- iCloud / Yahoo / AOL use **public IMAP** with an app password. Optional host hints: `imap.mail.me.com`, `imap.mail.yahoo.com`, `imap.aol.com`.
+- **Proton Mail and Tuta cannot be connected.** No third-party mailbox API on mobile. Do not IMAP-pretend. Do not ask anyone to install Bridge.
 - Play Billing / StoreKit / Google-Apple-Microsoft “Manage subscriptions” catalogs are **not** available as a client API. Do not scrape those dashboards.
 - Scan does not infer Tuta → Proton → GitHub.
 - Agent never types passwords. Stops at the OAuth/IMAP sheet.
+- IMAP fetch on this Expo client is **unverified** until a native IMAP socket exists.
 
 #### Tasks
 
-- [x] Settings section **Email scan** (not mixed into Cloud Sync).
-- [x] Provider interface + incremental scan cache + cursor (`MailProvider`, in-memory `ScanCacheStore`, `runIncrementalScan`). SQLite persist (`mail_mailboxes` / `mail_messages`, schema v10, local-only).
+Scan-brain / Settings **code landed** but Phase 4 remains **NOT done** until H1–H3 and a real import-capable live scan.
+
+- [x] Settings section **Email scan** (not mixed into Cloud Sync). (`0d6fa10`)
+- [x] Provider interface + incremental scan cache + cursor. SQLite persist (`mail_mailboxes` / `mail_messages`, schema v10, local-only).
 - [x] Shared subject-first classifier; body/PDF only for money classes. (`src/services/emailscan/`)
-- [x] Display-filter function: Recurring / Sparse / Free (default Recurring). Toggle does not refetch. Settings toggles filter the cache only.
-- [x] Branded rows above; IMAP/IMAPS last. No branded iCloud/Proton/Tuta.
+- [x] Display-filter function: Recurring / Sparse / Free (default Recurring). Toggle does not refetch.
 - [x] Fixtures (welcome, reset, renewal, usage invoice, order, PDF, newsletter). Do not invent rows.
 - [x] No crawler or training work. No committed OAuth client secrets. No LLM in Phase 4.
-- [ ] **Emulator visual gate** (user-driven): Gmail connect+empty Scan; Workspace/Outlook full scan; Tuta/Proton via IMAP. Agent stops at the sheet.
+- [ ] **H1 — Honesty (catalog + copy + tests).** Drop Yahoo/AOL branded OAuth. IMAP note without Proton/Tuta. IMAP `liveScanInPhase4: false`. Settings/IMAP-sheet copy factual. Tests must not lock Yahoo/AOL as branded OAuth. **This docs commit is plan-only; H1 code is a later commit.**
+- [ ] **H2 — Native IMAP socket** (not JS-only Expo). Then live-scan for **documented public hosts only** (iCloud / Yahoo / AOL / custom). Still not Proton/Tuta.
+- [ ] **H3 — HTTPS completeness**, one provider at a time: Zoho Mail HTTP fetcher; dedicated mail client ids (not Drive/OneDrive); verify Google/Microsoft token exchange; Fastmail query vs subject-union; Office 365 live-scan flag.
+- [ ] Live Gmail/Workspace/Outlook connect+scan when mail client ids exist. Agent stops at the sheet.
+- [ ] Do **not** run a Tuta/Proton IMAP visual gate.
+
+**Do not start H2/H3 in the H1 commit. Do not mix H1 with emulator OAuth.**
 
 #### Test split (token-cheap)
 
-Consumer Gmail and Google Workspace are **not** the same login. They can share one Gmail API parser. Proton and Tuta use **IMAP / IMAPS**.
+Consumer Gmail and Google Workspace are **not** the same login. They can share one Gmail API parser.
+
+**Stale (contradicted by 2026-08-19 docs — do not execute):** “Tuta IMAP full scan” and “Proton IMAP connect + short scan.” Tuta has no IMAP. Proton Bridge is desktop-local only.
 
 Agent drives to the OAuth sheet or IMAP form, then **stops**. User completes that one login. Agent never types credentials. One provider per Act session.
 
 Cheap, no live mail: classifier fixtures (covers the shared scan brain once).
 
-| Account                    | What we test                                            | Why                                                                                                                                             |
-| -------------------------- | ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| Normal Gmail (no receipts) | **Connect + Scan**; default recurring view empty/honest | Proves Google OAuth + honest miss. Free filter may show account mail. Not Workspace.                                                            |
-| Google Workspace           | **Full scan**                                           | Real Google receipts + work-domain / admin consent. Import one.                                                                                 |
-| Outlook                    | **Full scan**                                           | Different stack (Graph). Import one.                                                                                                            |
-| Tuta (IMAP)                | **Full scan if IMAP works**                             | Inbox that has subscriptions.                                                                                                                   |
-| Proton (IMAP)              | **Connect + short Scan**                                | Same IMAP path as Tuta. Skip a second long import if Tuta already imported.                                                                     |
-| Yahoo, AOL, Zoho, Fastmail | **Connect sheet only** in Phase 4 Act sessions          | **Implement fully** (real `connect`/`scan`/cursor, shared classifier). Live connect+scan stays **unverified**. Do not ship a dead Yahoo button. |
+| Account                    | What we test                                                                       | Why                                         |
+| -------------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------- |
+| Normal Gmail (no receipts) | **Connect + Scan** when mail client id exists; default recurring view empty/honest | Gmail API. Not Workspace.                   |
+| Google Workspace           | **Full scan**                                                                      | Same API, work login. Import one.           |
+| Outlook                    | **Full scan**                                                                      | Graph. Import one.                          |
+| Microsoft 365              | Connect-only or share Outlook Graph if already proven                              | Same API, own row                           |
+| Zoho / Fastmail            | Connect sheet; live-scan when fetcher + client id exist (H3)                       | Real HTTPS APIs                             |
+| IMAP form                  | Opens; iCloud/Yahoo/AOL **hints**; agent stops; user types                         | Public IMAP only. Fetch unverified until H2 |
+| Proton / Tuta              | **No connect attempt.** UI states they cannot be connected                         | Docs                                        |
 
 Do **not** re-run icon-crawler gates or a 7-provider screenshot marathon in one chat.
 
@@ -1127,14 +1176,16 @@ Do **not** re-run icon-crawler gates or a 7-provider screenshot marathon in one 
 
 - Same static + build gate.
 - Classifier + rollup unit tests. If an IdP sheet cannot complete on emulator, say **unverified**.
+- After H1: tests assert branded rows = Gmail / Workspace / Outlook / Office365 / Zoho / Fastmail; IMAP last; **no** Yahoo/AOL branded OAuth; **no** icloud/proton/tuta ids; IMAP live-scan false.
 
-#### Visual gate (skill loop)
+#### Visual gate (skill loop) — after H1 copy, not before
 
 1. Settings → Email scan list visible above the nav overlay.
-2. Each branded row starts that provider’s OAuth (not an IMAP form). Gmail vs Workspace are separate Connect rows.
-3. IMAP row opens host/user/password (or app password). Proton and Tuta use this row.
-4. After Scan: default list is recurring only; Sparse/Free toggles change the view without a new fetch.
-5. Live order: Gmail connect + empty recurring Scan first; then Workspace full scan; Outlook full scan; Tuta IMAP scan if it works; Proton IMAP connect/short scan. Other branded rows: sheet opens only.
+2. Branded rows are Gmail, Workspace, Outlook, Microsoft 365, Zoho, Fastmail only. Each starts that provider’s OAuth (not an IMAP form).
+3. IMAP row opens host/user/password (or app password). Copy names **iCloud, Yahoo, AOL, custom** — **not** Proton/Tuta.
+4. UI states Proton Mail and Tuta cannot be connected.
+5. After Scan (HTTPS providers only, when client ids exist): default list is recurring only; Sparse/Free toggles change the view without a new fetch.
+6. Live order when mail client ids exist: Gmail connect + empty recurring Scan first; then Workspace full scan; Outlook full scan. Do **not** attempt Proton/Tuta.
 
 ---
 
@@ -1201,27 +1252,28 @@ Parked until a documented API exists. Do not implement as Connect-without-scan.
 
 ## Changelog (plan)
 
-| Date       | Note                                                                                                                                                                                                                                                                             |
-| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-08-11 | Phases 1–5 implemented and smoke-tested; `plan.md` created as living board                                                                                                                                                                                                       |
-| 2026-08-11 | **Phase 5.5** inserted: professional cleanup (artifacts, docs, src layout) between Phase 5 and Phase 6                                                                                                                                                                           |
-| 2026-08-11 | **5.5-A done:** artifacts removed, gitignore, APKs→`build-out/apk/`, gate passed                                                                                                                                                                                                 |
-| 2026-08-11 | **5.5-B done:** docs under `docs/`; stubs/autopsy removed                                                                                                                                                                                                                        |
-| 2026-08-11 | **5.5-C done:** components merged into `src/components/`; gate passed                                                                                                                                                                                                            |
-| 2026-08-11 | **5.5-D done:** lib/services/constants → src/; aliases `@/*`→src+root, `@assets/*`; gate passed                                                                                                                                                                                  |
-| 2026-08-11 | **5.5-E done:** scripts/{android,train,models,poc}; train:registry OK; gate passed                                                                                                                                                                                               |
-| 2026-08-11 | **5.5-F done:** README rewrite; `@/` imports; Phase 5.5 complete; Phase 6 unblocked                                                                                                                                                                                              |
-| 2026-08-11 | **Phase 5.5 complete**                                                                                                                                                                                                                                                           |
-| 2026-08-13 | **MAJOR FIX inserted:** crawler → picker → card/cache → upscale recovery is now the blocking pre-Phase-6 work; full-pipeline contracts and cross-layer regression gates defined                                                                                                  |
-| 2026-08-14 | **MAJOR FIX complete (Tranches A–F):** provenance precision gating removed picker pollution; lifecycle/ownership/stale-gen added; verified on-device with real companies                                                                                                         |
-| 2026-08-14 | **UI Improvements inserted:** nav-overlay fix, Subscriptions "+", insights chart bounds, connect Google/Apple; Phase 0 (docs + generic skill) precedes all build/emulator verification                                                                                           |
-| 2026-08-15 | **UI Phase 1 done (`e4e383e`):** `useBottomClearance()` on all four tab lists + colliding sheets; emulator visual gate passed (Create/picker/Sign Out above nav)                                                                                                                 |
-| 2026-08-15 | **UI Phase 2 done (`77a83bb`):** Subscriptions tab `+` reuses CreateSubscriptionModal; created Crunchyroll $7.99 on-device                                                                                                                                                       |
-| 2026-08-15 | **UI Phase 3 done (`913b08f`):** Insights bar row is a horizontal ScrollView; 6-month/Year stay inside the card; labels hide after 3 points                                                                                                                                      |
-| 2026-08-15 | **UI Phase 4 rewritten:** email receipt scan only (native mail OAuth + IMAP last). Hollow Google/Apple SSO Connect dropped. SSO catalogs / Play / StoreKit parked in Backburner.                                                                                                 |
-| 2026-08-15 | **UI Phase 4 test split:** Gmail connect+empty Scan; Workspace/Outlook full scan; Tuta/Proton via IMAP; other branded rows connect-only. Gmail ≠ Workspace.                                                                                                                      |
-| 2026-08-15 | **UI Phase 5 parked:** Subscriptions List/Graph toggle; explicit depends-on links (Tuta→Porkbun/Proton→GitHub…). After email scan. Do not auto-infer from receipts.                                                                                                              |
-| 2026-08-17 | **UI Phase 4 scan strategy:** account≠bill; incremental cache + cursor; subject-first classify; body/PDF only for money; display filters (default recurring) do not refetch.                                                                                                     |
-| 2026-08-18 | **UI Phase 4 scan brain:** subject-first classifier + rollup + display-filter function + fixtures/unit tests in `src/services/emailscan/`. No Settings UI, OAuth, or live mail yet. Yahoo/AOL/Zoho/Fastmail stay fully wired when providers land; live-scan deferred/unverified. |
-| 2026-08-18 | **UI Phase 4 provider/cursor:** catalog (IMAP last; no fake iCloud/Proton/Tuta) + incremental scan engine (cursor, parser-version reparse, display filters do not refetch). Still no Settings UI or live OAuth.                                                                  |
-| 2026-08-18 | **UI Phase 4 Settings + persist:** Email scan section, schema v10 local-only cache, honest OAuth/IMAP connect. IMAP fetch and Yahoo/AOL/Zoho/Fastmail live-scan remain unverified. No emulator gate yet. No mail client IDs in `.env`.                                           |
+| Date       | Note                                                                                                                                                                                                                                                                                                                                      |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-08-11 | Phases 1–5 implemented and smoke-tested; `plan.md` created as living board                                                                                                                                                                                                                                                                |
+| 2026-08-11 | **Phase 5.5** inserted: professional cleanup (artifacts, docs, src layout) between Phase 5 and Phase 6                                                                                                                                                                                                                                    |
+| 2026-08-11 | **5.5-A done:** artifacts removed, gitignore, APKs→`build-out/apk/`, gate passed                                                                                                                                                                                                                                                          |
+| 2026-08-11 | **5.5-B done:** docs under `docs/`; stubs/autopsy removed                                                                                                                                                                                                                                                                                 |
+| 2026-08-11 | **5.5-C done:** components merged into `src/components/`; gate passed                                                                                                                                                                                                                                                                     |
+| 2026-08-11 | **5.5-D done:** lib/services/constants → src/; aliases `@/*`→src+root, `@assets/*`; gate passed                                                                                                                                                                                                                                           |
+| 2026-08-11 | **5.5-E done:** scripts/{android,train,models,poc}; train:registry OK; gate passed                                                                                                                                                                                                                                                        |
+| 2026-08-11 | **5.5-F done:** README rewrite; `@/` imports; Phase 5.5 complete; Phase 6 unblocked                                                                                                                                                                                                                                                       |
+| 2026-08-11 | **Phase 5.5 complete**                                                                                                                                                                                                                                                                                                                    |
+| 2026-08-13 | **MAJOR FIX inserted:** crawler → picker → card/cache → upscale recovery is now the blocking pre-Phase-6 work; full-pipeline contracts and cross-layer regression gates defined                                                                                                                                                           |
+| 2026-08-14 | **MAJOR FIX complete (Tranches A–F):** provenance precision gating removed picker pollution; lifecycle/ownership/stale-gen added; verified on-device with real companies                                                                                                                                                                  |
+| 2026-08-14 | **UI Improvements inserted:** nav-overlay fix, Subscriptions "+", insights chart bounds, connect Google/Apple; Phase 0 (docs + generic skill) precedes all build/emulator verification                                                                                                                                                    |
+| 2026-08-15 | **UI Phase 1 done (`e4e383e`):** `useBottomClearance()` on all four tab lists + colliding sheets; emulator visual gate passed (Create/picker/Sign Out above nav)                                                                                                                                                                          |
+| 2026-08-15 | **UI Phase 2 done (`77a83bb`):** Subscriptions tab `+` reuses CreateSubscriptionModal; created Crunchyroll $7.99 on-device                                                                                                                                                                                                                |
+| 2026-08-15 | **UI Phase 3 done (`913b08f`):** Insights bar row is a horizontal ScrollView; 6-month/Year stay inside the card; labels hide after 3 points                                                                                                                                                                                               |
+| 2026-08-15 | **UI Phase 4 rewritten:** email receipt scan only (native mail OAuth + IMAP last). Hollow Google/Apple SSO Connect dropped. SSO catalogs / Play / StoreKit parked in Backburner.                                                                                                                                                          |
+| 2026-08-15 | **UI Phase 4 test split:** Gmail connect+empty Scan; Workspace/Outlook full scan; Tuta/Proton via IMAP; other branded rows connect-only. Gmail ≠ Workspace.                                                                                                                                                                               |
+| 2026-08-15 | **UI Phase 5 parked:** Subscriptions List/Graph toggle; explicit depends-on links (Tuta→Porkbun/Proton→GitHub…). After email scan. Do not auto-infer from receipts.                                                                                                                                                                       |
+| 2026-08-17 | **UI Phase 4 scan strategy:** account≠bill; incremental cache + cursor; subject-first classify; body/PDF only for money; display filters (default recurring) do not refetch.                                                                                                                                                              |
+| 2026-08-18 | **UI Phase 4 scan brain:** subject-first classifier + rollup + display-filter function + fixtures/unit tests in `src/services/emailscan/`. No Settings UI, OAuth, or live mail yet. Yahoo/AOL/Zoho/Fastmail stay fully wired when providers land; live-scan deferred/unverified.                                                          |
+| 2026-08-18 | **UI Phase 4 provider/cursor:** catalog (IMAP last; no fake iCloud/Proton/Tuta) + incremental scan engine (cursor, parser-version reparse, display filters do not refetch). Still no Settings UI or live OAuth.                                                                                                                           |
+| 2026-08-18 | **UI Phase 4 Settings + persist:** Email scan section, schema v10 local-only cache, honest OAuth/IMAP connect. IMAP fetch and Yahoo/AOL/Zoho/Fastmail live-scan remain unverified. No emulator gate yet. No mail client IDs in `.env`.                                                                                                    |
+| 2026-08-20 | **UI Phase 4 is NOT done.** Official mail-API docs (2026-08-19) contradict shipped catalog/copy: Proton/Tuta are not IMAP; Yahoo/AOL branded OAuth is closed (IMAP + app password); IMAP fetch has no native socket. No Bridge/tunnels. Remedy: H1 catalog+copy (later commit), H2 native IMAP, H3 HTTPS fetchers. This row is plan-only. |
