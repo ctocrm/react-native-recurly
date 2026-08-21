@@ -11,9 +11,13 @@ import {
   connectOAuthAndRecord,
   connectPasswordMailAndRecord,
   disconnectMailbox,
+  loadImapCredentials,
+  loadPasswordMailCredentials,
+  mailboxIdFor,
   oauthClientId,
 } from "@/services/emailscan/providers";
 import { useUser } from "@clerk/expo";
+import { Ionicons } from "@expo/vector-icons";
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -78,12 +82,15 @@ export default function EmailScanSection({
   const [imapUser, setImapUser] = useState("");
   const [imapPass, setImapPass] = useState("");
   const [imapPort, setImapPort] = useState("993");
+  const [showImapPass, setShowImapPass] = useState(false);
   const [passwordKind, setPasswordKind] = useState<"proton" | "tuta" | null>(
     null,
   );
   const [passwordUser, setPasswordUser] = useState("");
   const [passwordPass, setPasswordPass] = useState("");
   const [passwordTotp, setPasswordTotp] = useState("");
+  const [showPasswordPass, setShowPasswordPass] = useState(false);
+  const [editingMailboxId, setEditingMailboxId] = useState<string | null>(null);
 
   const refreshBoxes = useCallback(async () => {
     try {
@@ -101,13 +108,32 @@ export default function EmailScanSection({
     if (openAddOnMount) setPickerOpen(true);
   }, [openAddOnMount]);
 
+  const resetImapForm = () => {
+    setImapHost("");
+    setImapUser("");
+    setImapPass("");
+    setImapPort("993");
+    setShowImapPass(false);
+    setEditingMailboxId(null);
+  };
+
+  const resetPasswordForm = () => {
+    setPasswordUser("");
+    setPasswordPass("");
+    setPasswordTotp("");
+    setShowPasswordPass(false);
+    setEditingMailboxId(null);
+  };
+
   const addMailbox = async (id: MailProviderId) => {
     setPickerOpen(false);
     if (id === "imap") {
+      resetImapForm();
       setImapOpen(true);
       return;
     }
     if (id === "proton" || id === "tuta") {
+      resetPasswordForm();
       setPasswordKind(id);
       return;
     }
@@ -131,6 +157,49 @@ export default function EmailScanSection({
     } finally {
       setBusy(false);
     }
+  };
+
+  const editMailbox = async (box: {
+    mailboxId: string;
+    providerId: MailProviderId;
+  }) => {
+    if (box.providerId === "imap") {
+      const creds = await loadImapCredentials(box.mailboxId);
+      setImapHost(creds?.host ?? "");
+      setImapPort(String(creds?.port ?? 993));
+      setImapUser(creds?.username ?? "");
+      setImapPass(creds?.password ?? "");
+      setShowImapPass(false);
+      setEditingMailboxId(box.mailboxId);
+      setImapOpen(true);
+      return;
+    }
+    if (box.providerId === "proton" || box.providerId === "tuta") {
+      const creds = await loadPasswordMailCredentials(
+        box.providerId,
+        box.mailboxId,
+      );
+      setPasswordUser(creds?.username ?? "");
+      setPasswordPass(creds?.password ?? "");
+      setPasswordTotp(creds?.totp ?? "");
+      setShowPasswordPass(false);
+      setEditingMailboxId(box.mailboxId);
+      setPasswordKind(box.providerId);
+      return;
+    }
+    Alert.alert(
+      "Edit mailbox",
+      "This account uses OAuth. Sign in again to update it?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Reconnect",
+          onPress: () => {
+            addMailbox(box.providerId).catch(() => undefined);
+          },
+        },
+      ],
+    );
   };
 
   const removeMailbox = (box: {
@@ -213,11 +282,15 @@ export default function EmailScanSection({
         existing: subscriptions,
         addSubscription,
       });
+      if (errors.length) {
+        const text = errors.join("\n");
+        setStatus(text);
+        Alert.alert("Scan errors", text);
+        return;
+      }
       setStatus(
         imported === 0
-          ? errors.length
-            ? errors.join("\n")
-            : "Scan finished. No new subscriptions."
+          ? "Scan finished. No new subscriptions."
           : `Added ${imported} subscription(s).`,
       );
     } finally {
@@ -231,6 +304,10 @@ export default function EmailScanSection({
       return;
     }
     try {
+      const nextId = mailboxIdFor("imap", imapUser.trim());
+      if (editingMailboxId && editingMailboxId !== nextId) {
+        await disconnectMailbox(editingMailboxId, "imap");
+      }
       await connectImapAndRecord({
         host: imapHost.trim(),
         port: Number.parseInt(imapPort, 10) || 993,
@@ -239,7 +316,7 @@ export default function EmailScanSection({
         password: imapPass,
       });
       setImapOpen(false);
-      setImapPass("");
+      resetImapForm();
       await refreshBoxes();
     } catch (error) {
       Alert.alert(
@@ -259,14 +336,17 @@ export default function EmailScanSection({
       return;
     }
     try {
+      const nextId = mailboxIdFor(passwordKind, passwordUser.trim());
+      if (editingMailboxId && editingMailboxId !== nextId) {
+        await disconnectMailbox(editingMailboxId, passwordKind);
+      }
       await connectPasswordMailAndRecord(passwordKind, {
         username: passwordUser.trim(),
         password: passwordPass,
         totp: passwordTotp.trim() || undefined,
       });
       setPasswordKind(null);
-      setPasswordPass("");
-      setPasswordTotp("");
+      resetPasswordForm();
       await refreshBoxes();
     } catch (error) {
       Alert.alert(
@@ -302,6 +382,9 @@ export default function EmailScanSection({
               >
                 {mailboxLabel(box.mailboxId, box.providerId)}
               </Text>
+              <Pressable className="pr-3" onPress={() => editMailbox(box)}>
+                <Text className="text-xs font-sans-bold text-accent">Edit</Text>
+              </Pressable>
               <Pressable onPress={() => removeMailbox(box)}>
                 <Text className="text-xs font-sans-bold text-destructive">
                   Remove
@@ -342,7 +425,10 @@ export default function EmailScanSection({
         </Pressable>
       </View>
       {status && (
-        <Text className="mt-2 text-xs font-sans-medium text-muted-foreground">
+        <Text
+          className="mt-2 text-xs font-sans-medium text-muted-foreground"
+          selectable
+        >
           {status}
         </Text>
       )}
@@ -407,7 +493,7 @@ export default function EmailScanSection({
               showsVerticalScrollIndicator={false}
             >
               <Text className="text-xl font-sans-bold text-primary mb-2">
-                IMAP / IMAPS
+                {editingMailboxId ? "Edit IMAP / IMAPS" : "IMAP / IMAPS"}
               </Text>
               <TextInput
                 className="rounded-xl border border-border bg-card p-3 mb-2 text-primary"
@@ -430,13 +516,28 @@ export default function EmailScanSection({
                 value={imapUser}
                 onChangeText={setImapUser}
               />
-              <TextInput
-                className="rounded-xl border border-border bg-card p-3 mb-4 text-primary"
-                placeholder="Password / app password"
-                secureTextEntry
-                value={imapPass}
-                onChangeText={setImapPass}
-              />
+              <View className="mb-4 flex-row items-center rounded-xl border border-border bg-card">
+                <TextInput
+                  className="flex-1 p-3 text-primary"
+                  placeholder="Password / app password"
+                  secureTextEntry={!showImapPass}
+                  value={imapPass}
+                  onChangeText={setImapPass}
+                />
+                <Pressable
+                  className="px-3 py-3"
+                  onPress={() => setShowImapPass((v) => !v)}
+                  accessibilityLabel={
+                    showImapPass ? "Hide password" : "Show password"
+                  }
+                >
+                  <Ionicons
+                    name={showImapPass ? "eye-off-outline" : "eye-outline"}
+                    size={20}
+                    color="#6B7280"
+                  />
+                </Pressable>
+              </View>
               <Pressable
                 className="mb-3 items-center rounded-2xl bg-accent py-4"
                 onPress={submitImap}
@@ -477,6 +578,7 @@ export default function EmailScanSection({
               showsVerticalScrollIndicator={false}
             >
               <Text className="text-xl font-sans-bold text-primary mb-2">
+                {editingMailboxId ? "Edit " : ""}
                 {passwordKind === "proton" ? "Proton Mail" : "Tuta"}
               </Text>
               <TextInput
@@ -487,13 +589,28 @@ export default function EmailScanSection({
                 value={passwordUser}
                 onChangeText={setPasswordUser}
               />
-              <TextInput
-                className="rounded-xl border border-border bg-card p-3 mb-2 text-primary"
-                placeholder="Password"
-                secureTextEntry
-                value={passwordPass}
-                onChangeText={setPasswordPass}
-              />
+              <View className="mb-2 flex-row items-center rounded-xl border border-border bg-card">
+                <TextInput
+                  className="flex-1 p-3 text-primary"
+                  placeholder="Password"
+                  secureTextEntry={!showPasswordPass}
+                  value={passwordPass}
+                  onChangeText={setPasswordPass}
+                />
+                <Pressable
+                  className="px-3 py-3"
+                  onPress={() => setShowPasswordPass((v) => !v)}
+                  accessibilityLabel={
+                    showPasswordPass ? "Hide password" : "Show password"
+                  }
+                >
+                  <Ionicons
+                    name={showPasswordPass ? "eye-off-outline" : "eye-outline"}
+                    size={20}
+                    color="#6B7280"
+                  />
+                </Pressable>
+              </View>
               {passwordKind === "proton" && (
                 <TextInput
                   className="rounded-xl border border-border bg-card p-3 mb-4 text-primary"

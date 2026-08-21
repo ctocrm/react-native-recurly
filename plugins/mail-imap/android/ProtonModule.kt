@@ -86,8 +86,10 @@ private class ProtonClient {
     val modulus = info.optString("Modulus")
     val serverEphemeral = info.optString("ServerEphemeral")
     val srpSession = info.optString("SRPSession")
-    if (modulus.isEmpty() || serverEphemeral.isEmpty()) {
-      throw IllegalStateException("Proton auth/info missing SRP fields")
+    if (saltB64.isEmpty() || modulus.isEmpty() || serverEphemeral.isEmpty()) {
+      throw IllegalStateException(
+        "Proton login failed. Check the email address (use . not ,) and password.",
+      )
     }
     val srp = ProtonSrp.prove(
       password,
@@ -193,6 +195,11 @@ private class ProtonClient {
     val stream = if (conn.responseCode in 200..299) conn.inputStream else conn.errorStream
     val text = BufferedReader(InputStreamReader(stream, StandardCharsets.UTF_8)).use { it.readText() }
     if (conn.responseCode !in 200..299) {
+      if (conn.responseCode == 401 || conn.responseCode == 422) {
+        throw IllegalStateException(
+          "Proton rejected the password or 2FA code (HTTP ${conn.responseCode}).",
+        )
+      }
       throw IllegalStateException("Proton HTTP ${conn.responseCode}: $text")
     }
     return JSONObject(text)
@@ -255,7 +262,18 @@ private object ProtonSrp {
     return out
   }
 
-  private fun b64(s: String): ByteArray = android.util.Base64.decode(s, android.util.Base64.DEFAULT)
+  private fun b64(s: String): ByteArray {
+    val trimmed = s.trim()
+    val flags =
+      android.util.Base64.URL_SAFE or
+        android.util.Base64.NO_WRAP or
+        android.util.Base64.NO_PADDING
+    return try {
+      android.util.Base64.decode(trimmed, flags)
+    } catch (_: IllegalArgumentException) {
+      android.util.Base64.decode(trimmed, android.util.Base64.DEFAULT)
+    }
+  }
   private fun b64enc(b: ByteArray): String =
     android.util.Base64.encodeToString(b, android.util.Base64.NO_WRAP)
 }

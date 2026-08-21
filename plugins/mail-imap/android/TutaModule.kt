@@ -74,7 +74,10 @@ private class TutaClient {
   private val base = "https://app.tuta.com"
 
   fun login(mailAddress: String, password: String): TutaSession {
-    val saltBody = JSONObject().put("mailAddress", mailAddress).toString()
+    val saltBody = JSONObject()
+      .put("_format", "0")
+      .put("mailAddress", mailAddress)
+      .toString()
     val saltRes = request(
       "GET",
       "$base/rest/sys/saltservice?_body=${java.net.URLEncoder.encode(saltBody, "UTF-8")}",
@@ -86,7 +89,7 @@ private class TutaClient {
     if (saltB64.isEmpty()) {
       throw IllegalStateException("Tuta SaltService returned no salt")
     }
-    val verifier = authVerifier(password, android.util.Base64.decode(saltB64, android.util.Base64.DEFAULT), kdfVersion)
+    val verifier = authVerifier(password, b64(saltB64), kdfVersion)
     val sessionBody = JSONObject()
       .put("authVerifier", verifier)
       .put("mailAddress", mailAddress)
@@ -152,10 +155,13 @@ private class TutaClient {
     conn.requestMethod = method
     conn.connectTimeout = 20_000
     conn.readTimeout = 25_000
-    conn.setRequestProperty("Content-Type", "application/json")
     conn.setRequestProperty("Accept", "application/json")
-    conn.setRequestProperty("v", "1")
-    conn.setRequestProperty("cv", "jsmastery")
+    // Live web client version as of 2026-08-21. v=1 returns 474 (unsupported).
+    conn.setRequestProperty("v", "126")
+    conn.setRequestProperty("cv", "357.260818.1")
+    if (body != null && method != "GET") {
+      conn.setRequestProperty("Content-Type", "application/json")
+    }
     if (session != null) {
       conn.setRequestProperty("accessToken", session.accessToken)
     }
@@ -166,8 +172,32 @@ private class TutaClient {
     val stream = if (conn.responseCode in 200..299) conn.inputStream else conn.errorStream
     val text = BufferedReader(InputStreamReader(stream, StandardCharsets.UTF_8)).use { it.readText() }
     if (conn.responseCode !in 200..299) {
-      throw IllegalStateException("Tuta HTTP ${conn.responseCode}: $text")
+      val extra = if (text.isBlank()) "(empty body, error-id ${conn.getHeaderField("error-id")})" else text
+      if (conn.responseCode == 474) {
+        throw IllegalStateException(
+          "Tuta rejected this client version (HTTP 474). Not a password error. $extra",
+        )
+      }
+      if (conn.responseCode == 401 || conn.responseCode == 403) {
+        throw IllegalStateException(
+          "Tuta rejected the password (HTTP ${conn.responseCode}). $extra",
+        )
+      }
+      throw IllegalStateException("Tuta HTTP ${conn.responseCode}: $extra")
     }
     return if (text.isBlank()) JSONObject() else JSONObject(text)
+  }
+
+  private fun b64(s: String): ByteArray {
+    val trimmed = s.trim()
+    val flags =
+      android.util.Base64.URL_SAFE or
+        android.util.Base64.NO_WRAP or
+        android.util.Base64.NO_PADDING
+    return try {
+      android.util.Base64.decode(trimmed, flags)
+    } catch (_: IllegalArgumentException) {
+      android.util.Base64.decode(trimmed, android.util.Base64.DEFAULT)
+    }
   }
 }
