@@ -1,5 +1,6 @@
 import CreateSubscriptionModal from "@/components/CreateSubscriptionModal";
 import EditSubscriptionModal from "@/components/EditSubscriptionModal";
+import EmailScanSection from "@/components/EmailScanSection";
 import ListHeading from "@/components/ListHeading";
 import SubscriptionCard from "@/components/SubscriptionCard";
 import SubscriptionIconPickerModal from "@/components/SubscriptionIconPickerModal";
@@ -180,6 +181,7 @@ const Subscriptions = () => {
                 <Image source={icons.add} className="home-add-icon" />
               </Pressable>
             </View>
+            <EmailScanSection />
             <View className="mb-5">
               <TextInput
                 className="rounded-2xl border border-border bg-card px-4 py-4 text-base font-sans-medium text-primary"

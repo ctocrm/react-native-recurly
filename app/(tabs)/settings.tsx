@@ -1,6 +1,5 @@
 import ConfirmModal from "@/components/ConfirmModal";
 import ConflictResolutionModal from "@/components/ConflictResolutionModal";
-import EmailScanSection from "@/components/EmailScanSection";
 import images from "@/constants/images";
 import { useCloudSync } from "@/context/CloudSyncContext";
 import { useDatabase } from "@/context/DatabaseProvider";
@@ -669,8 +668,6 @@ const Settings = () => {
             </>
           )}
         </View>
-
-        <EmailScanSection />
 
         {/* Backup Section */}
         <View className="auth-card mb-5">

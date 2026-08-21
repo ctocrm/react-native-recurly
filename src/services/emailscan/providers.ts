@@ -45,8 +45,8 @@ interface TokenBlob {
   accountHint?: string;
 }
 
-function tokenKey(providerId: MailProviderId, userId: string): string {
-  return `mail_tokens_${providerId}_${userId}`;
+function tokenKey(mailboxId: string): string {
+  return `mail_tokens_${mailboxId}`;
 }
 
 function imapKey(mailboxId: string): string {
@@ -60,23 +60,13 @@ export function mailboxIdFor(
   return hint ? `${providerId}:${hint}` : providerId;
 }
 
-async function loadTokens(
-  providerId: MailProviderId,
-  userId: string,
-): Promise<TokenBlob | null> {
-  const raw = await SecureStore.getItemAsync(tokenKey(providerId, userId));
+async function loadTokens(mailboxId: string): Promise<TokenBlob | null> {
+  const raw = await SecureStore.getItemAsync(tokenKey(mailboxId));
   return raw ? (JSON.parse(raw) as TokenBlob) : null;
 }
 
-async function saveTokens(
-  providerId: MailProviderId,
-  userId: string,
-  tokens: TokenBlob,
-): Promise<void> {
-  await SecureStore.setItemAsync(
-    tokenKey(providerId, userId),
-    JSON.stringify(tokens),
-  );
+async function saveTokens(mailboxId: string, tokens: TokenBlob): Promise<void> {
+  await SecureStore.setItemAsync(tokenKey(mailboxId), JSON.stringify(tokens));
 }
 
 function passwordKey(providerId: "proton" | "tuta", mailboxId: string): string {
@@ -233,15 +223,47 @@ export async function promptOAuth(
   if (!accessToken) {
     throw new MailConnectError("OAuth returned no access token");
   }
-  const tokens: TokenBlob = {
+  return {
     accessToken,
     refreshToken: params.refresh_token || params.refreshToken,
     expiresAt: params.expires_in
       ? Date.now() + Number.parseInt(params.expires_in, 10) * 1000
       : undefined,
   };
-  await saveTokens(providerId, userId, tokens);
-  return tokens;
+}
+
+async function accountHintFromToken(
+  providerId: MailProviderId,
+  accessToken: string,
+): Promise<string> {
+  try {
+    if (providerId === "gmail" || providerId === "workspace") {
+      const res = await fetch(
+        "https://gmail.googleapis.com/gmail/v1/users/me/profile",
+        { headers: { Authorization: `Bearer ${accessToken}` } },
+      );
+      if (res.ok) {
+        const json = (await res.json()) as { emailAddress?: string };
+        if (json.emailAddress) return json.emailAddress;
+      }
+    }
+    if (providerId === "outlook" || providerId === "office365") {
+      const res = await fetch("https://graph.microsoft.com/v1.0/me", {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (res.ok) {
+        const json = (await res.json()) as {
+          mail?: string;
+          userPrincipalName?: string;
+        };
+        if (json.mail) return json.mail;
+        if (json.userPrincipalName) return json.userPrincipalName;
+      }
+    }
+  } catch {
+    // fall through
+  }
+  return `${providerId}-${Date.now()}`;
 }
 
 const SUBJECT_QUERY =
@@ -639,7 +661,7 @@ async function fetcherFor(
       },
     };
   }
-  const tokens = await loadTokens(providerId, userId);
+  const tokens = await loadTokens(mailboxId);
   if (!tokens?.accessToken) {
     throw new MailConnectError("Not connected");
   }
@@ -679,34 +701,21 @@ export function createMailProvider(
           `${providerId} uses the password sheet, not OAuth`,
         );
       }
-      await promptOAuth(providerId, userId);
+      await connectOAuthAndRecord(providerId, userId);
     },
     async disconnect() {
-      if (providerId === "proton" || providerId === "tuta") {
-        await SecureStore.deleteItemAsync(
-          passwordKey(providerId, mailboxIdFor(providerId)),
-        );
-        return;
-      }
-      await SecureStore.deleteItemAsync(tokenKey(providerId, userId));
+      throw new MailConnectError("Use disconnectMailbox(mailboxId)");
     },
     async isConnected() {
-      if (providerId === "imap") {
-        const creds = await loadImapCredentials(mailboxIdFor("imap"));
-        return !!creds;
-      }
-      if (providerId === "proton" || providerId === "tuta") {
-        const creds = await loadPasswordMailCredentials(
-          providerId,
-          mailboxIdFor(providerId),
-        );
-        return !!creds;
-      }
-      const tokens = await loadTokens(providerId, userId);
-      return !!tokens?.accessToken;
+      const { listMailboxesAsync } = await import("./persist");
+      const boxes = await listMailboxesAsync();
+      return boxes.some((b) => b.providerId === providerId);
     },
     async scan(opts) {
-      const box = opts?.mailboxId || mailboxIdFor(providerId);
+      const box = opts?.mailboxId;
+      if (!box) {
+        throw new MailConnectError("scan needs a mailboxId");
+      }
       const fetcher = await fetcherFor(providerId, userId, box);
       return runPersistedScan({
         mailboxId: box,
@@ -715,6 +724,44 @@ export function createMailProvider(
       });
     },
   };
+}
+
+export async function connectOAuthAndRecord(
+  providerId: MailProviderId,
+  userId: string,
+): Promise<string> {
+  const tokens = await promptOAuth(providerId, userId);
+  const hint = await accountHintFromToken(providerId, tokens.accessToken);
+  const mailboxId = mailboxIdFor(providerId, hint);
+  await saveTokens(mailboxId, { ...tokens, accountHint: hint });
+  const { saveMailboxAsync } = await import("./persist");
+  await saveMailboxAsync({
+    mailboxId,
+    providerId,
+    cursor: {
+      mailboxId,
+      lastMessageDate: null,
+      lastMessageId: null,
+      parserVersion: 1,
+    },
+    messages: {},
+  });
+  return mailboxId;
+}
+
+export async function disconnectMailbox(
+  mailboxId: string,
+  providerId: MailProviderId,
+): Promise<void> {
+  if (providerId === "proton" || providerId === "tuta") {
+    await SecureStore.deleteItemAsync(passwordKey(providerId, mailboxId));
+  } else if (providerId === "imap") {
+    await SecureStore.deleteItemAsync(imapKey(mailboxId));
+  } else {
+    await SecureStore.deleteItemAsync(tokenKey(mailboxId));
+  }
+  const { clearMailboxAsync } = await import("./persist");
+  await clearMailboxAsync(mailboxId);
 }
 
 export async function connectImapAndRecord(
@@ -742,7 +789,7 @@ export async function connectPasswordMailAndRecord(
   providerId: "proton" | "tuta",
   creds: PasswordMailCredentials,
 ): Promise<string> {
-  const mailboxId = mailboxIdFor(providerId);
+  const mailboxId = mailboxIdFor(providerId, creds.username);
   await savePasswordMailCredentials(providerId, mailboxId, creds);
   const { saveMailboxAsync } = await import("./persist");
   await saveMailboxAsync({

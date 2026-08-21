@@ -1,25 +1,19 @@
 import { useSubscriptions } from "@/context/SubscriptionContext";
 import { useBottomClearance } from "@/hooks/useBottomClearance";
 import {
-  DEFAULT_DISPLAY_FILTERS,
   MAIL_PROVIDER_CATALOG,
-  buildCandidateMap,
   candidateToSubscription,
-  filterCandidates,
-  type DisplayFilters,
   type MailProviderId,
-  type ScanCandidate,
 } from "@/services/emailscan";
-import {
-  getMailboxAsync,
-  listMailboxesAsync,
-} from "@/services/emailscan/persist";
+import { listMailboxesAsync } from "@/services/emailscan/persist";
 import {
   MailConnectError,
   MailScanUnverifiedError,
   connectImapAndRecord,
+  connectOAuthAndRecord,
   connectPasswordMailAndRecord,
   createMailProvider,
+  disconnectMailbox,
   oauthClientId,
 } from "@/services/emailscan/providers";
 import { useUser } from "@clerk/expo";
@@ -34,21 +28,27 @@ import {
   View,
 } from "react-native";
 
+function mailboxLabel(mailboxId: string, providerId: MailProviderId): string {
+  const row = MAIL_PROVIDER_CATALOG.find((r) => r.id === providerId);
+  const hint = mailboxId.includes(":")
+    ? mailboxId.slice(mailboxId.indexOf(":") + 1)
+    : mailboxId;
+  return row ? `${row.label} · ${hint}` : hint;
+}
+
 export default function EmailScanSection() {
   const { sheetPadding } = useBottomClearance();
   const { user } = useUser();
-  const { addSubscription } = useSubscriptions();
+  const { subscriptions, addSubscription, deleteSubscription } =
+    useSubscriptions();
   const userId = user?.id || "anonymous";
 
-  const [busyId, setBusyId] = useState<MailProviderId | null>(null);
-  const [connected, setConnected] = useState<
-    Partial<Record<MailProviderId, boolean>>
-  >({});
-  const [filters, setFilters] = useState<DisplayFilters>(
-    DEFAULT_DISPLAY_FILTERS,
-  );
-  const [candidates, setCandidates] = useState<ScanCandidate[]>([]);
-  const [activeMailbox, setActiveMailbox] = useState<string | null>(null);
+  const [boxes, setBoxes] = useState<
+    { mailboxId: string; providerId: MailProviderId }[]
+  >([]);
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [imapOpen, setImapOpen] = useState(false);
   const [imapHost, setImapHost] = useState("");
   const [imapUser, setImapUser] = useState("");
@@ -60,40 +60,21 @@ export default function EmailScanSection() {
   const [passwordUser, setPasswordUser] = useState("");
   const [passwordPass, setPasswordPass] = useState("");
   const [passwordTotp, setPasswordTotp] = useState("");
-  const [status, setStatus] = useState<string | null>(null);
 
-  const refreshConnected = useCallback(async () => {
-    const next: Partial<Record<MailProviderId, boolean>> = {};
-    for (const row of MAIL_PROVIDER_CATALOG) {
-      const provider = createMailProvider(row.id, userId);
-      next[row.id] = await provider.isConnected();
-    }
-    setConnected(next);
+  const refreshBoxes = useCallback(async () => {
     try {
-      const boxes = await listMailboxesAsync();
-      if (boxes[0]) {
-        const state = await getMailboxAsync(boxes[0].mailboxId);
-        if (state) {
-          setActiveMailbox(state.mailboxId);
-          setCandidates(
-            buildCandidateMap(
-              Object.values(state.messages).map((m) => m.classified),
-            ),
-          );
-        }
-      }
+      setBoxes(await listMailboxesAsync());
     } catch {
-      // DB not ready yet
+      setBoxes([]);
     }
-  }, [userId]);
+  }, []);
 
   useEffect(() => {
-    refreshConnected().catch(() => undefined);
-  }, [refreshConnected]);
+    refreshBoxes().catch(() => undefined);
+  }, [refreshBoxes]);
 
-  const shown = filterCandidates(candidates, filters);
-
-  const handleConnect = async (id: MailProviderId) => {
+  const addMailbox = async (id: MailProviderId) => {
+    setPickerOpen(false);
     if (id === "imap") {
       setImapOpen(true);
       return;
@@ -105,77 +86,139 @@ export default function EmailScanSection() {
     if (!oauthClientId(id)) {
       Alert.alert(
         "Not configured",
-        `${id} OAuth needs a public client id in the environment. Not connected.`,
+        `${id} OAuth needs a public client id. Not connected.`,
       );
       return;
     }
-    setBusyId(id);
+    setBusy(true);
     setStatus(null);
     try {
-      const provider = createMailProvider(id, userId);
-      await provider.connect();
-      setConnected((prev) => ({ ...prev, [id]: true }));
-      setStatus(`${id} connected. Scan when you are ready.`);
+      await connectOAuthAndRecord(id, userId);
+      await refreshBoxes();
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Connect failed";
-      Alert.alert("Connect", message);
+      Alert.alert(
+        "Connect",
+        error instanceof Error ? error.message : "Connect failed",
+      );
     } finally {
-      setBusyId(null);
+      setBusy(false);
     }
   };
 
-  const handleScan = async (id: MailProviderId) => {
-    setBusyId(id);
+  const removeMailbox = (box: {
+    mailboxId: string;
+    providerId: MailProviderId;
+  }) => {
+    const associated = subscriptions.filter(
+      (s) => s.paymentMethod === box.mailboxId,
+    );
+    Alert.alert(
+      "Remove mailbox",
+      associated.length > 0
+        ? `Also remove ${associated.length} subscription(s) from this mailbox?`
+        : "Disconnect this mailbox?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Keep subscriptions",
+          onPress: () => {
+            disconnectMailbox(box.mailboxId, box.providerId)
+              .then(refreshBoxes)
+              .catch((error) =>
+                Alert.alert(
+                  "Remove",
+                  error instanceof Error ? error.message : "Failed",
+                ),
+              );
+          },
+        },
+        ...(associated.length > 0
+          ? [
+              {
+                text: "Remove subscriptions too",
+                style: "destructive" as const,
+                onPress: () => {
+                  Promise.all(associated.map((s) => deleteSubscription(s.id)))
+                    .then(() =>
+                      disconnectMailbox(box.mailboxId, box.providerId),
+                    )
+                    .then(refreshBoxes)
+                    .catch((error) =>
+                      Alert.alert(
+                        "Remove",
+                        error instanceof Error ? error.message : "Failed",
+                      ),
+                    );
+                },
+              },
+            ]
+          : [
+              {
+                text: "Remove",
+                style: "destructive" as const,
+                onPress: () => {
+                  disconnectMailbox(box.mailboxId, box.providerId)
+                    .then(refreshBoxes)
+                    .catch((error) =>
+                      Alert.alert(
+                        "Remove",
+                        error instanceof Error ? error.message : "Failed",
+                      ),
+                    );
+                },
+              },
+            ]),
+      ],
+    );
+  };
+
+  const scanAll = async () => {
+    if (boxes.length === 0) {
+      Alert.alert("Scan", "Add a mailbox first.");
+      return;
+    }
+    setBusy(true);
     setStatus(null);
+    let imported = 0;
+    const errors: string[] = [];
     try {
-      const provider = createMailProvider(id, userId);
-      const result = await provider.scan();
-      setActiveMailbox(result.mailboxId);
-      setCandidates(result.candidates);
-      setStatus(
-        result.candidates.length === 0
-          ? "Scan finished. Recurring view is empty (honest miss)."
-          : `Scan finished. ${result.candidates.length} candidate(s) cached.`,
-      );
-    } catch (error) {
-      if (error instanceof MailScanUnverifiedError) {
-        setStatus(`Unverified: ${error.message}`);
-        Alert.alert("Scan unverified", error.message);
-      } else if (error instanceof MailConnectError) {
-        Alert.alert("Not connected", error.message);
-      } else {
-        Alert.alert(
-          "Scan failed",
-          error instanceof Error ? error.message : "Unknown error",
-        );
+      for (const box of boxes) {
+        try {
+          const provider = createMailProvider(box.providerId, userId);
+          const result = await provider.scan({ mailboxId: box.mailboxId });
+          for (const candidate of result.candidates) {
+            const already = subscriptions.some(
+              (s) =>
+                s.name === candidate.merchant &&
+                s.paymentMethod === candidate.mailboxId,
+            );
+            if (already) continue;
+            await addSubscription(candidateToSubscription(candidate));
+            imported += 1;
+          }
+        } catch (error) {
+          if (error instanceof MailScanUnverifiedError) {
+            errors.push(`${box.mailboxId}: ${error.message}`);
+          } else if (error instanceof MailConnectError) {
+            errors.push(`${box.mailboxId}: ${error.message}`);
+          } else {
+            errors.push(
+              `${box.mailboxId}: ${
+                error instanceof Error ? error.message : "scan failed"
+              }`,
+            );
+          }
+        }
       }
+      setStatus(
+        imported === 0
+          ? errors.length
+            ? errors.join("\n")
+            : "Scan finished. No new subscriptions."
+          : `Added ${imported} subscription(s).`,
+      );
     } finally {
-      setBusyId(null);
-    }
-  };
-
-  const handleDisconnect = async (id: MailProviderId) => {
-    const provider = createMailProvider(id, userId);
-    await provider.disconnect();
-    setConnected((prev) => ({ ...prev, [id]: false }));
-    if (activeMailbox?.startsWith(id)) {
-      setCandidates([]);
-      setActiveMailbox(null);
-    }
-  };
-
-  const handleImport = async (candidate: ScanCandidate) => {
-    try {
-      await addSubscription(candidateToSubscription(candidate));
-      Alert.alert(
-        "Imported",
-        `${candidate.merchant} added. Scan did not auto-create it.`,
-      );
-    } catch (error) {
-      Alert.alert(
-        "Import failed",
-        error instanceof Error ? error.message : "Unknown error",
-      );
+      setBusy(false);
     }
   };
 
@@ -185,20 +228,16 @@ export default function EmailScanSection() {
       return;
     }
     try {
-      const mailboxId = await connectImapAndRecord({
+      await connectImapAndRecord({
         host: imapHost.trim(),
         port: Number.parseInt(imapPort, 10) || 993,
         secure: true,
         username: imapUser.trim(),
         password: imapPass,
       });
-      setConnected((prev) => ({ ...prev, imap: true }));
-      setActiveMailbox(mailboxId);
       setImapOpen(false);
       setImapPass("");
-      setStatus(
-        "IMAP credentials stored. Scan uses the native Android SSL socket (public hosts only).",
-      );
+      await refreshBoxes();
     } catch (error) {
       Alert.alert(
         "IMAP",
@@ -217,21 +256,15 @@ export default function EmailScanSection() {
       return;
     }
     try {
-      const mailboxId = await connectPasswordMailAndRecord(passwordKind, {
+      await connectPasswordMailAndRecord(passwordKind, {
         username: passwordUser.trim(),
         password: passwordPass,
         totp: passwordTotp.trim() || undefined,
       });
-      setConnected((prev) => ({ ...prev, [passwordKind]: true }));
-      setActiveMailbox(mailboxId);
       setPasswordKind(null);
       setPasswordPass("");
       setPasswordTotp("");
-      setStatus(
-        passwordKind === "proton"
-          ? "Proton credentials stored. Scan uses client REST + SRP (not IMAP, not Bridge)."
-          : "Tuta credentials stored. Scan uses client REST (FAQ-invited, not IMAP).",
-      );
+      await refreshBoxes();
     } catch (error) {
       Alert.alert(
         passwordKind === "proton" ? "Proton Mail" : "Tuta",
@@ -240,170 +273,113 @@ export default function EmailScanSection() {
     }
   };
 
-  const authLabel = (rowAuth: string, isOn: boolean) => {
-    if (rowAuth === "imap") return "Host / user / app password";
-    if (rowAuth === "password") return isOn ? "Connected" : "Password (+ 2FA)";
-    return isOn ? "Connected" : "OAuth";
-  };
-
-  const connectLabel = (rowAuth: string) => {
-    if (rowAuth === "imap") return "IMAP form";
-    if (rowAuth === "password") return "Password";
-    return "Connect";
-  };
-
   return (
-    <View className="auth-card mb-5">
-      <Text className="text-base font-sans-semibold text-primary mb-3">
-        Email scan
+    <View className="mb-5 rounded-2xl border border-border bg-card p-4">
+      <Text className="text-base font-sans-semibold text-primary mb-2">
+        Scan subscriptions
       </Text>
-      <Text className="text-xs font-sans-medium text-muted-foreground mb-3">
-        Connect a mailbox, then scan. A subscription is an account (including
-        $0). Scan never auto-creates rows. I stop at the OAuth / IMAP / Proton /
-        Tuta sheet.
-      </Text>
-      <Text className="text-xs font-sans-medium text-muted-foreground mb-3">
-        Not every merchant emails a receipt. IMAP is iCloud, Yahoo, AOL, or a
-        custom host — not Proton or Tuta. Proton and Tuta use password login
-        against their client REST APIs. Play / StoreKit catalogs are not this
-        phase.
-      </Text>
-
-      <View className="gap-2 mb-4">
-        {MAIL_PROVIDER_CATALOG.map((row) => {
-          const isOn = !!connected[row.id];
-          const busy = busyId === row.id;
-          return (
-            <View
-              key={row.id}
-              className="rounded-xl border border-border bg-card p-3"
-            >
-              <View className="flex-row items-center justify-between mb-2">
-                <View className="flex-1 pr-2">
-                  <Text className="text-sm font-sans-medium text-primary">
-                    {row.label}
-                  </Text>
-                  <Text className="text-xs font-sans-medium text-muted-foreground">
-                    {authLabel(row.auth, isOn)}
-                    {!row.liveScanInPhase4 && row.branded
-                      ? " · live-scan unverified"
-                      : ""}
-                  </Text>
-                </View>
-                {busy && <ActivityIndicator size="small" />}
-              </View>
-              <View className="flex-row gap-2">
-                <Pressable
-                  className="flex-1 rounded-xl bg-accent py-2 items-center"
-                  onPress={() => handleConnect(row.id)}
-                  disabled={busy}
-                >
-                  <Text className="text-xs font-sans-bold text-white">
-                    {connectLabel(row.auth)}
-                  </Text>
-                </Pressable>
-                <Pressable
-                  className={`flex-1 rounded-xl py-2 items-center ${
-                    isOn ? "bg-primary" : "bg-muted"
-                  }`}
-                  onPress={() => handleScan(row.id)}
-                  disabled={busy || !isOn}
-                >
-                  <Text
-                    className={`text-xs font-sans-bold ${
-                      isOn ? "text-white" : "text-muted-foreground"
-                    }`}
-                  >
-                    Scan
-                  </Text>
-                </Pressable>
-                {isOn && (
-                  <Pressable
-                    className="rounded-xl bg-destructive px-3 py-2 items-center"
-                    onPress={() => handleDisconnect(row.id)}
-                    disabled={busy}
-                  >
-                    <Text className="text-xs font-sans-bold text-white">
-                      Off
-                    </Text>
-                  </Pressable>
-                )}
-              </View>
-            </View>
-          );
-        })}
-      </View>
-
-      <Text className="text-sm font-sans-semibold text-primary mb-2">
-        Display filters
-      </Text>
-      <Text className="text-xs font-sans-medium text-muted-foreground mb-2">
-        Toggle does not refetch. Default is Recurring only.
-      </Text>
-      <View className="flex-row gap-2 mb-4">
-        {(
-          [
-            ["recurring", "Recurring"],
-            ["sparse", "Sparse"],
-            ["free", "Free"],
-          ] as const
-        ).map(([key, label]) => (
-          <Pressable
-            key={key}
-            className={`flex-1 rounded-xl py-2 items-center border ${
-              filters[key]
-                ? "border-primary bg-primary/10"
-                : "border-border bg-card"
-            }`}
-            onPress={() =>
-              setFilters((prev) => ({ ...prev, [key]: !prev[key] }))
-            }
-          >
-            <Text className="text-xs font-sans-bold text-primary">{label}</Text>
-          </Pressable>
-        ))}
-      </View>
-
-      {status && (
+      {boxes.length === 0 ? (
         <Text className="text-xs font-sans-medium text-muted-foreground mb-3">
-          {status}
-        </Text>
-      )}
-
-      {shown.length === 0 ? (
-        <Text className="text-sm font-sans-medium text-muted-foreground">
-          No candidates in this view.
+          No mailboxes yet.
         </Text>
       ) : (
-        <View className="gap-2">
-          {shown.map((c) => (
+        <View className="gap-2 mb-3">
+          {boxes.map((box) => (
             <View
-              key={`${c.mailboxId}-${c.merchantKey}-${c.kind}`}
-              className="rounded-xl border border-border bg-card p-3"
+              key={box.mailboxId}
+              className="flex-row items-center justify-between"
             >
-              <Text className="text-sm font-sans-bold text-primary">
-                {c.merchant}
-              </Text>
-              <Text className="text-xs font-sans-medium text-muted-foreground mb-2">
-                {c.kind}
-                {c.amountUnknown
-                  ? " · amount unknown"
-                  : c.amount !== undefined
-                    ? ` · ${c.currency ?? ""} ${c.amount}`
-                    : ""}
-              </Text>
-              <Pressable
-                className="rounded-xl bg-accent py-2 items-center"
-                onPress={() => handleImport(c)}
+              <Text
+                className="flex-1 pr-2 text-sm font-sans-medium text-primary"
+                numberOfLines={1}
               >
-                <Text className="text-xs font-sans-bold text-white">
-                  Import
+                {mailboxLabel(box.mailboxId, box.providerId)}
+              </Text>
+              <Pressable onPress={() => removeMailbox(box)}>
+                <Text className="text-xs font-sans-bold text-destructive">
+                  Remove
                 </Text>
               </Pressable>
             </View>
           ))}
         </View>
       )}
+      <View className="flex-row gap-2">
+        <Pressable
+          className="flex-1 rounded-xl bg-muted py-3 items-center"
+          onPress={() => setPickerOpen(true)}
+          disabled={busy}
+        >
+          <Text className="text-xs font-sans-bold text-primary">
+            Add mailbox
+          </Text>
+        </Pressable>
+        <Pressable
+          className={`flex-1 rounded-xl py-3 items-center ${
+            boxes.length ? "bg-accent" : "bg-muted"
+          }`}
+          onPress={scanAll}
+          disabled={busy || boxes.length === 0}
+        >
+          {busy ? (
+            <ActivityIndicator size="small" color="white" />
+          ) : (
+            <Text
+              className={`text-xs font-sans-bold ${
+                boxes.length ? "text-white" : "text-muted-foreground"
+              }`}
+            >
+              Scan for subscriptions
+            </Text>
+          )}
+        </Pressable>
+      </View>
+      {status && (
+        <Text className="mt-2 text-xs font-sans-medium text-muted-foreground">
+          {status}
+        </Text>
+      )}
+
+      <Modal
+        visible={pickerOpen}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setPickerOpen(false)}
+      >
+        <Pressable
+          className="flex-1 bg-black/50"
+          onPress={() => setPickerOpen(false)}
+        >
+          <Pressable
+            className="mt-auto rounded-t-3xl bg-background p-5"
+            style={{ paddingBottom: sheetPadding }}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <Text className="text-xl font-sans-bold text-primary mb-4">
+              Add mailbox
+            </Text>
+            {MAIL_PROVIDER_CATALOG.map((row) => (
+              <Pressable
+                key={row.id}
+                className="mb-2 rounded-xl border border-border bg-card p-3"
+                onPress={() => addMailbox(row.id)}
+              >
+                <Text className="text-sm font-sans-medium text-primary">
+                  {row.label}
+                </Text>
+              </Pressable>
+            ))}
+            <Pressable
+              className="mt-2 items-center rounded-2xl bg-muted py-4"
+              onPress={() => setPickerOpen(false)}
+            >
+              <Text className="text-base font-sans-bold text-primary">
+                Cancel
+              </Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       <Modal
         visible={imapOpen}
@@ -423,14 +399,9 @@ export default function EmailScanSection() {
             <Text className="text-xl font-sans-bold text-primary mb-2">
               IMAP / IMAPS
             </Text>
-            <Text className="text-xs font-sans-medium text-muted-foreground mb-4">
-              Public IMAP only: iCloud (imap.mail.me.com), Yahoo
-              (imap.mail.yahoo.com), AOL (imap.aol.com), or a custom host. Not
-              Proton or Tuta. Agent never types this.
-            </Text>
             <TextInput
               className="rounded-xl border border-border bg-card p-3 mb-2 text-primary"
-              placeholder="Host (imap.example.com)"
+              placeholder="Host"
               autoCapitalize="none"
               value={imapHost}
               onChangeText={setImapHost}
@@ -493,11 +464,6 @@ export default function EmailScanSection() {
           >
             <Text className="text-xl font-sans-bold text-primary mb-2">
               {passwordKind === "proton" ? "Proton Mail" : "Tuta"}
-            </Text>
-            <Text className="text-xs font-sans-medium text-muted-foreground mb-4">
-              {passwordKind === "proton"
-                ? "Password (+ optional 2FA). Client REST + SRP. Not IMAP, not Bridge, not OAuth. Agent never types this."
-                : "Password login. Client REST (FAQ-invited, no public docs). Not IMAP. Agent never types this."}
             </Text>
             <TextInput
               className="rounded-xl border border-border bg-card p-3 mb-2 text-primary"
