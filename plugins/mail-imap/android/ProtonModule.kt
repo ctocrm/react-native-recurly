@@ -153,7 +153,9 @@ private class ProtonClient {
   private fun stripModulus(modulus: String): String {
     val start = modulus.indexOf("-----BEGIN PGP SIGNED MESSAGE-----")
     val body = if (start >= 0) modulus.substring(start) else modulus
-    val lines = body.lines().filter {
+    val end = body.indexOf("-----BEGIN PGP SIGNATURE-----")
+    val signed = if (end >= 0) body.substring(0, end) else body
+    val lines = signed.lines().filter {
       it.isNotBlank() &&
         !it.startsWith("-----") &&
         !it.startsWith("Hash:") &&
@@ -264,14 +266,18 @@ private object ProtonSrp {
 
   private fun b64(s: String): ByteArray {
     val trimmed = s.trim()
-    val flags =
+    val urlSafe =
       android.util.Base64.URL_SAFE or
         android.util.Base64.NO_WRAP or
         android.util.Base64.NO_PADDING
     return try {
-      android.util.Base64.decode(trimmed, flags)
-    } catch (_: IllegalArgumentException) {
       android.util.Base64.decode(trimmed, android.util.Base64.DEFAULT)
+    } catch (_: IllegalArgumentException) {
+      try {
+        android.util.Base64.decode(trimmed, urlSafe)
+      } catch (_: IllegalArgumentException) {
+        throw IllegalStateException("Proton login data was not valid base64")
+      }
     }
   }
   private fun b64enc(b: ByteArray): String =
