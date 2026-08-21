@@ -276,19 +276,50 @@ private object ProtonSrp {
     if (version < 3) {
       throw IllegalStateException("Proton auth version $version is not supported")
     }
+    // go-srp: encodedSalt = Go base64("./A-Za-z0-9") of (salt || "proton"), then
+    // bcrypt.HashBytes(password, "$2y$10$"+encodedSalt). Favre's hash() string uses
+    // OpenBSD bcrypt encoding; Proton uses Go's standard base64 bit packing.
     val saltWithProton = salt + "proton".toByteArray(StandardCharsets.US_ASCII)
     if (saltWithProton.size != 16) {
       throw IllegalStateException(
         "Proton bcrypt salt is ${saltWithProton.size} bytes after adding proton (need 16)",
       )
     }
-    val crypted = BCrypt.with(BCrypt.Version.VERSION_2Y).hash(
+    val raw = BCrypt.with(BCrypt.Version.VERSION_2Y).hashRaw(
       10,
       saltWithProton,
       password.toByteArray(StandardCharsets.UTF_8),
     )
+    val hash23 = if (raw.rawHash.size > 23) raw.rawHash.copyOfRange(0, 23) else raw.rawHash
+    val crypted = (
+      "\$2y\$10\$" + goBcryptB64(saltWithProton) + goBcryptB64(hash23)
+      ).toByteArray(StandardCharsets.US_ASCII)
     return expandHash(crypted + modulus)
   }
+
+  /**
+   * Go encoding/base64 with alphabet ./A-Za-z0-9 and NoPadding.
+   * Not OpenBSD bcrypt encoding (different 6-bit packing).
+   */
+  private fun goBcryptB64(data: ByteArray): String {
+    val alphabet = "./ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+    val sb = StringBuilder()
+    var i = 0
+    while (i < data.size) {
+      val remaining = data.size - i
+      val b0 = data[i].toInt() and 0xff
+      val b1 = if (remaining > 1) data[i + 1].toInt() and 0xff else 0
+      val b2 = if (remaining > 2) data[i + 2].toInt() and 0xff else 0
+      val triple = (b0 shl 16) or (b1 shl 8) or b2
+      sb.append(alphabet[(triple ushr 18) and 0x3f])
+      sb.append(alphabet[(triple ushr 12) and 0x3f])
+      if (remaining > 1) sb.append(alphabet[(triple ushr 6) and 0x3f])
+      if (remaining > 2) sb.append(alphabet[triple and 0x3f])
+      i += 3
+    }
+    return sb.toString()
+  }
+
 
   private fun expandHash(data: ByteArray): ByteArray {
     val md = MessageDigest.getInstance("SHA-512")

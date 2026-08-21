@@ -9,7 +9,9 @@ import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 import org.bouncycastle.crypto.generators.Argon2BytesGenerator
 import org.bouncycastle.crypto.params.Argon2Parameters
+import org.json.JSONArray
 import org.json.JSONObject
+
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.io.OutputStreamWriter
@@ -106,12 +108,19 @@ private class TutaClient {
     val salt = b64(saltB64)
     val passphraseKey = derivePassphraseKey(password, salt, kdfVersion)
     val verifier = createAuthVerifierAsBase64Url(passphraseKey)
+    // Live SessionService accepts this ID-mapped shape (401 on bad verifier,
+    // 400 if 1218/null optionals are omitted).
     val sessionBody = JSONObject()
       .put("1212", "0")
       .put("1213", address)
       .put("1214", verifier)
-      .put("1215", "jsmastery Android")
+      .put("1215", "Linux Firefox")
+      .put("1216", JSONObject.NULL)
+      .put("1217", JSONObject.NULL)
+      .put("1417", JSONObject.NULL)
+      .put("1218", JSONArray())
       .toString()
+
     val session = request("POST", "$base/rest/sys/sessionservice", sessionBody, null)
     val token = session.optString("1221", session.optString("accessToken"))
     val user = session.optString("1223", session.optString("user"))
@@ -182,6 +191,8 @@ private class TutaClient {
     conn.setRequestProperty("Accept", "application/json")
     conn.setRequestProperty("v", modelVersion)
     conn.setRequestProperty("cv", clientVersion)
+    conn.setRequestProperty("cp", "web")
+
     if (body != null && method != "GET") {
       conn.setRequestProperty("Content-Type", "application/json")
     }
