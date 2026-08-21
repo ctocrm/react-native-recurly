@@ -45,12 +45,17 @@ interface TokenBlob {
   accountHint?: string;
 }
 
+/** SecureStore keys may only use A-Z a-z 0-9 . - _ */
+function secureStoreKey(raw: string): string {
+  return raw.replace(/[^A-Za-z0-9._-]/g, "_");
+}
+
 function tokenKey(mailboxId: string): string {
-  return `mail_tokens_${mailboxId}`;
+  return `mail_tokens_${secureStoreKey(mailboxId)}`;
 }
 
 function imapKey(mailboxId: string): string {
-  return `mail_imap_${mailboxId}`;
+  return `mail_imap_${secureStoreKey(mailboxId)}`;
 }
 
 export function mailboxIdFor(
@@ -70,7 +75,7 @@ async function saveTokens(mailboxId: string, tokens: TokenBlob): Promise<void> {
 }
 
 function passwordKey(providerId: "proton" | "tuta", mailboxId: string): string {
-  return `mail_password_${providerId}_${mailboxId}`;
+  return `mail_password_${providerId}_${secureStoreKey(mailboxId)}`;
 }
 
 export interface PasswordMailCredentials {
