@@ -5,11 +5,14 @@
 const {
   withDangerousMod,
   withMainApplication,
+  withAppBuildGradle,
 } = require("@expo/config-plugins");
 const fs = require("fs");
 const path = require("path");
 
 const SRC_DIR = path.join(__dirname, "android");
+const BCRYPT_DEP = 'implementation("at.favre.lib:bcrypt:0.10.2")';
+const BCPROV_DEP = 'implementation("org.bouncycastle:bcprov-jdk18on:1.78.1")';
 
 function withMailImap(config) {
   config = withDangerousMod(config, [
@@ -49,6 +52,19 @@ function withMailImap(config) {
       );
     }
     cfg.modResults.contents = contents;
+    return cfg;
+  });
+
+  config = withAppBuildGradle(config, (cfg) => {
+    if (
+      cfg.modResults.language === "groovy" &&
+      !cfg.modResults.contents.includes("at.favre.lib:bcrypt")
+    ) {
+      cfg.modResults.contents = cfg.modResults.contents.replace(
+        /dependencies \{/,
+        `dependencies {\n    // Proton SRP bcrypt + Tuta Argon2id\n    ${BCRYPT_DEP}\n    ${BCPROV_DEP}`,
+      );
+    }
     return cfg;
   });
 

@@ -1,5 +1,7 @@
 package com.ctocrm.jsmastery.imap
 
+import android.util.Log
+import at.favre.lib.crypto.bcrypt.BCrypt
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
@@ -20,7 +22,7 @@ import javax.net.ssl.HttpsURLConnection
 
 /**
  * Proton Mail client REST (same API Proton Android uses).
- * Not IMAP. Not Bridge. Auth is SRP; bodies need OpenPGP on device.
+ * Not IMAP. Not Bridge. Auth is Proton SRP (go-srp compatible).
  */
 class ProtonModule(reactContext: ReactApplicationContext) :
   ReactContextBaseJavaModule(reactContext) {
@@ -57,9 +59,14 @@ class ProtonModule(reactContext: ReactApplicationContext) :
         out.putArray("messages", arr)
         promise.resolve(out)
       } catch (e: Exception) {
+        Log.e(TAG, "Proton fetch failed", e)
         promise.reject("PROTON_ERROR", e.message ?: "Proton failed", e)
       }
     }
+  }
+
+  companion object {
+    const val TAG = "MailProton"
   }
 }
 
@@ -88,7 +95,7 @@ private class ProtonClient {
     val srpSession = info.optString("SRPSession")
     if (saltB64.isEmpty() || modulus.isEmpty() || serverEphemeral.isEmpty()) {
       throw IllegalStateException(
-        "Proton login failed. Check the email address (use . not ,) and password.",
+        "Proton did not return login parameters for this address. Check the email (use . not ,).",
       )
     }
     val srp = ProtonSrp.prove(
@@ -197,6 +204,7 @@ private class ProtonClient {
     val stream = if (conn.responseCode in 200..299) conn.inputStream else conn.errorStream
     val text = BufferedReader(InputStreamReader(stream, StandardCharsets.UTF_8)).use { it.readText() }
     if (conn.responseCode !in 200..299) {
+      Log.w("MailProton", "HTTP ${conn.responseCode}: $text")
       if (conn.responseCode == 401 || conn.responseCode == 422) {
         throw IllegalStateException(
           "Proton rejected the password or 2FA code (HTTP ${conn.responseCode}).",
@@ -211,10 +219,13 @@ private class ProtonClient {
 private data class SrpProof(val clientEphemeral: String, val clientProof: String)
 
 /**
- * Proton-style SRP (version 4). See ProtonMail/go-srp. Not a generic RFC 5054 client.
+ * Proton SRP matching ProtonMail/go-srp (not RFC 5054).
+ * Version 4: bcrypt $2y$10$ of password with salt||"proton", then 256-byte expandHash,
+ * little-endian modular exponentiation.
  */
 private object ProtonSrp {
   private val g = BigInteger.valueOf(2)
+  private val random = SecureRandom()
 
   fun prove(
     password: String,
@@ -223,45 +234,97 @@ private object ProtonSrp {
     serverEphemeralB64: String,
     version: Int,
   ): SrpProof {
-    val n = BigInteger(1, b64(modulusB64))
-    val B = BigInteger(1, b64(serverEphemeralB64))
+    val modulusBytes = b64(modulusB64)
+    val serverEphemeralBytes = b64(serverEphemeralB64)
     val salt = b64(saltB64)
-    val a = BigInteger(1, SecureRandom().generateSeed(32)).mod(n)
-    val A = g.modPow(a, n)
-    val hashedPassword = hashedSecret(version, password, salt)
-    val x = BigInteger(1, expandHash(hashedPassword))
-    val u = BigInteger(1, expandHash(pad(A, n) + pad(B, n)))
-    val k = BigInteger(1, expandHash(pad(n) + pad(g, n)))
-    val base = B.subtract(k.multiply(g.modPow(x, n))).mod(n)
-    val S = base.modPow(a.add(u.multiply(x)), n)
-    val clientProof = b64enc(expandHash(pad(A, n) + pad(B, n) + pad(S, n)))
-    return SrpProof(b64enc(pad(A, n)), clientProof)
+    val bitLength = modulusBytes.size * 8
+    if (bitLength != 2048) {
+      throw IllegalStateException("Proton SRP modulus size $bitLength is not 2048")
+    }
+    val hashedPassword = hashPassword(version, password, salt, modulusBytes)
+    val n = toInt(modulusBytes)
+    val b = toInt(serverEphemeralBytes)
+    val x = toInt(hashedPassword)
+    val k = toInt(expandHash(fromInt(bitLength, g) + fromInt(bitLength, n))).mod(n)
+    val nMinusOne = n.subtract(BigInteger.ONE)
+    var a: BigInteger
+    var clientEphemeral: ByteArray
+    var u: BigInteger
+    val lower = BigInteger.valueOf((bitLength * 2).toLong())
+    do {
+      do {
+        a = BigInteger(bitLength, random).mod(nMinusOne)
+      } while (a < lower || a >= nMinusOne)
+      clientEphemeral = fromInt(bitLength, g.modPow(a, n))
+
+      u = toInt(expandHash(clientEphemeral + serverEphemeralBytes))
+    } while (u == BigInteger.ZERO)
+
+    val base = b.subtract(k.multiply(g.modPow(x, n))).mod(n)
+    val exponent = a.add(u.multiply(x)).mod(nMinusOne)
+    val shared = fromInt(bitLength, base.modPow(exponent, n))
+    val clientProof = expandHash(clientEphemeral + serverEphemeralBytes + shared)
+    return SrpProof(b64enc(clientEphemeral), b64enc(clientProof))
   }
 
-  private fun hashedSecret(version: Int, password: String, salt: ByteArray): ByteArray {
-    val pw = password.toByteArray(StandardCharsets.UTF_8)
-    val inner = sha512(pw + salt)
-    return if (version >= 4) sha512(inner) else inner
+  private fun hashPassword(
+    version: Int,
+    password: String,
+    salt: ByteArray,
+    modulus: ByteArray,
+  ): ByteArray {
+    if (version < 3) {
+      throw IllegalStateException("Proton auth version $version is not supported")
+    }
+    val saltWithProton = salt + "proton".toByteArray(StandardCharsets.US_ASCII)
+    if (saltWithProton.size != 16) {
+      throw IllegalStateException(
+        "Proton bcrypt salt is ${saltWithProton.size} bytes after adding proton (need 16)",
+      )
+    }
+    val crypted = BCrypt.with(BCrypt.Version.VERSION_2Y).hash(
+      10,
+      saltWithProton,
+      password.toByteArray(StandardCharsets.UTF_8),
+    )
+    return expandHash(crypted + modulus)
   }
 
   private fun expandHash(data: ByteArray): ByteArray {
-    val h = sha512(data)
-    return h + sha512(h)
+    val md = MessageDigest.getInstance("SHA-512")
+    val out = ByteArray(256)
+    for (i in 0..3) {
+      md.reset()
+      md.update(data)
+      md.update(i.toByte())
+      val part = md.digest()
+      System.arraycopy(part, 0, out, i * 64, 64)
+    }
+    return out
   }
 
-  private fun sha512(data: ByteArray): ByteArray =
-    MessageDigest.getInstance("SHA-512").digest(data)
+  /** go-srp toInt: reverse bytes then interpret as big-endian integer. */
+  private fun toInt(arr: ByteArray): BigInteger {
+    val reversed = ByteArray(arr.size)
+    for (i in arr.indices) {
+      reversed[arr.size - 1 - i] = arr[i]
+    }
+    return BigInteger(1, reversed)
+  }
 
-  private fun pad(v: BigInteger, n: BigInteger = v): ByteArray {
-    val bytes = v.toByteArray()
-    val unsigned = if (bytes.isNotEmpty() && bytes[0] == 0.toByte()) {
-      bytes.copyOfRange(1, bytes.size)
-    } else bytes
-    val size = (n.bitLength() + 7) / 8
-    if (unsigned.size >= size) return unsigned.copyOfRange(unsigned.size - size, unsigned.size)
-    val out = ByteArray(size)
-    System.arraycopy(unsigned, 0, out, size - unsigned.size, unsigned.size)
-    return out
+  /** go-srp fromInt: big-endian bytes of num, reversed into bitLength/8 buffer. */
+  private fun fromInt(bitLength: Int, num: BigInteger): ByteArray {
+    val size = bitLength / 8
+    val arr = num.toByteArray()
+    val unsigned = if (arr.isNotEmpty() && arr[0] == 0.toByte()) {
+      arr.copyOfRange(1, arr.size)
+    } else arr
+    val reversed = ByteArray(size)
+    val n = minOf(unsigned.size, size)
+    for (i in 0 until n) {
+      reversed[i] = unsigned[unsigned.size - 1 - i]
+    }
+    return reversed
   }
 
   private fun b64(s: String): ByteArray {
@@ -280,6 +343,7 @@ private object ProtonSrp {
       }
     }
   }
+
   private fun b64enc(b: ByteArray): String =
     android.util.Base64.encodeToString(b, android.util.Base64.NO_WRAP)
 }
