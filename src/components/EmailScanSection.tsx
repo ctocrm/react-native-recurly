@@ -2,17 +2,14 @@ import { useSubscriptions } from "@/context/SubscriptionContext";
 import { useBottomClearance } from "@/hooks/useBottomClearance";
 import {
   MAIL_PROVIDER_CATALOG,
-  candidateToSubscription,
+  importFromConnectedMailboxes,
   type MailProviderId,
 } from "@/services/emailscan";
 import { listMailboxesAsync } from "@/services/emailscan/persist";
 import {
-  MailConnectError,
-  MailScanUnverifiedError,
   connectImapAndRecord,
   connectOAuthAndRecord,
   connectPasswordMailAndRecord,
-  createMailProvider,
   disconnectMailbox,
   oauthClientId,
 } from "@/services/emailscan/providers";
@@ -21,8 +18,11 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
+  ScrollView,
   Text,
   TextInput,
   View,
@@ -36,7 +36,11 @@ function mailboxLabel(mailboxId: string, providerId: MailProviderId): string {
   return row ? `${row.label} · ${hint}` : hint;
 }
 
-export default function EmailScanSection() {
+export default function EmailScanSection({
+  openAddOnMount = false,
+}: {
+  openAddOnMount?: boolean;
+}) {
   const { sheetPadding } = useBottomClearance();
   const { user } = useUser();
   const { subscriptions, addSubscription, deleteSubscription } =
@@ -48,7 +52,7 @@ export default function EmailScanSection() {
   >([]);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
-  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(openAddOnMount);
   const [imapOpen, setImapOpen] = useState(false);
   const [imapHost, setImapHost] = useState("");
   const [imapUser, setImapUser] = useState("");
@@ -72,6 +76,10 @@ export default function EmailScanSection() {
   useEffect(() => {
     refreshBoxes().catch(() => undefined);
   }, [refreshBoxes]);
+
+  useEffect(() => {
+    if (openAddOnMount) setPickerOpen(true);
+  }, [openAddOnMount]);
 
   const addMailbox = async (id: MailProviderId) => {
     setPickerOpen(false);
@@ -179,37 +187,12 @@ export default function EmailScanSection() {
     }
     setBusy(true);
     setStatus(null);
-    let imported = 0;
-    const errors: string[] = [];
     try {
-      for (const box of boxes) {
-        try {
-          const provider = createMailProvider(box.providerId, userId);
-          const result = await provider.scan({ mailboxId: box.mailboxId });
-          for (const candidate of result.candidates) {
-            const already = subscriptions.some(
-              (s) =>
-                s.name === candidate.merchant &&
-                s.paymentMethod === candidate.mailboxId,
-            );
-            if (already) continue;
-            await addSubscription(candidateToSubscription(candidate));
-            imported += 1;
-          }
-        } catch (error) {
-          if (error instanceof MailScanUnverifiedError) {
-            errors.push(`${box.mailboxId}: ${error.message}`);
-          } else if (error instanceof MailConnectError) {
-            errors.push(`${box.mailboxId}: ${error.message}`);
-          } else {
-            errors.push(
-              `${box.mailboxId}: ${
-                error instanceof Error ? error.message : "scan failed"
-              }`,
-            );
-          }
-        }
-      }
+      const { imported, errors } = await importFromConnectedMailboxes({
+        userId,
+        existing: subscriptions,
+        addSubscription,
+      });
       setStatus(
         imported === 0
           ? errors.length
@@ -387,64 +370,75 @@ export default function EmailScanSection() {
         transparent
         onRequestClose={() => setImapOpen(false)}
       >
-        <Pressable
-          className="flex-1 bg-black/50"
-          onPress={() => setImapOpen(false)}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          className="flex-1"
         >
           <Pressable
-            className="mt-auto rounded-t-3xl bg-background p-5"
-            style={{ paddingBottom: sheetPadding }}
-            onPress={(e) => e.stopPropagation()}
+            className="flex-1 bg-black/50 justify-end"
+            onPress={() => setImapOpen(false)}
           >
-            <Text className="text-xl font-sans-bold text-primary mb-2">
-              IMAP / IMAPS
-            </Text>
-            <TextInput
-              className="rounded-xl border border-border bg-card p-3 mb-2 text-primary"
-              placeholder="Host"
-              autoCapitalize="none"
-              value={imapHost}
-              onChangeText={setImapHost}
-            />
-            <TextInput
-              className="rounded-xl border border-border bg-card p-3 mb-2 text-primary"
-              placeholder="Port (993)"
-              keyboardType="number-pad"
-              value={imapPort}
-              onChangeText={setImapPort}
-            />
-            <TextInput
-              className="rounded-xl border border-border bg-card p-3 mb-2 text-primary"
-              placeholder="Username"
-              autoCapitalize="none"
-              value={imapUser}
-              onChangeText={setImapUser}
-            />
-            <TextInput
-              className="rounded-xl border border-border bg-card p-3 mb-4 text-primary"
-              placeholder="Password / app password"
-              secureTextEntry
-              value={imapPass}
-              onChangeText={setImapPass}
-            />
             <Pressable
-              className="mb-3 items-center rounded-2xl bg-accent py-4"
-              onPress={submitImap}
+              className="rounded-t-3xl bg-background p-5"
+              style={{ paddingBottom: sheetPadding, maxHeight: "85%" }}
+              onPress={(e) => e.stopPropagation()}
             >
-              <Text className="text-base font-sans-bold text-white">
-                Save IMAP login
-              </Text>
-            </Pressable>
-            <Pressable
-              className="items-center rounded-2xl bg-muted py-4"
-              onPress={() => setImapOpen(false)}
-            >
-              <Text className="text-base font-sans-bold text-primary">
-                Cancel
-              </Text>
+              <ScrollView
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="on-drag"
+                showsVerticalScrollIndicator={false}
+              >
+                <Text className="text-xl font-sans-bold text-primary mb-2">
+                  IMAP / IMAPS
+                </Text>
+                <TextInput
+                  className="rounded-xl border border-border bg-card p-3 mb-2 text-primary"
+                  placeholder="Host"
+                  autoCapitalize="none"
+                  value={imapHost}
+                  onChangeText={setImapHost}
+                />
+                <TextInput
+                  className="rounded-xl border border-border bg-card p-3 mb-2 text-primary"
+                  placeholder="Port (993)"
+                  keyboardType="number-pad"
+                  value={imapPort}
+                  onChangeText={setImapPort}
+                />
+                <TextInput
+                  className="rounded-xl border border-border bg-card p-3 mb-2 text-primary"
+                  placeholder="Username"
+                  autoCapitalize="none"
+                  value={imapUser}
+                  onChangeText={setImapUser}
+                />
+                <TextInput
+                  className="rounded-xl border border-border bg-card p-3 mb-4 text-primary"
+                  placeholder="Password / app password"
+                  secureTextEntry
+                  value={imapPass}
+                  onChangeText={setImapPass}
+                />
+                <Pressable
+                  className="mb-3 items-center rounded-2xl bg-accent py-4"
+                  onPress={submitImap}
+                >
+                  <Text className="text-base font-sans-bold text-white">
+                    Save IMAP login
+                  </Text>
+                </Pressable>
+                <Pressable
+                  className="items-center rounded-2xl bg-muted py-4"
+                  onPress={() => setImapOpen(false)}
+                >
+                  <Text className="text-base font-sans-bold text-primary">
+                    Cancel
+                  </Text>
+                </Pressable>
+              </ScrollView>
             </Pressable>
           </Pressable>
-        </Pressable>
+        </KeyboardAvoidingView>
       </Modal>
 
       <Modal
@@ -453,60 +447,71 @@ export default function EmailScanSection() {
         transparent
         onRequestClose={() => setPasswordKind(null)}
       >
-        <Pressable
-          className="flex-1 bg-black/50"
-          onPress={() => setPasswordKind(null)}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          className="flex-1"
         >
           <Pressable
-            className="mt-auto rounded-t-3xl bg-background p-5"
-            style={{ paddingBottom: sheetPadding }}
-            onPress={(e) => e.stopPropagation()}
+            className="flex-1 bg-black/50 justify-end"
+            onPress={() => setPasswordKind(null)}
           >
-            <Text className="text-xl font-sans-bold text-primary mb-2">
-              {passwordKind === "proton" ? "Proton Mail" : "Tuta"}
-            </Text>
-            <TextInput
-              className="rounded-xl border border-border bg-card p-3 mb-2 text-primary"
-              placeholder="Email"
-              autoCapitalize="none"
-              keyboardType="email-address"
-              value={passwordUser}
-              onChangeText={setPasswordUser}
-            />
-            <TextInput
-              className="rounded-xl border border-border bg-card p-3 mb-2 text-primary"
-              placeholder="Password"
-              secureTextEntry
-              value={passwordPass}
-              onChangeText={setPasswordPass}
-            />
-            {passwordKind === "proton" && (
-              <TextInput
-                className="rounded-xl border border-border bg-card p-3 mb-4 text-primary"
-                placeholder="2FA code (if enabled)"
-                keyboardType="number-pad"
-                value={passwordTotp}
-                onChangeText={setPasswordTotp}
-              />
-            )}
             <Pressable
-              className="mb-3 items-center rounded-2xl bg-accent py-4"
-              onPress={submitPasswordMail}
+              className="rounded-t-3xl bg-background p-5"
+              style={{ paddingBottom: sheetPadding, maxHeight: "85%" }}
+              onPress={(e) => e.stopPropagation()}
             >
-              <Text className="text-base font-sans-bold text-white">
-                Save login
-              </Text>
-            </Pressable>
-            <Pressable
-              className="items-center rounded-2xl bg-muted py-4"
-              onPress={() => setPasswordKind(null)}
-            >
-              <Text className="text-base font-sans-bold text-primary">
-                Cancel
-              </Text>
+              <ScrollView
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="on-drag"
+                showsVerticalScrollIndicator={false}
+              >
+                <Text className="text-xl font-sans-bold text-primary mb-2">
+                  {passwordKind === "proton" ? "Proton Mail" : "Tuta"}
+                </Text>
+                <TextInput
+                  className="rounded-xl border border-border bg-card p-3 mb-2 text-primary"
+                  placeholder="Email"
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  value={passwordUser}
+                  onChangeText={setPasswordUser}
+                />
+                <TextInput
+                  className="rounded-xl border border-border bg-card p-3 mb-2 text-primary"
+                  placeholder="Password"
+                  secureTextEntry
+                  value={passwordPass}
+                  onChangeText={setPasswordPass}
+                />
+                {passwordKind === "proton" && (
+                  <TextInput
+                    className="rounded-xl border border-border bg-card p-3 mb-4 text-primary"
+                    placeholder="2FA code (if enabled)"
+                    keyboardType="number-pad"
+                    value={passwordTotp}
+                    onChangeText={setPasswordTotp}
+                  />
+                )}
+                <Pressable
+                  className="mb-3 items-center rounded-2xl bg-accent py-4"
+                  onPress={submitPasswordMail}
+                >
+                  <Text className="text-base font-sans-bold text-white">
+                    Save login
+                  </Text>
+                </Pressable>
+                <Pressable
+                  className="items-center rounded-2xl bg-muted py-4"
+                  onPress={() => setPasswordKind(null)}
+                >
+                  <Text className="text-base font-sans-bold text-primary">
+                    Cancel
+                  </Text>
+                </Pressable>
+              </ScrollView>
             </Pressable>
           </Pressable>
-        </Pressable>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );

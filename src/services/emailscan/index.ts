@@ -64,3 +64,5 @@ export {
 } from "./scan";
 
 export { candidateToSubscription } from "./importCandidate";
+
+export { importFromConnectedMailboxes } from "./scanConnected";

@@ -31,7 +31,10 @@ const FILTER_OPTIONS = ["All", "Upcoming"] as const;
 const Subscriptions = () => {
   const { tabListPadding } = useBottomClearance();
   const posthog = usePostHog();
-  const { filter: initialFilter } = useLocalSearchParams<{ filter?: string }>();
+  const { filter: initialFilter, addMailbox } = useLocalSearchParams<{
+    filter?: string;
+    addMailbox?: string;
+  }>();
   const {
     subscriptions,
     addSubscription,
@@ -181,7 +184,7 @@ const Subscriptions = () => {
                 <Image source={icons.add} className="home-add-icon" />
               </Pressable>
             </View>
-            <EmailScanSection />
+            <EmailScanSection openAddOnMount={addMailbox === "1"} />
             <View className="mb-5">
               <TextInput
                 className="rounded-2xl border border-border bg-card px-4 py-4 text-base font-sans-medium text-primary"

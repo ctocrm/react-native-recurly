@@ -12,13 +12,23 @@ import { useSubscriptions } from "@/context/SubscriptionContext";
 import "@/global.css";
 import { useBottomClearance } from "@/hooks/useBottomClearance";
 import { formatCurrency } from "@/lib/utils";
+import { importFromConnectedMailboxes } from "@/services/emailscan";
+import { listMailboxesAsync } from "@/services/emailscan/persist";
 import { useUser } from "@clerk/expo";
 import dayjs from "dayjs";
 import { useRouter } from "expo-router";
 import { styled } from "nativewind";
 import { usePostHog } from "posthog-react-native";
-import { useMemo, useState } from "react";
-import { FlatList, Image, Pressable, Text, View } from "react-native";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Image,
+  Pressable,
+  Text,
+  View,
+} from "react-native";
 import { SafeAreaView as RNSafeAreaView } from "react-native-safe-area-context";
 
 const SafeAreaView = styled(RNSafeAreaView);
@@ -38,6 +48,7 @@ const App = () => {
     deleteSubscription,
     updateSubscriptionStatus,
     getUpcomingSubscriptions,
+    refreshSubscriptions,
   } = useSubscriptions();
   const [modalVisible, setModalVisible] = useState(false);
   const [editingSubscription, setEditingSubscription] =
@@ -52,6 +63,21 @@ const App = () => {
   const [iconPickerSubscription, setIconPickerSubscription] =
     useState<Subscription | null>(null);
   const [iconPickerVisible, setIconPickerVisible] = useState(false);
+  const [mailboxCount, setMailboxCount] = useState(0);
+  const [scanning, setScanning] = useState(false);
+
+  const refreshMailboxCount = useCallback(async () => {
+    try {
+      const boxes = await listMailboxesAsync();
+      setMailboxCount(boxes.length);
+    } catch {
+      setMailboxCount(0);
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshMailboxCount().catch(() => undefined);
+  }, [refreshMailboxCount, subscriptions.length]);
 
   const displayName =
     user?.firstName ||
@@ -86,6 +112,35 @@ const App = () => {
   const handleViewAllSubscriptionsTap = () => {
     posthog.capture("home_view_all_tapped");
     router.push("/(tabs)/subscriptions");
+  };
+
+  const handleHomeScanTap = async () => {
+    if (mailboxCount === 0) {
+      router.push("/(tabs)/subscriptions?addMailbox=1");
+      return;
+    }
+    setScanning(true);
+    try {
+      const { imported, errors } = await importFromConnectedMailboxes({
+        userId: user?.id || "anonymous",
+        existing: subscriptions,
+        addSubscription,
+      });
+      await refreshSubscriptions();
+      await refreshMailboxCount();
+      if (imported === 0 && errors.length) {
+        Alert.alert("Scan", errors.join("\n"));
+      } else if (imported === 0) {
+        Alert.alert("Scan", "No new subscriptions.");
+      }
+    } catch (error) {
+      Alert.alert(
+        "Scan",
+        error instanceof Error ? error.message : "Scan failed",
+      );
+    } finally {
+      setScanning(false);
+    }
   };
 
   const handleCreateSubscription = async (subscription: Subscription) => {
@@ -228,6 +283,27 @@ const App = () => {
               title="All Subscriptions"
               onViewAll={handleViewAllSubscriptionsTap}
             />
+            <Pressable
+              className={`mb-4 mt-3 items-center rounded-2xl py-4 ${
+                mailboxCount > 0 ? "bg-accent" : "bg-muted"
+              }`}
+              onPress={handleHomeScanTap}
+              disabled={scanning}
+            >
+              {scanning ? (
+                <ActivityIndicator size="small" color="white" />
+              ) : (
+                <Text
+                  className={`text-sm font-sans-bold ${
+                    mailboxCount > 0 ? "text-white" : "text-primary"
+                  }`}
+                >
+                  {mailboxCount > 0
+                    ? "Scan mailbox for subscriptions"
+                    : "Add at least one mailbox to scan"}
+                </Text>
+              )}
+            </Pressable>
           </>
         }
         data={subscriptions}
