@@ -205,6 +205,22 @@ private class ProtonClient {
     val text = BufferedReader(InputStreamReader(stream, StandardCharsets.UTF_8)).use { it.readText() }
     if (conn.responseCode !in 200..299) {
       Log.w("MailProton", "HTTP ${conn.responseCode}: $text")
+      val parsed = try {
+        JSONObject(text)
+      } catch (_: Exception) {
+        null
+      }
+      val apiCode = parsed?.optInt("Code") ?: 0
+      val apiError = parsed?.optString("Error").orEmpty()
+      if (
+        apiCode == 9001 ||
+        apiError.contains("CAPTCHA", ignoreCase = true) ||
+        apiError.contains("Human Verification", ignoreCase = true)
+      ) {
+        throw IllegalStateException(
+          "Proton asked for a CAPTCHA (not a password error). Sign in once at proton.me from this network, then retry.",
+        )
+      }
       if (conn.responseCode == 401 || conn.responseCode == 422) {
         throw IllegalStateException(
           "Proton rejected the password or 2FA code (HTTP ${conn.responseCode}).",
@@ -212,6 +228,7 @@ private class ProtonClient {
       }
       throw IllegalStateException("Proton HTTP ${conn.responseCode}: $text")
     }
+
     return JSONObject(text)
   }
 }

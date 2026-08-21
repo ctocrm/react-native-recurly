@@ -127,7 +127,9 @@ private class TutaClient {
     if (token.isEmpty()) {
       throw IllegalStateException("Tuta SessionService returned no accessToken")
     }
+    Log.i("MailTuta", "Tuta session created for $address user=$user")
     return TutaSession(token, user)
+
   }
 
   fun listMail(session: TutaSession, sinceIso: String?, limit: Int): List<TutaMsg> {
