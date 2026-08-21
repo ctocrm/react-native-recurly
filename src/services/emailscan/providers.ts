@@ -43,6 +43,7 @@ interface TokenBlob {
   refreshToken?: string;
   expiresAt?: number;
   accountHint?: string;
+  uid?: string;
 }
 
 /** SecureStore keys may only use A-Z a-z 0-9 . - _ */
@@ -645,27 +646,64 @@ async function fetcherFor(
       },
     };
   }
-  if (providerId === "proton" || providerId === "tuta") {
-    const creds = await loadPasswordMailCredentials(providerId, mailboxId);
+  if (providerId === "proton") {
+    const creds = await loadPasswordMailCredentials("proton", mailboxId);
     if (!creds) {
-      throw new MailConnectError(`${providerId} is not connected`);
+      throw new MailConnectError("proton is not connected");
     }
-    const { createPasswordMailFetcher } = await import("./imapNative");
-    const inner = createPasswordMailFetcher(providerId, creds, mailboxId);
+    const stored = await loadTokens(mailboxId);
+    const { createProtonFetcher } = await import("./imapNative");
+    const inner = createProtonFetcher(
+      creds,
+      mailboxId,
+      stored?.uid && stored.accessToken
+        ? {
+            uid: stored.uid,
+            accessToken: stored.accessToken,
+            refreshToken: stored.refreshToken ?? "",
+          }
+        : null,
+      async (session) => {
+        await saveTokens(mailboxId, {
+          uid: session.uid,
+          accessToken: session.accessToken,
+          refreshToken: session.refreshToken,
+          accountHint: creds.username,
+        });
+      },
+    );
     return {
       async fetchMessages(opts) {
         try {
           return await inner.fetchMessages(opts);
         } catch (error) {
           const message =
-            error instanceof Error
-              ? error.message
-              : `${providerId} fetch failed`;
+            error instanceof Error ? error.message : "proton fetch failed";
           throw new MailScanUnverifiedError(message);
         }
       },
     };
   }
+  if (providerId === "tuta") {
+    const creds = await loadPasswordMailCredentials("tuta", mailboxId);
+    if (!creds) {
+      throw new MailConnectError("tuta is not connected");
+    }
+    const { createPasswordMailFetcher } = await import("./imapNative");
+    const inner = createPasswordMailFetcher("tuta", creds, mailboxId);
+    return {
+      async fetchMessages(opts) {
+        try {
+          return await inner.fetchMessages(opts);
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : "tuta fetch failed";
+          throw new MailScanUnverifiedError(message);
+        }
+      },
+    };
+  }
+
   const tokens = await loadTokens(mailboxId);
   if (!tokens?.accessToken) {
     throw new MailConnectError("Not connected");
@@ -760,6 +798,9 @@ export async function disconnectMailbox(
 ): Promise<void> {
   if (providerId === "proton" || providerId === "tuta") {
     await SecureStore.deleteItemAsync(passwordKey(providerId, mailboxId));
+    if (providerId === "proton") {
+      await SecureStore.deleteItemAsync(tokenKey(mailboxId));
+    }
   } else if (providerId === "imap") {
     await SecureStore.deleteItemAsync(imapKey(mailboxId));
   } else {

@@ -7,7 +7,9 @@ import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
+import com.facebook.react.bridge.WritableMap
 import org.json.JSONObject
+
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.io.OutputStreamWriter
@@ -32,6 +34,78 @@ class ProtonModule(reactContext: ReactApplicationContext) :
   override fun getName(): String = "MailProton"
 
   @ReactMethod
+  fun login(
+    username: String,
+    password: String,
+    totp: String?,
+    hvToken: String?,
+    hvType: String?,
+    promise: Promise,
+  ) {
+    io.execute {
+      try {
+        val session = ProtonClient().login(
+          username.trim(),
+          password,
+          totp,
+          hvToken?.takeIf { it.isNotBlank() },
+          hvType?.takeIf { it.isNotBlank() },
+        )
+        promise.resolve(protonSessionToMap(session))
+      } catch (e: ProtonHvRequired) {
+        promise.reject("PROTON_HV", e.message, e.toMap())
+      } catch (e: Exception) {
+        Log.e(TAG, "Proton login failed", e)
+
+        promise.reject("PROTON_ERROR", e.message ?: "Proton login failed", e)
+      }
+    }
+  }
+
+  @ReactMethod
+  fun refreshSession(
+    uid: String,
+    refreshToken: String,
+    accessToken: String?,
+    promise: Promise,
+  ) {
+    io.execute {
+      try {
+        val session = ProtonClient().refresh(uid, refreshToken, accessToken.orEmpty())
+        promise.resolve(protonSessionToMap(session))
+      } catch (e: Exception) {
+        Log.e(TAG, "Proton refresh failed", e)
+
+        promise.reject("PROTON_ERROR", e.message ?: "Proton refresh failed", e)
+      }
+    }
+  }
+
+  @ReactMethod
+  fun listWithSession(
+    uid: String,
+    accessToken: String,
+    sinceIso: String?,
+    limit: Int,
+    promise: Promise,
+  ) {
+    io.execute {
+      try {
+        val messages = ProtonClient().listMessages(
+          ProtonSession(uid, accessToken, ""),
+          sinceIso,
+          limit.coerceIn(1, 100),
+        )
+        promise.resolve(protonMessagesToMap(messages))
+      } catch (e: Exception) {
+        Log.e(TAG, "Proton list failed", e)
+
+        promise.reject("PROTON_ERROR", e.message ?: "Proton list failed", e)
+      }
+    }
+  }
+
+  @ReactMethod
   fun fetchMessages(
     username: String,
     password: String,
@@ -43,21 +117,12 @@ class ProtonModule(reactContext: ReactApplicationContext) :
     io.execute {
       try {
         val client = ProtonClient()
-        val session = client.login(username.trim(), password, totp)
+        val session = client.login(username.trim(), password, totp, null, null)
         val messages = client.listMessages(session, sinceIso, limit.coerceIn(1, 100))
-        val arr = Arguments.createArray()
-        for (m in messages) {
-          val map = Arguments.createMap()
-          map.putString("messageId", m.id)
-          map.putString("from", m.from)
-          map.putString("subject", m.subject)
-          map.putString("date", m.date)
-          if (m.text != null) map.putString("text", m.text)
-          arr.pushMap(map)
-        }
-        val out = Arguments.createMap()
-        out.putArray("messages", arr)
-        promise.resolve(out)
+        promise.resolve(protonMessagesToMap(messages))
+      } catch (e: ProtonHvRequired) {
+        promise.reject("PROTON_HV", e.message, e.toMap())
+
       } catch (e: Exception) {
         Log.e(TAG, "Proton fetch failed", e)
         promise.reject("PROTON_ERROR", e.message ?: "Proton failed", e)
@@ -70,7 +135,53 @@ class ProtonModule(reactContext: ReactApplicationContext) :
   }
 }
 
-private data class ProtonSession(val uid: String, val accessToken: String)
+private fun protonSessionToMap(session: ProtonSession): WritableMap {
+  val map = Arguments.createMap()
+  map.putString("uid", session.uid)
+  map.putString("accessToken", session.accessToken)
+  map.putString("refreshToken", session.refreshToken)
+  return map
+}
+
+private fun protonMessagesToMap(messages: List<ProtonMsg>): WritableMap {
+  val arr = Arguments.createArray()
+  for (m in messages) {
+    val map = Arguments.createMap()
+    map.putString("messageId", m.id)
+    map.putString("from", m.from)
+    map.putString("subject", m.subject)
+    map.putString("date", m.date)
+    if (m.text != null) map.putString("text", m.text)
+    arr.pushMap(map)
+  }
+  val out = Arguments.createMap()
+  out.putArray("messages", arr)
+  return out
+}
+
+
+internal class ProtonHvRequired(
+  val webUrl: String,
+  val hvToken: String,
+  val methods: String,
+) : IllegalStateException(
+  "Proton asked for a CAPTCHA (not a password error).",
+) {
+  fun toMap(): WritableMap {
+    val map = Arguments.createMap()
+    map.putString("webUrl", webUrl)
+    map.putString("hvToken", hvToken)
+    map.putString("methods", methods)
+    return map
+  }
+}
+
+internal data class ProtonSession(
+  val uid: String,
+  val accessToken: String,
+  val refreshToken: String = "",
+)
+
 private data class ProtonMsg(
   val id: String,
   val from: String,
@@ -82,12 +193,21 @@ private data class ProtonMsg(
 private class ProtonClient {
   private val api = "https://mail.proton.me/api"
 
-  fun login(username: String, password: String, totp: String?): ProtonSession {
+  fun login(
+    username: String,
+    password: String,
+    totp: String?,
+    hvToken: String?,
+    hvType: String?,
+  ): ProtonSession {
     val info = postJson(
       "$api/auth/v4/info",
       JSONObject().put("Username", username).toString(),
       null,
+      null,
+      null,
     )
+
     val version = info.optInt("Version", 4)
     val saltB64 = info.optString("Salt")
     val modulus = info.optString("Modulus")
@@ -110,27 +230,56 @@ private class ProtonClient {
       .put("ClientEphemeral", srp.clientEphemeral)
       .put("ClientProof", srp.clientProof)
       .put("SRPSession", srpSession)
-    val auth = postJson("$api/auth/v4", authBody.toString(), null)
+    val auth = postJson("$api/auth/v4", authBody.toString(), null, hvToken, hvType)
     if (auth.has("TwoFactor") && auth.optInt("TwoFactor") == 1) {
       if (totp.isNullOrBlank()) {
         throw IllegalStateException("Proton 2FA required")
       }
       val uid = auth.optString("UID")
       val token = auth.optString("AccessToken")
+      val refresh = auth.optString("RefreshToken")
       val two = postJson(
         "$api/auth/v4/2fa",
         JSONObject().put("TwoFactorCode", totp).toString(),
-        ProtonSession(uid, token),
+        ProtonSession(uid, token, refresh),
+        null,
+        null,
       )
-      return ProtonSession(two.optString("UID", uid), two.optString("AccessToken", token))
+      return sessionFromAuth(two, uid, token, refresh)
     }
-    val uid = auth.optString("UID")
-    val token = auth.optString("AccessToken")
+    return sessionFromAuth(auth, "", "", "")
+  }
+
+  fun refresh(uid: String, refreshToken: String, accessToken: String): ProtonSession {
+    val body = JSONObject()
+      .put("UID", uid)
+      .put("RefreshToken", refreshToken)
+      .put("ResponseType", "token")
+      .put("GrantType", "refresh_token")
+      .put("RedirectURI", "https://protonmail.ch")
+      .put("State", java.util.UUID.randomUUID().toString().replace("-", ""))
+    if (accessToken.isNotEmpty()) {
+      body.put("AccessToken", accessToken)
+    }
+    val auth = postJson("$api/auth/v4/refresh", body.toString(), null, null, null)
+    return sessionFromAuth(auth, uid, accessToken, refreshToken)
+  }
+
+  private fun sessionFromAuth(
+    auth: JSONObject,
+    fallbackUid: String,
+    fallbackAccess: String,
+    fallbackRefresh: String,
+  ): ProtonSession {
+    val uid = auth.optString("UID", fallbackUid)
+    val token = auth.optString("AccessToken", fallbackAccess)
+    val refresh = auth.optString("RefreshToken", fallbackRefresh)
     if (uid.isEmpty() || token.isEmpty()) {
       throw IllegalStateException("Proton auth returned no session")
     }
-    return ProtonSession(uid, token)
+    return ProtonSession(uid, token, refresh)
   }
+
 
   fun listMessages(session: ProtonSession, sinceIso: String?, limit: Int): List<ProtonMsg> {
     val url = "$api/mail/v4/messages?Page=0&PageSize=$limit&LabelID=0"
@@ -171,7 +320,13 @@ private class ProtonClient {
     return lines.joinToString("").replace("\\s".toRegex(), "")
   }
 
-  private fun postJson(url: String, body: String, session: ProtonSession?): JSONObject {
+  private fun postJson(
+    url: String,
+    body: String,
+    session: ProtonSession?,
+    hvToken: String?,
+    hvType: String?,
+  ): JSONObject {
     val conn = (URL(url).openConnection() as HttpsURLConnection)
     conn.requestMethod = "POST"
     conn.connectTimeout = 20_000
@@ -183,10 +338,15 @@ private class ProtonClient {
       conn.setRequestProperty("Authorization", "Bearer ${session.accessToken}")
       conn.setRequestProperty("x-pm-uid", session.uid)
     }
+    if (!hvToken.isNullOrBlank() && !hvType.isNullOrBlank()) {
+      conn.setRequestProperty("x-pm-human-verification-token", hvToken)
+      conn.setRequestProperty("x-pm-human-verification-token-type", hvType)
+    }
     conn.doOutput = true
     OutputStreamWriter(conn.outputStream, StandardCharsets.UTF_8).use { it.write(body) }
     return read(conn)
   }
+
 
   private fun getJson(url: String, session: ProtonSession): JSONObject {
     val conn = (URL(url).openConnection() as HttpsURLConnection)
@@ -217,10 +377,29 @@ private class ProtonClient {
         apiError.contains("CAPTCHA", ignoreCase = true) ||
         apiError.contains("Human Verification", ignoreCase = true)
       ) {
-        throw IllegalStateException(
-          "Proton asked for a CAPTCHA (not a password error). Sign in once at proton.me from this network, then retry.",
-        )
+        val details = parsed?.optJSONObject("Details")
+        val hvToken = details?.optString("HumanVerificationToken").orEmpty()
+        val methodsArr = details?.optJSONArray("HumanVerificationMethods")
+        val methods = if (methodsArr == null || methodsArr.length() == 0) {
+          "captcha"
+        } else {
+          buildString {
+            for (i in 0 until methodsArr.length()) {
+              if (i > 0) append(",")
+              append(methodsArr.optString(i))
+            }
+          }
+        }
+        val webUrl = details?.optString("WebUrl").orEmpty().ifEmpty {
+          if (hvToken.isNotEmpty()) {
+            "https://verify.proton.me/?methods=$methods&token=$hvToken"
+          } else {
+            ""
+          }
+        }
+        throw ProtonHvRequired(webUrl, hvToken, methods)
       }
+
       if (conn.responseCode == 401 || conn.responseCode == 422) {
         throw IllegalStateException(
           "Proton rejected the password or 2FA code (HTTP ${conn.responseCode}).",
