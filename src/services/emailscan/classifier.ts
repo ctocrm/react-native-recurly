@@ -409,15 +409,15 @@ export function classifyMessage(message: NormalizedMessage): ClassifiedMessage {
   }
 
   const body = moneyBodyText(message);
-  const parsed = body ? parseAmount(body) : null;
+  const parsed =
+    (body ? parseAmount(body) : null) || parseAmount(message.subject);
   const cadence = body
     ? inferCadence(body) || inferCadence(message.subject)
     : inferCadence(message.subject);
-  const invoiceAttached = hasInvoiceAttachment(message);
-  const amountUnknown = !parsed && invoiceAttached;
+  const amountUnknown = !parsed;
 
   if (parsed) evidence.push(`amount:${parsed.currency} ${parsed.amount}`);
-  if (amountUnknown) evidence.push("invoice-attached-amount-unknown");
+  if (amountUnknown) evidence.push("amount-unknown");
   if (cadence) evidence.push(`cadence:${cadence}`);
   if (body && RECURRING_MONEY_RE.test(body))
     evidence.push("body:recurring-cue");

@@ -14,6 +14,7 @@ import {
   FIXTURE_USAGE_INVOICE,
   FIXTURE_WELCOME,
 } from "../fixtures";
+import { candidateToSubscription } from "../importCandidate";
 import { buildCandidateMap, filterCandidates } from "../rollup";
 import type { NormalizedMessage } from "../types";
 import { DEFAULT_DISPLAY_FILTERS } from "../types";
@@ -220,5 +221,48 @@ describe("emailscan rollup + display filters", () => {
       [FIXTURE_NEWSLETTER, FIXTURE_OTP_DROP].map(classifyMessage),
     );
     expect(map).toEqual([]);
+  });
+});
+
+describe("emailscan subject amounts + no fake $0", () => {
+  it("reads a dollar amount from the subject when the body is missing", () => {
+    const hit = classifyMessage({
+      mailboxId: "proton:david@picksandshovels.app",
+      messageId: "github-subject-only",
+      from: "GitHub <noreply@github.com>",
+      subject: "Your GitHub invoice for $4.00",
+      date: "2026-08-01T12:00:00.000Z",
+    });
+    expect(hit.kind).toBe("sparse");
+    expect(hit.amount).toBe(4);
+    expect(hit.amountUnknown).toBe(false);
+  });
+
+  it("keeps Proton subject-only mail as amount-unknown, not $0", () => {
+    const hit = classifyMessage({
+      mailboxId: "proton:david@picksandshovels.app",
+      messageId: "proton-welcome",
+      from: "Proton <noreply@proton.me>",
+      subject: "Your Proton subscription",
+      date: "2026-08-01T12:00:00.000Z",
+    });
+    expect(hit.kind).toBe("recurring");
+    expect(hit.amount).toBeUndefined();
+    expect(hit.amountUnknown).toBe(true);
+  });
+
+  it("refuses to invent $0 when importing an amount-unknown candidate", () => {
+    expect(() =>
+      candidateToSubscription({
+        mailboxId: "proton:david@picksandshovels.app",
+        merchantKey: "proton",
+        merchant: "Proton",
+        kind: "recurring",
+        amountUnknown: true,
+        evidence: ["amount-unknown"],
+        messageIds: ["proton-welcome"],
+        confidence: "medium",
+      }),
+    ).toThrow(/refusing to invent \$0/);
   });
 });
