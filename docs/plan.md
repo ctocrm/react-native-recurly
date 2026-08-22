@@ -1155,8 +1155,8 @@ Scan-brain / Settings **code landed** but Phase 4 remains **NOT done** until H1�
 - [ ] **H3 — HTTPS completeness**, one provider at a time: Zoho Mail HTTP fetcher; dedicated mail client ids (not Drive/OneDrive); verify Google/Microsoft token exchange; Fastmail query vs subject-union; Office 365 live-scan flag.
 - [ ] **H4 — Proton client API.** Native SRP + OpenPGP + Proton HTTP (`mail/v4` list/get) → shared classifier. Password (+ 2FA) sheet. Not IMAP, not Bridge. Live-scan when crypto works.
   - **2026-08-21 evidence (`526361f`):** go-srp bcrypt (`salt||proton` + Go `./A-Za-z0-9` packing) + LE SRP now reaches `/auth/v4`. Live saved account `david@picksandshovels.app` (user-confirmed password, no 2FA) returns **HTTP 422 Code 9001 CAPTCHA**, not a password reject.
-  - **2026-08-21 CAPTCHA sheet (`93c2f52`):** Scan on that saved account opens official `verify.proton.me` in-app (`Proton verification` + puzzle). Native login/refresh/list persist UID/AccessToken/RefreshToken after a successful retry. **Unverified until you complete the puzzle** and a later scan uses refresh without CAPTCHA. Mail list/decrypt still later.
-
+  - **2026-08-21 CAPTCHA sheet (`93c2f52`):** Scan on that saved account opens official `verify.proton.me` in-app (`Proton verification` + puzzle). User completed the puzzle; Proton scan returned messages.
+  - **2026-08-21 scan-strategy miss then restore (`2b1dbca`):** Live Scan auto-imported every candidate and named merchants from From-domain, so Stripe (processor) and Me (self-mail) became Home rows. Restored: processors are not merchants (name seller from subject/body or drop); drop self-mail; live import uses default recurring-only filter. Unit tests pass. **Live Proton rescan unverified** (app was on Clerk sign-in; agent does not type credentials). Existing junk rows stay until you delete them or a later signed-in rescan. Tuta list/decrypt still empty on purpose.
 - [ ] **H5 — Tuta client protocol.** Login + list/decrypt against `/rest/{app}/{typename}`, GPL-safe (no copy of GPLv3 client into this tree). Honest “no public docs / unsupported.” Replace when Tuta ships public API docs.
   - **2026-08-21 evidence (`4836864`, `526361f`):** SaltService `v=154` + ID-mapped GET works. SessionService POST with `1218=[]` + null optionals + `cv`/`cp` logs in. adb: `Tuta session created for picksandshovels@tutamail.com user=["OxYUg5W----9"]`. Mail list/decrypt still returns empty on purpose (ciphertext; later pass).
 
@@ -1175,16 +1175,17 @@ Agent drives to the OAuth sheet or IMAP form, then **stops**. User completes tha
 
 Cheap, no live mail: classifier fixtures (covers the shared scan brain once).
 
-| Account                                                                               | What we test                                                                       | Why                                         |
-| ------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------- |
-| Normal Gmail (no receipts)                                                            | **Connect + Scan** when mail client id exists; default recurring view empty/honest | Gmail API. Not Workspace.                   |
-| Google Workspace                                                                      | **Full scan**                                                                      | Same API, work login. Import one.           |
-| Outlook                                                                               | **Full scan**                                                                      | Graph. Import one.                          |
-| Microsoft 365                                                                         | Connect-only or share Outlook Graph if already proven                              | Same API, own row                           |
-| Zoho / Fastmail                                                                       | Connect sheet; live-scan when fetcher + client id exist (H3)                       | Real HTTPS APIs                             |
-| IMAP form                                                                             | Opens; iCloud/Yahoo/AOL **hints**; agent stops; user types                         | Public IMAP only. Fetch unverified until H2 |
-| Proton Mail                                                                           | Password (+ 2FA) sheet after H4; agent stops; user types                           | Client REST + OpenPGP, not IMAP             |
-| Tuta                                                                                  | Password sheet after H5; agent stops; user types                                   | Client REST, FAQ-invited, not IMAP          |
+| Account | What we test | Why |
+| ------- | ------------ | --- |
+
+| Normal Gmail (no receipts) | **Connect + Scan** when mail client id exists; default recurring view empty/honest | Gmail API. Not Workspace. |
+| Google Workspace | **Full scan** | Same API, work login. Import one. |
+| Outlook | **Full scan** | Graph. Import one. |
+| Microsoft 365 | Connect-only or share Outlook Graph if already proven | Same API, own row |
+| Zoho / Fastmail | Connect sheet; live-scan when fetcher + client id exist (H3) | Real HTTPS APIs |
+| IMAP form | Opens; iCloud/Yahoo/AOL **hints**; agent stops; user types | Public IMAP only. Fetch unverified until H2 |
+| Proton Mail | Password (+ 2FA) sheet after H4; agent stops; user types | Client REST + OpenPGP, not IMAP |
+| Tuta | Password sheet after H5; agent stops; user types | Client REST, FAQ-invited, not IMAP |
 | Do **not** re-run icon-crawler gates or a 7-provider screenshot marathon in one chat. |
 
 #### Programmatic gate
@@ -1293,4 +1294,5 @@ Parked until a documented API exists. Do not implement as Connect-without-scan.
 | 2026-08-18 | **UI Phase 4 Settings + persist:** Email scan section, schema v10 local-only cache, honest OAuth/IMAP connect. IMAP fetch and Yahoo/AOL/Zoho/Fastmail live-scan remain unverified. No emulator gate yet. No mail client IDs in `.env`.                                                                                                    |
 | 2026-08-20 | **UI Phase 4 is NOT done.** Official mail-API docs (2026-08-19) contradict shipped catalog/copy: Proton/Tuta are not IMAP; Yahoo/AOL branded OAuth is closed (IMAP + app password); IMAP fetch has no native socket. No Bridge/tunnels. Remedy: H1 catalog+copy (later commit), H2 native IMAP, H3 HTTPS fetchers. This row is plan-only. |
 | 2026-08-21 | **H4/H5 login evidence.** Tuta SessionService login proven on saved `picksandshovels@tutamail.com` (`MailTuta: Tuta session created … user=["OxYUg5W----9"]`). Proton SRP now reaches `/auth/v4`; same saved Proton account is blocked by **CAPTCHA 9001**, not password. Mail list/decrypt still later. Commits `4836864`, `526361f`.    |
-| 2026-08-21 | **Proton CAPTCHA sheet.** Scan on saved `david@picksandshovels.app` opens official `verify.proton.me` in-app (`Proton verification` + puzzle). Retry `/auth/v4` with HV headers + persist refresh is wired (`93c2f52`) but **unverified until the puzzle is completed**.                                                                  |
+| 2026-08-21 | **Proton CAPTCHA sheet.** Scan on saved `david@picksandshovels.app` opens official `verify.proton.me` in-app (`Proton verification` + puzzle). User completed the puzzle; Proton scan returned messages. Retry + persist refresh remain unverified on a later scan.                                                                       |
+| 2026-08-21 | **Scan-strategy restore (`2b1dbca`).** Live Scan had auto-imported every candidate and named merchants from From-domain (Stripe, Me). Classifier now drops self-mail and unnamed processors; live import is recurring-only. Unit tests pass. Live Proton rescan unverified (Clerk sign-in). Tuta list/decrypt still later.                |
