@@ -238,7 +238,7 @@ describe("emailscan subject amounts + no fake $0", () => {
     expect(hit.amountUnknown).toBe(false);
   });
 
-  it("keeps Proton subject-only mail as amount-unknown, not $0", () => {
+  it("drops Proton mail when scanning the Proton mailbox", () => {
     const hit = classifyMessage({
       mailboxId: "proton:david@picksandshovels.app",
       messageId: "proton-welcome",
@@ -246,9 +246,23 @@ describe("emailscan subject amounts + no fake $0", () => {
       subject: "Your Proton subscription",
       date: "2026-08-01T12:00:00.000Z",
     });
+    expect(hit.kind).toBeNull();
+    expect(hit.subjectClass).toBe("drop");
+    expect(hit.evidence).toContain("drop:mailbox-vendor:proton");
+  });
+
+  it("still classifies a Proton bill found in another mailbox", () => {
+    const hit = classifyMessage({
+      mailboxId: "tuta:picksandshovels@tutamail.com",
+      messageId: "proton-bill-on-tuta",
+      from: "Proton <noreply@proton.me>",
+      subject: "Your Proton subscription $4.99",
+      date: "2026-08-01T12:00:00.000Z",
+    });
+    expect(hit.merchantKey).toBe("proton");
     expect(hit.kind).toBe("recurring");
-    expect(hit.amount).toBeUndefined();
-    expect(hit.amountUnknown).toBe(true);
+    expect(hit.amount).toBe(4.99);
+    expect(hit.subjectClass).not.toBe("drop");
   });
 
   it("refuses to invent $0 when importing an amount-unknown candidate", () => {

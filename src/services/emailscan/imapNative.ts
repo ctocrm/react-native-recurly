@@ -101,124 +101,6 @@ function nativeProton(): NativeProton | null {
   return (NativeModules.MailProton as NativeProton | undefined) ?? null;
 }
 
-const PROTON_API = "https://mail.proton.me/api";
-const PROTON_ALL_MAIL = 5;
-const PROTON_SEARCH_TERMS = [
-  "subscription",
-  "invoice",
-  "receipt",
-  "renewal",
-  "membership",
-  "billed",
-];
-
-type ProtonListRow = {
-  messageId: string;
-  from: string;
-  subject: string;
-  date: string;
-  text?: string;
-};
-
-function protonIsoFromUnix(time: number): string {
-  const ms = time > 0 ? time * 1000 : Date.now();
-  return new Date(ms).toISOString();
-}
-
-function protonRowFromApi(raw: {
-  ID?: string;
-  Subject?: string;
-  Time?: number;
-  Sender?: { Address?: string; Name?: string };
-}): ProtonListRow | null {
-  const id = raw.ID;
-  if (!id) return null;
-  const sender = raw.Sender;
-  return {
-    messageId: id,
-    from: sender?.Address || sender?.Name || "",
-    subject: raw.Subject || "",
-    date: protonIsoFromUnix(raw.Time ?? 0),
-  };
-}
-
-async function searchProtonSubjects(
-  session: ProtonNativeSession,
-  mailboxId: string,
-  sinceIso: string | null,
-  limit: number,
-): Promise<NormalizedMessage[]> {
-  const sinceMs = sinceIso ? Date.parse(sinceIso) : NaN;
-  const seen = new Set<string>();
-  const out: NormalizedMessage[] = [];
-  for (const term of PROTON_SEARCH_TERMS) {
-    if (out.length >= limit) break;
-    const url =
-      `${PROTON_API}/mail/v4/messages?Page=0&PageSize=${Math.min(limit, 100)}` +
-      `&LabelID=${PROTON_ALL_MAIL}&Keyword=${encodeURIComponent(term)}`;
-    const res = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${session.accessToken}`,
-        "x-pm-uid": session.uid,
-        "x-pm-appversion": "Other",
-        "User-Agent": "jsmastery/1.0",
-      },
-    });
-    if (!res.ok) continue;
-    const json = (await res.json()) as {
-      Messages?: {
-        ID?: string;
-        Subject?: string;
-        Time?: number;
-        Sender?: { Address?: string; Name?: string };
-      }[];
-    };
-    for (const raw of json.Messages || []) {
-      const row = protonRowFromApi(raw);
-      if (!row || seen.has(row.messageId)) continue;
-      if (Number.isFinite(sinceMs) && Date.parse(row.date) <= sinceMs) continue;
-      seen.add(row.messageId);
-      out.push({
-        mailboxId,
-        messageId: row.messageId,
-        from: row.from,
-        subject: row.subject,
-        date: row.date,
-        text: row.text,
-      });
-      if (out.length >= limit) break;
-    }
-  }
-  return out;
-}
-
-function mergeProtonMessages(
-  mailboxId: string,
-  listed: ProtonListRow[],
-  searched: NormalizedMessage[],
-): NormalizedMessage[] {
-  const seen = new Set<string>();
-  const out: NormalizedMessage[] = [];
-  for (const m of listed) {
-    if (!m.messageId || seen.has(m.messageId)) continue;
-    seen.add(m.messageId);
-    out.push({
-      mailboxId,
-      messageId: m.messageId,
-      from: m.from,
-      subject: m.subject,
-      date: m.date,
-      text: m.text,
-    });
-  }
-  for (const m of searched) {
-    if (!m.messageId || seen.has(m.messageId)) continue;
-    seen.add(m.messageId);
-    out.push(m);
-  }
-  return out;
-}
-
 type HvInfo = { webUrl?: string; hvToken?: string; methods?: string };
 
 function hvFromError(error: unknown): HvInfo | null {
@@ -304,13 +186,14 @@ export function createProtonFetcher(
         since?.date ?? null,
         limit,
       );
-      const searched = await searchProtonSubjects(
-        session,
+      return (listed.messages || []).map((m): NormalizedMessage => ({
         mailboxId,
-        since?.date ?? null,
-        limit,
-      );
-      return mergeProtonMessages(mailboxId, listed.messages || [], searched);
+        messageId: m.messageId,
+        from: m.from,
+        subject: m.subject,
+        date: m.date,
+        text: m.text,
+      }));
     },
   };
 }

@@ -15,17 +15,21 @@ import org.json.JSONObject
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.io.OutputStreamWriter
-import java.net.HttpURLConnection
 import java.net.URL
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import java.util.concurrent.Executors
+import javax.crypto.Cipher
+import javax.crypto.Mac
+import javax.crypto.spec.IvParameterSpec
+import javax.crypto.spec.SecretKeySpec
 import javax.net.ssl.HttpsURLConnection
 
 /**
  * Tuta client REST. Not IMAP.
- * Login: SaltService GET (ID-mapped JSON) then SessionService POST.
- * KDF is bcrypt (kdfVersion 0) or Argon2id (kdfVersion 1).
+ * Login: SaltService GET then SessionService POST.
+ * List: User → mail group → MailboxGroupRoot → MailBox → Inbox MailSet → Mail.
+ * Subjects decrypt on device. Addresses/dates are plaintext. GPL-safe reimplementation.
  */
 class TutaModule(reactContext: ReactApplicationContext) :
   ReactContextBaseJavaModule(reactContext) {
@@ -73,7 +77,12 @@ class TutaModule(reactContext: ReactApplicationContext) :
   }
 }
 
-private data class TutaSession(val accessToken: String, val userId: String)
+private data class TutaSession(
+  val accessToken: String,
+  val userId: String,
+  val passphraseKey: ByteArray,
+)
+
 private data class TutaMsg(
   val id: String,
   val from: String,
@@ -82,11 +91,22 @@ private data class TutaMsg(
   val text: String?,
 )
 
+private data class TutaGroupKey(
+  val groupId: String,
+  val version: String,
+  val key: ByteArray,
+)
+
 private class TutaClient {
   private val base = "https://app.tuta.com"
-  // Live web client as of 2026-08-21. v is the sys model version, not the app version.
   private val modelVersion = "154"
   private val clientVersion = "357.260818.1"
+  private val tutanotaV = "102"
+  private val mailV = "105"
+  private val mailDv = "144"
+  private val generatedMinId = "------------"
+  private val generatedMaxId = "zzzzzzzzzzzz"
+  private val fixedIv = ByteArray(16) { 0x88.toByte() }
 
   fun login(mailAddress: String, password: String): TutaSession {
     val address = mailAddress.lowercase().trim()
@@ -94,10 +114,12 @@ private class TutaClient {
       .put("418", "0")
       .put("419", address)
       .toString()
-    val saltRes = request(
+    val saltRes = requestObject(
       "GET",
       "$base/rest/sys/saltservice?_body=${java.net.URLEncoder.encode(saltBody, "UTF-8")}",
       null,
+      null,
+      modelVersion,
       null,
     )
     val kdfVersion = saltRes.optString("2133", saltRes.optString("kdfVersion", "1"))
@@ -108,8 +130,6 @@ private class TutaClient {
     val salt = b64(saltB64)
     val passphraseKey = derivePassphraseKey(password, salt, kdfVersion)
     val verifier = createAuthVerifierAsBase64Url(passphraseKey)
-    // Live SessionService accepts this ID-mapped shape (401 on bad verifier,
-    // 400 if 1218/null optionals are omitted).
     val sessionBody = JSONObject()
       .put("1212", "0")
       .put("1213", address)
@@ -121,27 +141,255 @@ private class TutaClient {
       .put("1218", JSONArray())
       .toString()
 
-    val session = request("POST", "$base/rest/sys/sessionservice", sessionBody, null)
+    val session = requestObject(
+      "POST",
+      "$base/rest/sys/sessionservice",
+      sessionBody,
+      null,
+      modelVersion,
+      null,
+    )
     val token = session.optString("1221", session.optString("accessToken"))
-    val user = session.optString("1223", session.optString("user"))
+    val user = firstId(session.opt("1223") ?: session.opt("user"))
     if (token.isEmpty()) {
       throw IllegalStateException("Tuta SessionService returned no accessToken")
     }
+    if (user.isEmpty()) {
+      throw IllegalStateException("Tuta SessionService returned no user id")
+    }
     Log.i("MailTuta", "Tuta session created for $address user=$user")
-    return TutaSession(token, user)
-
+    return TutaSession(token, user, passphraseKey)
   }
 
   fun listMail(session: TutaSession, sinceIso: String?, limit: Int): List<TutaMsg> {
-    // Bodies are client-encrypted. Metadata listing is a later pass once login is proven.
-    return emptyList()
+    val user = requestObject(
+      "GET",
+      "$base/rest/sys/user/${session.userId}",
+      null,
+      session,
+      modelVersion,
+      null,
+    )
+    val userGroupRaw = firstObject(user.opt("95"))
+      ?: throw IllegalStateException("Tuta User missing userGroup")
+    val userGroupId = firstId(userGroupRaw.opt("29"))
+    val userGroupEnc = b64(userGroupRaw.optString("27"))
+    val userGroupVer = userGroupRaw.optString("2246", "0")
+    val userGroupKey = decryptKey(session.passphraseKey, userGroupEnc)
+
+    val memberships = user.optJSONArray("96") ?: JSONArray()
+    var mailGroupId = ""
+    var mailGroupEnc = ByteArray(0)
+    var mailGroupVer = "0"
+    for (i in 0 until memberships.length()) {
+      val m = memberships.optJSONObject(i) ?: continue
+      if (m.optString("1030") != "5") continue
+      mailGroupId = firstId(m.opt("29"))
+      mailGroupEnc = b64(m.optString("27"))
+      mailGroupVer = m.optString("2246", "0")
+      break
+    }
+    if (mailGroupId.isEmpty() || mailGroupEnc.isEmpty()) {
+      throw IllegalStateException("Tuta User has no mail group membership")
+    }
+    val mailGroupKey = decryptKey(userGroupKey, mailGroupEnc)
+    val keys = mutableListOf(
+      TutaGroupKey(userGroupId, userGroupVer, userGroupKey),
+      TutaGroupKey(mailGroupId, mailGroupVer, mailGroupKey),
+    )
+
+    val root = requestObject(
+      "GET",
+      "$base/rest/tutanota/mailboxgrouproot/$mailGroupId",
+      null,
+      session,
+      tutanotaV,
+      null,
+    )
+    val mailboxId = firstId(root.opt("699"))
+    if (mailboxId.isEmpty()) {
+      throw IllegalStateException("Tuta MailboxGroupRoot missing mailbox id")
+    }
+
+    val box = requestObject(
+      "GET",
+      "$base/rest/tutanota/mailbox/$mailboxId",
+      null,
+      session,
+      tutanotaV,
+      null,
+    )
+    val mailSets = firstObject(box.opt("443"))
+    val mailSetListId = firstId(mailSets?.opt("442"))
+    if (mailSetListId.isEmpty()) {
+      throw IllegalStateException("Tuta MailBox missing mailSets list id")
+    }
+
+    val folders = requestArray(
+      "GET",
+      "$base/rest/tutanota/mailset/$mailSetListId?start=$generatedMinId&count=1000&reverse=false",
+      session,
+      tutanotaV,
+      null,
+    )
+    var entriesListId = ""
+    for (i in 0 until folders.length()) {
+      val folder = folders.optJSONObject(i) ?: continue
+      if (folder.optString("436") != "1") continue
+      entriesListId = firstId(folder.opt("1459"))
+      break
+    }
+    if (entriesListId.isEmpty()) {
+      throw IllegalStateException("Tuta Inbox MailSet has no entries list")
+    }
+
+    val entries = requestArray(
+      "GET",
+      "$base/rest/tutanota/mailsetentry/$entriesListId?start=$generatedMaxId&count=$limit&reverse=true",
+      session,
+      tutanotaV,
+      null,
+    )
+    val sinceMs = sinceIso?.let { runCatching { java.time.Instant.parse(it).toEpochMilli() }.getOrNull() }
+    val out = mutableListOf<TutaMsg>()
+    for (i in 0 until entries.length()) {
+      if (out.size >= limit) break
+      val entry = entries.optJSONObject(i) ?: continue
+      val mailRef = firstObjectOrArray(entry.opt("1456"))
+      val listId = mailRef.first
+      val elementId = mailRef.second
+      if (listId.isEmpty() || elementId.isEmpty()) continue
+      val mail = requestObject(
+        "GET",
+        "$base/rest/tutanota/mail/$listId/$elementId",
+        null,
+        session,
+        mailV,
+        mailDv,
+      )
+      val mailSk = sessionKey(mail, "587", "102", "1395", keys)
+      val subject = decryptString(mail.optString("105"), mailSk)
+      val sender = firstObject(mail.opt("111"))
+      val fromAddr = sender?.optString("95").orEmpty()
+      val fromName = decryptString(sender?.optString("94").orEmpty(), mailSk)
+      val from = if (fromName.isNotBlank() && fromAddr.isNotBlank()) {
+        "$fromName <$fromAddr>"
+      } else {
+        fromAddr.ifBlank { fromName }
+      }
+      val received = mail.optLong("107", 0L)
+      if (sinceMs != null && received > 0 && received <= sinceMs) continue
+      val date = if (received > 0) {
+        java.time.Instant.ofEpochMilli(received).toString()
+      } else {
+        java.time.Instant.now().toString()
+      }
+      val id = firstId(mail.opt("99")).ifBlank { "$listId/$elementId" }
+      out.add(TutaMsg(id, from, subject, date, null))
+    }
+    Log.i("MailTuta", "Tuta listed ${out.size} Inbox messages")
+    return out
+  }
+
+  private fun sessionKey(
+    instance: JSONObject,
+    ownerGroupAttr: String,
+    encKeyAttr: String,
+    versionAttr: String,
+    keys: List<TutaGroupKey>,
+  ): ByteArray? {
+    val groupId = firstId(instance.opt(ownerGroupAttr))
+    val enc = instance.optString(encKeyAttr)
+    if (groupId.isEmpty() || enc.isEmpty()) return null
+    val version = instance.optString(versionAttr, "0")
+    val groupKey = keys.firstOrNull { it.groupId == groupId && it.version == version }?.key
+      ?: keys.firstOrNull { it.groupId == groupId }?.key
+      ?: return null
+    return try {
+      decryptKey(groupKey, b64(enc))
+    } catch (e: Exception) {
+      Log.w("MailTuta", "session key unwrap failed: ${e.message}")
+      null
+    }
+  }
+
+  private fun decryptString(cipherB64: String, sessionKey: ByteArray?): String {
+    if (cipherB64.isBlank() || sessionKey == null) return ""
+    return try {
+      String(aesDecrypt(sessionKey, b64(cipherB64), padded = true), StandardCharsets.UTF_8)
+    } catch (e: Exception) {
+      Log.w("MailTuta", "string decrypt failed: ${e.message}")
+      ""
+    }
+  }
+
+  private fun decryptKey(wrappingKey: ByteArray, ciphertext: ByteArray): ByteArray {
+    val attempts = mutableListOf(wrappingKey)
+    if (wrappingKey.size > 16) attempts.add(wrappingKey.copyOfRange(0, 16))
+    var last: Exception? = null
+    for (key in attempts) {
+      try {
+        val padded = key.size != 16
+        val hasIv = key.size != 16 || ciphertext.size % 2 == 1
+        return aesDecrypt(key, ciphertext, padded = padded, hasPrependedIv = hasIv)
+      } catch (e: Exception) {
+        last = e
+      }
+    }
+    throw last ?: IllegalStateException("Tuta key unwrap failed")
   }
 
   /**
-   * Tuta KDF:
-   *  - "0" bcrypt: SHA-256(password) then bcrypt cost 8, first 16 bytes
-   *  - "1" Argon2id: t=4, m=32768 KiB, p=1, 32-byte key (OWASP / tutao defaults)
+   * Tuta AES-CBC. Odd-length ciphertext: version 1 + HMAC-SHA-256.
+   * AES-128 keys: SHA-256 split. AES-256 keys: SHA-512 split.
    */
+  private fun aesDecrypt(
+    key: ByteArray,
+    ciphertext: ByteArray,
+    padded: Boolean,
+    hasPrependedIv: Boolean = true,
+  ): ByteArray {
+    val authenticated = ciphertext.size % 2 == 1
+    val body: ByteArray
+    val encKey: ByteArray
+    if (authenticated) {
+      if (ciphertext[0].toInt() != 1) {
+        throw IllegalStateException("Tuta unknown cipher version ${ciphertext[0]}")
+      }
+      val hashed = if (key.size == 16) sha256(key) else sha512(key)
+      encKey = hashed.copyOfRange(0, key.size)
+      val authKey = hashed.copyOfRange(key.size, hashed.size)
+      val withoutVersion = ciphertext.copyOfRange(1, ciphertext.size - 32)
+      val mac = ciphertext.copyOfRange(ciphertext.size - 32, ciphertext.size)
+      val expected = hmacSha256(authKey, withoutVersion)
+      if (!expected.contentEquals(mac)) {
+        throw IllegalStateException("Tuta HMAC mismatch")
+      }
+      body = withoutVersion
+    } else {
+      encKey = key
+      body = ciphertext
+    }
+    val iv: ByteArray
+    val blocks: ByteArray
+    if (hasPrependedIv) {
+      iv = body.copyOfRange(0, 16)
+      blocks = body.copyOfRange(16, body.size)
+    } else {
+      iv = fixedIv
+      blocks = body
+    }
+    val cipher = Cipher.getInstance("AES/CBC/${if (padded) "PKCS5Padding" else "NoPadding"}")
+    cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(encKey, "AES"), IvParameterSpec(iv))
+    return cipher.doFinal(blocks)
+  }
+
+  private fun hmacSha256(key: ByteArray, data: ByteArray): ByteArray {
+    val mac = Mac.getInstance("HmacSHA256")
+    mac.init(SecretKeySpec(key, "HmacSHA256"))
+    return mac.doFinal(data)
+  }
+
   private fun derivePassphraseKey(password: String, salt: ByteArray, kdfVersion: String): ByteArray {
     return when (kdfVersion) {
       "0" -> {
@@ -167,34 +415,72 @@ private class TutaClient {
     }
   }
 
-  /** SHA-256 of the passphrase key, then base64url (tutao createAuthVerifierAsBase64Url). */
   private fun createAuthVerifierAsBase64Url(passphraseKey: ByteArray): String {
     val digest = sha256(passphraseKey)
-    val std = android.util.Base64.encodeToString(
-      digest,
-      android.util.Base64.NO_WRAP,
-    )
+    val std = android.util.Base64.encodeToString(digest, android.util.Base64.NO_WRAP)
     return std.replace('+', '-').replace('/', '_').replace("=", "")
   }
 
   private fun sha256(data: ByteArray): ByteArray =
     MessageDigest.getInstance("SHA-256").digest(data)
 
-  private fun request(
+  private fun sha512(data: ByteArray): ByteArray =
+    MessageDigest.getInstance("SHA-512").digest(data)
+
+  private fun requestObject(
     method: String,
     url: String,
     body: String?,
     session: TutaSession?,
+    version: String,
+    dependsOn: String?,
   ): JSONObject {
+    val text = requestRaw(method, url, body, session, version, dependsOn)
+    if (text.isBlank()) return JSONObject()
+    val trimmed = text.trim()
+    if (trimmed.startsWith("[")) {
+      val arr = JSONArray(trimmed)
+      return if (arr.length() > 0 && arr.optJSONObject(0) != null) {
+        arr.getJSONObject(0)
+      } else {
+        JSONObject()
+      }
+    }
+    return JSONObject(trimmed)
+  }
+
+  private fun requestArray(
+    method: String,
+    url: String,
+    session: TutaSession,
+    version: String,
+    dependsOn: String?,
+  ): JSONArray {
+    val text = requestRaw(method, url, null, session, version, dependsOn)
+    if (text.isBlank()) return JSONArray()
+    val trimmed = text.trim()
+    if (trimmed.startsWith("[")) return JSONArray(trimmed)
+    val obj = JSONObject(trimmed)
+    return JSONArray().put(obj)
+  }
+
+  private fun requestRaw(
+    method: String,
+    url: String,
+    body: String?,
+    session: TutaSession?,
+    version: String,
+    dependsOn: String?,
+  ): String {
     val conn = (URL(url).openConnection() as HttpsURLConnection)
     conn.requestMethod = method
     conn.connectTimeout = 20_000
     conn.readTimeout = 25_000
     conn.setRequestProperty("Accept", "application/json")
-    conn.setRequestProperty("v", modelVersion)
+    conn.setRequestProperty("v", version)
+    if (dependsOn != null) conn.setRequestProperty("dv", dependsOn)
     conn.setRequestProperty("cv", clientVersion)
     conn.setRequestProperty("cp", "web")
-
     if (body != null && method != "GET") {
       conn.setRequestProperty("Content-Type", "application/json")
     }
@@ -230,11 +516,46 @@ private class TutaClient {
       }
       throw IllegalStateException("Tuta HTTP ${conn.responseCode}: $extra")
     }
-    return if (text.isBlank()) JSONObject() else JSONObject(text)
+    return text
+  }
+
+  private fun firstId(raw: Any?): String {
+    return when (raw) {
+      null, JSONObject.NULL -> ""
+      is JSONArray -> {
+        if (raw.length() == 0) "" else firstId(raw.opt(raw.length() - 1))
+      }
+      else -> raw.toString().trim().trim('"')
+    }
+  }
+
+  private fun firstObject(raw: Any?): JSONObject? {
+    return when (raw) {
+      is JSONObject -> raw
+      is JSONArray -> if (raw.length() > 0) raw.optJSONObject(0) else null
+      else -> null
+    }
+  }
+
+  private fun firstObjectOrArray(raw: Any?): Pair<String, String> {
+    return when (raw) {
+      is JSONArray -> {
+        if (raw.length() >= 2) Pair(raw.optString(0), raw.optString(1))
+        else if (raw.length() == 1) Pair(raw.optString(0), "")
+        else Pair("", "")
+      }
+      is JSONObject -> Pair(firstId(raw.opt("0") ?: raw.opt("listId")), firstId(raw.opt("1") ?: raw.opt("elementId")))
+      is String -> {
+        val parts = raw.split("/")
+        if (parts.size >= 2) Pair(parts[0], parts[1]) else Pair(raw, "")
+      }
+      else -> Pair("", "")
+    }
   }
 
   private fun b64(s: String): ByteArray {
     val trimmed = s.trim()
+    if (trimmed.isEmpty()) return ByteArray(0)
     val flags =
       android.util.Base64.URL_SAFE or
         android.util.Base64.NO_WRAP or
