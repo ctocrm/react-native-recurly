@@ -27,6 +27,13 @@ describe("emailscan classifier (subject-first)", () => {
     expect(merchantFromAddress("billing@linode.com").merchantKey).toBe(
       "linode",
     );
+    // ccTLDs / public suffixes are not merchants.
+    expect(merchantFromAddress("noreply@proton.me")).toEqual({
+      merchantKey: "proton",
+      merchantName: "Proton",
+    });
+    expect(merchantFromAddress("hello@linear.app").merchantKey).toBe("linear");
+    expect(merchantFromAddress("billing@x.ai").merchantKey).toBe("x");
   });
 
   it("classifies the planned fixture subjects", () => {

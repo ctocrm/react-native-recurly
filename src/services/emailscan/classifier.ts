@@ -46,6 +46,24 @@ const GENERIC_LABELS = new Set([
   "email",
   "smtp",
   "mx",
+  // Public suffixes / ccTLDs. Never a merchant name (`proton.me` is not "Me").
+  "me",
+  "ai",
+  "app",
+  "dev",
+  "xyz",
+  "info",
+  "biz",
+  "us",
+  "uk",
+  "ca",
+  "de",
+  "fr",
+  "au",
+  "in",
+  "jp",
+  "edu",
+  "gov",
 ]);
 
 /** Payment processors are rails, not merchants the user subscribed to. */
