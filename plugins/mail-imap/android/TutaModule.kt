@@ -173,19 +173,18 @@ private class TutaClient {
     val userGroupRaw = firstObject(user.opt("95"))
       ?: throw IllegalStateException("Tuta User missing userGroup")
     val userGroupId = firstId(userGroupRaw.opt("29"))
-    val userGroupEnc = b64(userGroupRaw.optString("27"))
     val userGroupVer = userGroupRaw.optString("2246", "0")
-    val userGroupKey = decryptKey(session.passphraseKey, userGroupEnc)
+    val userGroupKey = decryptKey(session.passphraseKey, userGroupRaw.optString("27"))
 
     val memberships = user.optJSONArray("96") ?: JSONArray()
     var mailGroupId = ""
-    var mailGroupEnc = ByteArray(0)
+    var mailGroupEnc = ""
     var mailGroupVer = "0"
     for (i in 0 until memberships.length()) {
       val m = memberships.optJSONObject(i) ?: continue
       if (m.optString("1030") != "5") continue
       mailGroupId = firstId(m.opt("29"))
-      mailGroupEnc = b64(m.optString("27"))
+      mailGroupEnc = m.optString("27")
       mailGroupVer = m.optString("2246", "0")
       break
     }
@@ -306,7 +305,7 @@ private class TutaClient {
       ?: keys.firstOrNull { it.groupId == groupId }?.key
       ?: return null
     return try {
-      decryptKey(groupKey, b64(enc))
+      decryptKey(groupKey, enc)
     } catch (e: Exception) {
       Log.w("MailTuta", "session key unwrap failed: ${e.message}")
       null
@@ -315,25 +314,32 @@ private class TutaClient {
 
   private fun decryptString(cipherB64: String, sessionKey: ByteArray?): String {
     if (cipherB64.isBlank() || sessionKey == null) return ""
-    return try {
-      String(aesDecrypt(sessionKey, b64(cipherB64), padded = true), StandardCharsets.UTF_8)
-    } catch (e: Exception) {
-      Log.w("MailTuta", "string decrypt failed: ${e.message}")
-      ""
-    }
-  }
-
-  private fun decryptKey(wrappingKey: ByteArray, ciphertext: ByteArray): ByteArray {
-    val attempts = mutableListOf(wrappingKey)
-    if (wrappingKey.size > 16) attempts.add(wrappingKey.copyOfRange(0, 16))
     var last: Exception? = null
-    for (key in attempts) {
+    for (cipher in decodeTutaBytes(cipherB64)) {
       try {
-        val padded = key.size != 16
-        val hasIv = key.size != 16 || ciphertext.size % 2 == 1
-        return aesDecrypt(key, ciphertext, padded = padded, hasPrependedIv = hasIv)
+        return String(aesDecrypt(sessionKey, cipher, padded = true), StandardCharsets.UTF_8)
       } catch (e: Exception) {
         last = e
+      }
+    }
+    Log.w("MailTuta", "string decrypt failed: ${last?.message}")
+    return ""
+  }
+
+  // Official decryptKey: AES-CBC, no PKCS padding. AES-128 uses fixed IV.
+  // Bytes on the wire may be standard base64, URL-safe, or Tuta base64ext.
+  private fun decryptKey(wrappingKey: ByteArray, encoded: String): ByteArray {
+    val keys = mutableListOf(wrappingKey)
+    if (wrappingKey.size > 16) keys.add(wrappingKey.copyOfRange(0, 16))
+    var last: Exception? = null
+    for (ciphertext in decodeTutaBytes(encoded)) {
+      for (key in keys) {
+        try {
+          val hasIv = key.size != 16 || ciphertext.size % 2 == 1
+          return aesDecrypt(key, ciphertext, padded = false, hasPrependedIv = hasIv)
+        } catch (e: Exception) {
+          last = e
+        }
       }
     }
     throw last ?: IllegalStateException("Tuta key unwrap failed")
@@ -554,16 +560,46 @@ private class TutaClient {
   }
 
   private fun b64(s: String): ByteArray {
+    return decodeTutaBytes(s).firstOrNull() ?: ByteArray(0)
+  }
+
+  private fun decodeTutaBytes(s: String): List<ByteArray> {
     val trimmed = s.trim()
-    if (trimmed.isEmpty()) return ByteArray(0)
-    val flags =
-      android.util.Base64.URL_SAFE or
-        android.util.Base64.NO_WRAP or
-        android.util.Base64.NO_PADDING
-    return try {
-      android.util.Base64.decode(trimmed, android.util.Base64.DEFAULT)
-    } catch (_: IllegalArgumentException) {
-      android.util.Base64.decode(trimmed, flags)
+    if (trimmed.isEmpty()) return emptyList()
+    val out = LinkedHashMap<String, ByteArray>()
+    fun add(label: String, bytes: ByteArray?) {
+      if (bytes != null && bytes.isNotEmpty()) out.putIfAbsent(bytes.contentToString(), bytes)
     }
+    add("std", runCatching {
+      android.util.Base64.decode(trimmed, android.util.Base64.DEFAULT)
+    }.getOrNull())
+    add("url", runCatching {
+      android.util.Base64.decode(
+        trimmed,
+        android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP or android.util.Base64.NO_PADDING,
+      )
+    }.getOrNull())
+    add("ext", runCatching { decodeBase64Ext(trimmed) }.getOrNull())
+    if (out.isEmpty()) {
+      throw IllegalStateException("Tuta Bytes decode failed (${trimmed.length} chars)")
+    }
+    return out.values.toList()
+  }
+
+  private fun decodeBase64Ext(raw: String): ByteArray {
+    val ext = "-0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz"
+    val std = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+    val mapped = StringBuilder(raw.length)
+    for (ch in raw) {
+      val idx = ext.indexOf(ch)
+      if (idx < 0) throw IllegalArgumentException("not base64ext")
+      mapped.append(std[idx])
+    }
+    when (mapped.length % 4) {
+      2 -> mapped.append("==")
+      3 -> mapped.append("=")
+      1 -> throw IllegalArgumentException("bad base64ext length")
+    }
+    return android.util.Base64.decode(mapped.toString(), android.util.Base64.DEFAULT)
   }
 }
