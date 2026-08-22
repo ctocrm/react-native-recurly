@@ -28,8 +28,12 @@ export {
     classifySubject,
     extractEmailAddress,
     hasInvoiceAttachment,
+    isPaymentProcessor,
+    isSelfMail,
     merchantFromAddress,
-    moneyBodyText
+    merchantFromProcessorText,
+    moneyBodyText,
+    resolveMerchant
 } from "./classifier";
 
 export {

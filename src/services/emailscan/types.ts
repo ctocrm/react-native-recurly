@@ -3,7 +3,7 @@
  * A subscription is an account; a bill is optional evidence.
  */
 
-export const PARSER_VERSION = 1;
+export const PARSER_VERSION = 2;
 
 export type MailProviderId =
   | "gmail"

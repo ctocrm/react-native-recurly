@@ -1,16 +1,20 @@
 import {
+  brandedConnectRows,
+  imapConnectRow,
+  MAIL_PROVIDER_CATALOG,
+} from "../catalog";
+import {
   ALL_FIXTURES,
   FIXTURE_NEWSLETTER,
   FIXTURE_RENEWAL,
   FIXTURE_WELCOME,
-  MAIL_PROVIDER_CATALOG,
-  brandedConnectRows,
+} from "../fixtures";
+import { filterCandidates } from "../rollup";
+import {
   cachedCandidates,
   createMemoryScanStore,
-  filterCandidates,
-  imapConnectRow,
   runIncrementalScan,
-} from "../index";
+} from "../scan";
 import type { MessageFetcher, NormalizedMessage } from "../types";
 import { DEFAULT_DISPLAY_FILTERS, PARSER_VERSION } from "../types";
 

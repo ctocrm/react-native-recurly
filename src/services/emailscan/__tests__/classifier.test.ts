@@ -1,19 +1,20 @@
 import {
-    ALL_FIXTURES,
-    FIXTURE_NEWSLETTER,
-    FIXTURE_ORDER,
-    FIXTURE_OTP_DROP,
-    FIXTURE_PDF_AMOUNT_UNKNOWN,
-    FIXTURE_RENEWAL,
-    FIXTURE_RESET,
-    FIXTURE_USAGE_INVOICE,
-    FIXTURE_WELCOME,
-    buildCandidateMap,
-    classifyMessage,
-    classifySubject,
-    filterCandidates,
-    merchantFromAddress,
-} from "../index";
+  classifyMessage,
+  classifySubject,
+  merchantFromAddress,
+} from "../classifier";
+import {
+  ALL_FIXTURES,
+  FIXTURE_NEWSLETTER,
+  FIXTURE_ORDER,
+  FIXTURE_OTP_DROP,
+  FIXTURE_PDF_AMOUNT_UNKNOWN,
+  FIXTURE_RENEWAL,
+  FIXTURE_RESET,
+  FIXTURE_USAGE_INVOICE,
+  FIXTURE_WELCOME,
+} from "../fixtures";
+import { buildCandidateMap, filterCandidates } from "../rollup";
 import type { NormalizedMessage } from "../types";
 import { DEFAULT_DISPLAY_FILTERS } from "../types";
 
@@ -85,6 +86,62 @@ describe("emailscan classifier (subject-first)", () => {
   it("drops newsletter and OTP-only mail", () => {
     expect(classifyMessage(FIXTURE_NEWSLETTER).kind).toBeNull();
     expect(classifyMessage(FIXTURE_OTP_DROP).kind).toBeNull();
+  });
+
+  it("does not treat Stripe as a merchant; names the real seller when present", () => {
+    const unnamed = classifyMessage({
+      mailboxId: "proton:david@picksandshovels.app",
+      messageId: "stripe-unnamed",
+      from: "Stripe <receipts@stripe.com>",
+      subject: "Receipt from Stripe",
+      date: "2026-08-01T12:00:00.000Z",
+    });
+    expect(unnamed.kind).toBeNull();
+    expect(unnamed.merchantKey).toBe("stripe");
+    expect(unnamed.evidence).toEqual(
+      expect.arrayContaining(["drop:processor:stripe"]),
+    );
+
+    const named = classifyMessage({
+      mailboxId: "proton:david@picksandshovels.app",
+      messageId: "stripe-named",
+      from: "Stripe <receipts@stripe.com>",
+      subject: "Receipt from Linear",
+      date: "2026-08-01T12:00:00.000Z",
+      text: "You paid Linear $8.00 /mo via Stripe.",
+    });
+    expect(named.kind).toBe("sparse");
+    expect(named.merchantKey).toBe("linear");
+    expect(named.merchantName).toBe("Linear");
+    expect(named.evidence).toEqual(
+      expect.arrayContaining(["processor:stripe"]),
+    );
+  });
+
+  it("drops self-sent mail instead of naming it Me", () => {
+    const selfNamed = classifyMessage({
+      mailboxId: "proton:david@picksandshovels.app",
+      messageId: "self-me",
+      from: "Me",
+      subject: "Receipt for my notes",
+      date: "2026-08-01T12:00:00.000Z",
+    });
+    expect(selfNamed.kind).toBeNull();
+    expect(selfNamed.evidence).toEqual(
+      expect.arrayContaining(["drop:self-mail"]),
+    );
+
+    const selfAddr = classifyMessage({
+      mailboxId: "proton:david@picksandshovels.app",
+      messageId: "self-addr",
+      from: "David <david@picksandshovels.app>",
+      subject: "Your subscription reminder",
+      date: "2026-08-01T12:00:00.000Z",
+    });
+    expect(selfAddr.kind).toBeNull();
+    expect(selfAddr.evidence).toEqual(
+      expect.arrayContaining(["drop:self-mail"]),
+    );
   });
 });
 

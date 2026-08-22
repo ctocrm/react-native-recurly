@@ -48,6 +48,32 @@ const GENERIC_LABELS = new Set([
   "mx",
 ]);
 
+/** Payment processors are rails, not merchants the user subscribed to. */
+const PAYMENT_PROCESSORS = new Set([
+  "stripe",
+  "paypal",
+  "square",
+  "squareup",
+  "braintree",
+  "paddle",
+  "lemonsqueezy",
+  "lemon",
+  "fastspring",
+  "chargebee",
+  "recurly",
+  "adyen",
+  "klarna",
+  "afterpay",
+  "affirm",
+  "venmo",
+  "cashapp",
+  "wise",
+  "transferwise",
+  "worldpay",
+]);
+
+const SELF_DISPLAY_NAMES = new Set(["me", "you", "myself", "self"]);
+
 const ACCOUNT_RE =
   /\b(welcome|registered|verify(?:\s+your)?\s+email|account\s+created|confirm\s+your\s+(?:email|account)|thanks\s+for\s+(?:signing|joining)|you(?:'re| are) in)\b/i;
 
@@ -138,6 +164,128 @@ export function merchantFromAddress(from: string): {
   return { merchantKey: label.toLowerCase(), merchantName };
 }
 
+export function ownerAddressFromMailbox(mailboxId: string): string | null {
+  const colon = mailboxId.indexOf(":");
+  if (colon < 0) return null;
+  const hint = mailboxId
+    .slice(colon + 1)
+    .trim()
+    .toLowerCase();
+  return hint.includes("@") ? hint : null;
+}
+
+export function displayNameFrom(from: string): string {
+  const angled = from.indexOf("<");
+  const raw = (angled >= 0 ? from.slice(0, angled) : from).trim();
+  return raw
+    .replace(/^["']|["']$/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+export function isPaymentProcessor(merchantKey: string): boolean {
+  return PAYMENT_PROCESSORS.has(merchantKey.toLowerCase());
+}
+
+export function isSelfMail(message: NormalizedMessage): boolean {
+  const fromEmail = extractEmailAddress(message.from);
+  const owner = ownerAddressFromMailbox(message.mailboxId);
+  if (owner && fromEmail === owner) return true;
+  const display = displayNameFrom(message.from);
+  if (SELF_DISPLAY_NAMES.has(display)) {
+    if (!owner) return true;
+    if (fromEmail === owner || !fromEmail.includes("@")) return true;
+  }
+  const { merchantKey } = merchantFromAddress(message.from);
+  if (SELF_DISPLAY_NAMES.has(merchantKey) && !fromEmail.includes("@")) {
+    return true;
+  }
+  return false;
+}
+
+function titleCaseMerchant(raw: string): {
+  merchantKey: string;
+  merchantName: string;
+} {
+  const cleaned = raw
+    .replace(/["'`]/g, "")
+    .replace(/\s*[—(].*$/, "")
+    .replace(/\s+#\S+$/, "")
+    .replace(/\s+\d{3,}$/, "")
+    .replace(/^(?:your|a|an|the)\s+/i, "")
+    .trim();
+  const words = cleaned.split(/\s+/).filter(Boolean);
+  if (words.length === 0 || words.length > 6) {
+    return { merchantKey: "unknown", merchantName: "Unknown" };
+  }
+  const key = words
+    .join("-")
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, "");
+  if (!key || PAYMENT_PROCESSORS.has(key) || SELF_DISPLAY_NAMES.has(key)) {
+    return { merchantKey: "unknown", merchantName: "Unknown" };
+  }
+  const merchantName = words
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+  return { merchantKey: key, merchantName };
+}
+
+/** Real merchant from a processor receipt subject/body. Null if unknown. */
+export function merchantFromProcessorText(text: string): {
+  merchantKey: string;
+  merchantName: string;
+} | null {
+  const patterns = [
+    /(?:receipt|invoice|payment|paid)\s+(?:from|to|for)\s+(.+)$/i,
+    /you\s+paid\s+(.+)$/i,
+    /(.+?)\s+via\s+(?:stripe|paypal|square|paddle|braintree|lemonsqueezy|fastspring)\b/i,
+  ];
+  for (const re of patterns) {
+    const m = text.match(re);
+    if (!m?.[1]) continue;
+    const named = titleCaseMerchant(m[1]);
+    if (named.merchantKey !== "unknown") return named;
+  }
+  return null;
+}
+
+export function resolveMerchant(message: NormalizedMessage): {
+  merchantKey: string;
+  merchantName: string;
+  evidence: string[];
+  drop: boolean;
+} {
+  if (isSelfMail(message)) {
+    return {
+      merchantKey: "self",
+      merchantName: "Self",
+      evidence: ["drop:self-mail"],
+      drop: true,
+    };
+  }
+  const fromMerchant = merchantFromAddress(message.from);
+  if (!isPaymentProcessor(fromMerchant.merchantKey)) {
+    return { ...fromMerchant, evidence: [], drop: false };
+  }
+  const named =
+    merchantFromProcessorText(message.subject) ||
+    (message.text ? merchantFromProcessorText(message.text) : null);
+  if (!named) {
+    return {
+      merchantKey: fromMerchant.merchantKey,
+      merchantName: fromMerchant.merchantName,
+      evidence: [`drop:processor:${fromMerchant.merchantKey}`],
+      drop: true,
+    };
+  }
+  return {
+    ...named,
+    evidence: [`processor:${fromMerchant.merchantKey}`],
+    drop: false,
+  };
+}
+
 export function classifySubject(subject: string): SubjectClass {
   const s = subject.trim();
   if (!s) return "drop";
@@ -210,13 +358,14 @@ export function hasInvoiceAttachment(message: NormalizedMessage): boolean {
 
 export function classifyMessage(message: NormalizedMessage): ClassifiedMessage {
   const subjectClass = classifySubject(message.subject);
-  const { merchantKey, merchantName } = merchantFromAddress(message.from);
-  const evidence = [`subject:${subjectClass}`];
+  const resolved = resolveMerchant(message);
+  const { merchantKey, merchantName } = resolved;
+  const evidence = [`subject:${subjectClass}`, ...resolved.evidence];
 
-  if (subjectClass === "drop") {
+  if (resolved.drop || subjectClass === "drop") {
     return {
       message,
-      subjectClass,
+      subjectClass: resolved.drop ? "drop" : subjectClass,
       merchantKey,
       merchantName,
       kind: null,

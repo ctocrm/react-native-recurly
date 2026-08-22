@@ -1,10 +1,12 @@
 import { candidateToSubscription } from "./importCandidate";
 import { listMailboxesAsync } from "./persist";
 import {
-    createMailProvider,
-    MailConnectError,
-    MailScanUnverifiedError,
+  createMailProvider,
+  MailConnectError,
+  MailScanUnverifiedError,
 } from "./providers";
+import { filterCandidates } from "./rollup";
+import { DEFAULT_DISPLAY_FILTERS } from "./types";
 
 export async function importFromConnectedMailboxes(opts: {
   userId: string;
@@ -22,7 +24,11 @@ export async function importFromConnectedMailboxes(opts: {
     try {
       const provider = createMailProvider(box.providerId, opts.userId);
       const result = await provider.scan({ mailboxId: box.mailboxId });
-      for (const candidate of result.candidates) {
+      const recurring = filterCandidates(
+        result.candidates,
+        DEFAULT_DISPLAY_FILTERS,
+      );
+      for (const candidate of recurring) {
         const key = `${candidate.merchant}::${candidate.mailboxId}`;
         if (seen.has(key)) continue;
         await opts.addSubscription(candidateToSubscription(candidate));
