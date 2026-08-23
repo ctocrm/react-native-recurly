@@ -193,6 +193,27 @@ export async function clearMailboxAsync(mailboxId: string): Promise<void> {
   await db.runAsync("DELETE FROM mail_mailboxes WHERE id = ?", mailboxId);
 }
 
+/** Cached classified messages only. Does not drop mailbox rows or SecureStore. */
+export async function countScanCacheAsync(): Promise<number> {
+  const db = getDatabase();
+  const row = await db.getFirstAsync<{ n: number }>(
+    "SELECT COUNT(*) AS n FROM mail_messages",
+  );
+  return row?.n ?? 0;
+}
+
+/** Drop messages + since-cursors. Connected mailboxes stay signed in. */
+export async function clearScanCacheAsync(): Promise<void> {
+  const db = getDatabase();
+  await db.runAsync("DELETE FROM mail_messages");
+  await db.runAsync(
+    `UPDATE mail_mailboxes
+     SET last_message_date = NULL, last_message_id = NULL, parser_version = ?,
+         updated_at = datetime('now')`,
+    PARSER_VERSION,
+  );
+}
+
 /** ScanCacheStore that talks to the opened user DB. */
 export function createAsyncScanStore(): {
   getMailbox: typeof getMailboxAsync;

@@ -19,6 +19,10 @@ import {
   type IconCacheStats,
   type ImportScanResult,
 } from "@/services/database";
+import {
+  clearScanCacheAsync,
+  countScanCacheAsync,
+} from "@/services/emailscan/persist";
 import { useClerk, useUser } from "@clerk/expo";
 import * as DocumentPicker from "expo-document-picker";
 import * as Sharing from "expo-sharing";
@@ -36,7 +40,7 @@ import {
 } from "react-native";
 import { SafeAreaView as RNSafeAreaView } from "react-native-safe-area-context";
 
-type ClearTarget = "iconCache" | "crawlHistory" | null;
+type ClearTarget = "iconCache" | "crawlHistory" | "emailScanCache" | null;
 
 const SafeAreaView = styled(RNSafeAreaView);
 
@@ -98,14 +102,19 @@ const Settings = () => {
     crawlQueue: 0,
     crawledUrls: 0,
   });
+  const [scanCacheCount, setScanCacheCount] = useState(0);
   const [confirmTarget, setConfirmTarget] = useState<ClearTarget>(null);
   const [clearing, setClearing] = useState(false);
 
   const loadStats = useCallback(async () => {
     if (!isReady) return;
     try {
-      const stats = await getIconCacheStats();
+      const [stats, mailCount] = await Promise.all([
+        getIconCacheStats(),
+        countScanCacheAsync(),
+      ]);
       setCacheStats(stats);
+      setScanCacheCount(mailCount);
     } catch (error) {
       console.error("Failed to load cache stats:", error);
     }
@@ -327,6 +336,11 @@ const Settings = () => {
       message: `This clears the ${cacheStats.crawledUrls} crawled URL(s) used for deduplication and resets all rate-limit cooldowns, so re-spidering starts fresh with repeatable behaviour.`,
       event: "settings_clear_crawl_history",
     },
+    emailScanCache: {
+      title: "Clear Email Scan Cache",
+      message: `This deletes ${scanCacheCount} cached message(s) and resets the scan cursor. Connected mailboxes stay signed in. The next Scan lists inbox mail again.`,
+      event: "settings_clear_email_scan_cache",
+    },
   };
 
   const handleConfirmClear = async () => {
@@ -340,9 +354,12 @@ const Settings = () => {
         await clearIconCache();
         clearCache(); // empty the in-memory cache map too
         posthog.capture("settings_clear_icon_cache");
-      } else {
+      } else if (target === "crawlHistory") {
         await clearCrawlHistory();
         posthog.capture("settings_clear_crawl_history");
+      } else {
+        await clearScanCacheAsync();
+        posthog.capture("settings_clear_email_scan_cache");
       }
       await loadStats();
     } catch (error) {
@@ -763,8 +780,8 @@ const Settings = () => {
             Cache & Crawl Data
           </Text>
           <Text className="text-xs font-sans-medium text-muted-foreground mb-3">
-            Clear cached icon data or spider/crawl history to reset crawlers and
-            make re-searching repeatable.
+            Clear cached icon data, spider/crawl history, or the email-scan
+            cache. Mailbox logins stay signed in.
           </Text>
 
           <Pressable
@@ -779,13 +796,24 @@ const Settings = () => {
           </Pressable>
 
           <Pressable
-            className={`auth-button bg-destructive ${clearing || !isReady ? "opacity-50" : ""}`}
+            className={`auth-button bg-destructive mb-3 ${clearing || !isReady ? "opacity-50" : ""}`}
             onPress={() => setConfirmTarget("crawlHistory")}
             disabled={clearing || !isReady}
           >
             <Text className="auth-button-text text-white">
               Clear Spider / Crawl History
               {cacheStats.crawledUrls > 0 ? ` (${cacheStats.crawledUrls})` : ""}
+            </Text>
+          </Pressable>
+
+          <Pressable
+            className={`auth-button bg-destructive ${clearing || !isReady ? "opacity-50" : ""}`}
+            onPress={() => setConfirmTarget("emailScanCache")}
+            disabled={clearing || !isReady}
+          >
+            <Text className="auth-button-text text-white">
+              Clear Email Scan Cache
+              {scanCacheCount > 0 ? ` (${scanCacheCount})` : ""}
             </Text>
           </Pressable>
         </View>
