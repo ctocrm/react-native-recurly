@@ -11,6 +11,7 @@ import {
 } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { gunzipSync, inflateRawSync, inflateSync } from "node:zlib";
 
 const ROOT = resolve(import.meta.dirname, "../..");
 const BASE = "https://app.tuta.com";
@@ -18,7 +19,9 @@ const MODEL_V = "154";
 const TUTANOTA_V = "102";
 const MAIL_V = "105";
 const MAIL_DV = "144";
+const STORAGE_V = "14";
 const CLIENT_V = "357.260818.1";
+
 const MIN_ID = "------------";
 const MAX_ID = "zzzzzzzzzzzz";
 const FIXED_IV = Buffer.alloc(16, 0x88);
@@ -206,7 +209,72 @@ function decryptString(cipherB64, sessionKey) {
   return last ? `[decrypt fail: ${last.message}]` : "";
 }
 
+function inflateMaybe(bytes) {
+  if (!bytes || bytes.length === 0) return "";
+  for (const fn of [gunzipSync, inflateSync, inflateRawSync]) {
+    try {
+      return fn(bytes).toString("utf8");
+    } catch {
+      // try next
+    }
+  }
+  try {
+    return bytes.toString("utf8");
+  } catch {
+    return "";
+  }
+}
+
+function walkLongestPlain(node, sessionKey) {
+  let best = "";
+  const visit = (value) => {
+    if (value == null) return;
+    if (Array.isArray(value)) {
+      for (const item of value) visit(item);
+      return;
+    }
+    if (typeof value === "object") {
+      for (const item of Object.values(value)) visit(item);
+      return;
+    }
+    if (typeof value !== "string" || value.length < 16) return;
+    const plain = decryptString(value, sessionKey);
+    if (
+      plain &&
+      !plain.startsWith("[decrypt fail") &&
+      plain.length > best.length
+    ) {
+      best = plain;
+    }
+  };
+  visit(node);
+  return best;
+}
+
+function bodyFromDetails(details, sessionKey) {
+  const body = details?.["1288"] ?? details?.body;
+  const compressed = body?.["1276"] ?? body?.compressedText;
+  const text = body?.["1275"] ?? body?.text;
+  if (compressed) {
+    const raw = decryptString(compressed, sessionKey);
+    if (raw && !raw.startsWith("[decrypt fail")) {
+      const asBuf = Buffer.from(raw, "utf8");
+      const inflated = inflateMaybe(asBuf);
+      if (inflated && inflated.length >= raw.length) return inflated;
+      const latin = inflateMaybe(Buffer.from(raw, "latin1"));
+      if (latin) return latin;
+      return raw;
+    }
+  }
+  if (text) {
+    const raw = decryptString(text, sessionKey);
+    if (raw && !raw.startsWith("[decrypt fail")) return raw;
+  }
+  return walkLongestPlain(details, sessionKey);
+}
+
 function derivePassphraseKey(password, salt, kdfVersion) {
+
   if (kdfVersion === "0") {
     throw new Error(
       "bcrypt kdf not implemented in this POC; account used Argon2 last time",
@@ -227,7 +295,44 @@ function authVerifier(passphraseKey) {
   return sha256(passphraseKey).toString("base64url");
 }
 
-async function request(method, url, { body, token, version, dependsOn } = {}) {
+function randomCustomId() {
+  return crypto.getRandomValues(Buffer.alloc(4)).toString("base64url");
+}
+
+function blobTokenBodies(archiveId, instanceId) {
+  const readArchive = {
+    176: randomCustomId(),
+    177: archiveId,
+    178: null,
+    179: [],
+  };
+  const readInstance = {
+    176: randomCustomId(),
+    177: archiveId,
+    178: null,
+    179: [{ 173: randomCustomId(), 174: instanceId }],
+  };
+  return [
+    {
+      label: "archive-null",
+      body: { 78: "0", 180: null, 80: null, 181: readArchive },
+    },
+    {
+      label: "maildetails-2",
+      body: { 78: "0", 180: "2", 80: null, 181: readInstance },
+    },
+    {
+      label: "archive-2",
+      body: { 78: "0", 180: "2", 80: null, 181: readArchive },
+    },
+  ];
+}
+
+async function request(
+  method,
+  url,
+  { body, token, version, dependsOn, blobToken } = {},
+) {
   const headers = {
     Accept: "application/json",
     v: version ?? MODEL_V,
@@ -236,6 +341,7 @@ async function request(method, url, { body, token, version, dependsOn } = {}) {
   };
   if (dependsOn) headers.dv = dependsOn;
   if (token) headers.accessToken = token;
+  if (blobToken) headers.blobAccessToken = blobToken;
   if (body && method !== "GET") headers["Content-Type"] = "application/json";
   const res = await fetch(url, {
     method,
@@ -249,13 +355,114 @@ async function request(method, url, { body, token, version, dependsOn } = {}) {
   } catch {
     json = { _raw: text.slice(0, 400) };
   }
+  const extra = {};
+  for (const key of [
+    "error-id",
+    "errorid",
+    "access-control-allow-origin",
+    "content-type",
+    "precondition",
+  ]) {
+    const val = res.headers.get(key);
+    if (val) extra[key] = val;
+  }
   return {
     status: res.status,
     json,
     textLen: text.length,
     errorId: res.headers.get("error-id"),
+    extra,
   };
 }
+
+async function loadMailDetailsBlob({
+  token,
+  archiveId,
+  instanceId,
+  sessionKey,
+}) {
+  // Official worker: requestReadTokenArchive(archiveId) then GET
+  // `${blobServer}/rest/tutanota/maildetailsblob?ids=${elementId}`.
+  let tokenRes = { status: 0, json: null, errorId: null, extra: {} };
+  let blobAccessToken = "";
+  let servers = [];
+  for (const attempt of blobTokenBodies(archiveId, instanceId)) {
+    tokenRes = await request(
+      "POST",
+      `${BASE}/rest/storage/blobaccesstokenservice`,
+      {
+        body: JSON.stringify(attempt.body),
+        token,
+        version: STORAGE_V,
+      },
+    );
+    const info = tokenRes.json?.["161"] ?? tokenRes.json?.blobAccessInfo;
+    blobAccessToken = info?.["159"] ?? info?.blobAccessToken ?? "";
+    servers = (info?.["160"] ?? info?.servers ?? [])
+      .map((s) => s?.["156"] ?? s?.url ?? "")
+      .filter(Boolean);
+    log("blobAccessToken", {
+      label: attempt.label,
+      status: tokenRes.status,
+      errorId: tokenRes.errorId,
+      extra: tokenRes.extra,
+      keys: keysOf(tokenRes.json),
+      tokenChars: String(blobAccessToken).length,
+      servers,
+      sent: attempt.body,
+    });
+    if (tokenRes.status >= 200 && tokenRes.status <= 299 && blobAccessToken) {
+      break;
+    }
+  }
+  if (tokenRes.status < 200 || tokenRes.status > 299 || !blobAccessToken) {
+    return { status: tokenRes.status, text: "" };
+  }
+
+  const targets = servers.length ? servers : [BASE];
+  let last = { status: 0, json: null, errorId: null };
+  for (const server of targets) {
+    const origin = server.replace(/\/$/, "");
+    const qs = new URLSearchParams({
+      ids: instanceId,
+      blobAccessToken,
+      v: "113",
+      accessToken: token,
+    });
+    const url = `${origin}/rest/tutanota/maildetailsblob?${qs}`;
+    last = await request("GET", url, {
+      version: "113",
+      token,
+      blobToken: blobAccessToken,
+    });
+    log("maildetailsblob GET", {
+      origin,
+      status: last.status,
+      errorId: last.errorId,
+      extra: last.extra,
+      keys: keysOf(last.json),
+      first: Array.isArray(last.json) ? keysOf(last.json[0]) : keysOf(last.json),
+      rawHead: JSON.stringify(last.json)?.slice(0, 400),
+    });
+    if (last.status >= 200 && last.status <= 299 && last.json) break;
+  }
+
+  const instances = asArray(last.json);
+  let best = "";
+  for (const inst of instances) {
+    const details = inst?.["1305"] ?? inst?.details ?? inst;
+    const plain = bodyFromDetails(details, sessionKey);
+    if (plain.length > best.length) best = plain;
+    if (!plain) {
+      const walked = walkLongestPlain(inst, sessionKey);
+      if (walked.length > best.length) best = walked;
+    }
+  }
+  return { status: last.status, text: best };
+}
+
+
+
 
 function asArray(json) {
   if (Array.isArray(json)) return json;
@@ -470,8 +677,10 @@ async function main() {
         fromPlain: firstObject(mail?.["111"])?.["95"],
         body115: mail?.["115"],
         attachments117: mail?.["117"],
-        body1465: mail?.["1465"],
+        mailDetails1308: mail?.["1308"],
+        sets1465: mail?.["1465"],
       });
+
       const owner = firstId(mail?.["587"]);
       const groupKey =
         owner === mailGroupId
@@ -498,23 +707,33 @@ async function main() {
         from: fromName ? `${fromName} <${fromAddr}>` : fromAddr,
         subject,
       });
-      const [detailsListId, detailsElementId] = idPair(mail?.["1465"]);
-      if (detailsListId && detailsElementId) {
-        const detailsRes = await request(
-          "GET",
-          `${BASE}/rest/tutanota/maildetailsblob/${detailsListId}/${detailsElementId}`,
-          { token, version: TUTANOTA_V },
-        );
-        const details = detailsRes.json;
-        log("maildetailsblob", {
-          status: detailsRes.status,
-          errorId: detailsRes.errorId,
-          keys: keysOf(details),
-          first: Array.isArray(details) ? keysOf(details[0]) : keysOf(details),
-          rawHead: JSON.stringify(details)?.slice(0, 800),
-        });
+      const [archiveId, detailsElementId] = idPair(mail?.["1308"]);
+
+      let bodyText = "";
+      if (archiveId && detailsElementId && groupKey && mail?.["102"]) {
+        try {
+          const sk = decryptKey(groupKey, mail["102"]);
+          const loaded = await loadMailDetailsBlob({
+            token,
+            archiveId,
+            instanceId: detailsElementId,
+            sessionKey: sk.key,
+          });
+          bodyText = loaded.text || "";
+          log("DECrypted body", {
+            subject,
+            status: loaded.status,
+            chars: bodyText.length,
+            hasTotalCharged: /TOTAL CHARGED/i.test(bodyText),
+            has474: bodyText.includes("47.74"),
+            head: bodyText.replace(/\s+/g, " ").slice(0, 240),
+          });
+        } catch (e) {
+          log("body hop error", { message: e.message });
+        }
       }
       totalListed += 1;
+
     }
   }
 
