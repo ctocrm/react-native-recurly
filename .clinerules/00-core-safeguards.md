@@ -25,6 +25,22 @@ These are mandatory invariants for every Cline task in this project. The detaile
 - Do not touch unrelated files while fixing an issue.
 - If another issue is discovered, record it in the plan but do not silently expand scope.
 - Before risky changes or deletion, create a focused git checkpoint that excludes unrelated working-tree changes.
+- One issue is the **user's named outcome**, not a smaller milestone the agent invents after a partial win.
+- Finding a new hole does not let the agent abandon the named outcome.
+- Recording the hole in the plan is not permission to stop.
+
+## The user's named outcome is the only definition of done
+
+- The user-visible sentence the user asked for is the only definition of done.
+- Forbidden substitutes for done: listed N messages, an HTTP status, unit tests, a rebuild, a cache wipe, a screenshot of the wrong screen, a plan note, a changelog, an apology, or acknowledging the outcome.
+- Acknowledging the outcome is not completing it.
+- Do not ask the user to weaken, remove, or rephrase safeguards so a different finish line becomes legal.
+
+## Process is not the product
+
+- Updating `docs/plan.md`, `docs/LESSONS_LEARNED.md`, writing a fail report, or making a docs commit is **not the task** unless the user asked only for documentation.
+- Docs/hygiene only after the user's named gate is proven.
+- Committing "we failed at X" instead of doing the agreed next action is a rule violation.
 
 ## No claims without end-to-end evidence
 
@@ -33,6 +49,8 @@ These are mandatory invariants for every Cline task in this project. The detaile
 - If a required gate cannot be run, state that it remains unverified; do not convert partial evidence into a success claim.
 - For crawler/icon quality work, test at least 5 real, diverse subscriptions, including uncommon companies, after clearing state when needed.
 - Verify results are brand-correct icons, not merely valid images.
+- An honest fail write-up is not a completed task.
+- Unverified and failed are not done. The original outcome stays open until the **user** changes it.
 
 ## No tool-call spirals
 
@@ -45,13 +63,14 @@ These are mandatory invariants for every Cline task in this project. The detaile
 
 ## Three-strike fix safeguard
 
-- Count consecutive implementation attempts for the same root issue.
-- If three consecutive fix attempts fail validation, STOP the main repair loop.
-- Produce a detailed resume for the user: symptoms, evidence, attempts, diffs/commits, observed failures, hypotheses, and remaining uncertainty.
-- Preserve the current state with a focused git checkpoint.
-- Brainstorm with the user until a materially different approach is agreed.
-- Update `docs/plan.md` with that approach and commit the plan before resuming implementation.
-- Reset the attempt counter only after the approach materially changes or the failed hypothesis is replaced.
+- Count consecutive implementation attempts of the **same hypothesis**, not every edit toward the user's outcome.
+- Three-strike stops a **fourth blind implementation of the same hypothesis**.
+- It is a **pause**, not task completion. Do not say done, fail, or "gap only" as if the outcome is closed.
+- After three failed attempts: stop that hypothesis, preserve a focused checkpoint, give a detailed resume, then offer 2–5 materially different options with tradeoffs and wait for the user to pick.
+- Then implement **the option the user picked**. That resets the counter because the hypothesis changed.
+- Strikes do not carry across an agreed new hop (example: list/header HMAC unwrap is not the same hypothesis as a body BlobAccessToken fetch).
+- After the user picks, resume is required. Quitting is a violation.
+- Update `docs/plan.md` with the agreed approach only after the user picks, then resume implementation. A plan commit is not a substitute for the agreed action.
 
 ## Expensive/destructive work requires proof first
 
@@ -59,6 +78,9 @@ These are mandatory invariants for every Cline task in this project. The detaile
 - Before any future training, first prove end-to-end that the app loads and runs an existing known model through the intended inference path.
 - Never recommend paid compute to compensate for an unverified wiring, data, validation, or inference problem.
 - Never delete data/files or rewrite broad repository history without a checkpoint and explicit need.
+- If the next action is already agreed, **do that action**. Do not re-acknowledge, re-read the plan, or rebuild first.
+- Ceremony (reread / wipe / screenshot / plan note) while an agreed code/POC change is pending is a cost violation.
+- Token spend after the correct hop is known, without implementing it, is the failure this section exists to stop.
 
 ## Documentation and workflow
 
@@ -67,3 +89,5 @@ These are mandatory invariants for every Cline task in this project. The detaile
 - `docs/CLINE_WORKFLOW.md` is human-readable workflow documentation.
 - The native Cline repair workflow lives at `.clinerules/workflows/jsmastery-repair-loop.md`; do not confuse the documentation with the Cline-managed artifact.
 - Follow the native repair workflow for bug/recovery work: Analyse → Edit → Lint/Syntax → Commit → Build+Emulator → Test → Docs/Hygiene → Commit → Repeat.
+- Update documentation after the user-facing gate is proven, not after a failed attempt.
+

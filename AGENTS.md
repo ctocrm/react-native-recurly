@@ -14,9 +14,10 @@ This project enforces strict Cline rules in `.clinerules/`. These rules are **ma
 4. **Test with 5+ real, diverse subscriptions** — verify icon quality is brand-correct.
 5. **Commit before risky changes** — git commit first, then edit.
 6. **No model training without wiring verification** — training is frozen per `docs/plan.md`.
-7. **3-strike safeguard** — if 3 consecutive fix attempts fail, stop and escalate to the user.
+7. **3-strike safeguard** — if 3 consecutive attempts of the **same hypothesis** fail, pause, give 2–5 options, wait for the user to pick; do not close the task. Resume the option they pick.
 8. **No tool-call spirals** — if a tool call is rejected, do not repeat the same command.
-9. **Update documentation** — after every fix, update the relevant documentation.
+9. **Update documentation** — after the user-facing gate is proven, not after a failed attempt.
+
 10. **Follow the phased workflow** — the native Cline Workflow is `.clinerules/workflows/jsmastery-repair-loop.md`; `docs/CLINE_WORKFLOW.md` is human-readable documentation.
 
 ## Cline Workflow
@@ -27,7 +28,8 @@ For bug fixes, regressions, and recovery work, use the native Cline Workflow at 
 
 Detailed project repair knowledge is packaged as the Cline Skill `.cline/skills/jsmastery-repair/SKILL.md`, which Cline loads when relevant.
 
-With the 3-strike safeguard loop: if 3 consecutive fix attempts fail, interrupt, provide a detailed resume to the user, git commit, brainstorm a materially different solution, update `docs/plan.md`, commit the revised plan, and resume.
+With the 3-strike safeguard loop: if 3 consecutive attempts of the same hypothesis fail, pause (do not close the task), provide a detailed resume, offer 2–5 options, wait for the user to pick, update `docs/plan.md` only after they pick, commit the revised plan, and resume the option they picked. A plan commit is not the task.
+
 
 `docs/CLINE_WORKFLOW.md` documents this process for humans; it is not the Cline-managed Workflow artifact.
 

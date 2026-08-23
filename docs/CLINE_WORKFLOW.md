@@ -1,6 +1,7 @@
 # Cline Workflow — jsmastery Project
 
-**Last updated:** 2026-08-12  
+**Last updated:** 2026-08-23
+  
 **Purpose:** Human-readable documentation for the jsmastery repair process.
 
 > **This file is documentation, not the Cline-managed Workflow.**
@@ -101,7 +102,9 @@ Each phase follows this loop until the phase is complete:
 
 ### Step 7: Doc/Hygiene
 
-- Update `docs/plan.md` with what was done.
+- Update `docs/plan.md` with what was done **after** the user-facing gate is proven.
+- Do not write a fail report or changelog as a substitute for the named outcome.
+
 - Update any relevant documentation.
 - Clean up temporary files.
 - Delete stale docs, don't create new ones alongside them.
@@ -128,23 +131,25 @@ npm run build:android:x86_64   # install + launch on emu when self-contained
 
 ## 3-Strike Safeguard Loop
 
-If 3 consecutive implementation attempts fail validation for the same root issue, **STOP immediately**. Do not make a fourth speculative fix:
+If 3 consecutive implementation attempts of the **same hypothesis** fail, **pause**. Do not make a fourth speculative fix of that guess. This is not task completion. Do not say done, fail, or "gap only" as if the user's named outcome is closed.
 
 ```
 ┌─────────────────────────────────┐
-│ 3 consecutive fix attempts fail │
+│ 3 consecutive same-hypothesis   │
+│ attempts fail                   │
 └──────────────┬──────────────────┘
                │
                ▼
 ┌─────────────────────────────────┐
-│ 1. Interrupt the main loop      │
+│ 1. Pause that hypothesis        │
+│    (task stays open)            │
 └──────────────┬──────────────────┘
                │
                ▼
 ┌─────────────────────────────────┐
-│ 2. Provide detailed resume to   │
-│    the user (what was tried,     │
-│    what failed, why)             │
+│ 2. Provide detailed resume      │
+│    (what was tried, what        │
+│    failed, why)                 │
 └──────────────┬──────────────────┘
                │
                ▼
@@ -154,27 +159,28 @@ If 3 consecutive implementation attempts fail validation for the same root issue
                │
                ▼
 ┌─────────────────────────────────┐
-│ 4. Brainstorm with the user     │
-│    back and forth until settled  │
-│    on a new solution             │
+│ 4. Offer 2–5 options and wait   │
+│    until the user picks         │
 └──────────────┬──────────────────┘
                │
                ▼
 ┌─────────────────────────────────┐
 │ 5. Update docs (plan.md) with   │
-│    the new approach              │
+│    the picked approach          │
 └──────────────┬──────────────────┘
                │
                ▼
 ┌─────────────────────────────────┐
 │ 6. Git commit the updated plan  │
+│    (not a substitute for the    │
+│    agreed action)               │
 └──────────────┬──────────────────┘
                │
                ▼
 ┌─────────────────────────────────┐
-│ 7. Resume the main loop with    │
-│    the updated plan for that    │
-│    part of the issue            │
+│ 7. Resume is required.          │
+│    Implement the option the     │
+│    user picked                  │
 └─────────────────────────────────┘
 ```
 
@@ -189,6 +195,8 @@ If 3 consecutive implementation attempts fail validation for the same root issue
 
 - A fix that works but has a minor lint issue (fix the lint and retry).
 - A fix that works but needs a doc update (update the doc and continue).
+- A later agreed hop that is a different hypothesis (example: list/header HMAC unwrap is not the same strike as a body BlobAccessToken fetch).
+- Writing a fail report or plan note instead of doing the agreed next action (that is a rule violation, not a completed 3-strike).
 
 ---
 

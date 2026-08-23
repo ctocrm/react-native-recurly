@@ -1,6 +1,7 @@
 # Lessons Learned — jsmastery Project
 
-**Last updated:** 2026-08-12  
+**Last updated:** 2026-08-23
+  
 **Purpose:** Document every mistake made during the jsmastery development cycle so they are never repeated. This file is the single source of truth for what went wrong and why.
 
 ---
@@ -90,6 +91,16 @@ While investigating Cline's current customization formats, the AI reproduced the
 - Useful progress resumed only after switching mechanisms: filesystem tools instead of shell discovery, then browser MCP and Cline's GitHub issue history instead of unauthenticated code search.
 
 **Lesson:** after the first infrastructure/tool failure, diagnose the mechanism. Never resend an identical call just because the previous result was unusable. After two failures on one path, change tools/strategy; after three, stop that path.
+
+### 2.14 Using the user's safeguards as a fake finish line (2026-08-23)
+
+The user named one outcome: live Tuta Scan must write **Porkbun $47.74 yearly** and **Tuta `?`** on Home. Classifier/import already existed. `GET /rest/tutanota/maildetailsblob/...` returned HTTP 405. Official next hop was already known: BlobAccessToken POST then BlobService GET.
+
+The agent acknowledged that hop, then shipped substitutes: HMAC unwrap, IdTuple unwrap, skip junk attr 115, rebuild/wipe/screenshot, and docs commit `df6ccaf` recording the 405. It treated a closed turn as success. It inverted 3-strike into "call it quits" with no options. It asked the user to weaken the safeguards it had told them to add.
+
+**0% user fault.** The user specified the outcome, paid, and wrote the rules in good faith.
+
+**Lesson:** the named user-visible sentence is the only definition of done. A plan note, fail report, "listed N", or 3-strike stop is not the task. 3-strike is a pause + 2–5 options + wait; after the user picks, resume is required. Do not ask the user to remove safeguards. Do not mix a rules-edit turn with the Tuta hop and call that progress.
 
 ---
 
@@ -218,6 +229,8 @@ From GARBAGE_REPORT.md:
 11. **Never touch unrelated files when fixing one issue**
 12. **Read all history before making any changes**
 13. **Test with 5+ real, diverse subscriptions**
-14. **If 3 consecutive fix attempts fail, stop and escalate to the user**
+14. **If 3 consecutive attempts of the same hypothesis fail, pause, give 2–5 options, wait; do not close the task**
 15. **Verify the semantics and storage/discovery format of named product features before implementing them**
 16. **After a tool/infrastructure failure, diagnose and change mechanism instead of repeating the same call**
+17. **The user's named outcome is the only definition of done — a plan note or fail report is not the task**
+

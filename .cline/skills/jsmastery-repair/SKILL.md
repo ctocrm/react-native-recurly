@@ -57,14 +57,14 @@ A successful static check or build is not evidence that the behavior is fixed.
 
 ## Three-strike safeguard
 
-Track failed implementation attempts against the same root issue.
+Track consecutive implementation attempts of the **same hypothesis**, not every edit toward the user's named outcome.
 
-After three consecutive failed attempts:
+After three consecutive failed attempts of that hypothesis:
 
-1. Stop editing; no fourth speculative fix.
+1. Pause that hypothesis; no fourth speculative fix of the same guess.
 2. Preserve useful state with a focused checkpoint.
 3. Give the user a detailed resume containing:
-   - symptom and expected behavior
+   - symptom and expected behavior (the named outcome — still open)
    - reproduction
    - relevant code paths
    - last known working state
@@ -73,11 +73,12 @@ After three consecutive failed attempts:
    - commits/checkpoints
    - known facts versus hypotheses
    - unresolved uncertainty
-4. Brainstorm a materially different approach with the user.
-5. Do not resume implementation until an approach is agreed.
-6. Update `docs/plan.md` with the failed approach, new strategy, and next validation.
+4. Offer 2–5 materially different options with tradeoffs. Wait for the user to pick.
+5. Do not resume implementation until an approach is agreed. Do not quit or call the task done/failed/"gap only."
+6. After the user picks, update `docs/plan.md` with the failed approach, new strategy, and next validation. A plan commit is not a substitute for the agreed action.
 7. Commit the revised plan.
-8. Resume the main repair workflow and reset the attempt counter only because the hypothesis materially changed.
+8. Resume is required. Implement the option the user picked. Reset the attempt counter only because the hypothesis materially changed. Strikes do not carry across an agreed new hop.
+
 
 ## Icon/crawler-specific knowledge
 

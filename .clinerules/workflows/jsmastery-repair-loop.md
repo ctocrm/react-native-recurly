@@ -125,20 +125,23 @@ Commit the focused documentation/hygiene changes separately when appropriate.
 
 ## Three-strike interrupt loop
 
-If three consecutive implementation attempts fail for the same root issue, STOP the main loop. Do not make a fourth speculative fix.
+Three-strike stops a **fourth blind implementation of the same hypothesis**. It is a **pause**, not task completion. Do not say done, fail, or "gap only" as if the user's named outcome is closed. Do not make a fourth speculative fix of the same guess.
+
+Strikes count consecutive implementation attempts of the **same hypothesis**, not every edit toward the user's outcome. Strikes do not carry across an agreed new hop.
 
 ### A. Freeze and preserve
 
-1. Stop editing the issue.
+1. Stop editing that hypothesis.
 2. Inspect the current diff/status.
 3. Create a focused checkpoint if there is uncommitted investigative state worth preserving.
 4. Do not discard evidence from the failed attempts.
+5. Do not close the task.
 
 ### B. Give the user a detailed resume
 
 Report:
 
-- original symptom and expected behavior
+- original symptom and expected behavior (the user's named outcome — still open)
 - last known working state
 - reproduction steps
 - relevant architecture/code paths
@@ -155,22 +158,24 @@ Report:
 
 1. Enter a back-and-forth planning discussion.
 2. Do not edit while the replacement approach is unsettled.
-3. Offer materially different approaches based on evidence, including tradeoffs.
+3. Offer **2–5 materially different options** based on evidence, including tradeoffs.
 4. Do not merely rename/repackage the same failed hypothesis.
-5. Continue until the user and Cline agree on a new direction.
+5. Continue until the user picks. Quitting instead of offering options is a violation.
 
 ### D. Update and commit the revised plan
 
-1. Update the relevant section of `docs/plan.md` with:
+1. After the user picks, update the relevant section of `docs/plan.md` with:
    - failed approach
    - evidence that invalidated it
    - newly agreed hypothesis/strategy
    - exact next validation
 2. Commit the revised plan before implementation resumes.
+3. A plan commit is not a substitute for the agreed action.
 
 ### E. Resume the main loop
 
-Return to Analyse using the revised plan. Reset the three-attempt counter only because the underlying approach/hypothesis has materially changed.
+After the user picks, resume is required. Return to Analyse using the revised plan. Reset the three-attempt counter only because the underlying approach/hypothesis has materially changed. Implement the option the user picked.
+
 
 ## Tool/infrastructure failure interrupt
 
