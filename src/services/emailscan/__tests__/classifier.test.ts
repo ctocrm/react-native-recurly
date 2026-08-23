@@ -238,23 +238,10 @@ describe("emailscan subject amounts + no fake $0", () => {
     expect(hit.amountUnknown).toBe(false);
   });
 
-  it("drops Proton mail when scanning the Proton mailbox", () => {
+  it("classifies a Proton bill found in the Proton mailbox", () => {
     const hit = classifyMessage({
       mailboxId: "proton:david@picksandshovels.app",
-      messageId: "proton-welcome",
-      from: "Proton <noreply@proton.me>",
-      subject: "Your Proton subscription",
-      date: "2026-08-01T12:00:00.000Z",
-    });
-    expect(hit.kind).toBeNull();
-    expect(hit.subjectClass).toBe("drop");
-    expect(hit.evidence).toContain("drop:mailbox-vendor:proton");
-  });
-
-  it("still classifies a Proton bill found in another mailbox", () => {
-    const hit = classifyMessage({
-      mailboxId: "tuta:picksandshovels@tutamail.com",
-      messageId: "proton-bill-on-tuta",
+      messageId: "proton-invoice",
       from: "Proton <noreply@proton.me>",
       subject: "Your Proton subscription $4.99",
       date: "2026-08-01T12:00:00.000Z",
@@ -262,7 +249,21 @@ describe("emailscan subject amounts + no fake $0", () => {
     expect(hit.merchantKey).toBe("proton");
     expect(hit.kind).toBe("recurring");
     expect(hit.amount).toBe(4.99);
-    expect(hit.subjectClass).not.toBe("drop");
+    expect(hit.subjectClass).toBe("recurring");
+  });
+
+  it("classifies a Tuta invoice found in the Tuta mailbox", () => {
+    const hit = classifyMessage({
+      mailboxId: "tuta:picksandshovels@tutamail.com",
+      messageId: "tuta-invoice",
+      from: "system@tutanota.de",
+      subject: "New invoice for Tuta $12.00",
+      date: "2026-08-01T12:00:00.000Z",
+    });
+    expect(hit.merchantKey).toBe("tutanota");
+    expect(hit.kind).toBe("sparse");
+    expect(hit.amount).toBe(12);
+    expect(hit.subjectClass).toBe("sparse");
   });
 
   it("refuses to invent $0 when importing an amount-unknown candidate", () => {

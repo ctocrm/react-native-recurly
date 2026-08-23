@@ -205,30 +205,6 @@ export function isPaymentProcessor(merchantKey: string): boolean {
   return PAYMENT_PROCESSORS.has(merchantKey.toLowerCase());
 }
 
-/** Connecting Proton is not a Proton subscription. Same for Tuta/Gmail. */
-const MAILBOX_VENDOR_KEYS: Record<string, Set<string>> = {
-  proton: new Set(["proton"]),
-  tuta: new Set(["tuta", "tutanota", "tutamail"]),
-  gmail: new Set(["gmail", "google"]),
-  workspace: new Set(["gmail", "google"]),
-  outlook: new Set(["outlook", "hotmail", "live", "microsoft"]),
-  office365: new Set(["outlook", "microsoft"]),
-  imap: new Set(),
-};
-
-export function isMailboxVendor(
-  mailboxId: string,
-  merchantKey: string,
-): boolean {
-  const colon = mailboxId.indexOf(":");
-  const provider = (colon >= 0 ? mailboxId.slice(0, colon) : mailboxId)
-    .trim()
-    .toLowerCase();
-  const keys = MAILBOX_VENDOR_KEYS[provider];
-  if (!keys || keys.size === 0) return false;
-  return keys.has(merchantKey.toLowerCase());
-}
-
 export function isSelfMail(message: NormalizedMessage): boolean {
   const fromEmail = extractEmailAddress(message.from);
   const owner = ownerAddressFromMailbox(message.mailboxId);
@@ -307,14 +283,6 @@ export function resolveMerchant(message: NormalizedMessage): {
     };
   }
   const fromMerchant = merchantFromAddress(message.from);
-  if (isMailboxVendor(message.mailboxId, fromMerchant.merchantKey)) {
-    return {
-      merchantKey: fromMerchant.merchantKey,
-      merchantName: fromMerchant.merchantName,
-      evidence: [`drop:mailbox-vendor:${fromMerchant.merchantKey}`],
-      drop: true,
-    };
-  }
   if (!isPaymentProcessor(fromMerchant.merchantKey)) {
     return { ...fromMerchant, evidence: [], drop: false };
   }
