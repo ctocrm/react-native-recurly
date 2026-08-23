@@ -3,12 +3,12 @@
  */
 import { getDatabase } from "@/services/db/connection";
 import type {
-    CachedMessage,
-    ClassifiedMessage,
-    MailProviderId,
-    MailboxScanState,
-    NormalizedMessage,
-    ScanCacheStore,
+  CachedMessage,
+  ClassifiedMessage,
+  MailProviderId,
+  MailboxScanState,
+  NormalizedMessage,
+  ScanCacheStore,
 } from "./types";
 import { PARSER_VERSION } from "./types";
 
@@ -78,6 +78,30 @@ export async function getMailboxAsync(
     mailboxId,
   );
   if (!box) return undefined;
+  if (box.parser_version !== PARSER_VERSION) {
+    await db.runAsync(
+      "DELETE FROM mail_messages WHERE mailbox_id = ?",
+      mailboxId,
+    );
+    await db.runAsync(
+      `UPDATE mail_mailboxes
+       SET last_message_date = NULL, last_message_id = NULL, parser_version = ?
+       WHERE id = ?`,
+      PARSER_VERSION,
+      mailboxId,
+    );
+    return {
+      mailboxId: box.id,
+      providerId: box.provider_id as MailProviderId,
+      cursor: {
+        mailboxId: box.id,
+        lastMessageDate: null,
+        lastMessageId: null,
+        parserVersion: PARSER_VERSION,
+      },
+      messages: {},
+    };
+  }
   const rows = await db.getAllAsync<MessageRow>(
     "SELECT * FROM mail_messages WHERE mailbox_id = ?",
     mailboxId,
