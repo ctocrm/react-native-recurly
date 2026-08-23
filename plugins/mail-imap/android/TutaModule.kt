@@ -284,7 +284,12 @@ private class TutaClient {
         java.time.Instant.now().toString()
       }
       val id = firstId(mail.opt("99")).ifBlank { "$listId/$elementId" }
-      val text = decryptMailBody(mail, mailSk, session)
+      val text = try {
+        decryptMailBody(mail, mailSk, session)
+      } catch (e: Exception) {
+        Log.w("MailTuta", "mail body skipped: ${e.message}")
+        ""
+      }
       out.add(TutaMsg(id, from, subject, date, text.ifBlank { null }))
     }
     Log.i("MailTuta", "Tuta listed ${out.size} Inbox messages")
@@ -636,7 +641,8 @@ private class TutaClient {
     }.getOrNull())
     add("ext", runCatching { decodeBase64Ext(trimmed) }.getOrNull())
     if (out.isEmpty()) {
-      throw IllegalStateException("Tuta Bytes decode failed (${trimmed.length} chars)")
+      Log.w("MailTuta", "Tuta Bytes decode skipped (${trimmed.length} chars)")
+      return emptyList()
     }
     return out.values.toList()
   }
