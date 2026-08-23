@@ -1,14 +1,13 @@
 #!/usr/bin/env node
 /**
  * Text POC: Proton login + list Inbox headers.
- * On CAPTCHA 9001: serve a local page that injects AndroidInterface,
- * open it, wait for the solved token, then retry auth.
+ * On CAPTCHA 9001: open official verify.proton.me (same URL as the app
+ * WebView) and wait for the solved token, then retry auth.
  * Secrets stay in gitignored .env. Never print passwords or tokens.
  */
 import { spawn } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { createServer } from "node:http";
 import { resolve } from "node:path";
 import { stdin as input, stdout as output } from "node:process";
 import { createInterface } from "node:readline/promises";
@@ -476,7 +475,7 @@ async function protonFetch(
   const headers = {
     Accept: "application/json",
     "x-pm-appversion": "Other",
-    "User-Agent": "jsmastery-poc/1.0",
+    "User-Agent": "jsmastery/1.0",
   };
   if (body && method !== "GET") headers["Content-Type"] = "application/json";
   if (session) {
@@ -502,122 +501,25 @@ async function protonFetch(
   return { status: res.status, json, textLen: text.length };
 }
 
-function captchaHtml(verifyUrl) {
-  return `<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8" />
-  <title>Proton verification</title>
-  <style>
-    html, body { margin: 0; height: 100%; font-family: sans-serif; }
-    iframe { width: 100%; height: calc(100% - 48px); border: 0; }
-    header { padding: 12px 16px; background: #1b1340; color: #fff; }
-  </style>
-</head>
-<body>
-  <header>Solve the Proton puzzle. This page captures the token and sends it back to the POC.</header>
-  <iframe id="hv" src="${String(verifyUrl).replaceAll('"', "")}"></iframe>
-  <script>
-    function send(msg) {
-      try {
-        var payload = typeof msg === "string" ? msg : JSON.stringify(msg);
-        fetch("/token", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: payload,
-        });
-      } catch (e) {}
-    }
-    window.AndroidInterface = { dispatch: send };
-    window.addEventListener("message", function (event) {
-      try {
-        var data = event && event.data;
-        if (!data) return;
-        var parsed = typeof data === "string" ? JSON.parse(data) : data;
-        if (parsed && parsed.type === "HUMAN_VERIFICATION_SUCCESS") send(parsed);
-      } catch (e) {}
-    });
-  </script>
-</body>
-</html>`;
-}
-
 function openUrl(url) {
   spawn("xdg-open", [url], { detached: true, stdio: "ignore" }).unref();
 }
 
-function waitForCaptcha(verifyUrl) {
-  return new Promise((resolveWait, rejectWait) => {
-    const server = createServer((req, res) => {
-      if (
-        req.method === "GET" &&
-        (req.url === "/" || req.url?.startsWith("/?"))
-      ) {
-        res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-        res.end(captchaHtml(verifyUrl));
-        return;
-      }
-      if (req.method === "POST" && req.url === "/token") {
-        const chunks = [];
-        req.on("data", (c) => chunks.push(c));
-        req.on("end", () => {
-          try {
-            const parsed = JSON.parse(Buffer.concat(chunks).toString("utf8"));
-            const token = parsed?.payload?.token || parsed?.token;
-            const type = parsed?.payload?.type || parsed?.type || "captcha";
-            res.writeHead(200, { "content-type": "text/plain" });
-            res.end("ok");
-            if (token) {
-              server.close();
-              resolveWait({ token: String(token), type: String(type) });
-            }
-          } catch (e) {
-            res.writeHead(400);
-            res.end("bad");
-          }
-        });
-        return;
-      }
-      res.writeHead(404);
-      res.end();
-    });
-    server.listen(0, "127.0.0.1", () => {
-      const { port } = server.address();
-      const local = `http://127.0.0.1:${port}/`;
-      log("CAPTCHA local page", local);
-      log("CAPTCHA official url", verifyUrl);
-      openUrl(local);
-      console.log(
-        "\nSolve the Proton puzzle in the opened page.\nIf the iframe is blank, open the official URL above and paste the token here.",
-      );
-    });
-    const timer = setTimeout(
-      () => {
-        server.close();
-        rejectWait(new Error("CAPTCHA wait timed out after 5 minutes"));
-      },
-      5 * 60 * 1000,
-    );
-    const done = (value) => {
-      clearTimeout(timer);
-      resolveWait(value);
-    };
-    const orig = resolveWait;
-    resolveWait = (v) => {
-      clearTimeout(timer);
-      orig(v);
-    };
-    const rl = createInterface({ input, output });
-    rl.question("Paste solved token (or press Enter to wait for the page): ")
-      .then((line) => {
-        const token = line.trim();
-        if (!token) return;
-        rl.close();
-        server.close();
-        done({ token, type: "captcha" });
-      })
-      .catch(() => {});
-  });
+async function waitForCaptcha(verifyUrl) {
+  log("CAPTCHA official url", verifyUrl);
+  openUrl(verifyUrl);
+  console.log(
+    "\nSame URL the app WebView loads. Solve the Proton puzzle, then paste the token.",
+  );
+  const rl = createInterface({ input, output });
+  try {
+    const line = await rl.question("Paste solved token: ");
+    const token = line.trim();
+    if (!token) throw new Error("No CAPTCHA token pasted");
+    return { token, type: "captcha" };
+  } finally {
+    rl.close();
+  }
 }
 
 function parseHv(json) {
