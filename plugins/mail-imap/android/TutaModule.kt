@@ -546,9 +546,16 @@ private class TutaClient {
   private fun firstObjectOrArray(raw: Any?): Pair<String, String> {
     return when (raw) {
       is JSONArray -> {
-        if (raw.length() >= 2) Pair(raw.optString(0), raw.optString(1))
-        else if (raw.length() == 1) Pair(raw.optString(0), "")
-        else Pair("", "")
+        // Tuta IdTuple is often wrapped: [[listId, elementId]]
+        if (raw.length() == 1 && raw.optJSONArray(0) != null) {
+          firstObjectOrArray(raw.optJSONArray(0))
+        } else if (raw.length() >= 2) {
+          Pair(raw.optString(0), raw.optString(1))
+        } else if (raw.length() == 1) {
+          Pair(raw.optString(0), "")
+        } else {
+          Pair("", "")
+        }
       }
       is JSONObject -> Pair(firstId(raw.opt("0") ?: raw.opt("listId")), firstId(raw.opt("1") ?: raw.opt("elementId")))
       is String -> {
