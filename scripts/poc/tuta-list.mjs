@@ -468,6 +468,9 @@ async function main() {
         ver1395: mail?.["1395"],
         received107: mail?.["107"],
         fromPlain: firstObject(mail?.["111"])?.["95"],
+        body115: mail?.["115"],
+        attachments117: mail?.["117"],
+        body1465: mail?.["1465"],
       });
       const owner = firstId(mail?.["587"]);
       const groupKey =
@@ -495,6 +498,22 @@ async function main() {
         from: fromName ? `${fromName} <${fromAddr}>` : fromAddr,
         subject,
       });
+      const [detailsListId, detailsElementId] = idPair(mail?.["1465"]);
+      if (detailsListId && detailsElementId) {
+        const detailsRes = await request(
+          "GET",
+          `${BASE}/rest/tutanota/maildetailsblob/${detailsListId}/${detailsElementId}`,
+          { token, version: TUTANOTA_V },
+        );
+        const details = detailsRes.json;
+        log("maildetailsblob", {
+          status: detailsRes.status,
+          errorId: detailsRes.errorId,
+          keys: keysOf(details),
+          first: Array.isArray(details) ? keysOf(details[0]) : keysOf(details),
+          rawHead: JSON.stringify(details)?.slice(0, 800),
+        });
+      }
       totalListed += 1;
     }
   }

@@ -82,6 +82,7 @@ const Insights = () => {
       > = {};
 
       activeSubs.forEach((sub) => {
+        if (sub.priceUnknown) return;
         let monthlyAmount = sub.price;
         // Normalize to monthly
         if (sub.billing === "Yearly" || sub.frequency === "Yearly") {

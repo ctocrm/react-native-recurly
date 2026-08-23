@@ -11,6 +11,7 @@ import {
 interface UpcomingSubscriptionCardProps {
   name: string;
   price: number;
+  priceUnknown?: boolean;
   daysLeft: number;
   icon: ImageSourcePropType;
   currency?: string;
@@ -20,6 +21,7 @@ interface UpcomingSubscriptionCardProps {
 const UpcomingSubscriptionCard = ({
   name,
   price,
+  priceUnknown,
   daysLeft,
   icon,
   currency,
@@ -31,7 +33,7 @@ const UpcomingSubscriptionCard = ({
         <Image source={icon} className="upcoming-icon" />
         <View>
           <Text className="upcoming-price">
-            {formatCurrency(price, currency)}
+            {formatCurrency(price, currency, priceUnknown)}
           </Text>
           <Text className="upcoming-meta" numberOfLines={1}>
             {daysLeft > 1 ? `${daysLeft} days left` : `Last day`}

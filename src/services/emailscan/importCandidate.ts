@@ -12,12 +12,8 @@ export function candidateToSubscription(
       : candidate.cadence === "monthly"
         ? "Monthly"
         : "Monthly";
-  if (candidate.amount === undefined) {
-    throw new Error(
-      `refusing to invent $0 for ${candidate.merchant} (amount unknown)`,
-    );
-  }
-  const price = candidate.amount;
+  const known = candidate.amount !== undefined;
+  const priceUnknown = !known && candidate.kind !== "free";
   return {
     id: Date.now().toString(),
     icon: require("@assets/icons/plus.png"),
@@ -26,7 +22,8 @@ export function candidateToSubscription(
     category: candidate.kind,
     status: "active",
     startDate: new Date().toISOString(),
-    price,
+    price: known ? candidate.amount! : 0,
+    priceUnknown,
     currency: candidate.currency ?? "USD",
     billing: cadence,
     frequency: cadence,

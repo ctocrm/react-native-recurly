@@ -1,9 +1,9 @@
+import { useCachedIcon } from "@/hooks/useCachedIcon";
 import {
   formatCurrency,
   formatStatusLabel,
   formatSubscriptionDateTime,
 } from "@/lib/utils";
-import { useCachedIcon } from "@/hooks/useCachedIcon";
 import clsx from "clsx";
 import React, { useState } from "react";
 import { ActivityIndicator, Image, Pressable, Text, View } from "react-native";
@@ -15,6 +15,7 @@ interface SubscriptionCardProps {
   icon_key?: string;
   name: string;
   price: number;
+  priceUnknown?: boolean;
   currency?: string;
   billing: string;
   category?: string;
@@ -39,6 +40,7 @@ const SubscriptionCard = ({
   id,
   name,
   price,
+  priceUnknown,
   currency,
   icon,
   icon_key,
@@ -124,7 +126,9 @@ const SubscriptionCard = ({
           </View>
 
           <View className="sub-price-box">
-            <Text className="sub-price">{formatCurrency(price, currency)}</Text>
+            <Text className="sub-price">
+              {formatCurrency(price, currency, priceUnknown)}
+            </Text>
             <Text className="sub-billing">{billing}</Text>
           </View>
         </View>

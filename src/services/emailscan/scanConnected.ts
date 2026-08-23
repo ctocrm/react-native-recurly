@@ -10,28 +10,51 @@ export async function importFromConnectedMailboxes(opts: {
   userId: string;
   existing: Subscription[];
   addSubscription: (subscription: Subscription) => Promise<void>;
+  updateSubscription?: (
+    id: string,
+    data: Partial<Subscription>,
+  ) => Promise<void>;
 }): Promise<{ imported: number; errors: string[] }> {
   const boxes = await listMailboxesAsync();
   let imported = 0;
   const errors: string[] = [];
-  const seen = new Set(
-    opts.existing.map((s) => `${s.name}::${s.paymentMethod ?? ""}`),
+  const existingByKey = new Map(
+    opts.existing.map((s) => [`${s.name}::${s.paymentMethod ?? ""}`, s]),
   );
 
   for (const box of boxes) {
     try {
       const provider = createMailProvider(box.providerId, opts.userId);
       const result = await provider.scan({ mailboxId: box.mailboxId });
-      const paid = result.candidates.filter(
+      const keep = result.candidates.filter(
         (c) =>
-          (c.kind === "recurring" || c.kind === "sparse") &&
-          c.amount !== undefined,
+          c.kind === "recurring" || c.kind === "sparse" || c.kind === "free",
       );
-      for (const candidate of paid) {
+      for (const candidate of keep) {
         const key = `${candidate.merchant}::${candidate.mailboxId}`;
-        if (seen.has(key)) continue;
-        await opts.addSubscription(candidateToSubscription(candidate));
-        seen.add(key);
+        const already = existingByKey.get(key);
+        const next = candidateToSubscription(candidate);
+        if (already) {
+          const richer =
+            (already.priceUnknown && !next.priceUnknown) ||
+            (candidate.amount !== undefined &&
+              candidate.amount !== already.price);
+          if (richer && opts.updateSubscription) {
+            await opts.updateSubscription(already.id, {
+              price: next.price,
+              priceUnknown: next.priceUnknown,
+              currency: next.currency,
+              billing: next.billing,
+              frequency: next.frequency,
+              category: next.category,
+            });
+            existingByKey.set(key, { ...already, ...next, id: already.id });
+            imported += 1;
+          }
+          continue;
+        }
+        await opts.addSubscription(next);
+        existingByKey.set(key, next);
         imported += 1;
       }
     } catch (error) {

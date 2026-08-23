@@ -284,7 +284,8 @@ private class TutaClient {
         java.time.Instant.now().toString()
       }
       val id = firstId(mail.opt("99")).ifBlank { "$listId/$elementId" }
-      out.add(TutaMsg(id, from, subject, date, null))
+      val text = decryptMailBody(mail, mailSk, session)
+      out.add(TutaMsg(id, from, subject, date, text.ifBlank { null }))
     }
     Log.i("MailTuta", "Tuta listed ${out.size} Inbox messages")
     return out
@@ -310,6 +311,53 @@ private class TutaClient {
       Log.w("MailTuta", "session key unwrap failed: ${e.message}")
       null
     }
+  }
+
+  private fun decryptMailBody(
+    mail: JSONObject,
+    mailSk: ByteArray?,
+    session: TutaSession,
+  ): String {
+    val inline = decryptString(mail.optString("115"), mailSk)
+    if (inline.isNotBlank()) return inline
+    val ref = firstObjectOrArray(mail.opt("1465"))
+    if (ref.first.isEmpty() || ref.second.isEmpty() || mailSk == null) return ""
+    return try {
+      val blob = requestObject(
+        "GET",
+        "$base/rest/tutanota/maildetailsblob/${ref.first}/${ref.second}",
+        null,
+        session,
+        tutanotaV,
+        null,
+      )
+      longestDecryptedText(blob, mailSk)
+    } catch (e: Exception) {
+      Log.w("MailTuta", "mail body hop failed: ${e.message}")
+      ""
+    }
+  }
+
+  private fun longestDecryptedText(node: Any?, sessionKey: ByteArray): String {
+    var best = ""
+    fun walk(value: Any?) {
+      when (value) {
+        is JSONObject -> {
+          val keys = value.keys()
+          while (keys.hasNext()) walk(value.opt(keys.next()))
+        }
+        is JSONArray -> {
+          for (i in 0 until value.length()) walk(value.opt(i))
+        }
+        is String -> {
+          if (value.length < 24) return
+          val plain = decryptString(value, sessionKey)
+          if (plain.length > best.length) best = plain
+        }
+      }
+    }
+    walk(node)
+    return best
   }
 
   private fun decryptString(cipherB64: String, sessionKey: ByteArray?): String {

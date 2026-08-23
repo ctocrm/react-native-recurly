@@ -252,32 +252,112 @@ describe("emailscan subject amounts + no fake $0", () => {
     expect(hit.subjectClass).toBe("recurring");
   });
 
-  it("classifies a Tuta invoice found in the Tuta mailbox", () => {
+  it("classifies a Tuta invoice without inventing a dollar amount", () => {
     const hit = classifyMessage({
       mailboxId: "tuta:picksandshovels@tutamail.com",
       messageId: "tuta-invoice",
       from: "system@tutanota.de",
-      subject: "New invoice for Tuta $12.00",
+      subject: "New invoice for Tuta",
       date: "2026-08-01T12:00:00.000Z",
+      text: "There is a new invoice with the number 1915642915167825625098 available for you. You can download it in Settings -> Payment. The grand total will be debited automatically.",
     });
-    expect(hit.merchantKey).toBe("tutanota");
+    expect(hit.merchantKey).toBe("tuta");
     expect(hit.kind).toBe("sparse");
-    expect(hit.amount).toBe(12);
+    expect(hit.amount).toBeUndefined();
+    expect(hit.amountUnknown).toBe(true);
     expect(hit.subjectClass).toBe("sparse");
   });
 
+  it("imports a Tuta invoice as paid-unknown (?), not $0", () => {
+    const sub = candidateToSubscription({
+      mailboxId: "tuta:picksandshovels@tutamail.com",
+      merchantKey: "tuta",
+      merchant: "Tuta",
+      kind: "sparse",
+      amountUnknown: true,
+      evidence: ["amount-unknown"],
+      messageIds: ["tuta-invoice"],
+      confidence: "medium",
+    });
+    expect(sub.price).toBe(0);
+    expect(sub.priceUnknown).toBe(true);
+  });
+
+  it("keeps Porkbun verify + welcome as $0 and upgrades the order to $47.74 yearly", () => {
+    const verify = classifyMessage({
+      mailboxId: "tuta:picksandshovels@tutamail.com",
+      messageId: "porkbun-verify",
+      from: "Porkbun <support@porkbun.com>",
+      subject: "porkbun.com | Account Creation Email Verification Code",
+      date: "2026-08-01T12:00:00.000Z",
+    });
+    expect(verify.kind).toBe("free");
+    expect(verify.merchantKey).toBe("porkbun");
+
+    const welcome = classifyMessage({
+      mailboxId: "tuta:picksandshovels@tutamail.com",
+      messageId: "porkbun-welcome",
+      from: "Porkbun <support@porkbun.com>",
+      subject: "porkbun.com | Your New Account",
+      date: "2026-08-01T12:00:00.000Z",
+    });
+    expect(welcome.kind).toBe("free");
+
+    const order = classifyMessage({
+      mailboxId: "tuta:picksandshovels@tutamail.com",
+      messageId: "porkbun-order",
+      from: "Porkbun <support@porkbun.com>",
+      subject: "porkbun.com | Order - Thank You - 10996643",
+      date: "2026-08-01T12:00:00.000Z",
+      text: "picksandshovels.app Domain Registration SUCCESS $8.75\nTOTAL CHARGED:\t\t\tUSD $47.74",
+    });
+    expect(order.kind).toBe("sparse");
+    expect(order.amount).toBe(47.74);
+    expect(order.cadence).toBe("yearly");
+
+    const map = buildCandidateMap([verify, welcome, order]);
+    const porkbun = map.filter((c) => c.merchantKey === "porkbun");
+    expect(porkbun).toHaveLength(1);
+    expect(porkbun[0].amount).toBe(47.74);
+    expect(porkbun[0].cadence).toBe("yearly");
+  });
+
+  it("creates a Tuta $0 row from the welcome mail", () => {
+    const hit = classifyMessage({
+      mailboxId: "tuta:picksandshovels@tutamail.com",
+      messageId: "tuta-welcome",
+      from: "Tuta <hello@tutamail.com>",
+      subject: "Discover the Power of Your Secure Tuta Mailbox",
+      date: "2026-08-01T12:00:00.000Z",
+    });
+    expect(hit.kind).toBe("free");
+    expect(hit.merchantKey).toBe("tuta");
+    const sub = candidateToSubscription({
+      mailboxId: hit.message.mailboxId,
+      merchantKey: hit.merchantKey,
+      merchant: hit.merchantName,
+      kind: "free",
+      amountUnknown: false,
+      evidence: hit.evidence,
+      messageIds: [hit.message.messageId],
+      confidence: "medium",
+    });
+    expect(sub.price).toBe(0);
+    expect(sub.priceUnknown).toBe(false);
+  });
+
   it("refuses to invent $0 when importing an amount-unknown candidate", () => {
-    expect(() =>
-      candidateToSubscription({
-        mailboxId: "proton:david@picksandshovels.app",
-        merchantKey: "proton",
-        merchant: "Proton",
-        kind: "recurring",
-        amountUnknown: true,
-        evidence: ["amount-unknown"],
-        messageIds: ["proton-welcome"],
-        confidence: "medium",
-      }),
-    ).toThrow(/refusing to invent \$0/);
+    const sub = candidateToSubscription({
+      mailboxId: "proton:david@picksandshovels.app",
+      merchantKey: "proton",
+      merchant: "Proton",
+      kind: "recurring",
+      amountUnknown: true,
+      evidence: ["amount-unknown"],
+      messageIds: ["proton-welcome"],
+      confidence: "medium",
+    });
+    expect(sub.priceUnknown).toBe(true);
+    expect(sub.price).toBe(0);
   });
 });

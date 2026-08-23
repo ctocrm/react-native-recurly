@@ -125,6 +125,7 @@ const App = () => {
         userId: user?.id || "anonymous",
         existing: subscriptions,
         addSubscription,
+        updateSubscription,
       });
       await refreshSubscriptions();
       await refreshMailboxCount();
@@ -190,6 +191,7 @@ const App = () => {
 
     let total = 0;
     activeSubs.forEach((sub) => {
+      if (sub.priceUnknown) return;
       let monthlyAmount = sub.price;
       if (sub.billing === "Yearly" || sub.frequency === "Yearly") {
         monthlyAmount = sub.price / 12;

@@ -1111,7 +1111,7 @@ Subject (plus From) can create a candidate. Body and attachments run **only** fo
 
 **From domain** names the merchant (`noreply@github.com` → GitHub). Strip `noreply`, `billing`, `invoice`, `mail`. Public suffixes / ccTLDs (`me`, `ai`, `app`, …) are not merchants: `noreply@proton.me` is Proton, not Me.
 
-**Connect ≠ subscription.** Connecting Tuta/Proton does not invent a Home row. A real invoice/receipt/renewal **from** that vendor still classifies. Welcome/security from the vendor stays non-paid. Never invent `$0`.
+**Connect ≠ subscription.** Connecting Tuta/Proton does not invent a Home row. A real invoice/receipt/renewal **from** that vendor still classifies. Welcome/security from the vendor stays **$0**. A paid invoice with no parseable total stays **`?`**, not `$0`.
 
 **Money parse (recurring + sparse only):** prefer `text/plain`, else HTML stripped to text; then attachments named like `invoice.pdf` / `receipt.pdf` / `statement.pdf` (skip images/logos). First clear amount + currency. Recurring cues: `/mo`, `annual`, `renews`. Usage cues: `usage`, `overage`, `this period`. If PDF text extract is too expensive in Phase 4: keep “invoice attached, amount unknown” — do not invent a total or force $0.
 
@@ -1310,3 +1310,4 @@ Parked until a documented API exists. Do not implement as Connect-without-scan.
 | 2026-08-22 | **Tuta 0-Inbox was IdTuple wrap.** Node POC listed 7 Inbox entries. `1456` is `[[listId, elementId]]`; flatten skipped every mail. After unwrap: Porkbun + Tuta invoice headers. Kotlin `firstObjectOrArray` now unwraps that nest.                                                                                                       |
 | 2026-08-22 | **Proton Node POC.** `scripts/poc/proton-list.mjs` reaches `/auth/v4`. This run: **422 Code 2028** unusual-activity lock, not CAPTCHA 9001. POC opens official verify.proton.me if 9001 returns. Do not retry until the lock lifts.                                                                                                       |
 | 2026-08-23 | **Connect ≠ subscription, not mailbox-vendor drop.** Removed `isMailboxVendor`. A Tuta/Proton invoice in that mailbox classifies. Persist wipes scan cache on `PARSER_VERSION` 6. x86_64 release installed `-r` (firstInstall still 2026-08-13). Live Scan after this APK unverified until you tap Scan. Amounts still need body/PDF.     |
+| 2026-08-23 | **Five-email Scan contract.** Porkbun verify/welcome → $0; Porkbun order → $47.74 yearly (TOTAL CHARGED, not first $8.75); Tuta welcome → $0; Tuta invoice with no total → ?. Import writes $0 and priceUnknown. Schema v11 + PARSER_VERSION 7. Kotlin fetches maildetailsblob 1465. Unit tests pass. Live Scan after rebuild unverified. |

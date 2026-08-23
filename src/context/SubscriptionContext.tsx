@@ -1,16 +1,4 @@
 import { posthog } from "@/config/posthog";
-import { processIconQueue } from "@/services/iconBackgroundCrawler";
-import dayjs from "dayjs";
-import React, {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
-import { AppState } from "react-native";
 import {
   addSubscription as dbAddSubscription,
   deleteSubscription as dbDeleteSubscription,
@@ -23,6 +11,18 @@ import {
   setPreference,
   updateCrawledUrlAttempt,
 } from "@/services/database";
+import { processIconQueue } from "@/services/iconBackgroundCrawler";
+import dayjs from "dayjs";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import { AppState } from "react-native";
 import { useDatabase } from "./DatabaseProvider";
 
 interface SubscriptionContextType {
@@ -285,6 +285,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
             icon: sub.icon,
             name: sub.name,
             price: sub.price,
+            priceUnknown: sub.priceUnknown,
             currency: sub.currency || "USD",
             daysLeft,
           } satisfies UpcomingSubscription;

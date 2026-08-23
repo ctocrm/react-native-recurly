@@ -158,8 +158,12 @@ const SubscriptionStatsModal = ({
                 Price
               </Text>
               <Text className="text-sm font-sans-bold text-primary">
-                {formatCurrency(subscription.price, subscription.currency)} /{" "}
-                {subscription.billing?.toLowerCase?.() || "mo"}
+                {formatCurrency(
+                  subscription.price,
+                  subscription.currency,
+                  subscription.priceUnknown,
+                )}{" "}
+                / {subscription.billing?.toLowerCase?.() || "mo"}
               </Text>
             </View>
 
@@ -168,7 +172,11 @@ const SubscriptionStatsModal = ({
                 Total Spent
               </Text>
               <Text className="text-sm font-sans-bold text-primary">
-                {formatCurrency(totalSpentToDate, subscription.currency)}
+                {formatCurrency(
+                  totalSpentToDate,
+                  subscription.currency,
+                  subscription.priceUnknown,
+                )}
               </Text>
             </View>
 

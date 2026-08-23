@@ -5,7 +5,7 @@
 import type { SQLiteDatabase } from "expo-sqlite";
 
 /** Bump when adding a migration. Stored in PRAGMA user_version. */
-export const SCHEMA_VERSION = 10;
+export const SCHEMA_VERSION = 11;
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS subscriptions (
@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS subscriptions (
   status        TEXT DEFAULT 'active',
   start_date    TEXT,
   price         REAL NOT NULL,
+  price_unknown INTEGER NOT NULL DEFAULT 0,
   currency      TEXT DEFAULT 'USD',
   billing       TEXT NOT NULL,
   frequency     TEXT,
@@ -356,6 +357,15 @@ export const MIGRATIONS: ((db: SQLiteDatabase) => Promise<void>)[] = [
         );
         CREATE INDEX IF NOT EXISTS idx_mail_messages_mailbox ON mail_messages(mailbox_id);
       `);
+    }
+  },
+  // 11: paid-unknown price ("?") vs known $0.
+  async (db) => {
+    const names = await columnNames(db, "subscriptions");
+    if (!names.includes("price_unknown")) {
+      await db.execAsync(
+        `ALTER TABLE subscriptions ADD COLUMN price_unknown INTEGER NOT NULL DEFAULT 0;`,
+      );
     }
   },
 ];

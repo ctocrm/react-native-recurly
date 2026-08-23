@@ -67,8 +67,12 @@ export default function EmailScanSection({
   const { sheetPadding } = useBottomClearance();
   const keyboardHeight = useKeyboardHeight();
   const { user } = useUser();
-  const { subscriptions, addSubscription, deleteSubscription } =
-    useSubscriptions();
+  const {
+    subscriptions,
+    addSubscription,
+    deleteSubscription,
+    updateSubscription,
+  } = useSubscriptions();
   const userId = user?.id || "anonymous";
 
   const [boxes, setBoxes] = useState<
@@ -281,6 +285,7 @@ export default function EmailScanSection({
         userId,
         existing: subscriptions,
         addSubscription,
+        updateSubscription,
       });
       if (errors.length) {
         const text = errors.join("\n");

@@ -55,6 +55,7 @@ function rowToSubscription(row: Record<string, any>): Subscription {
     status: row.status ?? undefined,
     startDate: row.start_date ?? undefined,
     price: row.price,
+    priceUnknown: Boolean(row.price_unknown),
     currency: row.currency ?? undefined,
     billing: row.billing,
     frequency: row.frequency ?? undefined,
@@ -94,8 +95,8 @@ export async function addSubscription(
     iconKey = match ? match[0] : "plus";
   }
   await db.runAsync(
-    `INSERT INTO subscriptions (id, name, plan, category, payment_method, status, start_date, price, currency, billing, frequency, renewal_date, color, icon_key)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO subscriptions (id, name, plan, category, payment_method, status, start_date, price, price_unknown, currency, billing, frequency, renewal_date, color, icon_key)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     subscription.id,
     subscription.name,
     subscription.plan ?? null,
@@ -104,6 +105,7 @@ export async function addSubscription(
     subscription.status ?? "active",
     subscription.startDate ?? null,
     subscription.price,
+    subscription.priceUnknown ? 1 : 0,
     subscription.currency ?? "USD",
     subscription.billing,
     subscription.frequency ?? null,
@@ -126,6 +128,7 @@ export async function updateSubscription(
     status: "status",
     startDate: "start_date",
     price: "price",
+    priceUnknown: "price_unknown",
     currency: "currency",
     billing: "billing",
     frequency: "frequency",
@@ -138,7 +141,8 @@ export async function updateSubscription(
   for (const [key, col] of Object.entries(fieldMap)) {
     if (key in data && data[key as keyof Subscription] !== undefined) {
       setClauses.push(`${col} = ?`);
-      params.push(data[key as keyof Subscription]);
+      const value = data[key as keyof Subscription];
+      params.push(key === "priceUnknown" ? (value ? 1 : 0) : value);
     }
   }
   if (setClauses.length === 0) return;

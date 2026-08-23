@@ -93,7 +93,7 @@ const PAYMENT_PROCESSORS = new Set([
 const SELF_DISPLAY_NAMES = new Set(["me", "you", "myself", "self"]);
 
 const ACCOUNT_RE =
-  /\b(welcome|registered|verify(?:\s+your)?\s+email|account\s+created|confirm\s+your\s+(?:email|account)|thanks\s+for\s+(?:signing|joining)|you(?:'re| are) in)\b/i;
+  /\b(welcome|registered|verify(?:\s+your)?\s+email|account\s+created|account\s+creation|new\s+account|confirm\s+your\s+(?:email|account)|thanks\s+for\s+(?:signing|joining)|you(?:'re| are) in|discover\s+the\s+power|secure\s+\w+\s+mailbox)\b/i;
 
 const SECURITY_RE =
   /\b(password\s+reset|reset\s+your\s+password|login\s+alert|new\s+device|new\s+sign[- ]?in|two[- ]factor|2fa|verification\s+code|security\s+alert|suspicious\s+(?:login|activity))\b/i;
@@ -174,12 +174,16 @@ export function merchantFromAddress(from: string): {
       local.split(/[._+-]/).find((p) => !LOCAL_PARTS_TO_STRIP.has(p)) ||
       "unknown";
   }
+  const key = label.toLowerCase();
+  if (key === "tutanota" || key === "tutamail") {
+    return { merchantKey: "tuta", merchantName: "Tuta" };
+  }
   const merchantName = label
     .split(/[-_]/)
     .filter(Boolean)
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(" ");
-  return { merchantKey: label.toLowerCase(), merchantName };
+  return { merchantKey: key, merchantName };
 }
 
 export function ownerAddressFromMailbox(mailboxId: string): string | null {
@@ -309,7 +313,13 @@ export function classifySubject(subject: string): SubjectClass {
   if (!s) return "drop";
 
   if (DROP_RE.test(s) && !RECURRING_RE.test(s)) return "drop";
-  if (OTP_ONLY_RE.test(s) && !ACCOUNT_RE.test(s) && !SECURITY_RE.test(s)) {
+  if (
+    OTP_ONLY_RE.test(s) &&
+    !ACCOUNT_RE.test(s) &&
+    !SECURITY_RE.test(s) &&
+    !SPARSE_RE.test(s) &&
+    !RECURRING_RE.test(s)
+  ) {
     return "drop";
   }
   if (RECURRING_RE.test(s)) return "recurring";
@@ -333,6 +343,13 @@ function stripHtml(html: string): string {
 function parseAmount(
   text: string,
 ): { amount: number; currency: string } | null {
+  const total = text.match(
+    /total\s+charged:?\s*(?:USD\s*)?\$?\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{2})|[0-9]+(?:\.[0-9]{2}))/i,
+  );
+  if (total?.[1]) {
+    const amount = Number.parseFloat(total[1].replace(/,/g, ""));
+    if (!Number.isNaN(amount)) return { amount, currency: "USD" };
+  }
   for (const { re, currency, group } of AMOUNT_RES) {
     const m = text.match(re);
     if (!m) continue;
@@ -344,7 +361,13 @@ function parseAmount(
 }
 
 function inferCadence(text: string): Cadence | undefined {
-  if (/(\/yr\b|per\s+year|annual(?:ly)?)/i.test(text)) return "yearly";
+  if (
+    /(\/yr\b|per\s+year|annual(?:ly)?|domain\s+registration|renewal\s+price)/i.test(
+      text,
+    )
+  ) {
+    return "yearly";
+  }
   if (/(\/mo\b|per\s+month|monthly)/i.test(text)) return "monthly";
   if (/\brenews\b/i.test(text)) return "unknown";
   return undefined;
