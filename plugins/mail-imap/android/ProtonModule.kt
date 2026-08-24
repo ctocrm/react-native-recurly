@@ -435,6 +435,7 @@ private class ProtonClient {
   }
 
   private fun unlockKeys(session: ProtonSession, password: String): UnlockedProtonKeys {
+    unlockLockedScope(session, password)
     val userJson = getJson("$api/core/v4/users", session)
     val user = userJson.optJSONObject("User") ?: userJson
     val userKeys = user.optJSONArray("Keys") ?: JSONArray()
@@ -503,6 +504,41 @@ private class ProtonClient {
       }
     }
     return UnlockedProtonKeys(userCount, addrCount, allPriv.distinctBy { it.keyID })
+  }
+
+  /**
+   * Official locked-scope reauth: POST /auth/v4/info with ReauthScope=locked,
+   * then PUT /core/v4/users/unlock with the same SRP proofs as login.
+   */
+  private fun unlockLockedScope(session: ProtonSession, password: String) {
+    val info = postJson(
+      "$api/auth/v4/info",
+      JSONObject().put("Intent", "Proton").put("ReauthScope", "locked").toString(),
+      session,
+      null,
+      null,
+    )
+    val version = info.optInt("Version", 4)
+    val saltB64 = info.optString("Salt")
+    val modulus = info.optString("Modulus")
+    val serverEphemeral = info.optString("ServerEphemeral")
+    val srpSession = info.optString("SRPSession")
+    if (saltB64.isEmpty() || modulus.isEmpty() || serverEphemeral.isEmpty()) {
+      throw IllegalStateException("Proton did not return locked-scope SRP parameters")
+    }
+    val srp = ProtonSrp.prove(
+      password,
+      saltB64,
+      stripModulus(modulus),
+      serverEphemeral,
+      version,
+    )
+    val body = JSONObject()
+      .put("ClientEphemeral", srp.clientEphemeral)
+      .put("ClientProof", srp.clientProof)
+      .put("SRPSession", srpSession)
+    putJson("$api/core/v4/users/unlock", body.toString(), session)
+    Log.i(ProtonModule.TAG, "Proton locked-scope unlock ok")
   }
 
   private fun mailboxPassForKey(
@@ -709,6 +745,21 @@ private class ProtonClient {
       conn.setRequestProperty("x-pm-human-verification-token", hvToken)
       conn.setRequestProperty("x-pm-human-verification-token-type", hvType)
     }
+    conn.doOutput = true
+    OutputStreamWriter(conn.outputStream, StandardCharsets.UTF_8).use { it.write(body) }
+    return read(conn)
+  }
+
+  private fun putJson(url: String, body: String, session: ProtonSession): JSONObject {
+    val conn = (URL(url).openConnection() as HttpsURLConnection)
+    conn.requestMethod = "PUT"
+    conn.connectTimeout = 20_000
+    conn.readTimeout = 25_000
+    conn.setRequestProperty("Content-Type", "application/json")
+    conn.setRequestProperty("Authorization", "Bearer ${session.accessToken}")
+    conn.setRequestProperty("x-pm-uid", session.uid)
+    conn.setRequestProperty("x-pm-appversion", "Other")
+    conn.setRequestProperty("User-Agent", "jsmastery/1.0")
     conn.doOutput = true
     OutputStreamWriter(conn.outputStream, StandardCharsets.UTF_8).use { it.write(body) }
     return read(conn)
