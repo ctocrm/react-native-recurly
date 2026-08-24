@@ -46,6 +46,24 @@ describe("domainDiscovery (pure, provider-independent)", () => {
         scoreDomainMatch("acehardware", "acehardware.com"),
       ).toBeGreaterThanOrEqual(80);
     });
+    it("does not prefer .com over an equally branded non-com TLD", () => {
+      expect(scoreDomainMatch("proton", "proton.me")).toBe(
+        scoreDomainMatch("proton", "proton.com"),
+      );
+      const ranking = rankOfficialDomainCandidates("proton", [
+        "https://proton.me/",
+        "https://proton.com/",
+      ]);
+      expect(ranking.best?.host).toBe("proton.me");
+    });
+    it("picks dotted brand hosts without a .com bonus", () => {
+      expect(scoreDomainMatch("ground-news", "ground.news")).toBeGreaterThanOrEqual(
+        90,
+      );
+      expect(scoreDomainMatch("ground-news", "groundnews.com")).toBeGreaterThanOrEqual(
+        80,
+      );
+    });
     it("scores unrelated host low", () => {
       expect(scoreDomainMatch("le-devoir", "fitliferegime.com")).toBeLessThan(
         40,
@@ -87,12 +105,12 @@ describe("domainDiscovery (pure, provider-independent)", () => {
       expect(pick.confidence).toBe("high");
     });
 
-    it("falls back to deterministic guess when search yields nothing usable (F5/F12)", () => {
+    it("returns empty when search yields nothing usable (no .com guess)", () => {
       const pick = pickOfficialDomain("le-devoir", [
         "https://en.wikipedia.org/wiki/Le_Devoir",
       ]);
-      // No confident candidate -> deterministic exact match for the brand slug.
-      expect(pick.url).toContain("ledevoir.com");
+      expect(pick.url).toBe("");
+      expect(pick.confidence).toBe("low");
     });
   });
 

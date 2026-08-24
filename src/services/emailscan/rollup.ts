@@ -43,6 +43,7 @@ export function rollupCandidates(hits: ClassifiedMessage[]): ScanCandidate[] {
         mailboxId: hit.message.mailboxId,
         merchantKey: hit.merchantKey,
         merchant: hit.merchantName,
+        officialDomain: hit.officialDomain ?? null,
         kind: hit.kind,
         amount: hit.amount,
         currency: hit.currency,
@@ -77,6 +78,9 @@ export function rollupCandidates(hits: ClassifiedMessage[]): ScanCandidate[] {
 
     if (confidenceRank(hit.confidence) > confidenceRank(existing.confidence)) {
       existing.confidence = hit.confidence;
+    }
+    if (!existing.officialDomain && hit.officialDomain) {
+      existing.officialDomain = hit.officialDomain;
     }
   }
 

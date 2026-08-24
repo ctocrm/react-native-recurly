@@ -564,7 +564,7 @@ const SEARCH_VARIATIONS = [
 ];
 
 /** Decode DuckDuckGo redirect links (uddg=) into real destination URLs. */
-function extractDuckDuckGoUddgLinks(html: string): string[] {
+export function extractDuckDuckGoUddgLinks(html: string): string[] {
   const out: string[] = [];
   const seen = new Set<string>();
   const re = /[?&]uddg=([^&"']+)/gi;
@@ -1085,12 +1085,6 @@ export async function searchForLinksToSpider(brand: string): Promise<string[]> {
     }
   };
 
-  const deterministicOrigins = getOfficialDomainGuesses(brand);
-  deterministicOrigins.forEach(addLink);
-  console.log(
-    `[SEARCH_ENGINE] Added ${deterministicOrigins.length} deterministic official-site guesses for "${brand}"`,
-  );
-
   // Prefer server-rendered HTML (SPA shell has almost no result links).
   const response = await fetchWithTimeout(
     `https://html.duckduckgo.com/html/?q=${encodeURIComponent(brand)}`,
@@ -1122,12 +1116,7 @@ export async function searchForLinksToSpider(brand: string): Promise<string[]> {
     );
   }
 
-  // If fetch returned 0 links, consider using WebView as fallback
-  // This happens when anti-bot measures block the fetch response
-  // The deterministic guesses mean `allLinks` is intentionally non-empty even
-  // when HTTP search is blocked. Still run the WebView route so mobile gets
-  // real result links rather than guesses alone.
-  if (allLinks.length <= deterministicOrigins.length * 2) {
+  if (allLinks.length === 0) {
     console.log(
       `[SEARCH_ENGINE] Fetch returned 0 links, trying WebView fallback for "${brand}"`,
     );

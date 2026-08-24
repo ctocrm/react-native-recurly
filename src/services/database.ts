@@ -537,6 +537,7 @@ export interface IconCrawlSession {
   startedAt: string | null;
   updatedAt: string | null;
   completedAt: string | null;
+  officialDomain: string | null;
 }
 
 export interface IconCrawlSessionUpdate {
@@ -548,24 +549,31 @@ export interface IconCrawlSessionUpdate {
   deferredCount?: number;
   spideredPages?: number;
   completed?: boolean;
+  officialDomain?: string | null;
 }
 
-export async function beginIconCrawlSession(iconKey: string): Promise<void> {
+export async function beginIconCrawlSession(
+  iconKey: string,
+  officialDomain?: string | null,
+): Promise<void> {
   const db = getDatabase();
+  const seed = officialDomain?.trim() || null;
   await db.runAsync(
     `INSERT INTO icon_crawl_sessions (
        icon_key, status, detail, discovered_count, downloaded_count,
        rejected_count, deferred_count, spidered_pages, started_at, updated_at,
-       completed_at
+       completed_at, official_domain
      ) VALUES (?, 'discovering', 'Starting discovery', 0, 0, 0, 0, 0,
-       datetime('now'), datetime('now'), NULL)
+       datetime('now'), datetime('now'), NULL, ?)
      ON CONFLICT(icon_key) DO UPDATE SET
        status = 'discovering', detail = 'Starting discovery',
        discovered_count = 0, downloaded_count = 0, rejected_count = 0,
        deferred_count = 0, spidered_pages = 0,
        started_at = datetime('now'), updated_at = datetime('now'),
-       completed_at = NULL`,
+       completed_at = NULL,
+       official_domain = COALESCE(excluded.official_domain, icon_crawl_sessions.official_domain)`,
     iconKey,
+    seed,
   );
 }
 
@@ -584,6 +592,7 @@ export async function updateIconCrawlSession(
        rejected_count = COALESCE(?, rejected_count),
        deferred_count = COALESCE(?, deferred_count),
        spidered_pages = COALESCE(?, spidered_pages),
+       official_domain = COALESCE(?, official_domain),
        updated_at = datetime('now'), completed_at = ${completedAt}
      WHERE icon_key = ?`,
     status,
@@ -593,6 +602,7 @@ export async function updateIconCrawlSession(
     update.rejectedCount ?? null,
     update.deferredCount ?? null,
     update.spideredPages ?? null,
+    update.officialDomain ?? null,
     iconKey,
   );
 }
@@ -613,10 +623,11 @@ export async function getIconCrawlSession(
     started_at: string | null;
     updated_at: string | null;
     completed_at: string | null;
+    official_domain: string | null;
   }>(
     `SELECT icon_key, status, detail, discovered_count, downloaded_count,
        rejected_count, deferred_count, spidered_pages, started_at, updated_at,
-       completed_at
+       completed_at, official_domain
      FROM icon_crawl_sessions WHERE icon_key = ?`,
     iconKey,
   );
@@ -633,6 +644,7 @@ export async function getIconCrawlSession(
     startedAt: row.started_at,
     updatedAt: row.updated_at,
     completedAt: row.completed_at,
+    officialDomain: row.official_domain,
   };
 }
 

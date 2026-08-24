@@ -6,10 +6,7 @@
  * This module answers one question: does this candidate's origin give evidence
  * it belongs to the brand? Pure and unit-testable.
  */
-import {
-    generateDeterministicGuesses,
-    normalizeBrand,
-} from "./domainDiscovery";
+import { normalizeBrand } from "./domainDiscovery";
 
 export type Provenance = "official" | "brand-token" | "library" | "untrusted";
 
@@ -41,20 +38,18 @@ function hostOf(url: string): string | null {
 }
 
 /**
- * Build the set of hosts considered "official" for a brand: the deterministic
- * guesses plus, when known, the ranked best host discovered from search.
+ * Build the set of hosts considered "official" for a brand.
+ * Only a discovered / scan-seeded host counts. Deterministic .com guesses
+ * are not official.
  */
 export function officialHostsForBrand(
   brand: string,
   rankedBestHost?: string | null,
 ): Set<string> {
   const hosts = new Set<string>();
-  for (const g of generateDeterministicGuesses(brand)) {
-    const h = hostOf(g.url);
-    if (h) hosts.add(h);
-  }
-  if (rankedBestHost)
+  if (rankedBestHost) {
     hosts.add(rankedBestHost.replace(/^www\./, "").toLowerCase());
+  }
   return hosts;
 }
 

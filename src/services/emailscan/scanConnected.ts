@@ -65,7 +65,9 @@ export async function importFromConnectedMailboxes(opts: {
                   icon_key: crawlKey,
                 });
               }
-              void startIconCrawl(crawlKey, already.id);
+              void startIconCrawl(crawlKey, already.id, {
+                officialDomain: candidate.officialDomain,
+              });
             }
           }
           continue;
@@ -74,7 +76,9 @@ export async function importFromConnectedMailboxes(opts: {
         existingByKey.set(key, next);
         imported += 1;
         if (next.icon_key && next.icon_key !== "plus") {
-          void startIconCrawl(next.icon_key, next.id);
+          void startIconCrawl(next.icon_key, next.id, {
+            officialDomain: candidate.officialDomain,
+          });
         }
       }
     } catch (error) {

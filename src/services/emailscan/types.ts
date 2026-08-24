@@ -3,7 +3,7 @@
  * A subscription is an account; a bill is optional evidence.
  */
 
-export const PARSER_VERSION = 9;
+export const PARSER_VERSION = 10;
 
 
 export type MailProviderId =
@@ -48,6 +48,8 @@ export interface ClassifiedMessage {
   subjectClass: SubjectClass;
   merchantKey: string;
   merchantName: string;
+  /** Sanitized From-host for icon crawl. Null for processor/ESP mail. */
+  officialDomain?: string | null;
   /** Null when subjectClass is drop. */
   kind: CandidateKind | null;
   amount?: number;
@@ -64,6 +66,8 @@ export interface ScanCandidate {
   mailboxId: string;
   merchantKey: string;
   merchant: string;
+  /** Sanitized From-host for icon crawl. Absent when unknown. */
+  officialDomain?: string | null;
   kind: CandidateKind;
   amount?: number;
   currency?: string;

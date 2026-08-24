@@ -2,7 +2,7 @@
 
 **Last updated:** 2026-08-24
 
-**Status:** Phases **1–5.5 complete**. **MAJOR FIX (Tranches A–F) complete on-device.** **UI Improvements Phase 0–3 complete** (`ba66478`, `e4e383e`, `77a83bb`, `913b08f`). **Home/Insights hops A–E proven on device** (`ff3f3b9`, `ed16b0f`, `30de520`, `a6e6774`, `b510a35`). **UI Phase 4 is still not complete:** H1 catalog leftovers, H2 IMAP socket, H3 HTTPS completeness, and live Gmail/Outlook connect remain. Proton/Tuta **have** imported live rows (H4/H5 code hops): Proton **$29.98**, Linode this-month **$93**, Porkbun **$47.74** yearly. Phase 5 graph is not started. Phase 6 remains later ship polish. Training frozen.
+**Status:** Phases **1–5.5 complete**. **MAJOR FIX (Tranches A–F) landed** but **crawler quality is still open** (hops 1–5 below). **UI Improvements Phase 0–3 complete** (`ba66478`, `e4e383e`, `77a83bb`, `913b08f`). **Home/Insights hops A–E proven on device** (`ff3f3b9`, `ed16b0f`, `30de520`, `a6e6774`, `b510a35`). **UI Phase 4 is still not complete:** H1 catalog leftovers, H2 IMAP socket, H3 HTTPS completeness, and live Gmail/Outlook connect remain. Proton/Tuta **have** imported live rows (H4/H5 code hops): Proton **$29.98**, Linode this-month **$93**, Porkbun **$47.74** yearly. Phase 5 graph is not started. Phase 6 remains later ship polish. Training frozen.
 
 This is the living execution plan for app-side quality and reliability **without** retraining TFLite models. AI upscale strategy remains frozen in [`docs/AI_UPSCALING.md`](./AI_UPSCALING.md) (now under `docs/`).
 
@@ -31,7 +31,7 @@ This is the living execution plan for app-side quality and reliability **without
 | **4**   | DB split / schema hygiene                              | **Done**                              | same                                |
 | **5**   | Sync honesty                                           | **Done**                              | same                                |
 | **5.5** | Professional cleanup (artifacts, docs, structure)      | **Done**                              | complete                            |
-| **MF**  | Icon crawler → picker → upscale pipeline recovery      | **Done (A–F on-device)**              | full cross-layer gate every tranche |
+| **MF**  | Icon crawler → picker → upscale pipeline recovery      | **A–F landed; quality hops 1–5 open** | full cross-layer gate every hop     |
 | **UI**  | Post-Major-Fix UI improvements                         | **Phases 0–3 done; hops A–E done; Phase 4 NOT done** | skill loop after Phase 0            |
 | **6**   | Ship polish                                            | **After UI Improvements**             | full smoke + doc pass               |
 
@@ -385,7 +385,7 @@ scripts/
 
 ## MAJOR FIX — Icon crawler → picker → upscale pipeline recovery ✅
 
-**Status:** **Done (Tranches A–F on-device, 2026-08-14).** Frozen contracts still apply to later UI work. Phase 6 ship polish waits on UI Improvements.
+**Status:** **Tranches A–F landed (2026-08-14).** Frozen contracts still apply. **Crawler quality is not done** — hops 1–5 below are the remaining named outcome. Phase 6 waits on UI Improvements **and** these quality hops.
 
 **Why this is a major fix:** crawler discovery, picker behavior, card/cache state, and upscaling are one coupled icon pipeline. Project history repeatedly fixed one layer while breaking another, then continued forward and recreated the same failures. This repair is not complete when search returns URLs, when images download, when TypeScript passes, or when the app builds. It is complete only when the full user-facing icon pipeline works end-to-end without regressing its downstream contracts.
 
@@ -772,6 +772,76 @@ A technically valid/downloadable image that is not the intended brand is a **fai
 ### Major Fix completion rule
 
 Do not mark this section complete, unblock Phase 6, or describe the crawler as fixed until the full end-to-end acceptance contract above has been demonstrated on emulator/device.
+
+---
+
+## Icon crawl quality — hops 1–5 (open)
+
+**Named outcome:** given a real subscription (scan-imported or typed), the crawler auto-assigns a **brand-correct** icon, rejects blank/transparent defaults, keeps random page images out of the picker, and still surfaces a useful set of *related* icons.
+
+Do **not** restore an old crawler commit. Close the holes in the current staged resolver. Training stays frozen.
+
+### Diagnosis (2026-08-24)
+
+Git does **not** show a restore of the July crawler. Last crawler edit is `d55bbf3` (Tranche E). Later `ed16b0f` only *starts* the existing crawl after Scan import. `370dc55` reverted premature Tranche B; B was rewritten as `fbf7107`. This is the current mixed pipeline: later precision/ownership/responsiveness patches on incomplete official-domain discovery, plus older loose gates still live.
+
+**Why it feels like the old bugs came back**
+
+1. **Card locks the first valid download.** `9e091c1` cut `IMMEDIATE_FETCH_BATCH` 12 → 2. Tranche E `canAutoAssignCache` treats any valid cache row as user-chosen.
+2. **Official domain is wrong or missing.** Scan has `noreply@proton.me` and throws the host away; TIER 0 guesses `proton.com` via the DDG SPA. Scorer gives `+10` to `.com`.
+3. **Random images leak.** `queueDirectFromLink` has no provenance gate. OG/Twitter/generic JSON-LD `image` still count as logos.
+4. **Blank/transparent rejection does not cover the card.** PNG-only alpha; live preview skips `isBase64IconValid`.
+5. **Fewer real icons is a yield collapse**, not a missing `searchAllSources`.
+
+Not a `git restore`. Not a training/upscale problem. Not a wholesale checkout of `1072b28` / `3e3546c`.
+
+### Shared contracts (every hop)
+
+- Store original downloaded bytes, format, and dimensions. **No crawl-time upscale.**
+- Explicit user/AI picker choice is never overwritten.
+- Wikipedia / social / app-store / aggregator / search exclusions stay.
+- Name/slug stays the card / `icon_key`. The host is crawl evidence, not the display name.
+- One hop at a time. Prove the hop’s gate before the next.
+
+### Hop 1 — Official domain (two tracks) — **in progress**
+
+Scan already has a host. Manual add only has a name. **`.com` must not be the first official guess on either path.**
+
+**Track A — Scan-found:** sanitize the From-host (`proton.me`) and pass it as `officialDomain`. Peel mailer labels; reject ESP/CDN and payment-processor hosts. Persist on the crawl session. No subscription-schema change.
+
+**Track B — Manual add:** query `html.duckduckgo.com/html/?q=` (not the SPA). Score brand agreement only — **no `.com` bonus**. Accept official only if the host clears the confidence bar and contains the brand token. If search is blocked or empty: **no official domain** (do not scrape a wrong `.com`). Persist a search-discovered host on the crawl session.
+
+**Gate:** Scan Proton logs `official=proton.me` and first-party Proton icons. Manual Proton / Ground News / Linear can pick the real TLD from search. TIER 0.5 runs on that host.
+
+### Hop 2 — Stop locking the first progressive icon
+
+Distinguish crawler-owned cache vs user/AI-chosen cache. Re-run `pickBestIcon` as better valid candidates arrive. Never overwrite an explicit picker/AI choice.
+
+**Gate:** Proton and 4 other brands first show a progressive icon, then the card upgrades. A user-picked tile stays put.
+
+### Hop 3 — Close the random-image holes
+
+`queueDirectFromLink` uses the TIER 3 provenance gate. OG / Twitter / generic JSON-LD `image` are not logos unless there is a real logo signal. Rank provenance before `scoreIconQuality`. Tighten `looksLikeDirectImage` / brand-token.
+
+**Gate:** Picker for 5 diverse brands shows brand-associated icons only.
+
+### Hop 4 — Blank/transparent cannot become the default
+
+Visible-pixel / empty checks past PNG. Card + create-modal live preview refuse invalid cache rows. Invalid cache remains healable after Hop 2.
+
+**Gate:** A transparent/empty candidate is not auto-assigned and is not the card default.
+
+### Hop 5 — Yield, after precision is back
+
+Only then raise `IMMEDIATE_FETCH_BATCH` carefully, or fetch more first-party/library hits, without unbounded page-image scraping.
+
+**Gate:** More *real* related icons, not more random images.
+
+### Validation (required after each hop)
+
+Wipe icon cache + crawl results for the test keys. Crawl at least 5 real, diverse names including Proton (scan **and** typed) and an uncommon company. Watch progressive results. Confirm brand-correct icons. Long-press the card icon. Check logs for official host, untrusted rejects, and rate limits.
+
+**Act first:** Hop 1. Hop 2 is the other half of “first one found,” but without the right host there is no correct icon to promote.
 
 ---
 
@@ -1341,4 +1411,6 @@ Parked until a documented API exists. Do not implement as Connect-without-scan.
 | 2026-08-24 | **Hop D Insights this-month proven (`a6e6774`).** Live Insights: this-month actuals **$122.98**, recurring **$29.98**, sparse **$93.00**, top merchant **Linode $93**. Chart bars were still cloned run-rate until hop E. |
 | 2026-08-24 | **Hop E Insights mail bars proven (`b510a35`).** x86_64 release installed `-r`. Title **Monthly spend from mail**. This Month: one **Aug $122.98** bar. Last 3 Months: **Jun $29.98**, **Jul $94.72**, **Aug $122.98**. Year: 12 bars Sep→Aug; Jan is run-rate (no Porkbun spike). Jul/Aug taller than Apr–Jun. Chips change bar count. Live Jul is **$94.72** (`29.98+17+47.74`); Porkbun mail date is July on device, not January. After Year horizontal scroll, switching to This Month can look empty until remount (leftover offset). |
 | 2026-08-24 | **Docs synced to hops A–E.** Plan header/UI board now say A–E proven; leftover Year→This Month scroll is a note, not a new hop. `docs/CODEBASE.md` Home/Insights/chargeDisplay map refreshed. Lessons: live Porkbun is July not January; leftover Year offset; do not restyle the tab bar. |
+| 2026-08-24 | **Icon quality hops 1–5 recorded.** Crawler files were not restored. Combined plan: Hop 1 two-track official domain (scan From-host / search TLD, no `.com` first guess); Hop 2 stop first-icon lock-in; Hop 3 provenance holes; Hop 4 blank reject on card; Hop 5 yield after precision. |
+| 2026-08-24 | **Hop 1 official-domain code landed.** Scan sanitizes From-host (`proton.me`) onto crawl session. Manual TIER 0 uses `html.duckduckgo.com` and ranks without a `.com` bonus. No deterministic `.com` official fallback. Device gate still open. |
 

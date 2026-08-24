@@ -5,7 +5,7 @@
 import type { SQLiteDatabase } from "expo-sqlite";
 
 /** Bump when adding a migration. Stored in PRAGMA user_version. */
-export const SCHEMA_VERSION = 11;
+export const SCHEMA_VERSION = 12;
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS subscriptions (
@@ -63,7 +63,8 @@ CREATE TABLE IF NOT EXISTS icon_crawl_sessions (
   spidered_pages    INTEGER NOT NULL DEFAULT 0,
   started_at        TEXT DEFAULT (datetime('now')),
   updated_at        TEXT DEFAULT (datetime('now')),
-  completed_at      TEXT
+  completed_at      TEXT,
+  official_domain   TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_icon_crawl_sessions_status ON icon_crawl_sessions(status);
 
@@ -317,7 +318,8 @@ export const MIGRATIONS: ((db: SQLiteDatabase) => Promise<void>)[] = [
           spidered_pages    INTEGER NOT NULL DEFAULT 0,
           started_at        TEXT DEFAULT (datetime('now')),
           updated_at        TEXT DEFAULT (datetime('now')),
-          completed_at      TEXT
+          completed_at      TEXT,
+          official_domain   TEXT
         );
         CREATE INDEX IF NOT EXISTS idx_icon_crawl_sessions_status
         ON icon_crawl_sessions(status);
@@ -365,6 +367,16 @@ export const MIGRATIONS: ((db: SQLiteDatabase) => Promise<void>)[] = [
     if (!names.includes("price_unknown")) {
       await db.execAsync(
         `ALTER TABLE subscriptions ADD COLUMN price_unknown INTEGER NOT NULL DEFAULT 0;`,
+      );
+    }
+  },
+  // 12: persist scan/search official-domain hint on the crawl session.
+  async (db) => {
+    if (!(await tableExists(db, "icon_crawl_sessions"))) return;
+    const names = await columnNames(db, "icon_crawl_sessions");
+    if (!names.includes("official_domain")) {
+      await db.execAsync(
+        `ALTER TABLE icon_crawl_sessions ADD COLUMN official_domain TEXT;`,
       );
     }
   },

@@ -247,6 +247,7 @@ describe("emailscan subject amounts + no fake $0", () => {
       date: "2026-08-01T12:00:00.000Z",
     });
     expect(hit.merchantKey).toBe("proton");
+    expect(hit.officialDomain).toBe("proton.me");
     expect(hit.kind).toBe("recurring");
     expect(hit.amount).toBe(4.99);
     expect(hit.subjectClass).toBe("recurring");

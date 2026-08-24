@@ -2,6 +2,7 @@
  * Subject-first classifier. Body and invoice-like attachments run only
  * for money classes (recurring / sparse). No LLM.
  */
+import { officialDomainFromAddress } from "@/services/domain/officialDomain";
 import type {
   Cadence,
   ClassifiedMessage,
@@ -275,6 +276,7 @@ export function merchantFromProcessorText(text: string): {
 export function resolveMerchant(message: NormalizedMessage): {
   merchantKey: string;
   merchantName: string;
+  officialDomain: string | null;
   evidence: string[];
   drop: boolean;
 } {
@@ -282,13 +284,20 @@ export function resolveMerchant(message: NormalizedMessage): {
     return {
       merchantKey: "self",
       merchantName: "Self",
+      officialDomain: null,
       evidence: ["drop:self-mail"],
       drop: true,
     };
   }
   const fromMerchant = merchantFromAddress(message.from);
+  const fromDomain = officialDomainFromAddress(message.from);
   if (!isPaymentProcessor(fromMerchant.merchantKey)) {
-    return { ...fromMerchant, evidence: [], drop: false };
+    return {
+      ...fromMerchant,
+      officialDomain: fromDomain,
+      evidence: [],
+      drop: false,
+    };
   }
   const named =
     merchantFromProcessorText(message.subject) ||
@@ -297,12 +306,14 @@ export function resolveMerchant(message: NormalizedMessage): {
     return {
       merchantKey: fromMerchant.merchantKey,
       merchantName: fromMerchant.merchantName,
+      officialDomain: null,
       evidence: [`drop:processor:${fromMerchant.merchantKey}`],
       drop: true,
     };
   }
   return {
     ...named,
+    officialDomain: null,
     evidence: [`processor:${fromMerchant.merchantKey}`],
     drop: false,
   };
@@ -410,7 +421,7 @@ export function hasInvoiceAttachment(message: NormalizedMessage): boolean {
 export function classifyMessage(message: NormalizedMessage): ClassifiedMessage {
   const subjectClass = classifySubject(message.subject);
   const resolved = resolveMerchant(message);
-  const { merchantKey, merchantName } = resolved;
+  const { merchantKey, merchantName, officialDomain } = resolved;
   const evidence = [`subject:${subjectClass}`, ...resolved.evidence];
 
   if (resolved.drop || subjectClass === "drop") {
@@ -419,6 +430,7 @@ export function classifyMessage(message: NormalizedMessage): ClassifiedMessage {
       subjectClass: resolved.drop ? "drop" : subjectClass,
       merchantKey,
       merchantName,
+      officialDomain,
       kind: null,
       amountUnknown: false,
       needsBody: false,
@@ -433,6 +445,7 @@ export function classifyMessage(message: NormalizedMessage): ClassifiedMessage {
       subjectClass,
       merchantKey,
       merchantName,
+      officialDomain,
       kind: "free",
       amountUnknown: false,
       needsBody: false,
@@ -463,6 +476,7 @@ export function classifyMessage(message: NormalizedMessage): ClassifiedMessage {
     subjectClass,
     merchantKey,
     merchantName,
+    officialDomain,
     kind,
     amount: parsed?.amount,
     currency: parsed?.currency,

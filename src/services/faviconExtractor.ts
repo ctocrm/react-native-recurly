@@ -153,7 +153,15 @@ async function checkDomain(domain: string): Promise<FaviconResult | null> {
 // Main favicon extraction function with bounded concurrency
 export async function extractFavicon(
   brandName: string,
+  officialHost?: string | null,
 ): Promise<FaviconResult | null> {
+  const seeded = officialHost?.replace(/^www\./, "").toLowerCase();
+  if (seeded) {
+    const direct = await checkDomain(`https://${seeded}`);
+    if (direct) return direct;
+    return null;
+  }
+
   const domains = generateLikelyDomains(brandName);
 
   // Process domains with bounded concurrency, short-circuit on first success

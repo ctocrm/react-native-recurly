@@ -10,6 +10,7 @@ import {
   enqueueIconScrape,
   getCachedIcon,
   getCrawlResults,
+  getIconCrawlSession,
   getQueuedIcons,
   markUrlAsCrawled,
   saveCrawlResult,
@@ -17,6 +18,10 @@ import {
   updateIconCrawlSession,
 } from "@/services/database";
 import { rankOfficialDomainCandidates } from "@/services/domain/domainDiscovery";
+import {
+  officialSiteUrlForHost,
+  sanitizeOfficialHost,
+} from "@/services/domain/officialDomain";
 import {
   classifyCandidate,
   isTrustedProvenance,
@@ -44,6 +49,7 @@ import {
   recordSuccess,
 } from "@/services/rateLimitTracker";
 import {
+  extractDuckDuckGoUddgLinks,
   searchAllSources,
   searchForLinksToSpider,
 } from "@/services/searchEngines";
@@ -712,69 +718,88 @@ export async function findIconUrls(iconKey: string): Promise<number> {
   // Track URLs we need to fetch immediately
   const urlsToFetch: CrawlCandidate[] = [];
 
-  // TIER 0: Discover official website - smarter first step
-  // Use a simple text search to find the brand's official site
+  // TIER 0: Discover official website. Scan seeds skip search.
   console.log(`[SEARCH] TIER 0: Discovering official website`);
   let officialSiteUrl: string | null = null;
   let officialHosts = officialHostsForBrand(iconKey);
-  try {
-    const ddgUrl = "https://duckduckgo.com";
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 15000);
-    const response = await fetch(
-      `${ddgUrl}/?q=${encodeURIComponent(iconKey)}&ia=web`,
-      {
-        signal: controller.signal,
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+  const sessionHint = await getIconCrawlSession(iconKey);
+  const seededHost = sessionHint?.officialDomain
+    ? sanitizeOfficialHost(sessionHint.officialDomain)
+    : null;
+  if (seededHost) {
+    officialSiteUrl = officialSiteUrlForHost(seededHost);
+    officialHosts = officialHostsForBrand(iconKey, seededHost);
+    console.log(`[SEARCH] TIER 0: Using seeded official site: ${officialSiteUrl}`);
+  } else {
+    try {
+      const ddgHtmlUrl = "https://html.duckduckgo.com";
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 15000);
+      const response = await fetch(
+        `${ddgHtmlUrl}/html/?q=${encodeURIComponent(iconKey)}`,
+        {
+          signal: controller.signal,
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            Accept:
+              "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          },
         },
-      },
-    );
-    clearTimeout(timer);
+      );
+      clearTimeout(timer);
 
-    if (response.ok) {
-      const html = await response.text();
-      // Collect ALL result links, then rank them by brand agreement instead of
-      // trusting the first link (Tranche A F1/F11: first-link pulled wikipedia,
-      // app stores, and unrelated sites as the "official" domain).
-      const candidateUrls: string[] = [];
-      const linkRe = /<a[^>]+href\s*=\s*["'](https?:\/\/[^"']+)["'][^>]*>/gi;
-      let m: RegExpExecArray | null;
-      while ((m = linkRe.exec(html)) !== null) candidateUrls.push(m[1]);
+      if (response.ok) {
+        const html = await response.text();
+        const candidateUrls = extractDuckDuckGoUddgLinks(html);
+        if (candidateUrls.length === 0) {
+          const linkRe = /<a[^>]+href\s*=\s*["'](https?:\/\/[^"']+)["'][^>]*>/gi;
+          let m: RegExpExecArray | null;
+          while ((m = linkRe.exec(html)) !== null) {
+            if (
+              !m[1].includes("duckduckgo.com") &&
+              !m[1].includes("google.com")
+            ) {
+              candidateUrls.push(m[1]);
+            }
+          }
+        }
 
-      const ranking = rankOfficialDomainCandidates(iconKey, candidateUrls);
-      if (ranking.best) {
-        officialSiteUrl = ranking.best.url;
-        officialHosts = officialHostsForBrand(iconKey, ranking.best.host);
-        console.log(
-          `[SEARCH] TIER 0: Ranked official site: ${officialSiteUrl} (${ranking.best.confidence}, ${ranking.best.reason})`,
-        );
+        const ranking = rankOfficialDomainCandidates(iconKey, candidateUrls);
+        if (ranking.best) {
+          officialSiteUrl = ranking.best.url;
+          officialHosts = officialHostsForBrand(iconKey, ranking.best.host);
+          await updateIconCrawlSession(iconKey, {
+            officialDomain: ranking.best.host,
+          });
+          console.log(
+            `[SEARCH] TIER 0: Ranked official site: ${officialSiteUrl} (${ranking.best.confidence}, ${ranking.best.reason})`,
+          );
+        } else {
+          console.log(
+            `[SEARCH] TIER 0: no confident official domain among ${candidateUrls.length} links`,
+          );
+        }
+        if (ranking.rejected.length > 0) {
+          console.log(
+            `[SEARCH] TIER 0: rejected ${ranking.rejected.length} non-brand hosts: ${ranking.rejected
+              .slice(0, 5)
+              .map((r) => `${r.host}(${r.reason})`)
+              .join(", ")}`,
+          );
+        }
+      } else if (response.status === 429) {
+        await recordRateLimit(ddgHtmlUrl);
       } else {
-        console.log(
-          `[SEARCH] TIER 0: no confident official domain among ${candidateUrls.length} links`,
-        );
+        providerFailures++;
       }
-      if (ranking.rejected.length > 0) {
-        console.log(
-          `[SEARCH] TIER 0: rejected ${ranking.rejected.length} non-brand hosts: ${ranking.rejected
-            .slice(0, 5)
-            .map((r) => `${r.host}(${r.reason})`)
-            .join(", ")}`,
-        );
-      }
-    } else if (response.status === 429) {
-      // Only 429 cools down DDG; 403 is common bot challenge, not a domain ban
-      await recordRateLimit(ddgUrl);
-    } else {
+    } catch (err: any) {
       providerFailures++;
-    }
-  } catch (err: any) {
-    providerFailures++;
-    if (err.name !== "AbortError") {
-      console.log(`[SEARCH] TIER 0: Error finding official site: ${err}`);
-    } else {
-      console.log(`[SEARCH] TIER 0: Timeout finding official site`);
+      if (err.name !== "AbortError") {
+        console.log(`[SEARCH] TIER 0: Error finding official site: ${err}`);
+      } else {
+        console.log(`[SEARCH] TIER 0: Timeout finding official site`);
+      }
     }
   }
 
@@ -921,7 +946,10 @@ export async function findIconUrls(iconKey: string): Promise<number> {
 
   // TIER 2: Favicon extraction - FIND URL
   console.log(`[SEARCH] TIER 2: Favicon`);
-  const faviconResult = await extractFavicon(iconKey);
+  const faviconResult = await extractFavicon(
+    iconKey,
+    officialSiteUrl ? new URL(officialSiteUrl).hostname : null,
+  );
   if (faviconResult && !existingUrls.has(faviconResult.url)) {
     await saveCrawlResult(
       iconKey,
@@ -1394,28 +1422,34 @@ export async function promoteFirstIconToCache(iconKey: string): Promise<void> {
 // - Flags the icon as "loading" in the global registry for the FULL crawl.
 // - Runs the actual discovery/fetch as a detached promise that is never awaited
 //   by any UI, so closing any modal cannot cancel it.
+export type IconCrawlOptions = {
+  officialDomain?: string | null;
+};
+
 export async function startIconCrawl(
   iconKey: string,
   subscriptionId?: string,
+  options?: IconCrawlOptions,
 ): Promise<void> {
+  const seeded = options?.officialDomain
+    ? sanitizeOfficialHost(options.officialDomain)
+    : null;
   console.log(
-    `[CRAWL] startIconCrawl for ${iconKey} (sub: ${subscriptionId ?? "none"})`,
+    `[CRAWL] startIconCrawl for ${iconKey} (sub: ${subscriptionId ?? "none"}; official=${seeded ?? "search"})`,
   );
   if (activeCrawls.has(iconKey)) {
     console.log(`[CRAWL] Already crawling ${iconKey}, skip duplicate start`);
-    // Still ensure queue will process any pending rows
     await enqueueIconScrape(iconKey, subscriptionId);
+    if (seeded) {
+      await updateIconCrawlSession(iconKey, { officialDomain: seeded });
+    }
     return;
   }
   activeCrawls.add(iconKey);
   const gen = crawlGens.begin(iconKey);
 
-  // Durable DB record — this is what makes the search persistent/observable.
-  // enqueueIconScrape also kicks off the fetch worker, so the crawl is
-  // self-sustaining in the background without startIconCrawl awaiting the
-  // queue directly.
   await enqueueIconScrape(iconKey, subscriptionId);
-  await beginIconCrawlSession(iconKey);
+  await beginIconCrawlSession(iconKey, seeded);
   setIconCrawlProgress(iconKey, {
     status: "discovering",
     detail: "Discovering icon sources",

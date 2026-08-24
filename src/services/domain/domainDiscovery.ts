@@ -122,10 +122,8 @@ export function scoreDomainMatch(brand: string, hostname: string): number {
     score += 40; // brand appears mid-domain
   else if (hyphenated && host.includes(hyphenated)) score += 30;
 
-  // TLD quality: .com is the common default for brands.
-  if (host.endsWith(".com")) score += 10;
-  else if (/\.(io|app|co|ai|dev|net|org)$/.test(host)) score += 4;
-
+  // Brand-token agreement only. Do not prefer .com — proton.me / linear.app /
+  // ground.news are first-class official hosts.
   return score;
 }
 
@@ -186,8 +184,12 @@ export function rankOfficialDomainCandidates(
   const minScore = options.minScore ?? 40;
   const ranked: RankedDomain[] = [];
   const rejected: DomainRanking["rejected"] = [];
-  const seenHosts = new Set<string>();
+  const seen = new Map<
+    string,
+    { index: number; count: number; entry: RankedDomain }
+  >();
 
+  let nextIndex = 0;
   for (const raw of candidateUrls) {
     let url: URL;
     try {
@@ -197,8 +199,12 @@ export function rankOfficialDomainCandidates(
     }
     if (url.protocol !== "http:" && url.protocol !== "https:") continue;
     const host = url.hostname.replace(/^www\./, "").toLowerCase();
-    if (seenHosts.has(host)) continue;
-    seenHosts.add(host);
+
+    const existing = seen.get(host);
+    if (existing) {
+      existing.count += 1;
+      continue;
+    }
 
     const ex = isExcludedDomain(host);
     if (ex.excluded) {
@@ -207,24 +213,33 @@ export function rankOfficialDomainCandidates(
     }
 
     const score = scoreDomainMatch(brand, host);
-    ranked.push({
+    const entry: RankedDomain = {
       url: `${url.protocol}//${url.host}`,
       host,
       score,
       confidence: confidenceFor(score),
       reason: `brand-match score=${score}`,
-    });
+    };
+    seen.set(host, { index: nextIndex, count: 1, entry });
+    ranked.push(entry);
+    nextIndex += 1;
   }
 
-  ranked.sort((a, b) => b.score - a.score);
+  ranked.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    const freqB = seen.get(b.host)?.count ?? 0;
+    const freqA = seen.get(a.host)?.count ?? 0;
+    if (freqB !== freqA) return freqB - freqA;
+    return (seen.get(a.host)?.index ?? 0) - (seen.get(b.host)?.index ?? 0);
+  });
   const best =
     ranked.length > 0 && ranked[0].score >= minScore ? ranked[0] : null;
   return { best, ranked, rejected };
 }
 
 /**
- * Pick the official domain for a brand from candidate URLs, falling back to
- * deterministic guesses when nothing clears the threshold.
+ * Pick the official domain for a brand from candidate URLs.
+ * No deterministic .com fallback — a missing search hit is not proton.com.
  */
 export function pickOfficialDomain(
   brand: string,
@@ -234,13 +249,5 @@ export function pickOfficialDomain(
   if (best) {
     return { url: best.url, confidence: best.confidence, reason: best.reason };
   }
-  const fallback = generateDeterministicGuesses(brand)[0];
-  if (fallback) {
-    return {
-      url: fallback.url,
-      confidence: fallback.confidence,
-      reason: `${fallback.reason} (no confident search candidate)`,
-    };
-  }
-  return { url: "", confidence: "low", reason: "no candidates" };
+  return { url: "", confidence: "low", reason: "no confident search candidate" };
 }
