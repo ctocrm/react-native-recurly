@@ -1,6 +1,7 @@
 import {
     CrawlGenerationRegistry,
     canAutoAssignCache,
+    isUserChosenCacheSource,
     terminalStatusFor,
 } from "../crawlLifecycle";
 
@@ -29,8 +30,27 @@ describe("canAutoAssignCache (explicit cache ownership)", () => {
   it("heals an invalid cache", () => {
     expect(canAutoAssignCache(true, false)).toBe(true);
   });
-  it("NEVER overwrites a valid (chosen) cache", () => {
-    expect(canAutoAssignCache(true, true)).toBe(false);
+  it("upgrades a crawler-owned valid cache", () => {
+    expect(canAutoAssignCache(true, true, false)).toBe(true);
+  });
+  it("NEVER overwrites a user/AI-chosen cache", () => {
+    expect(canAutoAssignCache(true, true, true)).toBe(false);
+  });
+  it("treats a valid cache without an explicit chosen flag as crawler-owned", () => {
+    expect(canAutoAssignCache(true, true)).toBe(true);
+  });
+});
+
+describe("isUserChosenCacheSource", () => {
+  it("recognizes picker/AI ownership sources", () => {
+    expect(isUserChosenCacheSource("ai_upscale")).toBe(true);
+    expect(isUserChosenCacheSource("subscription")).toBe(true);
+    expect(isUserChosenCacheSource("user")).toBe(true);
+  });
+  it("treats crawl sources as crawler-owned", () => {
+    expect(isUserChosenCacheSource("official_apple_touch")).toBe(false);
+    expect(isUserChosenCacheSource("simple-icons")).toBe(false);
+    expect(isUserChosenCacheSource("favicon")).toBe(false);
   });
 });
 

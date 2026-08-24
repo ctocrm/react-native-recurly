@@ -390,6 +390,11 @@ const SubscriptionIconPickerModal = ({
         icon.source,
         icon.format,
         icon.originalUrl,
+        0,
+        undefined,
+        undefined,
+        false,
+        true,
       );
       posthog.capture("icon_picker_icon_selected", {
         subscription_name: subscriptionName,
@@ -417,6 +422,11 @@ const SubscriptionIconPickerModal = ({
       icon.source,
       newFormat,
       icon.originalUrl,
+      0,
+      undefined,
+      undefined,
+      false,
+      true,
     );
     await saveCrawlResult(
       iconKey,

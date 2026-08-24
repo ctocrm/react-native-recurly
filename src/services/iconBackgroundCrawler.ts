@@ -2,6 +2,7 @@ import { icons } from "@/constants/icons";
 import {
   CrawlGenerationRegistry,
   canAutoAssignCache,
+  isUserChosenCacheSource,
   terminalStatusFor,
 } from "@/services/crawlLifecycle";
 import {
@@ -419,6 +420,7 @@ async function downloadImageAsBase64(
         origSize?.height,
       );
       await recordSuccess(url);
+      await promoteFirstIconToCache(iconKey);
       notifyCacheUpdate();
       return true;
     } catch (err: any) {
@@ -1300,7 +1302,9 @@ export async function processIconQueue(): Promise<void> {
           const cachedValid =
             !!cached?.imageData &&
             isBase64IconValid(cached.imageData, cached.format);
-          if (canAutoAssignCache(!!cached?.imageData, cachedValid)) {
+          const userChosen =
+            cached?.chosen === true || isUserChosenCacheSource(cached?.source);
+          if (canAutoAssignCache(!!cached?.imageData, cachedValid, userChosen)) {
             const all = await getCrawlResults(item.icon_key);
             const withData = all.filter(
               (r) => r.imageData && isBase64IconValid(r.imageData, r.format),
@@ -1312,7 +1316,6 @@ export async function processIconQueue(): Promise<void> {
                   imageDataLength: r.imageData?.length,
                 })),
               )!;
-              // Upscale low-res picks (e.g. favicons) before caching.
               const bestUpscaled = await upscaleIconIfSmall(
                 best.imageData,
                 best.format,
@@ -1322,6 +1325,13 @@ export async function processIconQueue(): Promise<void> {
               ) {
                 console.log(
                   `[QUEUE] Skip caching invalid best icon for ${item.icon_key}`,
+                );
+              } else if (
+                cachedValid &&
+                cached?.imageData === bestUpscaled.base64
+              ) {
+                console.log(
+                  `[QUEUE] Best icon already cached for ${item.icon_key}`,
                 );
               } else {
                 await setCachedIcon(
@@ -1333,6 +1343,8 @@ export async function processIconQueue(): Promise<void> {
                   0,
                   best.originalWidth,
                   best.originalHeight,
+                  false,
+                  false,
                 );
                 console.log(`[QUEUE] Set best icon as cached: ${best.source}`);
               }
@@ -1367,8 +1379,10 @@ export async function promoteFirstIconToCache(iconKey: string): Promise<void> {
     const cached = await getCachedIcon(iconKey);
     const cachedValid =
       !!cached?.imageData && isBase64IconValid(cached.imageData, cached.format);
-    // Tranche E explicit ownership: never overwrite a valid (chosen) cache.
-    if (!canAutoAssignCache(!!cached?.imageData, cachedValid)) {
+    const userChosen =
+      cached?.chosen === true || isUserChosenCacheSource(cached?.source);
+    // Never overwrite a user/AI-chosen cache. Crawler-owned rows may upgrade.
+    if (!canAutoAssignCache(!!cached?.imageData, cachedValid, userChosen)) {
       return;
     }
 
@@ -1390,12 +1404,14 @@ export async function promoteFirstIconToCache(iconKey: string): Promise<void> {
         imageDataLength: r.imageData?.length,
       })),
     )!;
-    // Upscale low-res picks (e.g. favicons) before caching.
     const bestUpscaled = await upscaleIconIfSmall(best.imageData, best.format);
     if (!isBase64IconValid(bestUpscaled.base64, bestUpscaled.format)) {
       console.log(
         `[CRAWL] Best icon for ${iconKey} became invalid after upscale — skip auto-assign`,
       );
+      return;
+    }
+    if (cachedValid && cached?.imageData === bestUpscaled.base64) {
       return;
     }
     await setCachedIcon(
@@ -1407,9 +1423,11 @@ export async function promoteFirstIconToCache(iconKey: string): Promise<void> {
       0,
       best.originalWidth,
       best.originalHeight,
+      false,
+      false,
     );
     console.log(
-      `[CRAWL] Auto-assigned first valid icon for ${iconKey} (source=${best.source})`,
+      `[CRAWL] Auto-assigned best valid icon for ${iconKey} (source=${best.source})`,
     );
     notifyCacheUpdate();
   } catch (err) {

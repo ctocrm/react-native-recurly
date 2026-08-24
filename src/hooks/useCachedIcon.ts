@@ -142,12 +142,18 @@ export function useCachedIcon(iconKey: string | undefined): IconState {
       cached.format,
     );
     if (upscaled !== cached.imageData && active) {
+      const existing = await getCachedIcon(iconKey!);
       await setCachedIcon(
         iconKey!,
         upscaled,
         cached.source ?? "local",
         outFormat,
         cached.originalUrl ?? undefined,
+        0,
+        undefined,
+        undefined,
+        false,
+        existing?.chosen === true,
       );
     }
     if (!active) return;

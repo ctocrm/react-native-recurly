@@ -28,17 +28,24 @@ export function terminalStatusFor(
 
 /**
  * Whether the crawler may auto-assign the icon_cache for a key.
- * Auto-promotion is only allowed to FILL an empty cache or HEAL an invalid one.
- * A cache that already holds a valid image is, by definition, a chosen
- * (manual/AI/earlier-valid) icon and must never be overwritten by the crawler.
+ * Auto-promotion may FILL an empty cache, HEAL an invalid one, or UPGRADE a
+ * crawler-owned valid cache when a better candidate arrives.
+ * A user/AI-chosen cache is never overwritten.
  */
 export function canAutoAssignCache(
   hasImageData: boolean,
   isValid: boolean,
+  isUserChosen = false,
 ): boolean {
-  if (!hasImageData) return true; // empty cache: safe to fill
-  return !isValid; // invalid cache: safe to heal
-  // valid cache => user/AI-chosen => crawler must not overwrite
+  if (!hasImageData) return true;
+  if (!isValid) return true;
+  return !isUserChosen;
+}
+
+/** Sources that mean the user (or AI they invoked) owns the cache row. */
+export function isUserChosenCacheSource(source: string | null | undefined): boolean {
+  const src = (source || "").toLowerCase();
+  return src === "ai_upscale" || src === "subscription" || src === "user";
 }
 
 /**

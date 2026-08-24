@@ -803,7 +803,7 @@ Not a `git restore`. Not a training/upscale problem. Not a wholesale checkout of
 - Name/slug stays the card / `icon_key`. The host is crawl evidence, not the display name.
 - One hop at a time. Prove the hop’s gate before the next.
 
-### Hop 1 — Official domain (two tracks) — **in progress**
+### Hop 1 — Official domain (two tracks) — **code landed (`466cde7`); device gate open**
 
 Scan already has a host. Manual add only has a name. **`.com` must not be the first official guess on either path.**
 
@@ -813,7 +813,7 @@ Scan already has a host. Manual add only has a name. **`.com` must not be the fi
 
 **Gate:** Scan Proton logs `official=proton.me` and first-party Proton icons. Manual Proton / Ground News / Linear can pick the real TLD from search. TIER 0.5 runs on that host.
 
-### Hop 2 — Stop locking the first progressive icon
+### Hop 2 — Stop locking the first progressive icon — **code landed; device gate open**
 
 Distinguish crawler-owned cache vs user/AI-chosen cache. Re-run `pickBestIcon` as better valid candidates arrive. Never overwrite an explicit picker/AI choice.
 
@@ -1413,4 +1413,5 @@ Parked until a documented API exists. Do not implement as Connect-without-scan.
 | 2026-08-24 | **Docs synced to hops A–E.** Plan header/UI board now say A–E proven; leftover Year→This Month scroll is a note, not a new hop. `docs/CODEBASE.md` Home/Insights/chargeDisplay map refreshed. Lessons: live Porkbun is July not January; leftover Year offset; do not restyle the tab bar. |
 | 2026-08-24 | **Icon quality hops 1–5 recorded.** Crawler files were not restored. Combined plan: Hop 1 two-track official domain (scan From-host / search TLD, no `.com` first guess); Hop 2 stop first-icon lock-in; Hop 3 provenance holes; Hop 4 blank reject on card; Hop 5 yield after precision. |
 | 2026-08-24 | **Hop 1 official-domain code landed.** Scan sanitizes From-host (`proton.me`) onto crawl session. Manual TIER 0 uses `html.duckduckgo.com` and ranks without a `.com` bonus. No deterministic `.com` official fallback. Device gate still open. |
+| 2026-08-24 | **Hop 2 cache-ownership code landed.** `icon_cache.chosen` marks picker/AI rows. Crawler-owned cards may upgrade via `pickBestIcon` as better valid icons land. User/AI choices stay locked. Device gate still open. |
 

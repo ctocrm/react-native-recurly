@@ -5,7 +5,7 @@
 import type { SQLiteDatabase } from "expo-sqlite";
 
 /** Bump when adding a migration. Stored in PRAGMA user_version. */
-export const SCHEMA_VERSION = 12;
+export const SCHEMA_VERSION = 13;
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS subscriptions (
@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS icon_cache (
   fallback_tier INTEGER DEFAULT 0,
   original_width INTEGER,
   original_height INTEGER,
+  chosen        INTEGER NOT NULL DEFAULT 0,
   updated_at    TEXT DEFAULT (datetime('now'))
 );
 
@@ -379,6 +380,20 @@ export const MIGRATIONS: ((db: SQLiteDatabase) => Promise<void>)[] = [
         `ALTER TABLE icon_crawl_sessions ADD COLUMN official_domain TEXT;`,
       );
     }
+  },
+  // 13: distinguish crawler-owned vs user/AI-chosen icon_cache rows.
+  async (db) => {
+    if (!(await tableExists(db, "icon_cache"))) return;
+    const names = await columnNames(db, "icon_cache");
+    if (!names.includes("chosen")) {
+      await db.execAsync(
+        `ALTER TABLE icon_cache ADD COLUMN chosen INTEGER NOT NULL DEFAULT 0;`,
+      );
+    }
+    await db.execAsync(
+      `UPDATE icon_cache SET chosen = 1
+       WHERE lower(IFNULL(source,'')) IN ('ai_upscale','subscription','user');`,
+    );
   },
 ];
 

@@ -228,6 +228,7 @@ export interface CachedIconData {
   fallbackTier: number;
   originalWidth?: number;
   originalHeight?: number;
+  chosen: boolean;
 }
 
 function detectFormatFromBase64(base64: string, source: string): string {
@@ -263,8 +264,9 @@ export async function getCachedIcon(
       fallback_tier: number;
       original_width: number | null;
       original_height: number | null;
+      chosen: number | null;
     }>(
-      "SELECT image_data, source, format, original_url, fallback_tier, original_width, original_height FROM icon_cache WHERE icon_key = ?",
+      "SELECT image_data, source, format, original_url, fallback_tier, original_width, original_height, chosen FROM icon_cache WHERE icon_key = ?",
       iconKey,
     );
     if (row)
@@ -276,6 +278,7 @@ export async function getCachedIcon(
         fallbackTier: row.fallback_tier,
         originalWidth: row.original_width ?? undefined,
         originalHeight: row.original_height ?? undefined,
+        chosen: row.chosen === 1,
       };
     return null;
   } catch {
@@ -283,21 +286,27 @@ export async function getCachedIcon(
       const row = await db.getFirstAsync<{
         image_data: string;
         source: string;
+        format?: string;
+        original_url?: string | null;
+        fallback_tier?: number;
+        original_width?: number | null;
+        original_height?: number | null;
       }>(
-        "SELECT image_data, source FROM icon_cache WHERE icon_key = ?",
+        "SELECT image_data, source, format, original_url, fallback_tier, original_width, original_height FROM icon_cache WHERE icon_key = ?",
         iconKey,
       );
       if (row) {
-        const detectedFormat = detectFormatFromBase64(
-          row.image_data,
-          row.source,
-        );
+        const detectedFormat =
+          row.format || detectFormatFromBase64(row.image_data, row.source);
         return {
           imageData: row.image_data,
           source: row.source,
           format: detectedFormat,
-          originalUrl: null,
-          fallbackTier: 0,
+          originalUrl: row.original_url ?? null,
+          fallbackTier: row.fallback_tier ?? 0,
+          originalWidth: row.original_width ?? undefined,
+          originalHeight: row.original_height ?? undefined,
+          chosen: false,
         };
       }
       return null;
@@ -318,10 +327,11 @@ export async function setCachedIcon(
   originalHeight?: number,
   /** When true, skip cache listeners (use for multi-step writes; notify once at end). */
   silent: boolean = false,
+  chosen: boolean = false,
 ): Promise<void> {
   const db = getDatabase();
   await db.runAsync(
-    "INSERT OR REPLACE INTO icon_cache (icon_key, image_data, source, format, original_url, fallback_tier, original_width, original_height, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))",
+    "INSERT OR REPLACE INTO icon_cache (icon_key, image_data, source, format, original_url, fallback_tier, original_width, original_height, chosen, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))",
     iconKey,
     imageData,
     source,
@@ -330,6 +340,7 @@ export async function setCachedIcon(
     fallbackTier,
     originalWidth ?? null,
     originalHeight ?? null,
+    chosen ? 1 : 0,
   );
   if (silent) return;
   // Notify listeners that cache has been updated (dynamic import to avoid circular deps)
@@ -448,6 +459,7 @@ export async function replaceIconWithAiUpscale(
     originalWidth,
     originalHeight,
     true, // silent — notify once below
+    true, // user/AI-chosen
   );
   await deleteCrawlResultByImageData(iconKey, sourceImageData);
   const db = getDatabase();
@@ -1258,8 +1270,8 @@ export async function mergeIconCacheFromBackup(
       await db.runAsync(
         `INSERT OR REPLACE INTO icon_cache
           (icon_key, image_data, source, format, original_url, fallback_tier,
-           original_width, original_height, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')))`,
+           original_width, original_height, chosen, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, 0), COALESCE(?, datetime('now')))`,
         row.icon_key,
         row.image_data,
         row.source ?? "local",
@@ -1268,6 +1280,7 @@ export async function mergeIconCacheFromBackup(
         row.fallback_tier ?? 0,
         row.original_width ?? null,
         row.original_height ?? null,
+        row.chosen ?? 0,
         row.updated_at ?? null,
       );
       merged++;
