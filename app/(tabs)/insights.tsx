@@ -1,7 +1,9 @@
 import { icons } from "@/constants/icons";
 import { useSubscriptions } from "@/context/SubscriptionContext";
 import { useBottomClearance } from "@/hooks/useBottomClearance";
+import { useChargeDisplay } from "@/hooks/useChargeDisplay";
 import { formatCurrency } from "@/lib/utils";
+import { thisMonthInsights } from "@/services/emailscan";
 import { styled } from "nativewind";
 import { usePostHog } from "posthog-react-native";
 import React, { useEffect, useMemo, useState } from "react";
@@ -61,6 +63,7 @@ const Insights = () => {
   const { tabListPadding, pagePadding } = useBottomClearance();
   const posthog = usePostHog();
   const { subscriptions } = useSubscriptions();
+  const { messages } = useChargeDisplay(subscriptions);
   const [selectedPeriod, setSelectedPeriod] = useState<Period>("This Month");
 
   useEffect(() => {
@@ -68,55 +71,15 @@ const Insights = () => {
   }, [posthog]);
 
   // Calculate total monthly spend and category breakdown
-  const { totalMonthlySpend, categoryBreakdown, monthlyChartData } =
+  const { totalMonthlySpend, categoryBreakdown, monthlyChartData, merchants } =
     useMemo(() => {
-      // Filter active subscriptions — exclude cancelled and paused
-      const activeSubs = subscriptions.filter(
-        (s) => s.status !== "cancelled" && s.status !== "paused",
-      );
+      const insights = thisMonthInsights(subscriptions, messages);
+      const categoryTotals = [
+        { name: "recurring", total: insights.kinds.recurring },
+        { name: "sparse", total: insights.kinds.sparse },
+        { name: "free", total: insights.kinds.free },
+      ].filter((row) => row.total > 0 || row.name !== "free");
 
-      let total = 0;
-      const categoryTotals: Record<
-        string,
-        { total: number; count: number; subscriptions: Subscription[] }
-      > = {};
-
-      activeSubs.forEach((sub) => {
-        if (sub.priceUnknown) return;
-        let monthlyAmount = sub.price;
-        // Normalize to monthly
-        if (sub.billing === "Yearly" || sub.frequency === "Yearly") {
-          monthlyAmount = sub.price / 12;
-        } else if (sub.billing === "Weekly" || sub.frequency === "Weekly") {
-          monthlyAmount = sub.price * 4.33;
-        }
-
-        total += monthlyAmount;
-
-        const category = sub.category || "Other";
-        if (!categoryTotals[category]) {
-          categoryTotals[category] = {
-            total: 0,
-            count: 0,
-            subscriptions: [],
-          };
-        }
-        categoryTotals[category].total += monthlyAmount;
-        categoryTotals[category].count += 1;
-        categoryTotals[category].subscriptions.push(sub);
-      });
-
-      // Sort categories by total spend descending
-      const sortedCategories = Object.entries(categoryTotals)
-        .map(([name, data]) => ({
-          name,
-          total: data.total,
-          count: data.count,
-          subscriptions: data.subscriptions,
-        }))
-        .sort((a, b) => b.total - a.total);
-
-      // Generate estimated monthly chart data as a run-rate projection
       const currentMonth = new Date().getMonth();
       const monthsToShow =
         selectedPeriod === "This Month"
@@ -133,17 +96,18 @@ const Insights = () => {
         const monthIndex = (((currentMonth - i) % 12) + 12) % 12;
         chartData.push({
           label: MONTHS[monthIndex],
-          amount: total,
-          estimated: i > 0, // past months are estimated, current month is actual run-rate
+          amount: insights.total,
+          estimated: i > 0,
         });
       }
 
       return {
-        totalMonthlySpend: total,
-        categoryBreakdown: sortedCategories,
+        totalMonthlySpend: insights.total,
+        categoryBreakdown: categoryTotals,
         monthlyChartData: chartData,
+        merchants: insights.merchants,
       };
-    }, [subscriptions, selectedPeriod]);
+    }, [messages, selectedPeriod, subscriptions]);
 
   const maxCategorySpend =
     categoryBreakdown.length > 0
@@ -158,9 +122,6 @@ const Insights = () => {
   const totalSubs = subscriptions.filter(
     (s) => s.status !== "cancelled" && s.status !== "paused",
   ).length;
-
-  const topCategory =
-    categoryBreakdown.length > 0 ? categoryBreakdown[0] : null;
 
   return (
     <SafeAreaView
@@ -197,7 +158,7 @@ const Insights = () => {
             {/* Summary Card */}
             <View className="insights-summary-card">
               <Text className="insights-summary-label">
-                Total Monthly Spend
+                This month actuals
               </Text>
               <Text className="insights-summary-amount">
                 {formatCurrency(totalMonthlySpend)}
@@ -213,18 +174,18 @@ const Insights = () => {
                 </View>
                 <View className="insights-summary-item">
                   <Text className="insights-summary-item-value">
-                    {topCategory ? formatCurrency(topCategory.total) : "$0"}
+                    {merchants[0] ? formatCurrency(merchants[0].amount) : "$0"}
                   </Text>
                   <Text className="insights-summary-item-label">
-                    Most Spent
+                    Top merchant
                   </Text>
                 </View>
                 <View className="insights-summary-item">
                   <Text className="insights-summary-item-value">
-                    {topCategory ? topCategory.name : "-"}
+                    {merchants[0] ? merchants[0].name : "-"}
                   </Text>
                   <Text className="insights-summary-item-label">
-                    Top Category
+                    Top merchant
                   </Text>
                 </View>
               </View>
@@ -233,7 +194,7 @@ const Insights = () => {
             {/* Category Breakdown */}
             <View className="insights-section-head">
               <Text className="insights-section-title">
-                Spending by Category
+                This month by kind
               </Text>
             </View>
 
@@ -275,6 +236,24 @@ const Insights = () => {
                 </Pressable>
               );
             })}
+
+            <View className="insights-section-head mt-2">
+              <Text className="insights-section-title">Top merchants</Text>
+            </View>
+            {merchants.slice(0, 5).map((row) => (
+              <View
+                key={row.name}
+                className="mb-3 flex-row items-center justify-between rounded-2xl border border-border bg-card p-4"
+              >
+                <View>
+                  <Text className="insights-category-name">{row.name}</Text>
+                  <Text className="sub-meta">{row.kind}</Text>
+                </View>
+                <Text className="insights-category-spend">
+                  {formatCurrency(row.amount)}
+                </Text>
+              </View>
+            ))}
 
             {/* Estimated Monthly Spending Chart */}
             <View className="insights-section-head mt-5">

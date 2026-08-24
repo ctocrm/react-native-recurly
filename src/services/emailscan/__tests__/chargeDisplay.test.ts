@@ -4,6 +4,7 @@ import {
   displayedAmount,
   monthlySpendContribution,
   nextDisplayPeriod,
+  thisMonthInsights,
 } from "../chargeDisplay";
 import type { ClassifiedMessage } from "../types";
 
@@ -125,5 +126,33 @@ describe("charge display periods", () => {
       monthlySpendContribution(proton, messages, now) +
       monthlySpendContribution(porkbun, messages, now);
     expect(total).toBeCloseTo(29.98 + 47.74);
+  });
+
+  it("ranks this-month merchants and kind totals", () => {
+    const now = new Date("2026-08-24T12:00:00.000Z");
+    const linode: Subscription = {
+      ...porkbun,
+      id: "linode",
+      name: "Linode",
+      price: 17,
+      billing: "Monthly",
+      frequency: "Monthly",
+      paymentMethod: "proton:david@picksandshovels.app",
+    };
+    const messages = [
+      hit("Linode", 93, "2026-08-05T00:00:00.000Z", linode.paymentMethod!),
+      hit(
+        "Porkbun",
+        47.74,
+        "2026-01-10T00:00:00.000Z",
+        porkbun.paymentMethod!,
+      ),
+    ];
+    const insights = thisMonthInsights([proton, linode, porkbun], messages, now);
+    expect(insights.total).toBeCloseTo(29.98 + 93);
+    expect(insights.kinds.recurring).toBeCloseTo(29.98);
+    expect(insights.kinds.sparse).toBeCloseTo(93);
+    expect(insights.merchants[0].name).toBe("Linode");
+    expect(insights.merchants[0].amount).toBeCloseTo(93);
   });
 });

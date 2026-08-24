@@ -75,6 +75,7 @@ export {
     displayedAmount,
     monthlySpendContribution,
     nextDisplayPeriod,
+    thisMonthInsights,
 } from "./chargeDisplay";
 export type { DisplayPeriod } from "./chargeDisplay";
 

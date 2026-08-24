@@ -166,3 +166,45 @@ export function monthlySpendContribution(
   if (sub.priceUnknown || sub.category === "free") return 0;
   return convertStoredPrice(sub.price, storedCadence(sub), "monthly");
 }
+
+export type SpendKind = "recurring" | "sparse" | "free";
+
+export function spendKind(sub: Subscription): SpendKind {
+  if (sub.category === "sparse") return "sparse";
+  if (sub.category === "free") return "free";
+  return "recurring";
+}
+
+export function thisMonthInsights(
+  subscriptions: Subscription[],
+  messages: ClassifiedMessage[],
+  now = new Date(),
+): {
+  total: number;
+  count: number;
+  kinds: Record<SpendKind, number>;
+  merchants: { name: string; amount: number; kind: SpendKind }[];
+} {
+  const kinds: Record<SpendKind, number> = {
+    recurring: 0,
+    sparse: 0,
+    free: 0,
+  };
+  const merchants: { name: string; amount: number; kind: SpendKind }[] = [];
+  let count = 0;
+  for (const sub of subscriptions) {
+    if (sub.status === "cancelled" || sub.status === "paused") continue;
+    count += 1;
+    const kind = spendKind(sub);
+    const amount = monthlySpendContribution(sub, messages, now);
+    kinds[kind] += amount;
+    merchants.push({ name: sub.name, amount, kind });
+  }
+  merchants.sort((a, b) => b.amount - a.amount);
+  return {
+    total: kinds.recurring + kinds.sparse + kinds.free,
+    count,
+    kinds,
+    merchants,
+  };
+}
