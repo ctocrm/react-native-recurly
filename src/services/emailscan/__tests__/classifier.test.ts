@@ -281,6 +281,7 @@ describe("emailscan subject amounts + no fake $0", () => {
     });
     expect(sub.price).toBe(0);
     expect(sub.priceUnknown).toBe(true);
+    expect(sub.icon_key).toBe("tuta");
   });
 
   it("keeps Porkbun verify + welcome as $0 and upgrades the order to $47.74 yearly", () => {
@@ -358,6 +359,7 @@ describe("emailscan subject amounts + no fake $0", () => {
     });
     expect(sub.price).toBe(0);
     expect(sub.priceUnknown).toBe(false);
+    expect(sub.icon_key).toBe("tuta");
   });
 
   it("refuses to invent $0 when importing an amount-unknown candidate", () => {
@@ -373,5 +375,6 @@ describe("emailscan subject amounts + no fake $0", () => {
     });
     expect(sub.priceUnknown).toBe(true);
     expect(sub.price).toBe(0);
+    expect(sub.icon_key).toBe("proton");
   });
 });

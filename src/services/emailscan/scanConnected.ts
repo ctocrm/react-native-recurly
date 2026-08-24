@@ -1,3 +1,4 @@
+import { startIconCrawl } from "@/services/iconBackgroundCrawler";
 import { candidateToSubscription } from "./importCandidate";
 import { listMailboxesAsync } from "./persist";
 import {
@@ -51,11 +52,30 @@ export async function importFromConnectedMailboxes(opts: {
             existingByKey.set(key, { ...already, ...next, id: already.id });
             imported += 1;
           }
+          const existingKey = already.icon_key;
+          if (!existingKey || existingKey === "plus") {
+            const crawlKey = next.icon_key;
+            if (crawlKey && crawlKey !== "plus") {
+              if (opts.updateSubscription && existingKey !== crawlKey) {
+                await opts.updateSubscription(already.id, {
+                  icon_key: crawlKey,
+                });
+                existingByKey.set(key, {
+                  ...(existingByKey.get(key) ?? already),
+                  icon_key: crawlKey,
+                });
+              }
+              void startIconCrawl(crawlKey, already.id);
+            }
+          }
           continue;
         }
         await opts.addSubscription(next);
         existingByKey.set(key, next);
         imported += 1;
+        if (next.icon_key && next.icon_key !== "plus") {
+          void startIconCrawl(next.icon_key, next.id);
+        }
       }
     } catch (error) {
       const message =
