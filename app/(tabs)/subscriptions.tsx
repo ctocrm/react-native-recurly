@@ -29,7 +29,7 @@ const SafeAreaView = styled(RNSafeAreaView);
 const FILTER_OPTIONS = ["All", "Upcoming"] as const;
 
 const Subscriptions = () => {
-  const { tabListPadding } = useBottomClearance();
+  const { tabListPadding, pagePadding } = useBottomClearance();
   const posthog = usePostHog();
   const { filter: initialFilter, addMailbox } = useLocalSearchParams<{
     filter?: string;
@@ -166,7 +166,11 @@ const Subscriptions = () => {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-background p-5">
+    <SafeAreaView
+      edges={["top", "left", "right"]}
+      className="flex-1 bg-background px-5 pt-5"
+      style={{ paddingBottom: pagePadding }}
+    >
       <FlatList
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"

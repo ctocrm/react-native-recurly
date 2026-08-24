@@ -45,7 +45,7 @@ type ClearTarget = "iconCache" | "crawlHistory" | "emailScanCache" | null;
 const SafeAreaView = styled(RNSafeAreaView);
 
 const Settings = () => {
-  const { tabListPadding } = useBottomClearance();
+  const { tabListPadding, pagePadding } = useBottomClearance();
   const { signOut } = useClerk();
   const { user } = useUser();
   const posthog = usePostHog();
@@ -475,7 +475,11 @@ const Settings = () => {
   const email = user?.emailAddresses[0]?.emailAddress;
 
   return (
-    <SafeAreaView className="flex-1 bg-background">
+    <SafeAreaView
+      edges={["top", "left", "right"]}
+      className="flex-1 bg-background"
+      style={{ paddingBottom: pagePadding }}
+    >
       <ScrollView
         contentContainerClassName="p-5"
         contentContainerStyle={{ paddingBottom: tabListPadding }}

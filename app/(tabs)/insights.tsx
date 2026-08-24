@@ -58,7 +58,7 @@ const categoryColors: Record<string, string> = {
 };
 
 const Insights = () => {
-  const { tabListPadding } = useBottomClearance();
+  const { tabListPadding, pagePadding } = useBottomClearance();
   const posthog = usePostHog();
   const { subscriptions } = useSubscriptions();
   const [selectedPeriod, setSelectedPeriod] = useState<Period>("This Month");
@@ -163,7 +163,11 @@ const Insights = () => {
     categoryBreakdown.length > 0 ? categoryBreakdown[0] : null;
 
   return (
-    <SafeAreaView className="flex-1 bg-background">
+    <SafeAreaView
+      edges={["top", "left", "right"]}
+      className="flex-1 bg-background"
+      style={{ paddingBottom: pagePadding }}
+    >
       <FlatList
         contentContainerClassName="px-5"
         contentContainerStyle={{ paddingBottom: tabListPadding }}

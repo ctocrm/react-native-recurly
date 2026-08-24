@@ -37,7 +37,7 @@ const App = () => {
   const router = useRouter();
   const { user } = useUser();
   const posthog = usePostHog();
-  const { tabListPadding } = useBottomClearance();
+  const { tabListPadding, pagePadding } = useBottomClearance();
   const [expandedSubscriptionId, setExpandedSubscriptionId] = useState<
     string | null
   >(null);
@@ -222,7 +222,11 @@ const App = () => {
   }, [subscriptions]);
 
   return (
-    <SafeAreaView className="flex-1 bg-background p-5">
+    <SafeAreaView
+      edges={["top", "left", "right"]}
+      className="flex-1 bg-background px-5 pt-5"
+      style={{ paddingBottom: pagePadding }}
+    >
       <FlatList
         ListHeaderComponent={
           <>
