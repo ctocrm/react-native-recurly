@@ -1,6 +1,6 @@
 # Codebase overview — jsmastery
 
-**Last verified against source:** 2026-08-14 (HEAD `56bd161` plus later Phase 0 doc rewrite).
+**Last verified against source:** 2026-08-24 (hops A–E on device; HEAD after `b510a35`).
 
 Expo **~54.0.34** / React Native **0.81.5** / expo-router **~6.0.23** subscription tracker with an on-device icon crawler, optional TFLite AI upscaler, SQLCipher storage, and scoped cloud sync. NativeWind v5 (`^5.0.0-preview.4`). Auth is Clerk (`@clerk/expo@3.1.12`). Analytics is PostHog.
 
@@ -39,19 +39,19 @@ app/_layout.tsx
 | Onboarding    | `app/onboarding.tsx`                  | First-run placeholder                                                                                    | Minimal                                                                                                                                                                                                            | n/a                                                                         |
 | Auth layout   | `app/(auth)/_layout.tsx`              | Clerk-gated auth stack                                                                                   | —                                                                                                                                                                                                                  | n/a                                                                         |
 | Sign in / up  | `app/(auth)/signIn.tsx`, `signUp.tsx` | Clerk screens                                                                                            | Auth classes (`auth-safe-area` / `auth-screen`)                                                                                                                                                                    | n/a                                                                         |
-| Tabs layout   | `app/(tabs)/_layout.tsx`              | Clerk-gated `<Tabs>`; floating pill tab bar; mounts `HiddenSearchWebView`                                | Tab bar is **`position: "absolute"`** with `bottom: Math.max(insets.bottom, tabBar.horizontalInset)` (`horizontalInset` = 20). Height 72, radius 32, icon frame 48 (`src/constants/theme.ts` `components.tabBar`). | n/a                                                                         |
-| Home          | `app/(tabs)/index.tsx`                | Monthly spend, upcoming, preview list, header `icons.add`                                                | `SafeAreaView` + `p-5`. List uses `contentContainerClassName="pb-25"`.                                                                                                                                             | Header `+` opens `CreateSubscriptionModal` via `addSubscription` then crawl |
-| Subscriptions | `app/(tabs)/subscriptions.tsx`        | Full list: search, All/Upcoming, expand/edit/delete/stats, header `+`, **long-press card icon → picker** | `SafeAreaView` + `p-5`. List uses `useBottomClearance()`. Header `+` opens the same `CreateSubscriptionModal` as Home.                                                                                             | Header `+` → `addSubscription` then crawl                                   |
-| Insights      | `app/(tabs)/insights.tsx`             | Spend summary, category bars, **Estimated Monthly Spend** chart + period chips                           | `SafeAreaView` + `p-5`. Bar row is a horizontal `ScrollView` (`minWidth: 48`); value labels hide when more than 3 points. Period chips remain a separate `ScrollView`.                                             | n/a                                                                         |
-| Settings      | `app/(tabs)/settings.tsx`             | Profile, Account, Cloud Sync, Backup/Restore, Cache & Crawl clear, Sign out                              | `SafeAreaView` + `p-5`. **Phase 4 adds Connected Accounts.**                                                                                                                                                       | n/a                                                                         |
+| Tabs layout   | `app/(tabs)/_layout.tsx`              | Clerk-gated `<Tabs>`; floating pill tab bar; mounts `HiddenSearchWebView` + `ProtonCaptchaModal`         | Tab bar is **`position: "absolute"`** with `bottom: Math.max(insets.bottom, tabBar.horizontalInset)` (`horizontalInset` = 20). Height 72, radius 32, icon frame 48 (`src/constants/theme.ts` `components.tabBar`). **Do not restyle this pill.** | n/a                                                                         |
+| Home          | `app/(tabs)/index.tsx`                | Monthly spend from mail, upcoming, preview list, header `icons.add`, Scan                                | `SafeAreaView` edges `top/left/right` + `pagePadding`. List `tabListPadding`. `useChargeDisplay`.                                                                                                                                                  | Header `+` opens `CreateSubscriptionModal` via `addSubscription` then crawl |
+| Subscriptions | `app/(tabs)/subscriptions.tsx`        | Full list: search, All/Upcoming, expand/edit/delete/stats, header `+`, **long-press card icon → picker** | Same `useBottomClearance()` + `useChargeDisplay`. Header `+` opens the same `CreateSubscriptionModal` as Home.                                                                                                                                     | Header `+` → `addSubscription` then crawl                                   |
+| Insights      | `app/(tabs)/insights.tsx`             | This-month actuals, kind bars, top merchants, **Monthly spend from mail** + period chips                 | Same clearance. Bars from `monthlyChartFromMail`. After Year swipe, leftover horizontal offset can hide This Month until remount.                                                                                                                  | n/a                                                                         |
+| Settings      | `app/(tabs)/settings.tsx`             | Profile, Account, Cloud Sync, Backup/Restore, Cache & Crawl clear, scan-cache clear, Sign out            | Same clearance. Email scan UI lives on Subscriptions (`EmailScanSection`), not only Settings.                                                                                                                                                      | n/a                                                                         |
 | Detail        | `app/subscriptions/[id].tsx`          | Single subscription                                                                                      | Standard                                                                                                                                                                                                           | n/a                                                                         |
 
-### Hardcoded spacing facts that cause the nav-overlay bug
+### Hardcoded spacing facts (hop A closed the overlay)
 
 - `src/constants/theme.ts` `spacing` and `global.css` `--spacing-*` both jump **24 → 30**. There is **no `--spacing-25`**.
-- Tab lists use `contentContainerClassName="pb-25"`. That class is therefore a **no-op** (or at best undefined NativeWind behavior), not 100px of clearance.
-- Tab bar occupies ~72px plus `max(insets.bottom, 20)` from the physical bottom. Content and modal sheets that only use `pb-5` (20px) sit under the floating tab bar **and** the Android software nav (~y > 2320 on the 1080×2400 emulator).
-- This is the Phase 1 root cause. Observed in session: Create Subscription button center is under the nav overlay; only the uncovered top slice is tappable.
+- Tab lists used `contentContainerClassName="pb-25"`. That class is a **no-op**.
+- Tab bar occupies ~72px plus `max(insets.bottom, 20)` from the physical bottom. **Hop A (`ff3f3b9`)** now applies `pagePadding = tabBar.height + tabLift` on tab pages and omits SafeArea bottom so the viewport ends at the pill top. Lists only need `tabListPadding` (16). Sheets use `sheetPadding`. **Do not restyle the tab bar to “fix” overlay.**
+- Live 1080×2400: list `185–2085`, pill `2085–2274`. Mid-scroll cards clip at 2085, not under the pill.
 
 ---
 
@@ -72,6 +72,8 @@ None of these files call `useSafeAreaInsets`. Shared sheet chrome is `.modal-con
 | `UserSettingsModal.tsx`                             | Profile/settings sheet                                                                                                                                                                                                                                   | Settings                                                                      | Same                                                                        |
 | `ListHeading.tsx`                                   | Section title                                                                                                                                                                                                                                            | Lists                                                                         | —                                                                           |
 | `HiddenSearchWebView.tsx`                           | Headless WebView for search/scrape                                                                                                                                                                                                                       | Mounted in tab layout                                                         | Not user-facing                                                             |
+| `EmailScanSection.tsx`                              | Connect/scan mailbox list used from Subscriptions                                                                                                                                                                                                        | Subscriptions (`addMailbox` param)                                            | —                                                                           |
+| `ProtonCaptchaModal.tsx`                            | Official `verify.proton.me` puzzle during Proton scan                                                                                                                                                                                                    | Mounted in tab layout                                                         | Not a tab-bar overlay                                                       |
 
 ---
 
@@ -79,7 +81,7 @@ None of these files call `useSafeAreaInsets`. Shared sheet chrome is `.modal-con
 
 | File                      | Export                                     | Role                                                                                                |
 | ------------------------- | ------------------------------------------ | --------------------------------------------------------------------------------------------------- |
-| `DatabaseProvider.tsx`    | `DatabaseProvider`, `useDatabase`          | Opens SQLCipher, applies schema v8, exposes DB handle                                               |
+| `DatabaseProvider.tsx`    | `DatabaseProvider`, `useDatabase`          | Opens SQLCipher, applies schema v11, exposes DB handle                                              |
 | `SubscriptionContext.tsx` | `SubscriptionProvider`, `useSubscriptions` | CRUD, prefs, upcoming, refresh; kicks crawl queue once DB is ready                                  |
 | `IconCacheContext.tsx`    | `IconCacheProvider`, `useIconCache`        | In-memory `icon_key →` display bytes. No AppState listener here (child of root; DB is a descendant) |
 | `CloudSyncContext.tsx`    | `CloudSyncProvider`, `useCloudSync`        | Provider connect + scoped sync of **user tables only**                                              |
@@ -120,7 +122,7 @@ Three lanes:
 | File                                          | Role                                                                                                                                                                                   |
 | --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `database.ts`                                 | Public facade (call sites stay here).                                                                                                                                                  |
-| `db/schema.ts`                                | `SCHEMA_SQL`, `SCHEMA_VERSION = 8`, idempotent migrations, `applySchema()`. Crawl results, crawled_urls, icon_reports, dimensions, unique partial index on `(icon_key, original_url)`. |
+| `db/schema.ts`                                | `SCHEMA_SQL`, `SCHEMA_VERSION = 11`, idempotent migrations, `applySchema()`. Crawl results plus local-only `mail_mailboxes` / `mail_messages`. |
 | `db/connection.ts`                            | Key mgmt, open/close/`getDatabase`.                                                                                                                                                    |
 | `db/syncScope.ts`                             | What is allowed to leave the device.                                                                                                                                                   |
 | `cloudsync/CloudSyncService.ts` + `storage/*` | Google Drive / Dropbox / OneDrive / iCloud / OwnCloud. User tables + chosen icons only.                                                                                                |
@@ -132,6 +134,9 @@ Three lanes:
 - `src/services/__tests__/crawlLifecycle.test.ts`
 - `src/services/domain/__tests__/domainDiscovery.test.ts`
 - `src/services/domain/__tests__/provenance.test.ts`
+- `src/services/emailscan/__tests__/chargeDisplay.test.ts`
+- `src/services/emailscan/__tests__/classifier.test.ts`
+- `src/services/emailscan/__tests__/scan.test.ts`
 
 Characterization tests assert **actual** current behavior, not hoped-for behavior.
 
@@ -142,6 +147,9 @@ Characterization tests assert **actual** current behavior, not hoped-for behavio
 | Path                                             | Role                                                   |
 | ------------------------------------------------ | ------------------------------------------------------ |
 | `src/hooks/useCachedIcon.ts`                     | Card/picker image source from cache + bundled fallback |
+| `src/hooks/useBottomClearance.ts`                | `pagePadding` / `tabListPadding` / `sheetPadding` for the absolute tab pill |
+| `src/hooks/useChargeDisplay.ts`                  | Loads classified mail; `displayFor` / `cyclePeriod` / `monthlySpend` |
+| `src/services/emailscan/chargeDisplay.ts`        | Display-only period math. Does not rewrite stored cadence. `thisMonthInsights`, `monthlyChartFromMail` |
 | `src/lib/notifications.ts`                       | Cache-update notify (picker/card refresh)              |
 | `src/lib/resolveLogo.ts`                         | Bundled / cached logo resolution                       |
 | `src/lib/utils.ts`                               | Small helpers                                          |
@@ -158,10 +166,12 @@ NativeWind v5 + `global.css` (`@theme` spacing tokens listed above). Component c
 
 Insights chart structure today (`app/(tabs)/insights.tsx`):
 
-- Title “Estimated Monthly Spend”
-- A **horizontal `ScrollView`** for the bar row (`minWidth: 48` per bar)
+- Title **Monthly spend from mail** (not “Estimated Monthly Spend”)
+- Bars from `monthlyChartFromMail(subscriptions, messages, monthsToShow)`: sparse months use mail sums; recurring months use mail if present else stored monthly run-rate
+- A **horizontal `ScrollView`** for the bar row (`width: 56` per bar)
 - Value labels only when there are 3 or fewer points
-- Period chips (`This Month` / `3 Months` / `6 Months` / `Year`) in a **separate** horizontal `ScrollView` below the card
+- Period chips (`This Month` / `Last 3 Months` / `Last 6 Months` / `Year`) in a **separate** horizontal `ScrollView` below the card
+- Leftover Year `contentOffset` can hide the single This Month bar until remount — note, not a new hop
 
 ---
 
@@ -209,9 +219,12 @@ Known device facts (generic, not a button recipe): `wm size` 1080×2400; softwar
 
 ## What UI Phases 1–4 must change (and what they must not)
 
+Hops A–E already landed on top of Phases 1–3. Do not reopen them as if they were still the next work.
+
 | Phase                | Touches                                                                                                | Must not touch                                                  |
 | -------------------- | ------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------- |
-| 1 Nav overlay        | Tab list bottom padding; Create + picker (+ other sheets that share the collision) inset-aware padding | Crawler, models, schema                                         |
+| 1 Nav overlay        | Tab list bottom padding; Create + picker (+ other sheets that share the collision) inset-aware padding | Crawler, models, schema; **tab-bar restyle**                    |
 | 2 Subscriptions `+`  | `app/(tabs)/subscriptions.tsx` header + existing `CreateSubscriptionModal` wiring (copy Home)          | New create flow, crawler                                        |
-| 3 Insights chart     | `app/(tabs)/insights.tsx` Estimated Monthly Spend row only                                             | Period-chip `ScrollView` (already scrolls); other tabs          |
-| 4 Connected accounts | `app/(tabs)/settings.tsx` + new small module; `expo-auth-session` + `expo-secure-store` (already deps) | Wallet/Gmail scan implementation (stub only); crawler; training |
+| 3 Insights chart     | `app/(tabs)/insights.tsx` bar row scroll / label hide                                                  | Period-chip `ScrollView` (already scrolls); other tabs          |
+| A–E Home/Insights    | Proven 2026-08-24. See `docs/plan.md` hop board.                                                       | Do not start a new hop from leftover Year scroll                |
+| 4 Connected accounts | Settings / Subscriptions email-scan; H1 catalog honesty; H2 IMAP socket; H3 HTTPS                      | SSO catalogs, crawler, training; do not call Phase 4 done       |

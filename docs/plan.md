@@ -1,8 +1,8 @@
 # Product plan — icons, crawl, DB, sync (no training)
 
-**Last updated:** 2026-08-20
+**Last updated:** 2026-08-24
 
-**Status:** Phases **1–5.5 complete**. **MAJOR FIX (Tranches A–F) complete on-device.** **UI Improvements Phase 0–3 complete** (`ba66478`, `e4e383e`, `77a83bb`, `913b08f`). **UI Phase 4 (email account scan) is NOT done.** Classifier/Settings code exists, but the provider catalog and copy contradict official mail-API docs (Proton/Tuta are not IMAP; Yahoo/AOL branded OAuth is wrong; IMAP fetch has no native socket). Proton/Tuta **do** have a phone path: first-party **client REST + on-device decrypt** (not Bridge, not IMAP). Next: H1 honesty (catalog + copy), then H2 IMAP socket, H3 HTTPS fetchers, **H4 Proton client API**, **H5 Tuta client protocol**. Phase 5 starts only after Phase 4 can import rows. Phase 6 remains later ship polish. Training frozen.
+**Status:** Phases **1–5.5 complete**. **MAJOR FIX (Tranches A–F) complete on-device.** **UI Improvements Phase 0–3 complete** (`ba66478`, `e4e383e`, `77a83bb`, `913b08f`). **Home/Insights hops A–E proven on device** (`ff3f3b9`, `ed16b0f`, `30de520`, `a6e6774`, `b510a35`). **UI Phase 4 is still not complete:** H1 catalog leftovers, H2 IMAP socket, H3 HTTPS completeness, and live Gmail/Outlook connect remain. Proton/Tuta **have** imported live rows (H4/H5 code hops): Proton **$29.98**, Linode this-month **$93**, Porkbun **$47.74** yearly. Phase 5 graph is not started. Phase 6 remains later ship polish. Training frozen.
 
 This is the living execution plan for app-side quality and reliability **without** retraining TFLite models. AI upscale strategy remains frozen in [`docs/AI_UPSCALING.md`](./AI_UPSCALING.md) (now under `docs/`).
 
@@ -32,7 +32,7 @@ This is the living execution plan for app-side quality and reliability **without
 | **5**   | Sync honesty                                           | **Done**                              | same                                |
 | **5.5** | Professional cleanup (artifacts, docs, structure)      | **Done**                              | complete                            |
 | **MF**  | Icon crawler → picker → upscale pipeline recovery      | **Done (A–F on-device)**              | full cross-layer gate every tranche |
-| **UI**  | Post-Major-Fix UI improvements                         | **Phases 0–3 done; Phase 4 NOT done** | skill loop after Phase 0            |
+| **UI**  | Post-Major-Fix UI improvements                         | **Phases 0–3 done; hops A–E done; Phase 4 NOT done** | skill loop after Phase 0            |
 | **6**   | Ship polish                                            | **After UI Improvements**             | full smoke + doc pass               |
 
 ---
@@ -833,7 +833,7 @@ npm run build:android:x86_64   # install + launch on emu when self-contained
 
 ## UI Improvements — post-Major-Fix (2026-08-14)
 
-**Status:** Phases 0–3 complete (`ba66478`, `e4e383e`, `77a83bb`, `913b08f`). **Phase 4 (email account scan) is NOT done.** Scan-brain + Settings code landed (`4cc7a87`, `b52e2c6`, `0d6fa10`) but the provider catalog and UI copy contradict official mail-API docs. Proton/Tuta are **not** IMAP; they connect via **client REST + on-device decrypt** (H4/H5). Do not treat current code as Phase 4 complete. Phase 5 starts only after Phase 4 can import rows. Phase 6 ship polish stays after UI Phase 5.
+**Status:** Phases 0–3 complete (`ba66478`, `e4e383e`, `77a83bb`, `913b08f`). **Home/Insights hops A–E proven** (`ff3f3b9`–`b510a35`). **Phase 4 (email account scan) is NOT done.** Scan-brain + Settings code landed (`4cc7a87`, `b52e2c6`, `0d6fa10`) and Proton/Tuta later imported live rows, but the provider catalog and UI copy still contradict official mail-API docs. Proton/Tuta are **not** IMAP; they connect via **client REST + on-device decrypt** (H4/H5). Do not treat current code as Phase 4 complete. Phase 5 graph is not started. Phase 6 ship polish stays after UI Phase 5.
 
 Four user-requested improvements, one phase at a time. Current-code map: [`docs/CODEBASE.md`](./CODEBASE.md). Visual gates use [`.cline/skills/emulator-ui-driving/SKILL.md`](../.cline/skills/emulator-ui-driving/SKILL.md).
 
@@ -843,10 +843,14 @@ The predecessor claimed Phase 0 done after commit `56bd161`. That commit only ap
 
 ### Observed product problems (evidence, not guesses)
 
-1. **Native nav overlay / dead tap zone.** Floating tab bar is `position: "absolute"` with `bottom: Math.max(insets.bottom, 20)` and height 72 (`app/(tabs)/_layout.tsx`). Lists use `contentContainerClassName="pb-25"`, but `global.css` / `theme.ts` spacing jumps **24 → 30** — there is **no `--spacing-25`**, so that class is a no-op. Create sheet pins submit at `px-5 pb-5` (`CreateSubscriptionModal.tsx`). On-device, the Create button center sits under the Android nav; only the uncovered top slice is tappable.
-2. **Subscriptions has no add control.** Home header `icons.add` opens `CreateSubscriptionModal`. `app/(tabs)/subscriptions.tsx` has search/filters/cards only.
-3. **Insights chart overflows.** “Estimated Monthly Spend” is a non-scrolling `flex-row` (`insights-chart-scroll` is a class name, not a `ScrollView`). Period chips below _are_ in a `ScrollView`. 6-month / Year add more labeled bars than the card width.
-4. **No email account scan.** Settings has Clerk account + cloud _file_ sync (Drive/Dropbox/…). There is no mailbox connect/scan. A subscription is an account (including $0), not only a receipt. SSO catalogs have no public client API (backburner).
+These four were the 2026-08-14 starting bugs. They are **not** a current-state map.
+
+1. **Native nav overlay / dead tap zone.** Floating tab bar is `position: "absolute"` with `bottom: Math.max(insets.bottom, 20)` and height 72 (`app/(tabs)/_layout.tsx`). Lists used `contentContainerClassName="pb-25"`, but `global.css` / `theme.ts` spacing jumps **24 → 30** — there is **no `--spacing-25`**, so that class is a no-op. Create sheet pins submit at `px-5 pb-5` (`CreateSubscriptionModal.tsx`). On-device, the Create button center sat under the Android nav; only the uncovered top slice was tappable. **Hop A (`ff3f3b9`)** reserves `pagePadding` (pill + lift) and omits SafeArea bottom so the viewport ends at the pill top. **Do not restyle the tab bar.**
+2. **Subscriptions has no add control.** Home header `icons.add` opened `CreateSubscriptionModal`. `app/(tabs)/subscriptions.tsx` had search/filters/cards only. **Phase 2 (`77a83bb`)** added the header `+`.
+3. **Insights chart overflows.** “Estimated Monthly Spend” was a non-scrolling `flex-row` (`insights-chart-scroll` is a class name, not a `ScrollView`). Period chips below _are_ in a `ScrollView`. 6-month / Year add more labeled bars than the card width. **Phase 3 (`913b08f`)** made the bar row a horizontal `ScrollView`. **Hop E (`b510a35`)** retitled it **Monthly spend from mail** and fills bars from mail charges, not cloned run-rate.
+4. **No email account scan.** Settings had Clerk account + cloud _file_ sync (Drive/Dropbox/…). There was no mailbox connect/scan. A subscription is an account (including $0), not only a receipt. SSO catalogs have no public client API (backburner). Scan-brain later landed; Proton/Tuta import live rows; Phase 4 is still not complete.
+
+**Current after hops A–E (2026-08-24 device):** Home Monthly Spend **$122.98**. Sparse cards default to this-month mail (Linode **$93**; Porkbun this month **$0**, this year **$47.74**). Insights this-month actuals **$122.98** / recurring **$29.98** / sparse **$93** / top merchant Linode. Chart: This Month one **Aug $122.98** bar; Last 3 Months **Jun $29.98 / Jul $94.72 / Aug $122.98**; Year 12 bars Sep→Aug. Live Jul is **$94.72** because Porkbun mail sits in **July**, not the January test fixture. After a Year swipe, This Month can look empty until remount (leftover horizontal offset) — note, not a new hop.
 
 ### UI board
 
@@ -858,6 +862,20 @@ The predecessor claimed Phase 0 done after commit `56bd161`. That commit only ap
 | **3** | Insights chart bounds         | **Done (`913b08f`)** | `app/(tabs)/insights.tsx` Estimated Monthly Spend row                            | Period-chip `ScrollView`; other tabs |
 | **4** | Email account scan            | **NOT done**         | Settings email-scan list + mail OAuth/IMAP + scan cache                          | SSO catalogs, crawler, training      |
 | **5** | Subscription dependency graph | Not started          | Subscriptions List/Graph toggle + `dependsOn` links                              | Email scan implementation, crawler   |
+
+### Home / Insights hops (2026-08-24)
+
+Closed after live device gates. Do not start another hop from leftover Year→This Month scroll.
+
+| Hop | Name | Status | Live gate |
+| --- | ---- | ------ | --------- |
+| **A** | Nav overlay / mid-scroll clip | **Done (`ff3f3b9`)** | Viewport ends at pill top. List `185–2085`, pill `2085–2274`. Tab bar style unchanged. |
+| **B** | Scan starts icon crawl | **Done (`ed16b0f`)** | Import no longer hardcodes `icon_key: plus`. OpenAI bloom + Porkbun pig landed on Home. Crawler quality still later. |
+| **C** | This-month sparse actuals | **Done (`30de520`)** | Linode **This month $93**. Monthly Spend **$122.98**. Porkbun this month **$0**, tap → this year **$47.74**. Stored cadence unchanged. |
+| **D** | Insights this-month actuals | **Done (`a6e6774`)** | This-month **$122.98**, recurring **$29.98**, sparse **$93**, top merchant Linode **$93**. |
+| **E** | Insights mail bars | **Done (`b510a35`)** | Title **Monthly spend from mail**. This Month **Aug $122.98**. Last 3 **Jun $29.98 / Jul $94.72 / Aug $122.98**. Year 12 bars Sep→Aug; Jan is run-rate (no Porkbun spike). Live Jul **$94.72** (`29.98+17+47.74`); Porkbun mail date is July, not January. |
+
+Note: after Year horizontal scroll, switching to This Month can look empty until remount (leftover offset). A fresh Insights open shows the Aug bar. Not a new hop.
 
 ### Shared gates (Phases 1–4)
 
@@ -1320,6 +1338,7 @@ Parked until a documented API exists. Do not implement as Connect-without-scan.
 | 2026-08-24 | **Hop A nav overlay proven (`ff3f3b9`).** Absolute tab pill still overlays the scene; list padding alone left mid-scroll cards under the bar. Tab pages now reserve `pagePadding` (pill + lift) and omit SafeArea bottom so the viewport ends at the pill top. Live: list `185–2085`, pill `2085–2274`, last card Tuta `1744–2043`. Mid-scroll X clips at 2085, not under the pill. Tab bar style unchanged. |
 | 2026-08-24 | **Hop B scan icon crawl proven (`ed16b0f`).** Import no longer hardcodes `icon_key: plus`. Live Scan after `-r` install: `startIconCrawl` for proton/linode/x/linkedin/openai/porkbun/tuta on leftover plus-key rows. OpenAI bloom + Porkbun pig landed on Home. Crawler quality still later; this hop only starts the existing crawl. |
 | 2026-08-24 | **Hop C this-month actuals proven (`30de520`).** Sparse cards default to mail charges in the current window. Live: Linode **This month $93.00**; Monthly Spend **$122.98** (`29.98+93`). Proton tap Monthly→Yearly **$359.76**. Porkbun this month **$0.00**, tap → **This year $47.74**. Stored cadence unchanged. |
-| 2026-08-24 | **Hop D Insights this-month proven (`a6e6774`).** Live Insights: this-month actuals **$122.98**, recurring **$29.98**, sparse **$93.00**, top merchant **Linode $93**. Chart bars still cloned run-rate (hop E). |
+| 2026-08-24 | **Hop D Insights this-month proven (`a6e6774`).** Live Insights: this-month actuals **$122.98**, recurring **$29.98**, sparse **$93.00**, top merchant **Linode $93**. Chart bars were still cloned run-rate until hop E. |
 | 2026-08-24 | **Hop E Insights mail bars proven (`b510a35`).** x86_64 release installed `-r`. Title **Monthly spend from mail**. This Month: one **Aug $122.98** bar. Last 3 Months: **Jun $29.98**, **Jul $94.72**, **Aug $122.98**. Year: 12 bars Sep→Aug; Jan is run-rate (no Porkbun spike). Jul/Aug taller than Apr–Jun. Chips change bar count. Live Jul is **$94.72** (`29.98+17+47.74`); Porkbun mail date is July on device, not January. After Year horizontal scroll, switching to This Month can look empty until remount (leftover offset). |
+| 2026-08-24 | **Docs synced to hops A–E.** Plan header/UI board now say A–E proven; leftover Year→This Month scroll is a note, not a new hop. `docs/CODEBASE.md` Home/Insights/chargeDisplay map refreshed. Lessons: live Porkbun is July not January; leftover Year offset; do not restyle the tab bar. |
 
