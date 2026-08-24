@@ -11,6 +11,7 @@ import images from "@/constants/images";
 import { useSubscriptions } from "@/context/SubscriptionContext";
 import "@/global.css";
 import { useBottomClearance } from "@/hooks/useBottomClearance";
+import { useChargeDisplay } from "@/hooks/useChargeDisplay";
 import { formatCurrency } from "@/lib/utils";
 import { importFromConnectedMailboxes } from "@/services/emailscan";
 import { listMailboxesAsync } from "@/services/emailscan/persist";
@@ -50,6 +51,8 @@ const App = () => {
     getUpcomingSubscriptions,
     refreshSubscriptions,
   } = useSubscriptions();
+  const { displayFor, cyclePeriod, monthlySpend } =
+    useChargeDisplay(subscriptions);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingSubscription, setEditingSubscription] =
     useState<Subscription | null>(null);
@@ -183,26 +186,8 @@ const App = () => {
     // Icons will auto-refresh via cache update listener
   };
 
-  // Calculate total monthly spend from active subscriptions
-  const totalMonthlySpend = useMemo(() => {
-    const activeSubs = subscriptions.filter(
-      (s) => s.status !== "cancelled" && s.status !== "paused",
-    );
-
-    let total = 0;
-    activeSubs.forEach((sub) => {
-      if (sub.priceUnknown) return;
-      let monthlyAmount = sub.price;
-      if (sub.billing === "Yearly" || sub.frequency === "Yearly") {
-        monthlyAmount = sub.price / 12;
-      } else if (sub.billing === "Weekly" || sub.frequency === "Weekly") {
-        monthlyAmount = sub.price * 4.33;
-      }
-      total += monthlyAmount;
-    });
-
-    return total;
-  }, [subscriptions]);
+  // Recurring amortized monthly + sparse this-month actuals.
+  const totalMonthlySpend = monthlySpend;
 
   // Find the nearest upcoming renewal date
   const nearestRenewal = useMemo<dayjs.Dayjs | null>(() => {
@@ -318,6 +303,10 @@ const App = () => {
           <SubscriptionCard
             {...item}
             expanded={expandedSubscriptionId === item.id}
+            displayPrice={displayFor(item).amount}
+            displayUnknown={displayFor(item).unknown}
+            displayPeriodLabel={displayFor(item).label}
+            onCyclePeriod={() => cyclePeriod(item)}
             onPress={() => {
               const isExpanding = expandedSubscriptionId !== item.id;
               setExpandedSubscriptionId((currentId) =>

@@ -9,6 +9,7 @@ import { icons } from "@/constants/icons";
 import { useSubscriptions } from "@/context/SubscriptionContext";
 import "@/global.css";
 import { useBottomClearance } from "@/hooks/useBottomClearance";
+import { useChargeDisplay } from "@/hooks/useChargeDisplay";
 import clsx from "clsx";
 import { useLocalSearchParams } from "expo-router";
 import { styled } from "nativewind";
@@ -44,6 +45,7 @@ const Subscriptions = () => {
     getUpcomingSubscriptions,
     refreshSubscriptions,
   } = useSubscriptions();
+  const { displayFor, cyclePeriod } = useChargeDisplay(subscriptions);
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedSubscriptionId, setExpandedSubscriptionId] = useState<
     string | null
@@ -251,6 +253,10 @@ const Subscriptions = () => {
           <SubscriptionCard
             {...item}
             expanded={expandedSubscriptionId === item.id}
+            displayPrice={displayFor(item).amount}
+            displayUnknown={displayFor(item).unknown}
+            displayPeriodLabel={displayFor(item).label}
+            onCyclePeriod={() => cyclePeriod(item)}
             onPress={() => {
               const isExpanding = expandedSubscriptionId !== item.id;
               setExpandedSubscriptionId((currentId) =>

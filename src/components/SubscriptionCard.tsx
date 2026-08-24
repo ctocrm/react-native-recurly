@@ -34,6 +34,10 @@ interface SubscriptionCardProps {
   onMarkCancelled?: () => void;
   onViewStats?: () => void;
   onIconLongPress?: () => void;
+  displayPrice?: number;
+  displayUnknown?: boolean;
+  displayPeriodLabel?: string;
+  onCyclePeriod?: () => void;
 }
 
 const SubscriptionCard = ({
@@ -61,6 +65,10 @@ const SubscriptionCard = ({
   onMarkCancelled,
   onViewStats,
   onIconLongPress,
+  displayPrice,
+  displayUnknown,
+  displayPeriodLabel,
+  onCyclePeriod,
 }: SubscriptionCardProps) => {
   const [menuVisible, setMenuVisible] = useState(false);
   const { status: iconStatus, iconUri } = useCachedIcon(icon_key);
@@ -125,12 +133,25 @@ const SubscriptionCard = ({
             </View>
           </View>
 
-          <View className="sub-price-box">
+          <Pressable
+            className="sub-price-box"
+            onPress={(e) => {
+              e.stopPropagation();
+              onCyclePeriod?.();
+            }}
+            disabled={!onCyclePeriod}
+          >
             <Text className="sub-price">
-              {formatCurrency(price, currency, priceUnknown)}
+              {formatCurrency(
+                displayPrice ?? price,
+                currency,
+                displayUnknown ?? priceUnknown,
+              )}
             </Text>
-            <Text className="sub-billing">{billing}</Text>
-          </View>
+            <Text className="sub-billing">
+              {displayPeriodLabel ?? billing}
+            </Text>
+          </Pressable>
         </View>
 
         {/* "..." menu button */}

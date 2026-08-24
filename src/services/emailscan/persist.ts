@@ -123,6 +123,14 @@ export async function getMailboxAsync(
   };
 }
 
+export async function listClassifiedMessagesAsync(): Promise<
+  ClassifiedMessage[]
+> {
+  const db = getDatabase();
+  const rows = await db.getAllAsync<MessageRow>("SELECT * FROM mail_messages");
+  return rows.map((row) => rowToMessage(row).classified);
+}
+
 export async function listMailboxesAsync(): Promise<
   { mailboxId: string; providerId: MailProviderId }[]
 > {

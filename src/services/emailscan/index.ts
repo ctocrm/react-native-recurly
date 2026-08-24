@@ -69,4 +69,14 @@ export {
 
 export { candidateToSubscription } from "./importCandidate";
 
+export {
+    convertStoredPrice,
+    defaultDisplayPeriod,
+    displayedAmount,
+    monthlySpendContribution,
+    nextDisplayPeriod,
+} from "./chargeDisplay";
+export type { DisplayPeriod } from "./chargeDisplay";
+
 export { importFromConnectedMailboxes } from "./scanConnected";
+export { listClassifiedMessagesAsync } from "./persist";
