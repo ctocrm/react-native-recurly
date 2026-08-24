@@ -104,7 +104,10 @@ private class TutaClient {
   private val tutanotaV = "102"
   private val mailV = "105"
   private val mailDv = "144"
+  private val storageV = "14"
+  private val mailDetailsV = "113"
   private val generatedMinId = "------------"
+
   private val generatedMaxId = "zzzzzzzzzzzz"
   private val fixedIv = ByteArray(16) { 0x88.toByte() }
 
@@ -290,7 +293,11 @@ private class TutaClient {
         Log.w("MailTuta", "mail body skipped: ${e.message}")
         ""
       }
+      if (text.contains("47.74") || text.contains("TOTAL CHARGED", ignoreCase = true)) {
+        Log.i("MailTuta", "Tuta body money hit subject=$subject chars=${text.length}")
+      }
       out.add(TutaMsg(id, from, subject, date, text.ifBlank { null }))
+
     }
     Log.i("MailTuta", "Tuta listed ${out.size} Inbox messages")
     return out
@@ -325,23 +332,125 @@ private class TutaClient {
   ): String {
     val inline = decryptString(mail.optString("115"), mailSk)
     if (inline.isNotBlank()) return inline
-    val ref = firstObjectOrArray(mail.opt("1465"))
-    if (ref.first.isEmpty() || ref.second.isEmpty() || mailSk == null) return ""
+    if (mailSk == null) return ""
+    val ref = firstObjectOrArray(mail.opt("1308"))
+    if (ref.first.isEmpty() || ref.second.isEmpty()) return ""
     return try {
-      val blob = requestObject(
-        "GET",
-        "$base/rest/tutanota/maildetailsblob/${ref.first}/${ref.second}",
-        null,
-        session,
-        tutanotaV,
-        null,
-      )
-      longestDecryptedText(blob, mailSk)
+      loadMailDetailsBlob(session, ref.first, ref.second, mailSk)
     } catch (e: Exception) {
       Log.w("MailTuta", "mail body hop failed: ${e.message}")
       ""
     }
   }
+
+  private fun loadMailDetailsBlob(
+    session: TutaSession,
+    archiveId: String,
+    instanceId: String,
+    mailSk: ByteArray,
+  ): String {
+    val read = JSONObject()
+      .put("176", randomCustomId())
+      .put("177", archiveId)
+      .put("178", JSONObject.NULL)
+      .put("179", JSONArray())
+    val tokenBody = JSONObject()
+      .put("78", "0")
+      .put("80", JSONArray())
+      .put("180", JSONObject.NULL)
+      .put("181", JSONArray().put(read))
+      .toString()
+    val tokenRes = requestObject(
+      "POST",
+      "$base/rest/storage/blobaccesstokenservice",
+      tokenBody,
+      session,
+      storageV,
+      null,
+      "5",
+      null,
+    )
+    val info = firstAggObject(tokenRes.opt("161"))
+      ?: throw IllegalStateException("Tuta blob token missing 161")
+    val blobToken = info.optString("159")
+    if (blobToken.isEmpty()) {
+      throw IllegalStateException("Tuta blob token missing 159")
+    }
+    val servers = mutableListOf<String>()
+    val serverArr = info.optJSONArray("160") ?: JSONArray()
+    for (i in 0 until serverArr.length()) {
+      val url = serverArr.optJSONObject(i)?.optString("156").orEmpty()
+      if (url.isNotBlank()) servers.add(url.trimEnd('/'))
+    }
+    if (servers.isEmpty()) servers.add(base)
+    var lastError: Exception? = null
+    for (origin in servers) {
+      try {
+        val qs = java.net.URLEncoder.encode(instanceId, "UTF-8")
+        val tokenQs = java.net.URLEncoder.encode(blobToken, "UTF-8")
+        val accessQs = java.net.URLEncoder.encode(session.accessToken, "UTF-8")
+        val url =
+          "$origin/rest/tutanota/maildetailsblob/$archiveId?ids=$qs&blobAccessToken=$tokenQs&accessToken=$accessQs&v=$mailDetailsV&cv=$clientVersion"
+        val instances = requestArray(
+          "GET",
+          url,
+          session,
+          mailDetailsV,
+          null,
+          "5",
+          blobToken,
+        )
+        var best = ""
+        for (i in 0 until instances.length()) {
+          val inst = instances.optJSONObject(i) ?: continue
+          val details = firstAggObject(inst.opt("1305")) ?: inst
+          val plain = bodyFromDetails(details, mailSk)
+          if (plain.length > best.length) best = plain
+        }
+        if (best.isNotBlank()) return best
+      } catch (e: Exception) {
+        lastError = e
+      }
+    }
+    throw lastError ?: IllegalStateException("Tuta mail details blob empty")
+  }
+
+  private fun bodyFromDetails(details: JSONObject, mailSk: ByteArray): String {
+    val body = firstAggObject(details.opt("1288"))
+    val compressed = body?.optString("1276").orEmpty()
+    if (compressed.isNotBlank()) {
+      val bytes = decryptBytes(compressed, mailSk)
+      if (bytes != null) {
+        val inflated = tutaDecompress(bytes)
+        if (inflated.isNotBlank()) return inflated
+        return String(bytes, StandardCharsets.UTF_8)
+      }
+    }
+    val text = body?.optString("1275").orEmpty()
+    if (text.isNotBlank()) {
+      val plain = decryptString(text, mailSk)
+      if (plain.isNotBlank()) return plain
+    }
+    return longestDecryptedText(details, mailSk)
+  }
+
+  private fun firstAggObject(raw: Any?): JSONObject? {
+    return when (raw) {
+      is JSONObject -> raw
+      is JSONArray -> if (raw.length() > 0) raw.optJSONObject(0) else null
+      else -> null
+    }
+  }
+
+  private fun randomCustomId(): String {
+    val bytes = ByteArray(4)
+    java.security.SecureRandom().nextBytes(bytes)
+    return android.util.Base64.encodeToString(
+      bytes,
+      android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP or android.util.Base64.NO_PADDING,
+    )
+  }
+
 
   private fun longestDecryptedText(node: Any?, sessionKey: ByteArray): String {
     var best = ""
@@ -366,18 +475,75 @@ private class TutaClient {
   }
 
   private fun decryptString(cipherB64: String, sessionKey: ByteArray?): String {
-    if (cipherB64.isBlank() || sessionKey == null) return ""
-    var last: Exception? = null
+    val bytes = decryptBytes(cipherB64, sessionKey) ?: return ""
+    return String(bytes, StandardCharsets.UTF_8)
+  }
+
+  private fun decryptBytes(cipherB64: String, sessionKey: ByteArray?): ByteArray? {
+    if (cipherB64.isBlank() || sessionKey == null) return null
     for (cipher in decodeTutaBytes(cipherB64)) {
       try {
-        return String(aesDecrypt(sessionKey, cipher, padded = true), StandardCharsets.UTF_8)
-      } catch (e: Exception) {
-        last = e
+        return aesDecrypt(sessionKey, cipher, padded = true)
+      } catch (_: Exception) {
+        // try next encoding
       }
     }
-    Log.w("MailTuta", "string decrypt failed: ${last?.message}")
-    return ""
+    return null
   }
+
+  private fun tutaDecompress(bytes: ByteArray): String {
+    if (bytes.isEmpty()) return ""
+    var out = ByteArray(maxOf(64, bytes.size * 6))
+    var n = 0
+    var s = 0
+    fun ensure(need: Int) {
+      if (out.size >= need) return
+      val next = ByteArray(maxOf(out.size * 2, need))
+      System.arraycopy(out, 0, next, 0, n)
+      out = next
+    }
+    while (s < bytes.size) {
+      val token = bytes[s].toInt() and 0xff
+      s += 1
+      var lit = token shr 4
+      if (lit > 0) {
+        var extra = lit + 240
+        while (extra == 255) {
+          extra = bytes[s].toInt() and 0xff
+          s += 1
+          lit += extra
+        }
+        ensure(n + lit)
+        System.arraycopy(bytes, s, out, n, lit)
+        n += lit
+        s += lit
+        if (s == bytes.size) break
+      }
+      if (s + 1 >= bytes.size) break
+      val offset = (bytes[s].toInt() and 0xff) or ((bytes[s + 1].toInt() and 0xff) shl 8)
+      s += 2
+      if (offset == 0 || offset > n) {
+        throw IllegalStateException("Tuta decompress bad offset $offset")
+      }
+      var match = token and 15
+      var extra = match + 240
+      while (extra == 255) {
+        extra = bytes[s].toInt() and 0xff
+        s += 1
+        match += extra
+      }
+      val end = n + match + 4
+      ensure(end)
+      var from = n - offset
+      while (n < end) {
+        out[n] = out[from]
+        n += 1
+        from += 1
+      }
+    }
+    return String(out, 0, n, StandardCharsets.UTF_8)
+  }
+
 
   // Official decryptKey: AES-CBC, no PKCS padding. AES-128 uses fixed IV.
   // Bytes on the wire may be standard base64, URL-safe, or Tuta base64ext.
@@ -493,8 +659,10 @@ private class TutaClient {
     session: TutaSession?,
     version: String,
     dependsOn: String?,
+    clientPlatform: String = "web",
+    blobToken: String? = null,
   ): JSONObject {
-    val text = requestRaw(method, url, body, session, version, dependsOn)
+    val text = requestRaw(method, url, body, session, version, dependsOn, clientPlatform, blobToken)
     if (text.isBlank()) return JSONObject()
     val trimmed = text.trim()
     if (trimmed.startsWith("[")) {
@@ -514,8 +682,10 @@ private class TutaClient {
     session: TutaSession,
     version: String,
     dependsOn: String?,
+    clientPlatform: String = "web",
+    blobToken: String? = null,
   ): JSONArray {
-    val text = requestRaw(method, url, null, session, version, dependsOn)
+    val text = requestRaw(method, url, null, session, version, dependsOn, clientPlatform, blobToken)
     if (text.isBlank()) return JSONArray()
     val trimmed = text.trim()
     if (trimmed.startsWith("[")) return JSONArray(trimmed)
@@ -530,6 +700,8 @@ private class TutaClient {
     session: TutaSession?,
     version: String,
     dependsOn: String?,
+    clientPlatform: String = "web",
+    blobToken: String? = null,
   ): String {
     val conn = (URL(url).openConnection() as HttpsURLConnection)
     conn.requestMethod = method
@@ -539,12 +711,15 @@ private class TutaClient {
     conn.setRequestProperty("v", version)
     if (dependsOn != null) conn.setRequestProperty("dv", dependsOn)
     conn.setRequestProperty("cv", clientVersion)
-    conn.setRequestProperty("cp", "web")
+    conn.setRequestProperty("cp", clientPlatform)
     if (body != null && method != "GET") {
       conn.setRequestProperty("Content-Type", "application/json")
     }
     if (session != null) {
       conn.setRequestProperty("accessToken", session.accessToken)
+    }
+    if (blobToken != null) {
+      conn.setRequestProperty("blobAccessToken", blobToken)
     }
     if (body != null && method != "GET") {
       conn.doOutput = true
@@ -577,6 +752,7 @@ private class TutaClient {
     }
     return text
   }
+
 
   private fun firstId(raw: Any?): String {
     return when (raw) {

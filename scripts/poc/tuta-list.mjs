@@ -196,21 +196,79 @@ function decryptKey(wrappingKey, encoded) {
   throw last ?? new Error("key unwrap failed");
 }
 
-function decryptString(cipherB64, sessionKey) {
-  if (!cipherB64 || !sessionKey) return "";
-  let last = null;
+function decryptBytes(cipherB64, sessionKey) {
+  if (!cipherB64 || !sessionKey) return null;
   for (const { buf } of decodeTutaBytes(cipherB64)) {
     try {
-      return aesDecrypt(sessionKey, buf, true).toString("utf8");
-    } catch (e) {
-      last = e;
+      return aesDecrypt(sessionKey, buf, true);
+    } catch {
+      // try next encoding
     }
   }
-  return last ? `[decrypt fail: ${last.message}]` : "";
+  return null;
+}
+
+function decryptString(cipherB64, sessionKey) {
+  const bytes = decryptBytes(cipherB64, sessionKey);
+  return bytes ? bytes.toString("utf8") : "";
+}
+
+function tutaDecompress(bytes) {
+  if (!bytes || bytes.length === 0) return "";
+  const src = Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes);
+  let out = Buffer.alloc(Math.max(64, src.length * 6));
+  let n = 0;
+  let s = 0;
+  const ensure = (need) => {
+    if (out.length >= need) return;
+    const next = Buffer.alloc(Math.max(out.length * 2, need));
+    out.copy(next);
+    out = next;
+  };
+  while (s < src.length) {
+    const token = src[s++];
+    let lit = token >> 4;
+    if (lit > 0) {
+      let extra = lit + 240;
+      while (extra === 255) {
+        extra = src[s++];
+        lit += extra;
+      }
+      ensure(n + lit);
+      src.copy(out, n, s, s + lit);
+      n += lit;
+      s += lit;
+      if (s === src.length) break;
+    }
+    if (s + 1 >= src.length) break;
+    const offset = src[s] | (src[s + 1] << 8);
+    s += 2;
+    if (offset === 0 || offset > n) {
+      throw new Error(`tuta decompress bad offset ${offset} at ${s}`);
+    }
+    let match = token & 15;
+    let extra = match + 240;
+    while (extra === 255) {
+      extra = src[s++];
+      match += extra;
+    }
+    const end = n + match + 4;
+    ensure(end);
+    let from = n - offset;
+    while (n < end) out[n++] = out[from++];
+  }
+  return out.subarray(0, n).toString("utf8");
 }
 
 function inflateMaybe(bytes) {
   if (!bytes || bytes.length === 0) return "";
+  try {
+    const tuta = tutaDecompress(bytes);
+    if (tuta && tuta.includes("<") && !tuta.includes("\u0000")) return tuta;
+    if (tuta && tuta.length > 20) return tuta;
+  } catch {
+    // not tuta-compressed
+  }
   for (const fn of [gunzipSync, inflateSync, inflateRawSync]) {
     try {
       return fn(bytes).toString("utf8");
@@ -223,6 +281,12 @@ function inflateMaybe(bytes) {
   } catch {
     return "";
   }
+}
+
+
+function firstNode(value) {
+  if (Array.isArray(value)) return value.length ? firstNode(value[0]) : null;
+  return value ?? null;
 }
 
 function walkLongestPlain(node, sessionKey) {
@@ -238,12 +302,14 @@ function walkLongestPlain(node, sessionKey) {
       return;
     }
     if (typeof value !== "string" || value.length < 16) return;
-    const plain = decryptString(value, sessionKey);
-    if (
-      plain &&
-      !plain.startsWith("[decrypt fail") &&
-      plain.length > best.length
-    ) {
+    const bytes = decryptBytes(value, sessionKey);
+    if (!bytes) return;
+    const inflated = inflateMaybe(bytes);
+    const plain =
+      inflated && inflated.length >= bytes.length
+        ? inflated
+        : bytes.toString("utf8");
+    if (plain && !plain.startsWith("[decrypt fail") && plain.length > best.length) {
       best = plain;
     }
   };
@@ -252,28 +318,27 @@ function walkLongestPlain(node, sessionKey) {
 }
 
 function bodyFromDetails(details, sessionKey) {
-  const body = details?.["1288"] ?? details?.body;
+  const root = firstNode(details);
+  const body = firstNode(root?.["1288"] ?? root?.body);
   const compressed = body?.["1276"] ?? body?.compressedText;
   const text = body?.["1275"] ?? body?.text;
   if (compressed) {
-    const raw = decryptString(compressed, sessionKey);
-    if (raw && !raw.startsWith("[decrypt fail")) {
-      const asBuf = Buffer.from(raw, "utf8");
-      const inflated = inflateMaybe(asBuf);
-      if (inflated && inflated.length >= raw.length) return inflated;
-      const latin = inflateMaybe(Buffer.from(raw, "latin1"));
-      if (latin) return latin;
-      return raw;
+    const bytes = decryptBytes(compressed, sessionKey);
+    if (bytes) {
+      const inflated = inflateMaybe(bytes);
+      if (inflated) return inflated;
+      return bytes.toString("utf8");
     }
   }
   if (text) {
     const raw = decryptString(text, sessionKey);
-    if (raw && !raw.startsWith("[decrypt fail")) return raw;
+    if (raw) return raw;
   }
-  return walkLongestPlain(details, sessionKey);
+  return walkLongestPlain(root ?? details, sessionKey);
 }
 
 function derivePassphraseKey(password, salt, kdfVersion) {
+
 
   if (kdfVersion === "0") {
     throw new Error(
@@ -299,45 +364,16 @@ function randomCustomId() {
   return crypto.getRandomValues(Buffer.alloc(4)).toString("base64url");
 }
 
-function blobTokenBodies(archiveId, instanceId) {
-  const readArchive = {
-    176: randomCustomId(),
-    177: archiveId,
-    178: null,
-    179: [],
-  };
-  const readInstance = {
-    176: randomCustomId(),
-    177: archiveId,
-    178: null,
-    179: [{ 173: randomCustomId(), 174: instanceId }],
-  };
-  return [
-    {
-      label: "archive-null",
-      body: { 78: "0", 180: null, 80: null, 181: readArchive },
-    },
-    {
-      label: "maildetails-2",
-      body: { 78: "0", 180: "2", 80: null, 181: readInstance },
-    },
-    {
-      label: "archive-2",
-      body: { 78: "0", 180: "2", 80: null, 181: readArchive },
-    },
-  ];
-}
-
 async function request(
   method,
   url,
-  { body, token, version, dependsOn, blobToken } = {},
+  { body, token, version, dependsOn, blobToken, clientPlatform } = {},
 ) {
   const headers = {
     Accept: "application/json",
     v: version ?? MODEL_V,
     cv: CLIENT_V,
-    cp: "web",
+    cp: clientPlatform ?? "5",
   };
   if (dependsOn) headers.dv = dependsOn;
   if (token) headers.accessToken = token;
@@ -355,24 +391,17 @@ async function request(
   } catch {
     json = { _raw: text.slice(0, 400) };
   }
-  const extra = {};
-  for (const key of [
-    "error-id",
-    "errorid",
-    "access-control-allow-origin",
-    "content-type",
-    "precondition",
-  ]) {
-    const val = res.headers.get(key);
-    if (val) extra[key] = val;
-  }
   return {
     status: res.status,
     json,
     textLen: text.length,
     errorId: res.headers.get("error-id"),
-    extra,
   };
+}
+
+function firstAgg(value) {
+  if (Array.isArray(value)) return value[0] ?? null;
+  return value ?? null;
 }
 
 async function loadMailDetailsBlob({
@@ -381,40 +410,40 @@ async function loadMailDetailsBlob({
   instanceId,
   sessionKey,
 }) {
-  // Official worker: requestReadTokenArchive(archiveId) then GET
-  // `${blobServer}/rest/tutanota/maildetailsblob?ids=${elementId}`.
-  let tokenRes = { status: 0, json: null, errorId: null, extra: {} };
-  let blobAccessToken = "";
-  let servers = [];
-  for (const attempt of blobTokenBodies(archiveId, instanceId)) {
-    tokenRes = await request(
-      "POST",
-      `${BASE}/rest/storage/blobaccesstokenservice`,
+  // Live Tuta web 201:
+  // {"78":"0","80":[],"180":null,"181":[{"176":id,"177":archiveId,"178":null,"179":[]}]}
+  // then GET `${blobServer}/rest/tutanota/maildetailsblob/${archiveId}?ids=...`
+  const tokenBody = JSON.stringify({
+    78: "0",
+    80: [],
+    180: null,
+    181: [
       {
-        body: JSON.stringify(attempt.body),
-        token,
-        version: STORAGE_V,
+        176: randomCustomId(),
+        177: archiveId,
+        178: null,
+        179: [],
       },
-    );
-    const info = tokenRes.json?.["161"] ?? tokenRes.json?.blobAccessInfo;
-    blobAccessToken = info?.["159"] ?? info?.blobAccessToken ?? "";
-    servers = (info?.["160"] ?? info?.servers ?? [])
-      .map((s) => s?.["156"] ?? s?.url ?? "")
-      .filter(Boolean);
-    log("blobAccessToken", {
-      label: attempt.label,
-      status: tokenRes.status,
-      errorId: tokenRes.errorId,
-      extra: tokenRes.extra,
-      keys: keysOf(tokenRes.json),
-      tokenChars: String(blobAccessToken).length,
-      servers,
-      sent: attempt.body,
-    });
-    if (tokenRes.status >= 200 && tokenRes.status <= 299 && blobAccessToken) {
-      break;
-    }
-  }
+    ],
+  });
+  const tokenRes = await request(
+    "POST",
+    `${BASE}/rest/storage/blobaccesstokenservice`,
+    { body: tokenBody, token, version: STORAGE_V, clientPlatform: "5" },
+  );
+  const info = firstAgg(tokenRes.json?.["161"] ?? tokenRes.json?.blobAccessInfo);
+  const blobAccessToken = info?.["159"] ?? info?.blobAccessToken ?? "";
+  const servers = (info?.["160"] ?? info?.servers ?? [])
+    .flatMap((s) => (Array.isArray(s) ? s : [s]))
+    .map((s) => s?.["156"] ?? s?.url ?? "")
+    .filter(Boolean);
+  log("blobAccessToken", {
+    status: tokenRes.status,
+    errorId: tokenRes.errorId,
+    keys: keysOf(tokenRes.json),
+    tokenChars: String(blobAccessToken).length,
+    servers,
+  });
   if (tokenRes.status < 200 || tokenRes.status > 299 || !blobAccessToken) {
     return { status: tokenRes.status, text: "" };
   }
@@ -426,23 +455,24 @@ async function loadMailDetailsBlob({
     const qs = new URLSearchParams({
       ids: instanceId,
       blobAccessToken,
-      v: "113",
       accessToken: token,
+      v: "113",
+      cv: CLIENT_V,
     });
-    const url = `${origin}/rest/tutanota/maildetailsblob?${qs}`;
+    const url = `${origin}/rest/tutanota/maildetailsblob/${archiveId}?${qs}`;
     last = await request("GET", url, {
       version: "113",
       token,
       blobToken: blobAccessToken,
+      clientPlatform: "5",
     });
     log("maildetailsblob GET", {
       origin,
       status: last.status,
       errorId: last.errorId,
-      extra: last.extra,
       keys: keysOf(last.json),
       first: Array.isArray(last.json) ? keysOf(last.json[0]) : keysOf(last.json),
-      rawHead: JSON.stringify(last.json)?.slice(0, 400),
+      rawHead: JSON.stringify(last.json)?.slice(0, 200),
     });
     if (last.status >= 200 && last.status <= 299 && last.json) break;
   }
@@ -450,7 +480,7 @@ async function loadMailDetailsBlob({
   const instances = asArray(last.json);
   let best = "";
   for (const inst of instances) {
-    const details = inst?.["1305"] ?? inst?.details ?? inst;
+    const details = firstAgg(inst?.["1305"] ?? inst?.details ?? inst);
     const plain = bodyFromDetails(details, sessionKey);
     if (plain.length > best.length) best = plain;
     if (!plain) {
@@ -460,6 +490,7 @@ async function loadMailDetailsBlob({
   }
   return { status: last.status, text: best };
 }
+
 
 
 
