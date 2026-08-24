@@ -322,6 +322,20 @@ describe("emailscan subject amounts + no fake $0", () => {
     expect(porkbun[0].cadence).toBe("yearly");
   });
 
+  it("reads Porkbun TOTAL CHARGED when Tuta stuffed HTML into text", () => {
+    const order = classifyMessage({
+      mailboxId: "tuta:picksandshovels@tutamail.com",
+      messageId: "porkbun-order-html",
+      from: "Porkbun <support@porkbun.com>",
+      subject: "porkbun.com | Order - Thank You - 10996643",
+      date: "2026-08-01T12:00:00.000Z",
+      text: `<p>picksandshovels.app Domain Registration SUCCESS $8.75</p><td>TOTAL&nbsp;CHARGED:</td><td>USD&nbsp;$47.74</td>`,
+    });
+    expect(order.kind).toBe("sparse");
+    expect(order.amount).toBe(47.74);
+    expect(order.cadence).toBe("yearly");
+  });
+
   it("creates a Tuta $0 row from the welcome mail", () => {
     const hit = classifyMessage({
       mailboxId: "tuta:picksandshovels@tutamail.com",

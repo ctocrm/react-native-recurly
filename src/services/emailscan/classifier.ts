@@ -334,17 +334,25 @@ function stripHtml(html: string): string {
     .replace(/<script[\s\S]*?<\/script>/gi, " ")
     .replace(/<style[\s\S]*?<\/style>/gi, " ")
     .replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&#(\d+);/g, (_, n) =>
+      String.fromCharCode(Number.parseInt(n, 10)),
+    )
     .replace(/&/g, "&")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function looksLikeMarkup(text: string): boolean {
+  return /<\/?[a-z][\s\S]*>/i.test(text) || /&(nbsp|amp|lt|gt|quot|#\d+);/i.test(text);
 }
 
 function parseAmount(
   text: string,
 ): { amount: number; currency: string } | null {
   const total = text.match(
-    /total\s+charged:?\s*(?:USD\s*)?\$?\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{2})|[0-9]+(?:\.[0-9]{2}))/i,
+    /total\s+charged[\s\S]{0,80}?(?:USD\s*)?\$?\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{2})|[0-9]+(?:\.[0-9]{2}))/i,
   );
   if (total?.[1]) {
     const amount = Number.parseFloat(total[1].replace(/,/g, ""));
@@ -382,7 +390,9 @@ function isInvoiceAttachment(att: MailAttachment): boolean {
 export function moneyBodyText(message: NormalizedMessage): string {
   const parts: string[] = [];
   if (message.text && message.text.trim()) {
-    parts.push(message.text);
+    parts.push(
+      looksLikeMarkup(message.text) ? stripHtml(message.text) : message.text,
+    );
   } else if (message.html && message.html.trim()) {
     parts.push(stripHtml(message.html));
   }
