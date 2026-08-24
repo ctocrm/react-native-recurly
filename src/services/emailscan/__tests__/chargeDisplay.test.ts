@@ -5,6 +5,7 @@ import {
   monthlySpendContribution,
   nextDisplayPeriod,
   thisMonthInsights,
+  monthlyChartFromMail,
 } from "../chargeDisplay";
 import type { ClassifiedMessage } from "../types";
 
@@ -154,5 +155,43 @@ describe("charge display periods", () => {
     expect(insights.kinds.sparse).toBeCloseTo(93);
     expect(insights.merchants[0].name).toBe("Linode");
     expect(insights.merchants[0].amount).toBeCloseTo(93);
+  });
+
+  it("builds 12-month bars from mail dates plus recurring run-rate", () => {
+    const now = new Date("2026-08-24T12:00:00.000Z");
+    const messages = [
+      hit(
+        "Porkbun",
+        47.74,
+        "2026-01-10T00:00:00.000Z",
+        porkbun.paymentMethod!,
+      ),
+      hit("Linode", 17, "2026-07-05T00:00:00.000Z", "proton:david@picksandshovels.app"),
+      hit("Linode", 93, "2026-08-05T00:00:00.000Z", "proton:david@picksandshovels.app"),
+    ];
+    const linode: Subscription = {
+      ...porkbun,
+      id: "linode",
+      name: "Linode",
+      price: 17,
+      billing: "Monthly",
+      frequency: "Monthly",
+      paymentMethod: "proton:david@picksandshovels.app",
+    };
+    const bars = monthlyChartFromMail(
+      [proton, linode, porkbun],
+      messages,
+      12,
+      now,
+    );
+    expect(bars).toHaveLength(12);
+    expect(bars[0].label).toBe("Sep");
+    expect(bars[bars.length - 1].label).toBe("Aug");
+    const jan = bars.find((b) => b.label === "Jan");
+    const jul = bars.find((b) => b.label === "Jul");
+    const aug = bars.find((b) => b.label === "Aug");
+    expect(jan?.amount).toBeCloseTo(29.98 + 47.74);
+    expect(jul?.amount).toBeCloseTo(29.98 + 17);
+    expect(aug?.amount).toBeCloseTo(29.98 + 93);
   });
 });

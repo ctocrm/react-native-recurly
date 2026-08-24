@@ -3,7 +3,7 @@ import { useSubscriptions } from "@/context/SubscriptionContext";
 import { useBottomClearance } from "@/hooks/useBottomClearance";
 import { useChargeDisplay } from "@/hooks/useChargeDisplay";
 import { formatCurrency } from "@/lib/utils";
-import { thisMonthInsights } from "@/services/emailscan";
+import { thisMonthInsights, monthlyChartFromMail } from "@/services/emailscan";
 import { styled } from "nativewind";
 import { usePostHog } from "posthog-react-native";
 import React, { useEffect, useMemo, useState } from "react";
@@ -18,21 +18,6 @@ import {
 import { SafeAreaView as RNSafeAreaView } from "react-native-safe-area-context";
 
 const SafeAreaView = styled(RNSafeAreaView);
-
-const MONTHS = [
-  "Jan",
-  "Feb",
-  "Mar",
-  "Apr",
-  "May",
-  "Jun",
-  "Jul",
-  "Aug",
-  "Sep",
-  "Oct",
-  "Nov",
-  "Dec",
-];
 
 const PERIODS = [
   "This Month",
@@ -80,7 +65,6 @@ const Insights = () => {
         { name: "free", total: insights.kinds.free },
       ].filter((row) => row.total > 0 || row.name !== "free");
 
-      const currentMonth = new Date().getMonth();
       const monthsToShow =
         selectedPeriod === "This Month"
           ? 1
@@ -90,16 +74,11 @@ const Insights = () => {
               ? 6
               : 12;
 
-      const chartData: { label: string; amount: number; estimated: boolean }[] =
-        [];
-      for (let i = monthsToShow - 1; i >= 0; i--) {
-        const monthIndex = (((currentMonth - i) % 12) + 12) % 12;
-        chartData.push({
-          label: MONTHS[monthIndex],
-          amount: insights.total,
-          estimated: i > 0,
-        });
-      }
+      const chartData = monthlyChartFromMail(
+        subscriptions,
+        messages,
+        monthsToShow,
+      );
 
       return {
         totalMonthlySpend: insights.total,
@@ -258,7 +237,7 @@ const Insights = () => {
             {/* Estimated Monthly Spending Chart */}
             <View className="insights-section-head mt-5">
               <Text className="insights-section-title">
-                Estimated Monthly Spend
+                Monthly spend from mail
               </Text>
             </View>
 

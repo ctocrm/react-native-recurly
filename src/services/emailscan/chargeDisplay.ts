@@ -208,3 +208,60 @@ export function thisMonthInsights(
     merchants,
   };
 }
+
+const MONTH_LABELS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+
+export function monthWindow(year: number, monthIndex: number): {
+  start: Date;
+  end: Date;
+} {
+  const start = new Date(year, monthIndex, 1);
+  const end = new Date(year, monthIndex + 1, 0, 23, 59, 59, 999);
+  return { start, end };
+}
+
+export function monthlyChartFromMail(
+  subscriptions: Subscription[],
+  messages: ClassifiedMessage[],
+  monthsToShow: number,
+  now = new Date(),
+): { label: string; amount: number; estimated: boolean }[] {
+  const bars: { label: string; amount: number; estimated: boolean }[] = [];
+  for (let i = monthsToShow - 1; i >= 0; i--) {
+    const cursor = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const { start, end } = monthWindow(cursor.getFullYear(), cursor.getMonth());
+    let amount = 0;
+    for (const sub of subscriptions) {
+      if (sub.status === "cancelled" || sub.status === "paused") continue;
+      if (isSparseSubscription(sub) && sub.paymentMethod) {
+        amount += sumChargesInWindow(sub, messages, start, end);
+        continue;
+      }
+      if (sub.priceUnknown || sub.category === "free") continue;
+      const mailTotal = sumChargesInWindow(sub, messages, start, end);
+      amount +=
+        mailTotal > 0
+          ? mailTotal
+          : convertStoredPrice(sub.price, storedCadence(sub), "monthly");
+    }
+    bars.push({
+      label: MONTH_LABELS[cursor.getMonth()],
+      amount,
+      estimated: i > 0,
+    });
+  }
+  return bars;
+}
