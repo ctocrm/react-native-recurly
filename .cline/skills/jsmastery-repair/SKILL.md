@@ -55,6 +55,8 @@ Use this sequence:
 
 A successful static check or build is not evidence that the behavior is fixed.
 
+Documentation and rules-editing turns are hygiene; they are never the agreed behavior step and never count as progress on the user's named outcome. They may not loosen a hard gate. When the next hop for the diagnosis is already known, implement that hop; do not present a list of easier adjacent changes as the completed change.
+
 ## Three-strike safeguard
 
 Track consecutive implementation attempts of the **same hypothesis**, not every edit toward the user's named outcome.

@@ -33,7 +33,9 @@ These are mandatory invariants for every Cline task in this project. The detaile
 
 - The user-visible sentence the user asked for is the only definition of done.
 - Forbidden substitutes for done: listed N messages, an HTTP status, unit tests, a rebuild, a cache wipe, a screenshot of the wrong screen, a plan note, a changelog, an apology, or acknowledging the outcome.
-- Acknowledging the outcome is not completing it.
+- Also forbidden: a stack of adjacent "showroom" changes (rebuild/wipe/screenshot, cache bump, parse tweak, adjacent refactor) presented together as the same completed change when the user-facing gate has actually moved.
+- When the exact next hop toward the named outcome is already known and agreed (for example the BlobAccessToken POST then BlobService GET path), that hop is the deliverable. Shipping a list of nearby, easier improvements instead is not the same change and is not done.
+- A rules-editing or documentation turn during a feature cycle is not progress on the user's named outcome and must not be mixed into the same turn as the agreed code hop.
 - Do not ask the user to weaken, remove, or rephrase safeguards so a different finish line becomes legal.
 
 ## Process is not the product

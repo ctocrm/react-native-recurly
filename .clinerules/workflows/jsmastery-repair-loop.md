@@ -8,6 +8,8 @@ The execution-plan source of truth is `docs/plan.md`. The historical failure evi
 
 Work on one root issue at a time. Do not skip a gate and do not call a phase complete from static inspection alone.
 
+When the exact next hop for the user's named outcome is already known and agreed, that hop is the deliverable. Stacking adjacent "showroom" improvements, a rebuild/wipe/screenshot turn, or a rules/docs turn as "the fix" is not progress and does not satisfy the user's sentence. A rules or documentation turn may never loosen a gate.
+
 Maintain an attempt counter for the current root issue. An implementation attempt fails when the proposed fix fails its relevant validation, fails to reproduce the requested behavior, introduces a regression, or cannot pass a required build/device gate because of the change.
 
 ## Main loop
