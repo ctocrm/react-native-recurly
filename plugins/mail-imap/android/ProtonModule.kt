@@ -8,9 +8,27 @@ import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.bridge.WritableMap
+import org.bouncycastle.jce.provider.BouncyCastleProvider
+import org.bouncycastle.openpgp.PGPCompressedData
+import org.bouncycastle.openpgp.PGPEncryptedDataList
+import org.bouncycastle.openpgp.PGPLiteralData
+import org.bouncycastle.openpgp.PGPObjectFactory
+import org.bouncycastle.openpgp.PGPOnePassSignatureList
+import org.bouncycastle.openpgp.PGPPrivateKey
+import org.bouncycastle.openpgp.PGPPublicKeyEncryptedData
+import org.bouncycastle.openpgp.PGPSecretKey
+import org.bouncycastle.openpgp.PGPSecretKeyRing
+import org.bouncycastle.openpgp.PGPSecretKeyRingCollection
+import org.bouncycastle.openpgp.PGPUtil
+import org.bouncycastle.openpgp.operator.jcajce.JcaKeyFingerprintCalculator
+import org.bouncycastle.openpgp.operator.jcajce.JcaPGPDigestCalculatorProviderBuilder
+import org.bouncycastle.openpgp.operator.jcajce.JcePBESecretKeyDecryptorBuilder
+import org.bouncycastle.openpgp.operator.jcajce.JcePublicKeyDataDecryptorFactoryBuilder
+import org.json.JSONArray
 import org.json.JSONObject
 
 import java.io.BufferedReader
+import java.io.ByteArrayInputStream
 import java.io.InputStreamReader
 import java.io.OutputStreamWriter
 import java.math.BigInteger
@@ -19,12 +37,14 @@ import java.net.URL
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import java.security.SecureRandom
+import java.security.Security
 import java.util.concurrent.Executors
 import javax.net.ssl.HttpsURLConnection
 
 /**
  * Proton Mail client REST (same API Proton Android uses).
  * Not IMAP. Not Bridge. Auth is Proton SRP (go-srp compatible).
+ * Bodies decrypt on device with official mailbox-password + OpenPGP.
  */
 class ProtonModule(reactContext: ReactApplicationContext) :
   ReactContextBaseJavaModule(reactContext) {
@@ -56,7 +76,6 @@ class ProtonModule(reactContext: ReactApplicationContext) :
         promise.reject("PROTON_HV", e.message, e.toMap())
       } catch (e: Exception) {
         Log.e(TAG, "Proton login failed", e)
-
         promise.reject("PROTON_ERROR", e.message ?: "Proton login failed", e)
       }
     }
@@ -75,7 +94,6 @@ class ProtonModule(reactContext: ReactApplicationContext) :
         promise.resolve(protonSessionToMap(session))
       } catch (e: Exception) {
         Log.e(TAG, "Proton refresh failed", e)
-
         promise.reject("PROTON_ERROR", e.message ?: "Proton refresh failed", e)
       }
     }
@@ -87,6 +105,7 @@ class ProtonModule(reactContext: ReactApplicationContext) :
     accessToken: String,
     sinceIso: String?,
     limit: Int,
+    password: String?,
     promise: Promise,
   ) {
     io.execute {
@@ -94,12 +113,12 @@ class ProtonModule(reactContext: ReactApplicationContext) :
         val messages = ProtonClient().listMessages(
           ProtonSession(uid, accessToken, ""),
           sinceIso,
-          limit.coerceIn(1, 100),
+          limit.coerceIn(1, 500),
+          password,
         )
         promise.resolve(protonMessagesToMap(messages))
       } catch (e: Exception) {
         Log.e(TAG, "Proton list failed", e)
-
         promise.reject("PROTON_ERROR", e.message ?: "Proton list failed", e)
       }
     }
@@ -118,11 +137,10 @@ class ProtonModule(reactContext: ReactApplicationContext) :
       try {
         val client = ProtonClient()
         val session = client.login(username.trim(), password, totp, null, null)
-        val messages = client.listMessages(session, sinceIso, limit.coerceIn(1, 100))
+        val messages = client.listMessages(session, sinceIso, limit.coerceIn(1, 500), password)
         promise.resolve(protonMessagesToMap(messages))
       } catch (e: ProtonHvRequired) {
         promise.reject("PROTON_HV", e.message, e.toMap())
-
       } catch (e: Exception) {
         Log.e(TAG, "Proton fetch failed", e)
         promise.reject("PROTON_ERROR", e.message ?: "Proton failed", e)
@@ -159,7 +177,6 @@ private fun protonMessagesToMap(messages: List<ProtonMsg>): WritableMap {
   return out
 }
 
-
 internal class ProtonHvRequired(
   val webUrl: String,
   val hvToken: String,
@@ -187,7 +204,19 @@ private data class ProtonMsg(
   val from: String,
   val subject: String,
   val date: String,
-  val text: String?,
+  var text: String?,
+  val addressId: String,
+)
+
+private data class MailboxPass(
+  val full: String,
+  val last31: String,
+)
+
+private data class UnlockedProtonKeys(
+  val userKeyCount: Int,
+  val addrKeyCount: Int,
+  val privateKeys: List<PGPPrivateKey>,
 )
 
 private class ProtonClient {
@@ -280,30 +309,368 @@ private class ProtonClient {
     return ProtonSession(uid, token, refresh)
   }
 
-
-  fun listMessages(session: ProtonSession, sinceIso: String?, limit: Int): List<ProtonMsg> {
-    val url = "$api/mail/v4/messages?Page=0&PageSize=$limit&LabelID=0"
-    val json = getJson(url, session)
-    val arr = json.optJSONArray("Messages") ?: return emptyList()
+  fun listMessages(
+    session: ProtonSession,
+    sinceIso: String?,
+    limit: Int,
+    password: String?,
+  ): List<ProtonMsg> {
+    ensureBc()
+    val cap = limit.coerceIn(1, 500)
+    val pageSize = minOf(cap, 150)
+    val labelId = "15"
     val out = mutableListOf<ProtonMsg>()
     val sinceMs = sinceIso?.let { parseIsoMs(it) }
-    for (i in 0 until arr.length()) {
-      val m = arr.getJSONObject(i)
-      val time = m.optLong("Time") * 1000
-      if (sinceMs != null && time <= sinceMs) continue
-      val sender = m.optJSONObject("Sender")
-      val from = sender?.optString("Address") ?: sender?.optString("Name") ?: ""
-      out.add(
-        ProtonMsg(
-          id = m.optString("ID"),
-          from = from,
-          subject = m.optString("Subject"),
-          date = java.time.Instant.ofEpochMilli(if (time > 0) time else System.currentTimeMillis()).toString(),
-          text = null,
-        ),
-      )
+    var page = 0
+    var total = -1
+    var pages = 0
+    while (out.size < cap) {
+      var pageJson: JSONObject? = null
+      var staleTries = 0
+      while (staleTries < 5) {
+        val url = "$api/mail/v4/messages?Page=$page&PageSize=$pageSize&LabelID=$labelId"
+        val fetched = getJson(url, session)
+        pageJson = fetched
+        staleTries += 1
+        if (!jsonTruthy(fetched, "Stale")) break
+      }
+      val pageJsonSafe = pageJson ?: break
+      pages += 1
+      if (total < 0) total = pageJsonSafe.optInt("Total", -1)
+      val arr = pageJsonSafe.optJSONArray("Messages") ?: break
+      if (arr.length() == 0) break
+      for (i in 0 until arr.length()) {
+        if (out.size >= cap) break
+        val m = arr.getJSONObject(i)
+        val time = m.optLong("Time") * 1000
+        if (sinceMs != null && time <= sinceMs) continue
+        val sender = m.optJSONObject("Sender")
+        val from = sender?.optString("Address") ?: sender?.optString("Name") ?: ""
+        out.add(
+          ProtonMsg(
+            id = m.optString("ID"),
+            from = from,
+            subject = m.optString("Subject"),
+            date = java.time.Instant.ofEpochMilli(
+              if (time > 0) time else System.currentTimeMillis(),
+            ).toString(),
+            text = null,
+            addressId = m.optString("AddressID"),
+          ),
+        )
+      }
+      if (arr.length() < pageSize) break
+      if (total >= 0 && (page + 1) * pageSize >= total) break
+      page += 1
+    }
+    Log.i(
+      ProtonModule.TAG,
+      "Proton listed ${out.size} of $total label=$labelId pages=$pages",
+    )
+    logPatternCounts(out)
+    if (!password.isNullOrBlank()) {
+      decryptListedBodies(session, password, out)
     }
     return out
+  }
+
+  private fun decryptListedBodies(
+    session: ProtonSession,
+    password: String,
+    messages: MutableList<ProtonMsg>,
+  ) {
+    val unlocked = try {
+      unlockKeys(session, password)
+    } catch (e: Exception) {
+      Log.w(ProtonModule.TAG, "Proton unlock failed: ${e.message}")
+      Log.i(
+        ProtonModule.TAG,
+        "Proton unlocked userKeys=0 addrKeys=0 mode=fail",
+      )
+      Log.i(
+        ProtonModule.TAG,
+        "Proton decrypted 0 of ${messages.size} bodies fail=${messages.size}",
+      )
+      return
+    }
+    Log.i(
+      ProtonModule.TAG,
+      "Proton unlocked userKeys=${unlocked.userKeyCount} addrKeys=${unlocked.addrKeyCount} mode=one",
+    )
+    if (unlocked.privateKeys.isEmpty()) {
+      Log.i(
+        ProtonModule.TAG,
+        "Proton decrypted 0 of ${messages.size} bodies fail=${messages.size}",
+      )
+      return
+    }
+    var decrypted = 0
+    var fail = 0
+    var loggedFail = false
+    for (i in messages.indices) {
+      val msg = messages[i]
+      try {
+        val full = getJson("$api/mail/v4/messages/${msg.id}", session)
+        val message = full.optJSONObject("Message") ?: full
+        val body = message.optString("Body")
+        val text = decryptPgpMessage(body, unlocked.privateKeys)
+        if (text.isBlank()) {
+          fail += 1
+          continue
+        }
+        messages[i] = msg.copy(text = text)
+        decrypted += 1
+      } catch (e: Exception) {
+        fail += 1
+        if (!loggedFail) {
+          loggedFail = true
+          Log.w(ProtonModule.TAG, "Proton body decrypt failed: ${e.message}")
+        }
+      }
+    }
+    Log.i(
+      ProtonModule.TAG,
+      "Proton decrypted $decrypted of ${messages.size} bodies fail=$fail",
+    )
+  }
+
+  private fun unlockKeys(session: ProtonSession, password: String): UnlockedProtonKeys {
+    val userJson = getJson("$api/core/v4/users", session)
+    val user = userJson.optJSONObject("User") ?: userJson
+    val userKeys = user.optJSONArray("Keys") ?: JSONArray()
+    val addrJson = getJson("$api/core/v4/addresses", session)
+    val addresses = addrJson.optJSONArray("Addresses") ?: JSONArray()
+    val saltsJson = getJson("$api/core/v4/keys/salts", session)
+    val salts = saltsJson.optJSONArray("KeySalts") ?: JSONArray()
+
+    val sharedPasses = linkedSetOf<String>()
+    sharedPasses.add(password)
+    for (i in 0 until userKeys.length()) {
+      val keyId = userKeys.getJSONObject(i).optString("ID")
+      val pair = mailboxPassForKey(password, salts, keyId)
+      if (pair.last31.isNotEmpty()) sharedPasses.add(pair.last31)
+      if (pair.full.isNotEmpty()) sharedPasses.add(pair.full)
+    }
+
+    val userPriv = mutableListOf<PGPPrivateKey>()
+    var userCount = 0
+    for (i in 0 until userKeys.length()) {
+      val key = userKeys.getJSONObject(i)
+      if (key.has("Active") && !jsonTruthy(key, "Active")) continue
+      val armored = key.optString("PrivateKey")
+      val pair = mailboxPassForKey(password, salts, key.optString("ID"))
+      val tries = linkedSetOf<String>()
+      tries.addAll(sharedPasses)
+      if (pair.last31.isNotEmpty()) tries.add(pair.last31)
+      if (pair.full.isNotEmpty()) tries.add(pair.full)
+      val unlocked = unlockArmoredPrivateKey(armored, tries)
+      if (unlocked.isNotEmpty()) {
+        userCount += 1
+        userPriv.addAll(unlocked)
+      }
+    }
+    if (userCount == 0) {
+      Log.w(
+        ProtonModule.TAG,
+        "Proton could not unlock any user key (two-password mode or bad key pass)",
+      )
+    }
+
+    val allPriv = userPriv.toMutableList()
+    var addrCount = 0
+    for (a in 0 until addresses.length()) {
+      val addr = addresses.getJSONObject(a)
+      val keys = addr.optJSONArray("Keys") ?: continue
+      for (i in 0 until keys.length()) {
+        val key = keys.getJSONObject(i)
+        if (key.has("Active") && !jsonTruthy(key, "Active")) continue
+        val armored = key.optString("PrivateKey")
+        val token = key.optString("Token")
+        val tries = sharedPasses.toMutableSet()
+        if (token.isNotBlank() && userPriv.isNotEmpty()) {
+          try {
+            val tokenPass = decryptPgpMessage(token, userPriv)
+            if (tokenPass.isNotBlank()) tries.add(tokenPass)
+          } catch (e: Exception) {
+            Log.w(ProtonModule.TAG, "Proton address token unwrap failed: ${e.message}")
+          }
+        }
+        val unlocked = unlockArmoredPrivateKey(armored, tries)
+        if (unlocked.isNotEmpty()) {
+          addrCount += 1
+          allPriv.addAll(unlocked)
+        }
+      }
+    }
+    return UnlockedProtonKeys(userCount, addrCount, allPriv.distinctBy { it.keyID })
+  }
+
+  private fun mailboxPassForKey(
+    password: String,
+    salts: JSONArray,
+    keyId: String,
+  ): MailboxPass {
+    if (keyId.isBlank()) return MailboxPass("", "")
+    for (i in 0 until salts.length()) {
+      val salt = salts.getJSONObject(i)
+      if (salt.optString("ID") != keyId) continue
+      val keySaltB64 = salt.optString("KeySalt")
+      if (keySaltB64.isBlank()) return MailboxPass("", "")
+      val keySalt = try {
+        ProtonSrp.decodeB64(keySaltB64)
+      } catch (_: Exception) {
+        return MailboxPass("", "")
+      }
+      if (keySalt.size != 16) {
+        Log.w(ProtonModule.TAG, "Proton key salt is ${keySalt.size} bytes (need 16)")
+        return MailboxPass("", "")
+      }
+      return ProtonSrp.mailboxPassword(password, keySalt)
+    }
+    return MailboxPass("", "")
+  }
+
+  private fun unlockArmoredPrivateKey(
+    armored: String,
+    passphrases: Collection<String>,
+  ): List<PGPPrivateKey> {
+    if (armored.isBlank()) return emptyList()
+    val out = mutableListOf<PGPPrivateKey>()
+    val rings = secretKeyRings(armored)
+    val candidates = passphrases.toMutableList()
+    candidates.add("")
+    for (ring in rings) {
+      val keys = ring.secretKeys
+      while (keys.hasNext()) {
+        val secret = keys.next() as PGPSecretKey
+        var unlocked: PGPPrivateKey? = null
+        for (pass in candidates) {
+          try {
+            val decryptor = JcePBESecretKeyDecryptorBuilder(
+              JcaPGPDigestCalculatorProviderBuilder()
+                .setProvider(BouncyCastleProvider.PROVIDER_NAME)
+                .build(),
+            ).setProvider(BouncyCastleProvider.PROVIDER_NAME).build(pass.toCharArray())
+            unlocked = secret.extractPrivateKey(decryptor)
+            if (unlocked != null) break
+          } catch (_: Exception) {
+            // try next passphrase
+          }
+        }
+        if (unlocked != null) out.add(unlocked)
+      }
+    }
+    return out
+  }
+
+  private fun secretKeyRings(armored: String): List<PGPSecretKeyRing> {
+    val decoder = PGPUtil.getDecoderStream(
+      ByteArrayInputStream(armored.toByteArray(StandardCharsets.US_ASCII)),
+    )
+    val factory = PGPObjectFactory(decoder, JcaKeyFingerprintCalculator())
+    val out = mutableListOf<PGPSecretKeyRing>()
+    var obj = factory.nextObject()
+    while (obj != null) {
+      when (obj) {
+        is PGPSecretKeyRing -> out.add(obj)
+        is PGPSecretKeyRingCollection -> {
+          val rings = obj.keyRings
+          while (rings.hasNext()) {
+            val ring = rings.next()
+            if (ring is PGPSecretKeyRing) out.add(ring)
+          }
+        }
+      }
+      obj = factory.nextObject()
+    }
+    return out
+  }
+
+  private fun decryptPgpMessage(armoredOrRaw: String, keys: List<PGPPrivateKey>): String {
+    val raw = armoredOrRaw.trim()
+    if (raw.isEmpty() || keys.isEmpty()) {
+      throw IllegalStateException("empty ciphertext or no keys")
+    }
+    val inputBytes = if (raw.startsWith("-----BEGIN")) {
+      raw.toByteArray(StandardCharsets.US_ASCII)
+    } else {
+      try {
+        android.util.Base64.decode(raw, android.util.Base64.DEFAULT)
+      } catch (_: Exception) {
+        raw.toByteArray(StandardCharsets.UTF_8)
+      }
+    }
+    val decoder = PGPUtil.getDecoderStream(ByteArrayInputStream(inputBytes))
+    var factory = PGPObjectFactory(decoder, JcaKeyFingerprintCalculator())
+    var obj = factory.nextObject()
+    var encList: PGPEncryptedDataList? = null
+    while (obj != null) {
+      if (obj is PGPEncryptedDataList) {
+        encList = obj
+        break
+      }
+      obj = factory.nextObject()
+    }
+    if (encList == null) throw IllegalStateException("no encrypted data")
+    var encrypted: PGPPublicKeyEncryptedData? = null
+    var priv: PGPPrivateKey? = null
+    var clear: java.io.InputStream? = null
+    val packets = mutableListOf<PGPPublicKeyEncryptedData>()
+    val rawPackets = encList.encryptedDataObjects
+    while (rawPackets.hasNext()) {
+      val pked = rawPackets.next() as? PGPPublicKeyEncryptedData ?: continue
+      packets.add(pked)
+    }
+    fun open(pked: PGPPublicKeyEncryptedData, key: PGPPrivateKey): java.io.InputStream {
+      return pked.getDataStream(
+        JcePublicKeyDataDecryptorFactoryBuilder()
+          .setProvider(BouncyCastleProvider.PROVIDER_NAME)
+          .build(key),
+      )
+    }
+    for (pked in packets) {
+      val match = keys.firstOrNull { it.keyID == pked.keyID }
+      if (match != null) {
+        try {
+          clear = open(pked, match)
+          encrypted = pked
+          priv = match
+          break
+        } catch (_: Exception) {
+          // try next packet
+        }
+      }
+    }
+    if (clear == null) {
+      outer@ for (pked in packets) {
+        for (candidate in keys) {
+          try {
+            clear = open(pked, candidate)
+            encrypted = pked
+            priv = candidate
+            break@outer
+          } catch (_: Exception) {
+            // try next key
+          }
+        }
+      }
+    }
+    if (clear == null || encrypted == null || priv == null) {
+      throw IllegalStateException("no matching OpenPGP key")
+    }
+    factory = PGPObjectFactory(clear, JcaKeyFingerprintCalculator())
+    obj = factory.nextObject()
+    if (obj is PGPCompressedData) {
+      factory = PGPObjectFactory(obj.dataStream, JcaKeyFingerprintCalculator())
+      obj = factory.nextObject()
+    }
+    if (obj is PGPOnePassSignatureList) {
+      obj = factory.nextObject()
+    }
+    if (obj is PGPLiteralData) {
+      return obj.inputStream.readBytes().toString(StandardCharsets.UTF_8)
+    }
+    throw IllegalStateException("no literal data")
   }
 
   private fun stripModulus(modulus: String): String {
@@ -346,7 +713,6 @@ private class ProtonClient {
     OutputStreamWriter(conn.outputStream, StandardCharsets.UTF_8).use { it.write(body) }
     return read(conn)
   }
-
 
   private fun getJson(url: String, session: ProtonSession): JSONObject {
     val conn = (URL(url).openConnection() as HttpsURLConnection)
@@ -399,7 +765,6 @@ private class ProtonClient {
         }
         throw ProtonHvRequired(webUrl, hvToken, methods)
       }
-
       if (conn.responseCode == 401 || conn.responseCode == 422) {
         throw IllegalStateException(
           "Proton rejected the password or 2FA code (HTTP ${conn.responseCode}).",
@@ -407,7 +772,6 @@ private class ProtonClient {
       }
       throw IllegalStateException("Proton HTTP ${conn.responseCode}: $text")
     }
-
     return JSONObject(text)
   }
 }
@@ -430,9 +794,9 @@ private object ProtonSrp {
     serverEphemeralB64: String,
     version: Int,
   ): SrpProof {
-    val modulusBytes = b64(modulusB64)
-    val serverEphemeralBytes = b64(serverEphemeralB64)
-    val salt = b64(saltB64)
+    val modulusBytes = decodeB64(modulusB64)
+    val serverEphemeralBytes = decodeB64(serverEphemeralB64)
+    val salt = decodeB64(saltB64)
     val bitLength = modulusBytes.size * 8
     if (bitLength != 2048) {
       throw IllegalStateException("Proton SRP modulus size $bitLength is not 2048")
@@ -452,7 +816,6 @@ private object ProtonSrp {
         a = BigInteger(bitLength, random).mod(nMinusOne)
       } while (a < lower || a >= nMinusOne)
       clientEphemeral = fromInt(bitLength, g.modPow(a, n))
-
       u = toInt(expandHash(clientEphemeral + serverEphemeralBytes))
     } while (u == BigInteger.ZERO)
 
@@ -461,6 +824,42 @@ private object ProtonSrp {
     val shared = fromInt(bitLength, base.modPow(exponent, n))
     val clientProof = expandHash(clientEphemeral + serverEphemeralBytes + shared)
     return SrpProof(b64enc(clientEphemeral), b64enc(clientProof))
+  }
+
+  fun mailboxPassword(password: String, keySalt: ByteArray): MailboxPass {
+    val raw = BCrypt.with(BCrypt.Version.VERSION_2Y).hashRaw(
+      10,
+      keySalt,
+      password.toByteArray(StandardCharsets.UTF_8),
+    )
+    val hash23 = if (raw.rawHash.size > 23) raw.rawHash.copyOfRange(0, 23) else raw.rawHash
+    val crypted = (
+      "\$2y\$10\$" + goBcryptB64(keySalt) + goBcryptB64(hash23)
+    ).toByteArray(StandardCharsets.US_ASCII)
+    val full = String(crypted, StandardCharsets.US_ASCII)
+    val last31 = if (crypted.size >= 31) {
+      String(crypted.copyOfRange(crypted.size - 31, crypted.size), StandardCharsets.US_ASCII)
+    } else {
+      full
+    }
+    return MailboxPass(full, last31)
+  }
+
+  fun decodeB64(s: String): ByteArray {
+    val trimmed = s.trim()
+    val urlSafe =
+      android.util.Base64.URL_SAFE or
+        android.util.Base64.NO_WRAP or
+        android.util.Base64.NO_PADDING
+    return try {
+      android.util.Base64.decode(trimmed, android.util.Base64.DEFAULT)
+    } catch (_: IllegalArgumentException) {
+      try {
+        android.util.Base64.decode(trimmed, urlSafe)
+      } catch (_: IllegalArgumentException) {
+        throw IllegalStateException("Proton login data was not valid base64")
+      }
+    }
   }
 
   private fun hashPassword(
@@ -472,9 +871,6 @@ private object ProtonSrp {
     if (version < 3) {
       throw IllegalStateException("Proton auth version $version is not supported")
     }
-    // go-srp: encodedSalt = Go base64("./A-Za-z0-9") of (salt || "proton"), then
-    // bcrypt.HashBytes(password, "$2y$10$"+encodedSalt). Favre's hash() string uses
-    // OpenBSD bcrypt encoding; Proton uses Go's standard base64 bit packing.
     val saltWithProton = salt + "proton".toByteArray(StandardCharsets.US_ASCII)
     if (saltWithProton.size != 16) {
       throw IllegalStateException(
@@ -489,14 +885,10 @@ private object ProtonSrp {
     val hash23 = if (raw.rawHash.size > 23) raw.rawHash.copyOfRange(0, 23) else raw.rawHash
     val crypted = (
       "\$2y\$10\$" + goBcryptB64(saltWithProton) + goBcryptB64(hash23)
-      ).toByteArray(StandardCharsets.US_ASCII)
+    ).toByteArray(StandardCharsets.US_ASCII)
     return expandHash(crypted + modulus)
   }
 
-  /**
-   * Go encoding/base64 with alphabet ./A-Za-z0-9 and NoPadding.
-   * Not OpenBSD bcrypt encoding (different 6-bit packing).
-   */
   private fun goBcryptB64(data: ByteArray): String {
     val alphabet = "./ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
     val sb = StringBuilder()
@@ -516,7 +908,6 @@ private object ProtonSrp {
     return sb.toString()
   }
 
-
   private fun expandHash(data: ByteArray): ByteArray {
     val md = MessageDigest.getInstance("SHA-512")
     val out = ByteArray(256)
@@ -530,7 +921,6 @@ private object ProtonSrp {
     return out
   }
 
-  /** go-srp toInt: reverse bytes then interpret as big-endian integer. */
   private fun toInt(arr: ByteArray): BigInteger {
     val reversed = ByteArray(arr.size)
     for (i in arr.indices) {
@@ -539,7 +929,6 @@ private object ProtonSrp {
     return BigInteger(1, reversed)
   }
 
-  /** go-srp fromInt: big-endian bytes of num, reversed into bitLength/8 buffer. */
   private fun fromInt(bitLength: Int, num: BigInteger): ByteArray {
     val size = bitLength / 8
     val arr = num.toByteArray()
@@ -554,23 +943,6 @@ private object ProtonSrp {
     return reversed
   }
 
-  private fun b64(s: String): ByteArray {
-    val trimmed = s.trim()
-    val urlSafe =
-      android.util.Base64.URL_SAFE or
-        android.util.Base64.NO_WRAP or
-        android.util.Base64.NO_PADDING
-    return try {
-      android.util.Base64.decode(trimmed, android.util.Base64.DEFAULT)
-    } catch (_: IllegalArgumentException) {
-      try {
-        android.util.Base64.decode(trimmed, urlSafe)
-      } catch (_: IllegalArgumentException) {
-        throw IllegalStateException("Proton login data was not valid base64")
-      }
-    }
-  }
-
   private fun b64enc(b: ByteArray): String =
     android.util.Base64.encodeToString(b, android.util.Base64.NO_WRAP)
 }
@@ -581,4 +953,97 @@ private fun parseIsoMs(iso: String): Long {
   } catch (_: Exception) {
     0L
   }
+}
+
+private fun ensureBc() {
+  val existing = Security.getProvider(BouncyCastleProvider.PROVIDER_NAME)
+  if (existing is BouncyCastleProvider) return
+  if (existing != null) {
+    Security.removeProvider(BouncyCastleProvider.PROVIDER_NAME)
+  }
+  Security.insertProviderAt(BouncyCastleProvider(), 1)
+}
+
+private fun jsonTruthy(obj: JSONObject, key: String): Boolean {
+  if (!obj.has(key) || obj.isNull(key)) return false
+  return when (val v = obj.opt(key)) {
+    is Boolean -> v
+    is Number -> v.toInt() != 0
+    is String -> v == "1" || v.equals("true", ignoreCase = true)
+    else -> false
+  }
+}
+
+private val ACCOUNT_RE =
+  Regex(
+    """\b(welcome|registered|verify(?:\s+your)?\s+email|account\s+created|account\s+creation|new\s+account|confirm\s+your\s+(?:email|account)|thanks\s+for\s+(?:signing|joining)|you(?:'re| are) in|discover\s+the\s+power|secure\s+\w+\s+mailbox)\b""",
+    RegexOption.IGNORE_CASE,
+  )
+private val SECURITY_RE =
+  Regex(
+    """\b(password\s+reset|reset\s+your\s+password|login\s+alert|new\s+device|new\s+sign[- ]?in|two[- ]factor|2fa|verification\s+code|security\s+alert|suspicious\s+(?:login|activity))\b""",
+    RegexOption.IGNORE_CASE,
+  )
+private val RECURRING_RE =
+  Regex(
+    """\b(subscription|membership|renewal|renews|renewed|billed\s+(?:monthly|yearly|annually)|monthly\s+(?:plan|membership)|annual\s+(?:plan|membership)|your\s+prime\s+membership)\b""",
+    RegexOption.IGNORE_CASE,
+  )
+private val SPARSE_RE =
+  Regex(
+    """\b(invoice|usage|statement|in[- ]?app\s+purchase|\biap\b|order|receipt|one[- ]off|overage)\b""",
+    RegexOption.IGNORE_CASE,
+  )
+private val DROP_RE =
+  Regex(
+    """\b(newsletter|weekly\s+digest|shipping\s+(?:update|confirmation)|your\s+(?:package|order)\s+has\s+shipped|unsubscribe|digest)\b""",
+    RegexOption.IGNORE_CASE,
+  )
+private val OTP_ONLY_RE =
+  Regex(
+    """\b(one[- ]time\s+(?:pass(?:word|code)|code)|otp|verification\s+code|your\s+code\s+is)\b""",
+    RegexOption.IGNORE_CASE,
+  )
+
+private fun classifyProtonSubject(subject: String): String {
+  val s = subject.trim()
+  if (s.isEmpty()) return "emptySubject"
+  if (DROP_RE.containsMatchIn(s) && !RECURRING_RE.containsMatchIn(s)) return "drop"
+  if (
+    OTP_ONLY_RE.containsMatchIn(s) &&
+    !ACCOUNT_RE.containsMatchIn(s) &&
+    !SECURITY_RE.containsMatchIn(s) &&
+    !SPARSE_RE.containsMatchIn(s) &&
+    !RECURRING_RE.containsMatchIn(s)
+  ) {
+    return "drop"
+  }
+  if (RECURRING_RE.containsMatchIn(s)) return "recurring"
+  if (SPARSE_RE.containsMatchIn(s)) return "sparse"
+  if (SECURITY_RE.containsMatchIn(s)) return "security"
+  if (ACCOUNT_RE.containsMatchIn(s)) return "account"
+  return "drop"
+}
+
+private fun logPatternCounts(messages: List<ProtonMsg>) {
+  var recurring = 0
+  var sparse = 0
+  var account = 0
+  var security = 0
+  var drop = 0
+  var emptySubject = 0
+  for (m in messages) {
+    when (classifyProtonSubject(m.subject)) {
+      "recurring" -> recurring += 1
+      "sparse" -> sparse += 1
+      "account" -> account += 1
+      "security" -> security += 1
+      "emptySubject" -> emptySubject += 1
+      else -> drop += 1
+    }
+  }
+  Log.i(
+    ProtonModule.TAG,
+    "Proton patterns recurring=$recurring sparse=$sparse account=$account security=$security drop=$drop emptySubject=$emptySubject",
+  )
 }

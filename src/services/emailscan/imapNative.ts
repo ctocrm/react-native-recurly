@@ -79,6 +79,7 @@ interface NativeProton {
     accessToken: string,
     sinceIso: string | null,
     limit: number,
+    password: string,
   ): Promise<{
     messages: {
       messageId: string;
@@ -185,6 +186,7 @@ export function createProtonFetcher(
         session.accessToken,
         since?.date ?? null,
         limit,
+        creds.password,
       );
       return (listed.messages || []).map((m): NormalizedMessage => ({
         mailboxId,

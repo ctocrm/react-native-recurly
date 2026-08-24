@@ -13,6 +13,7 @@ const path = require("path");
 const SRC_DIR = path.join(__dirname, "android");
 const BCRYPT_DEP = 'implementation("at.favre.lib:bcrypt:0.10.2")';
 const BCPROV_DEP = 'implementation("org.bouncycastle:bcprov-jdk18on:1.78.1")';
+const BCPG_DEP = 'implementation("org.bouncycastle:bcpg-jdk18on:1.78.1")';
 
 function withMailImap(config) {
   config = withDangerousMod(config, [
@@ -56,13 +57,22 @@ function withMailImap(config) {
   });
 
   config = withAppBuildGradle(config, (cfg) => {
-    if (
-      cfg.modResults.language === "groovy" &&
-      !cfg.modResults.contents.includes("at.favre.lib:bcrypt")
-    ) {
+    if (cfg.modResults.language !== "groovy") {
+      return cfg;
+    }
+    if (!cfg.modResults.contents.includes("at.favre.lib:bcrypt")) {
       cfg.modResults.contents = cfg.modResults.contents.replace(
         /dependencies \{/,
-        `dependencies {\n    // Proton SRP bcrypt + Tuta Argon2id\n    ${BCRYPT_DEP}\n    ${BCPROV_DEP}`,
+        `dependencies {\n    // Proton SRP bcrypt + Tuta Argon2id + OpenPGP\n    ${BCRYPT_DEP}\n    ${BCPROV_DEP}\n    ${BCPG_DEP}`,
+      );
+    }
+    if (
+      !cfg.modResults.contents.includes("bcpg-jdk18on") &&
+      cfg.modResults.contents.includes("bcprov-jdk18on")
+    ) {
+      cfg.modResults.contents = cfg.modResults.contents.replace(
+        BCPROV_DEP,
+        `${BCPROV_DEP}\n    ${BCPG_DEP}`,
       );
     }
     return cfg;
