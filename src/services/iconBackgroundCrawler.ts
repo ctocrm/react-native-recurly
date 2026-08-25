@@ -252,13 +252,6 @@ function yieldToUi(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
-/** Wait without blocking JS until the shared bounded download worker is idle. */
-async function waitForQueueIdle(): Promise<void> {
-  while (isProcessingQueue) {
-    await sleep(100);
-  }
-}
-
 async function downloadImageAsBase64(
   url: string,
   source: string,
@@ -1353,10 +1346,9 @@ export async function processIconQueue(): Promise<void> {
         } catch (error) {
           console.error(`[QUEUE] Error:`, error);
         } finally {
-          // NOTE: intentionally do NOT clear the icon-loading flag here. The
-          // crawl-wide loading state is owned by startIconCrawl and cleared only
-          // when the whole crawl finishes, so the UI stays in "loading" until the
-          // crawl that started it is actually done.
+          // Searching… is owned by startIconCrawl for THIS iconKey's discovery
+          // + first batch. Do not clear it here; also do not keep it on for
+          // leftover shared-queue fetches of other brands.
           await dequeueIcon(item.icon_key);
         }
       }
@@ -1437,9 +1429,9 @@ export async function promoteFirstIconToCache(iconKey: string): Promise<void> {
 
 // Detached, persistent background crawler.
 // - Writes a durable record to the DB icon_crawl_queue (survives modal unmount).
-// - Flags the icon as "loading" in the global registry for the FULL crawl.
-// - Runs the actual discovery/fetch as a detached promise that is never awaited
-//   by any UI, so closing any modal cannot cancel it.
+// - Flags THIS iconKey as "loading" for discovery + the first fetch batch.
+//   Searching… must not wait on the shared leftover queue for other brands.
+// - Runs discovery as a detached promise never awaited by any UI.
 export type IconCrawlOptions = {
   officialDomain?: string | null;
 };
@@ -1473,22 +1465,16 @@ export async function startIconCrawl(
     detail: "Discovering icon sources",
   });
 
-  // Flag the icon as "loading" for the FULL crawl duration. This is the
-  // crawl-wide loading state — only startIconCrawl clears it, never the
-  // per-item completion inside processIconQueue.
+  // Searching… follows THIS iconKey's discovery + first fetch batch, not the
+  // shared leftover queue (other brands' Bing/pngkey drains).
   setIconLoading(iconKey, true);
 
   // Fire-and-forget background worker. Not awaited by any caller/modal.
   void (async () => {
     try {
-      // findIconUrls triggers background queue processing as it discovers URLs,
-      // so we only enqueue work here and let it run; promoteFirstIconToCache
-      // still runs to auto-assign the first fetched icon to the subscription.
+      // findIconUrls runs discovery and a small immediate fetch, then enqueues
+      // remaining URLs on the shared worker without awaiting that worker.
       const providerFailures = await findIconUrls(iconKey);
-      // `findIconUrls` deliberately starts the shared worker without awaiting
-      // it, so the UI can receive early icons. Completion, however, must only
-      // be reported after that worker has reached an idle terminal state.
-      await waitForQueueIdle();
       // Stale-cancellation: a newer crawl for this key owns publication now.
       if (!crawlGens.isCurrent(iconKey, gen)) return;
       await promoteFirstIconToCache(iconKey);
@@ -1528,8 +1514,9 @@ export async function startIconCrawl(
         detail: "Crawler failed; saved candidates can be retried",
       });
     } finally {
-      // Only clear the crawl-wide loading flag from here, never from the
-      // per-item completion in processIconQueue.
+      // Clear THIS key as soon as its discovery + first batch finished.
+      // Background queue may still fetch remaining candidates; picker reloads
+      // via notifyCacheUpdate. Do not wait on other keys' leftover URLs.
       setIconLoading(iconKey, false);
       activeCrawls.delete(iconKey);
     }
