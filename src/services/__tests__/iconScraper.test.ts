@@ -1,4 +1,10 @@
-import { generateAlternativeSlugs, nameToSlug } from "../iconScraper";
+import {
+  generateAlternativeSlugs,
+  isCrawlableSlug,
+  isLeftoverTypingSlug,
+  leftoverSlugSkipReason,
+  nameToSlug,
+} from "../iconScraper";
 
 describe("iconScraper (pure functions)", () => {
   describe("nameToSlug", () => {
@@ -81,6 +87,31 @@ describe("iconScraper (pure functions)", () => {
       // base: test-app-app
       // noSuffix: test (remove -app twice? Actually removes -(app|io|tv|ai|hq|tech|pro|me)$/i and then -(com|net|org)$/i. It removes one at a time? The code does two separate replaces, so it might remove both? We'll just expect no duplicates.
       expect(alternatives).toEqual([...new Set(alternatives)]);
+    });
+  });
+
+  describe("isLeftoverTypingSlug", () => {
+    it("refuses crumbs shorter than 3 chars", () => {
+      expect(isLeftoverTypingSlug("")).toBe(true);
+      expect(isLeftoverTypingSlug("ne")).toBe(true);
+      expect(leftoverSlugSkipReason("ne")).toContain("need 3+ chars");
+    });
+
+    it("refuses prefixes while typing Netflix / Spotify / Proton", () => {
+      expect(isLeftoverTypingSlug("net")).toBe(true);
+      expect(isLeftoverTypingSlug("netf")).toBe(true);
+      expect(isLeftoverTypingSlug("spo")).toBe(true);
+      expect(isLeftoverTypingSlug("pro")).toBe(true);
+      expect(leftoverSlugSkipReason("net")).toBe("prefix of known brand");
+      expect(isCrawlableSlug("net")).toBe(false);
+    });
+
+    it("allows the finished brand and unrelated 3+ letter slugs", () => {
+      expect(isLeftoverTypingSlug("netflix")).toBe(false);
+      expect(isLeftoverTypingSlug("spotify")).toBe(false);
+      expect(isLeftoverTypingSlug("proton")).toBe(false);
+      expect(isLeftoverTypingSlug("linode")).toBe(false);
+      expect(isCrawlableSlug("netflix")).toBe(true);
     });
   });
 });

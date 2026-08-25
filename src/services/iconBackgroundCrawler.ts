@@ -42,7 +42,11 @@ import {
 } from "@/services/iconQuality";
 import { getReportsForIcon, hashImageData } from "@/services/iconReportService";
 import { officialHostsForBrand } from "@/services/domain/provenance";
-import { findAllIconSources, MIN_CRAWL_SLUG_LENGTH } from "@/services/iconScraper";
+import {
+  findAllIconSources,
+  isLeftoverTypingSlug,
+  leftoverSlugSkipReason,
+} from "@/services/iconScraper";
 import { mimeForFormat, upscaleIconIfSmall } from "@/services/iconUpscaler";
 import { isBase64IconValid, isPaintableCardIcon } from "@/services/iconValidation";
 import {
@@ -1373,6 +1377,9 @@ export async function processIconQueue(): Promise<void> {
 // Promote the best already-fetched *valid* crawl result to icon_cache so the
 // subscription card auto-assigns a non-empty icon without reopening any modal.
 export async function promoteFirstIconToCache(iconKey: string): Promise<void> {
+  if (isLeftoverTypingSlug(iconKey)) {
+    return;
+  }
   try {
     const cached = await getCachedIcon(iconKey);
     const cachedValid =
@@ -1448,9 +1455,9 @@ export async function startIconCrawl(
   subscriptionId?: string,
   options?: IconCrawlOptions,
 ): Promise<void> {
-  if (iconKey.length < MIN_CRAWL_SLUG_LENGTH) {
+  if (isLeftoverTypingSlug(iconKey)) {
     console.log(
-      `[CRAWL] skip leftover slug "${iconKey}" (need ${MIN_CRAWL_SLUG_LENGTH}+ chars)`,
+      `[CRAWL] skip leftover slug "${iconKey}" (${leftoverSlugSkipReason(iconKey)})`,
     );
     return;
   }

@@ -7,7 +7,7 @@ import {
   addCacheUpdateListener,
   isIconLoading,
 } from "@/services/iconLoadingRegistry";
-import { nameToSlug, MIN_CRAWL_SLUG_LENGTH } from "@/services/iconScraper";
+import { isCrawlableSlug, nameToSlug } from "@/services/iconScraper";
 import { isPaintableCardIcon } from "@/services/iconValidation";
 import clsx from "clsx";
 import dayjs from "dayjs";
@@ -94,7 +94,7 @@ const EditSubscriptionModal = ({
   useEffect(() => {
     const refreshLiveIcon = async () => {
       const key = liveKeyRef.current;
-      if (!key) {
+      if (!key || !isCrawlableSlug(key)) {
         setLiveIconUri(null);
         return;
       }
@@ -169,7 +169,7 @@ const EditSubscriptionModal = ({
       liveKeyRef.current = slug;
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
       debounceTimer.current = setTimeout(() => {
-        if (slug.length >= MIN_CRAWL_SLUG_LENGTH && !isIconLoading(slug)) {
+        if (isCrawlableSlug(slug) && !isIconLoading(slug)) {
           startIconCrawl(slug);
         }
       }, 600);
@@ -224,7 +224,7 @@ const EditSubscriptionModal = ({
     // Start a detached background crawl for the typed name. Runs independently
     // of this modal, so the icon keeps being discovered/auto-assigned.
     const slug = nameToSlug(name);
-    if (slug.length >= MIN_CRAWL_SLUG_LENGTH) startIconCrawl(slug, subscription.id);
+    if (isCrawlableSlug(slug)) startIconCrawl(slug, subscription.id);
 
     onSave(subscription.id, data);
     onClose();
