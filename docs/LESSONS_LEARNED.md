@@ -225,6 +225,16 @@ User: _"something happened with the icon crawling, think you restored a previous
 
 **Lesson:** compare crawler files to last-good before assuming a restore. A plus preview after crawl is often unpaintable SVG or over-strict validation, not a checkout of `063ac4b`. Do not put `expo-image` / `SmartIcon` on `SubscriptionCard`.
 
+### 3.9 Leftover-slug on device vs ranking rewrite (2026-08-25)
+
+User saw Bing junk on `net` while typing Netflix and assumed the crawler ranking was broken again.
+
+Evidence: leftover-slug was already in git (`6c47871`) but **not on the device**. The 06:33 Hop 3 APK (`6d54b0d`) still crawled leftover prefixes. After `adb install -r` of the leftover-slug APK on the **existing** `emulator-5554`, typed `ne`/`net` stayed plus and did not auto-assign Bing. The 5-brand long-press picker (Ace, typed Proton, Figma, Notion, Linode; extra scan Proton + Porkbun) showed brand-associated painted tiles only. Empty cream tiles were unpaintable SVGs (known Hop 4).
+
+A prior `--install` spawned a **second emulator** and killed package service (`Can't find service: package`). Wait for the existing device (`service check package`) and `adb -s emulator-5554 install -r`; do not launch another AVD.
+
+**Lesson:** install the leftover-slug APK before rewriting ranking/TIER 3. Do not start Hop 5 or checkout `063ac4b` / `3c10700` to “fix” a prefix that never landed on device.
+
 ---
 
 ## 4. Key Lessons

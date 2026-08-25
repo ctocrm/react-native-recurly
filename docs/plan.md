@@ -2,7 +2,7 @@
 
 **Last updated:** 2026-08-25
 
-**Status:** Phases **1–5.5 complete**. **MAJOR FIX (Tranches A–F) landed** but **crawler quality is still open** (hops 1–3 and 5 below; **Hop 4 proven** `2d0ba23` + `32521cb`). **UI Improvements Phase 0–3 complete** (`ba66478`, `e4e383e`, `77a83bb`, `913b08f`). **Home/Insights hops A–E proven on device** (`ff3f3b9`, `ed16b0f`, `30de520`, `a6e6774`, `b510a35`). **UI Phase 4 is still not complete:** H1 catalog leftovers, H2 IMAP socket, H3 HTTPS completeness, and live Gmail/Outlook connect remain. Proton/Tuta **have** imported live rows (H4/H5 code hops): Proton **$29.98**, Linode this-month **$93**, Porkbun **$47.74** yearly. Phase 5 graph is not started. Phase 6 remains later ship polish. Training frozen.
+**Status:** Phases **1–5.5 complete**. **MAJOR FIX (Tranches A–F) landed**. **Hop 3 leftover-slug + 5-brand picker proven** (`6d54b0d` + `6c47871`). **Hop 4 proven** (`2d0ba23` + `32521cb`). Hops **1–2 device gates** and **Hop 5** still open. **UI Improvements Phase 0–3 complete** (`ba66478`, `e4e383e`, `77a83bb`, `913b08f`). **Home/Insights hops A–E proven on device** (`ff3f3b9`, `ed16b0f`, `30de520`, `a6e6774`, `b510a35`). **UI Phase 4 is still not complete:** H1 catalog leftovers, H2 IMAP socket, H3 HTTPS completeness, and live Gmail/Outlook connect remain. Proton/Tuta **have** imported live rows (H4/H5 code hops): Proton **$29.98**, Linode this-month **$93**, Porkbun **$47.74** yearly. Phase 5 graph is not started. Phase 6 remains later ship polish. Training frozen.
 
 This is the living execution plan for app-side quality and reliability **without** retraining TFLite models. AI upscale strategy remains frozen in [`docs/AI_UPSCALING.md`](./AI_UPSCALING.md) (now under `docs/`).
 
@@ -31,7 +31,7 @@ This is the living execution plan for app-side quality and reliability **without
 | **4**   | DB split / schema hygiene                              | **Done**                              | same                                |
 | **5**   | Sync honesty                                           | **Done**                              | same                                |
 | **5.5** | Professional cleanup (artifacts, docs, structure)      | **Done**                              | complete                            |
-| **MF**  | Icon crawler → picker → upscale pipeline recovery      | **A–F landed; Hop 4 proven; hops 1–3 and 5 open** | full cross-layer gate every hop     |
+| **MF**  | Icon crawler → picker → upscale pipeline recovery      | **A–F landed; Hops 3–4 proven; hops 1–2 device + 5 open** | full cross-layer gate every hop     |
 | **UI**  | Post-Major-Fix UI improvements                         | **Phases 0–3 done; hops A–E done; Phase 4 NOT done** | skill loop after Phase 0            |
 | **6**   | Ship polish                                            | **After UI Improvements**             | full smoke + doc pass               |
 
@@ -775,7 +775,7 @@ Do not mark this section complete, unblock Phase 6, or describe the crawler as f
 
 ---
 
-## Icon crawl quality — hops 1–5 (open)
+## Icon crawl quality — hops 1–5 (1–2 device + 5 open; 3–4 proven)
 
 **Named outcome:** given a real subscription (scan-imported or typed), the crawler auto-assigns a **brand-correct** icon, rejects blank/transparent defaults, keeps random page images out of the picker, and still surfaces a useful set of *related* icons.
 
@@ -819,11 +819,24 @@ Distinguish crawler-owned cache vs user/AI-chosen cache. Re-run `pickBestIcon` a
 
 **Gate:** Proton and 4 other brands first show a progressive icon, then the card upgrades. A user-picked tile stays put.
 
-### Hop 3 — Close the random-image holes
+### Hop 3 — Close the random-image holes — **leftover-slug + picker gate proven on device (`6d54b0d` + `6c47871`)**
 
-`queueDirectFromLink` uses the TIER 3 provenance gate. OG / Twitter / generic JSON-LD `image` are not logos unless there is a real logo signal. Rank provenance before `scoreIconQuality`. Tighten `looksLikeDirectImage` / brand-token.
+`queueDirectFromLink` uses the TIER 3 provenance gate. OG / Twitter / generic JSON-LD `image` are not logos unless there is a real logo signal. Rank provenance before `scoreIconQuality`. Tighten `looksLikeDirectImage` / brand-token. Leftover typing prefixes (`ne` / `net` / `spo` / `pro`) are not crawlable (`6c47871`).
 
 **Gate:** Picker for 5 diverse brands shows brand-associated icons only.
+
+**Gate (device, 2026-08-25):** leftover-slug APK (`6c47871`, built 15:19) installed `-r` on existing `emulator-5554` (package `lastUpdateTime=15:22:34`). Do **not** launch a second emulator / `--install` while that device is up.
+
+- Create leftover-slug: typed `ne` stayed plus (no crawl). Typed `net` stayed plus after debounce; Netflix autocomplete only; **no Bing auto-assign**.
+- Long-press picker (not create auto-select). Painted tiles were brand-associated. Empty cream tiles are unpaintable SVGs (RN `Image`; known Hop 4). No Bing / OG / random photos on the asserted rows.
+  1. Ace Hardware — card red ACE; picker 52 icons; first visible tiles cream SVG plates.
+  2. Proton typed (Cloud $9.99) — purple P plus cream SVG plates; 33 icons.
+  3. Figma — Figma mark plus cream SVG plates; 63 icons.
+  4. Notion — brand cube only (1 icon).
+  5. Linode (uncommon, scan $93) — after Search Online: cream SVG + green cubes; `[CRAWL] startIconCrawl for linode`; simple-icons SVG + icons8 PNG.
+- Extra: scan Proton (Other $5) — purple P plus cream SVG plates (same collection as typed Proton). Porkbun (uncommon, scan $47.74) — after Search Online: cream SVG + coral/red mark; `[CRAWL] Auto-assigned best valid icon for porkbun (source=favicon)`.
+
+Ranking / TIER 3 / HTML extraction / `IMMEDIATE_FETCH_BATCH=2` / picker render / `SubscriptionCard` were **not** changed to “fix” leftover-slug. Card still uses RN `Image` (no `expo-image` / `SmartIcon`). Do not checkout `063ac4b` / `3c10700`.
 
 ### Hop 4 — Blank/transparent cannot become the default — **proven (`2d0ba23`, `32521cb`)**
 
@@ -834,7 +847,7 @@ Visible-pixel / empty checks past PNG (JPEG/WebP/GIF/ICO). Flat **near-white** p
 - `2d0ba23` then over-rejected monochrome PNGs and auto-assigned unpaintable SVGs, so create preview stayed plus until a later ICO (`No valid icons to auto-assign for netflix`). Crawler file was unchanged vs `210c908`.
 - `32521cb` x86_64 APK installed `-r`. Home Ace still red ACE. Typed `spotify` auto-selected green mark. Log: `[CRAWL] Auto-assigned best valid icon for spotify (source=icons8)`. `tsc` + `iconValidation` tests passed.
 
-Later hops still own leftover-slug crawls (`ac` / `ne` / `sp`) and junk provenance. Do not checkout `063ac4b` / `3c10700`.
+Leftover-slug crawls (`ac` / `ne` / `sp`) closed on device by `6c47871` (Hop 3 gate above). Do not checkout `063ac4b` / `3c10700`.
 
 ### Hop 5 — Yield, after precision is back
 
@@ -846,7 +859,7 @@ Only then raise `IMMEDIATE_FETCH_BATCH` carefully, or fetch more first-party/lib
 
 Wipe icon cache + crawl results for the test keys. Crawl at least 5 real, diverse names including Proton (scan **and** typed) and an uncommon company. Watch progressive results. Confirm brand-correct icons. Long-press the card icon. Check logs for official host, untrusted rejects, and rate limits.
 
-**Act next:** Hop 3 (provenance / leftover-slug junk). Do not start Hop 5 in the same turn. Do not restore `063ac4b`.
+**Act next:** Hop 1 or Hop 2 device gates (official domain / progressive upgrade). Do not start Hop 5 in the same turn. Do not restore `063ac4b`.
 
 ---
 
