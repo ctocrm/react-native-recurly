@@ -71,6 +71,11 @@ describe("iconScraper (pure functions)", () => {
       expect(alternatives).toContain("git");
     });
 
+    it("does not emit leftover 1–2 letter first parts", () => {
+      const alternatives = generateAlternativeSlugs("ac-hardware");
+      expect(alternatives).not.toContain("ac");
+    });
+
     it("deduplicates alternatives", () => {
       const alternatives = generateAlternativeSlugs("test-app-app");
       // base: test-app-app

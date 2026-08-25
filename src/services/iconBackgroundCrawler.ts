@@ -24,10 +24,10 @@ import {
   sanitizeOfficialHost,
 } from "@/services/domain/officialDomain";
 import {
-  classifyCandidate,
-  isTrustedProvenance,
-  officialHostsForBrand,
-} from "@/services/domain/provenance";
+  classifyTrustedCandidate,
+  isPublishableExtractedIcon,
+  looksLikeDirectImage,
+} from "@/services/iconCandidate";
 import { extractFavicon } from "@/services/faviconExtractor";
 import { extractIconsFromUrls } from "@/services/htmlIconExtractor";
 import {
@@ -41,7 +41,8 @@ import {
   sortUrlsByQuality,
 } from "@/services/iconQuality";
 import { getReportsForIcon, hashImageData } from "@/services/iconReportService";
-import { findAllIconSources } from "@/services/iconScraper";
+import { officialHostsForBrand } from "@/services/domain/provenance";
+import { findAllIconSources, MIN_CRAWL_SLUG_LENGTH } from "@/services/iconScraper";
 import { mimeForFormat, upscaleIconIfSmall } from "@/services/iconUpscaler";
 import { isBase64IconValid, isPaintableCardIcon } from "@/services/iconValidation";
 import {
@@ -579,6 +580,7 @@ export async function getIconCollection(iconKey: string): Promise<{
           originalWidth: b.originalWidth,
           originalHeight: b.originalHeight,
           imageDataLength: b.imageData?.length,
+          brand: iconKey,
         }) -
         scoreIconQuality({
           source: a.source,
@@ -587,6 +589,7 @@ export async function getIconCollection(iconKey: string): Promise<{
           originalWidth: a.originalWidth,
           originalHeight: a.originalHeight,
           imageDataLength: a.imageData?.length,
+          brand: iconKey,
         })
       );
     });
@@ -636,8 +639,9 @@ async function fetchInitialCandidates(
   iconKey: string,
   candidates: CrawlCandidate[],
   counts: CrawlCounts,
+  officialHost?: string | null,
 ): Promise<Set<string>> {
-  const immediate = sortUrlsByQuality(candidates).slice(
+  const immediate = sortUrlsByQuality(candidates, iconKey, officialHost).slice(
     0,
     IMMEDIATE_FETCH_BATCH,
   );
@@ -968,10 +972,12 @@ export async function findIconUrls(iconKey: string): Promise<number> {
   // Fetch curated/official candidates before unreliable web discovery. This
   // keeps maximum-search behavior without making first results wait on DDG,
   // Bing, Google, or a multi-page spider crawl.
+  const officialHostHint = [...officialHosts][0] ?? null;
   const immediatelyAttempted = await fetchInitialCandidates(
     iconKey,
     urlsToFetch,
     counts,
+    officialHostHint,
   );
 
   // TIER 3: Multi-engine image/dork search (direct logo URLs) + page links to spider
@@ -985,21 +991,6 @@ export async function findIconUrls(iconKey: string): Promise<number> {
   );
   const isSearchEngineHost = (u: string) =>
     /google\.|bing\.|duckduckgo\.|yandex\./i.test(u);
-
-  // Match peak-era (5b7c1a0) image gate: extension OR logo/icon token in URL.
-  const looksLikeDirectImage = (url: string): boolean => {
-    const lower = url.toLowerCase();
-    if (/\.(svg|png|jpg|jpeg|ico|webp|gif)(\?|#|$)/i.test(lower)) return true;
-    if (lower.includes("logo") || lower.includes("icon")) return true;
-    if (
-      /(?:^|[/?#_.=-])(favicon|brand|apple-touch|android-chrome)(?:$|[/?#_.=-])/i.test(
-        lower,
-      )
-    ) {
-      return true;
-    }
-    return false;
-  };
 
   const [searchResults, linkResults] = await Promise.all([
     searchAllSources(iconKey).catch((e) => {
@@ -1030,13 +1021,12 @@ export async function findIconUrls(iconKey: string): Promise<number> {
     if (existingUrls.has(result.url)) continue;
     if (isSearchEngineHost(result.url)) continue;
 
-    // Tranche D: gate publication on provenance. Arbitrary-domain images with no
-    // brand evidence (random pictures) are rejected even if they look like images.
-    if (
-      !isTrustedProvenance(
-        classifyCandidate(iconKey, officialHosts, result.url).prov,
-      )
-    ) {
+    const classified = classifyTrustedCandidate(
+      iconKey,
+      officialHosts,
+      result.url,
+    );
+    if (!classified.trusted) {
       untrustedRejected++;
       continue;
     }
@@ -1058,6 +1048,15 @@ export async function findIconUrls(iconKey: string): Promise<number> {
   const linkUrls: string[] = [];
   const queueDirectFromLink = async (linkUrl: string) => {
     if (existingUrls.has(linkUrl)) return;
+    const classified = classifyTrustedCandidate(
+      iconKey,
+      officialHosts,
+      linkUrl,
+    );
+    if (!classified.trusted) {
+      untrustedRejected++;
+      return;
+    }
     const fmt = detectUrlFormat(linkUrl);
     await saveCrawlResult(iconKey, "", "web_search", fmt, linkUrl);
     urlsToFetch.push({ url: linkUrl, source: "web_search", format: fmt });
@@ -1105,7 +1104,10 @@ export async function findIconUrls(iconKey: string): Promise<number> {
       const spideredIcons = await extractIconsFromUrls(uncrawledLinks, iconKey);
       console.log(`[SEARCH] SPIDER: Found ${spideredIcons.length} icon URLs`);
       for (const icon of spideredIcons.slice(0, MAX_SPIDERED_ICONS)) {
-        if (!existingUrls.has(icon.url)) {
+        if (
+          !existingUrls.has(icon.url) &&
+          isPublishableExtractedIcon(icon.url, icon.source)
+        ) {
           await saveCrawlResult(
             iconKey,
             "",
@@ -1138,6 +1140,8 @@ export async function findIconUrls(iconKey: string): Promise<number> {
   // High-quality sources first so the first batch is not all tiny favicons
   const orderedFetch = sortUrlsByQuality(
     urlsToFetch.filter((candidate) => !immediatelyAttempted.has(candidate.url)),
+    iconKey,
+    [...officialHosts][0] ?? null,
   );
   console.log(
     `[SEARCH] Immediately fetching ${orderedFetch.length} URLs (quality-ordered)`,
@@ -1269,6 +1273,7 @@ export async function processIconQueue(): Promise<void> {
                 (x): x is { url: string; source: string; format: string } =>
                   Boolean(x),
               ),
+            item.icon_key,
           );
 
           for (const c of candidates) {
@@ -1307,6 +1312,7 @@ export async function processIconQueue(): Promise<void> {
                 withData.map((r) => ({
                   ...r,
                   imageDataLength: r.imageData?.length,
+                  brand: item.icon_key,
                 })),
               )!;
               const bestUpscaled = await upscaleIconIfSmall(
@@ -1394,6 +1400,7 @@ export async function promoteFirstIconToCache(iconKey: string): Promise<void> {
       withData.map((r) => ({
         ...r,
         imageDataLength: r.imageData?.length,
+        brand: iconKey,
       })),
     )!;
     const bestUpscaled = await upscaleIconIfSmall(best.imageData, best.format);
@@ -1441,6 +1448,12 @@ export async function startIconCrawl(
   subscriptionId?: string,
   options?: IconCrawlOptions,
 ): Promise<void> {
+  if (iconKey.length < MIN_CRAWL_SLUG_LENGTH) {
+    console.log(
+      `[CRAWL] skip leftover slug "${iconKey}" (need ${MIN_CRAWL_SLUG_LENGTH}+ chars)`,
+    );
+    return;
+  }
   const seeded = options?.officialDomain
     ? sanitizeOfficialHost(options.officialDomain)
     : null;

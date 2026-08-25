@@ -78,12 +78,11 @@ export function classifyCandidate(
 
   const { compact, hyphenated } = normalizeBrand(brand);
   const dotted = hyphenated ? hyphenated.replace(/-/g, ".") : "";
+  const tokens = [compact, hyphenated, dotted].filter(
+    (t) => t && t.length >= 3,
+  );
   const lower = url.toLowerCase();
-  if (
-    (compact && lower.includes(compact)) ||
-    (hyphenated && lower.includes(hyphenated)) ||
-    (dotted && lower.includes(dotted))
-  ) {
+  if (tokens.some((token) => lower.includes(token))) {
     return { prov: "brand-token", reason: "url contains brand token" };
   }
 

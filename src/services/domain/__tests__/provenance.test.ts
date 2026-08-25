@@ -75,4 +75,14 @@ describe("provenance (Tranche C/D precision gating)", () => {
     );
     expect(r.prov).toBe("official");
   });
+
+  it("REJECTS leftover 1–2 letter slugs as brand-token evidence", () => {
+    const r = classifyCandidate(
+      "ne",
+      officialHostsForBrand("ne"),
+      "https://dotnet.microsoft.com/favicon.ico",
+    );
+    expect(r.prov).toBe("untrusted");
+    expect(isTrustedProvenance(r.prov)).toBe(false);
+  });
 });

@@ -10,7 +10,7 @@ import {
   addCacheUpdateListener,
   isIconLoading,
 } from "@/services/iconLoadingRegistry";
-import { nameToSlug } from "@/services/iconScraper";
+import { nameToSlug, MIN_CRAWL_SLUG_LENGTH } from "@/services/iconScraper";
 import { isPaintableCardIcon } from "@/services/iconValidation";
 import clsx from "clsx";
 import dayjs from "dayjs";
@@ -157,7 +157,7 @@ const CreateSubscriptionModal = ({
       liveKeyRef.current = slug;
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
       debounceTimer.current = setTimeout(() => {
-        if (slug.length >= 2 && !isIconLoading(slug)) {
+        if (slug.length >= MIN_CRAWL_SLUG_LENGTH && !isIconLoading(slug)) {
           startIconCrawl(slug);
         }
       }, 600);

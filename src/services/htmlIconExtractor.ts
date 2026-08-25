@@ -4,6 +4,8 @@
  * JSON-LD logos, Apple touch icons).
  */
 
+import { isPublishableExtractedIcon } from "@/services/iconCandidate";
+
 interface ExtractedIcon {
   url: string;
   format: "svg" | "png" | "ico" | "jpg" | "jpeg" | "webp";
@@ -36,6 +38,10 @@ async function fetchPage(url: string): Promise<string | null> {
   } finally {
     clearTimeout(timer);
   }
+}
+
+function shouldKeepExtracted(url: string, source: string): boolean {
+  return isPublishableExtractedIcon(url, source);
 }
 
 function detectImageFormat(url: string): ExtractedIcon["format"] {
@@ -209,7 +215,7 @@ function extractIconsFromHtml(html: string, pageUrl: string): ExtractedIcon[] {
     /<meta[^>]+(?:property|name)\s*=\s*["']og:image["'][^>]+content\s*=\s*["']([^"']+)["'][^>]*>/gi;
   while ((match = ogRegex.exec(html)) !== null) {
     const rawUrl = resolveUrl(match[1], pageUrl);
-    if (!seen.has(rawUrl)) {
+    if (!seen.has(rawUrl) && shouldKeepExtracted(rawUrl, "og_image")) {
       seen.add(rawUrl);
       icons.push({
         url: rawUrl,
@@ -223,7 +229,7 @@ function extractIconsFromHtml(html: string, pageUrl: string): ExtractedIcon[] {
     /<meta[^>]+content\s*=\s*["']([^"']+)["'][^>]+(?:property|name)\s*=\s*["']og:image["'][^>]*>/gi;
   while ((match = ogRevRegex.exec(html)) !== null) {
     const rawUrl = resolveUrl(match[1], pageUrl);
-    if (!seen.has(rawUrl)) {
+    if (!seen.has(rawUrl) && shouldKeepExtracted(rawUrl, "og_image")) {
       seen.add(rawUrl);
       icons.push({
         url: rawUrl,
@@ -238,7 +244,7 @@ function extractIconsFromHtml(html: string, pageUrl: string): ExtractedIcon[] {
     /<meta[^>]+(?:name|property)\s*=\s*["']twitter:image["'][^>]+content\s*=\s*["']([^"']+)["'][^>]*>/gi;
   while ((match = twitterRegex.exec(html)) !== null) {
     const rawUrl = resolveUrl(match[1], pageUrl);
-    if (!seen.has(rawUrl)) {
+    if (!seen.has(rawUrl) && shouldKeepExtracted(rawUrl, "twitter_image")) {
       seen.add(rawUrl);
       icons.push({
         url: rawUrl,
@@ -252,7 +258,7 @@ function extractIconsFromHtml(html: string, pageUrl: string): ExtractedIcon[] {
     /<meta[^>]+content\s*=\s*["']([^"']+)["'][^>]+(?:name|property)\s*=\s*["']twitter:image["'][^>]*>/gi;
   while ((match = twitterRevRegex.exec(html)) !== null) {
     const rawUrl = resolveUrl(match[1], pageUrl);
-    if (!seen.has(rawUrl)) {
+    if (!seen.has(rawUrl) && shouldKeepExtracted(rawUrl, "twitter_image")) {
       seen.add(rawUrl);
       icons.push({
         url: rawUrl,
@@ -303,7 +309,7 @@ function extractIconsFromHtml(html: string, pageUrl: string): ExtractedIcon[] {
         if (item.image) {
           if (typeof item.image === "string") {
             const rawUrl = resolveUrl(item.image, pageUrl);
-            if (!seen.has(rawUrl)) {
+            if (!seen.has(rawUrl) && shouldKeepExtracted(rawUrl, "jsonld_image")) {
               seen.add(rawUrl);
               icons.push({
                 url: rawUrl,
@@ -313,7 +319,7 @@ function extractIconsFromHtml(html: string, pageUrl: string): ExtractedIcon[] {
             }
           } else if (item.image.url) {
             const rawUrl = resolveUrl(item.image.url, pageUrl);
-            if (!seen.has(rawUrl)) {
+            if (!seen.has(rawUrl) && shouldKeepExtracted(rawUrl, "jsonld_image")) {
               seen.add(rawUrl);
               icons.push({
                 url: rawUrl,

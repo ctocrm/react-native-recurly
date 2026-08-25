@@ -7,7 +7,7 @@ import {
   addCacheUpdateListener,
   isIconLoading,
 } from "@/services/iconLoadingRegistry";
-import { nameToSlug } from "@/services/iconScraper";
+import { nameToSlug, MIN_CRAWL_SLUG_LENGTH } from "@/services/iconScraper";
 import { isPaintableCardIcon } from "@/services/iconValidation";
 import clsx from "clsx";
 import dayjs from "dayjs";
@@ -169,7 +169,7 @@ const EditSubscriptionModal = ({
       liveKeyRef.current = slug;
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
       debounceTimer.current = setTimeout(() => {
-        if (slug.length >= 2 && !isIconLoading(slug)) {
+        if (slug.length >= MIN_CRAWL_SLUG_LENGTH && !isIconLoading(slug)) {
           startIconCrawl(slug);
         }
       }, 600);
@@ -224,7 +224,7 @@ const EditSubscriptionModal = ({
     // Start a detached background crawl for the typed name. Runs independently
     // of this modal, so the icon keeps being discovered/auto-assigned.
     const slug = nameToSlug(name);
-    if (slug.length >= 2) startIconCrawl(slug, subscription.id);
+    if (slug.length >= MIN_CRAWL_SLUG_LENGTH) startIconCrawl(slug, subscription.id);
 
     onSave(subscription.id, data);
     onClose();
