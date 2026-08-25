@@ -5,11 +5,9 @@ import {
   formatSubscriptionDateTime,
 } from "@/lib/utils";
 import clsx from "clsx";
-import { Image } from "expo-image";
 import React, { useState } from "react";
-import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { ActivityIndicator, Image, Pressable, Text, View } from "react-native";
 import SubscriptionCardMenu from "./SubscriptionCardMenu";
-import { SmartIcon } from "./SmartIcon";
 
 interface SubscriptionCardProps {
   id: string;
@@ -73,7 +71,7 @@ const SubscriptionCard = ({
   onCyclePeriod,
 }: SubscriptionCardProps) => {
   const [menuVisible, setMenuVisible] = useState(false);
-  const { status: iconStatus, iconUri, format: iconFormat } = useCachedIcon(icon_key);
+  const { status: iconStatus, iconUri } = useCachedIcon(icon_key);
 
   // Determine which icon to display
   // Priority: cached web icon > static icon asset from subscription
@@ -90,19 +88,17 @@ const SubscriptionCard = ({
     // Cached icon from web crawl (take priority)
     if (iconStatus === "cached" && iconUri) {
       return (
-        <SmartIcon
-          uri={iconUri}
-          format={iconFormat}
+        <Image
+          source={{ uri: iconUri }}
           className="size-16 rounded-xl"
+          resizeMode="contain"
         />
       );
     }
 
     // No cached icon available - use the static icon asset
     // This is either the brand icon or the "plus" default icon set at creation time
-    return (
-      <Image source={icon} className="size-16 rounded-xl" contentFit="contain" />
-    );
+    return <Image source={icon} className="size-16 rounded-xl" />;
   };
 
   return (

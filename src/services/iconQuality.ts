@@ -1,17 +1,7 @@
 /**
- * Prefer first-party / library provenance, then larger / vector sources.
- * Visual quality never outranks an untrusted or social-share image.
+ * Prefer larger / vector sources over tiny favicons when choosing what to
+ * show on the card and what to fetch first. No training — app-only ranking.
  */
-
-import {
-  classifyCandidate,
-  officialHostsForBrand,
-  type Provenance,
-} from "@/services/domain/provenance";
-import {
-  isGenericSocialImage,
-  provenanceRank,
-} from "@/services/iconCandidate";
 
 export type IconQualityInput = {
   source: string;
@@ -21,30 +11,7 @@ export type IconQualityInput = {
   originalHeight?: number | null;
   /** base64 length as weak size proxy when dimensions unknown */
   imageDataLength?: number;
-  /** Optional crawl brand so provenance can be ranked first. */
-  brand?: string;
-  officialHost?: string | null;
 };
-
-function provenanceFor(icon: IconQualityInput): Provenance {
-  const url = icon.originalUrl || "";
-  if (!url) {
-    const src = (icon.source || "").toLowerCase();
-    if (
-      src === "simple-icons" ||
-      src === "devicons" ||
-      src === "tabler" ||
-      src === "boxicons" ||
-      src === "icons8"
-    ) {
-      return "library";
-    }
-    if (src.startsWith("official") || src.includes("apple")) return "official";
-    return "untrusted";
-  }
-  const hosts = officialHostsForBrand(icon.brand || "", icon.officialHost);
-  return classifyCandidate(icon.brand || "", hosts, url).prov;
-}
 
 /** Higher = better for display without AI upscale. */
 export function scoreIconQuality(icon: IconQualityInput): number {
@@ -52,14 +19,6 @@ export function scoreIconQuality(icon: IconQualityInput): number {
   const src = (icon.source || "").toLowerCase();
   const fmt = (icon.format || "").toLowerCase();
   const url = (icon.originalUrl || "").toLowerCase();
-
-  // Provenance first: official/library/brand-token beat visual quality.
-  score += provenanceRank(provenanceFor(icon)) * 2000;
-
-  // Social/share photos are not logos even on a first-party host.
-  if (isGenericSocialImage(url, src) && !src.includes("logo")) {
-    score -= 800;
-  }
 
   // Format: vector beats raster; ico is usually tiny
   if (fmt === "svg" || url.endsWith(".svg") || url.includes(".svg?")) {
@@ -87,13 +46,14 @@ export function scoreIconQuality(icon: IconQualityInput): number {
   if (src.includes("apple") || url.includes("apple-touch")) score += 350;
   if (url.includes("android-chrome") || url.includes("192x192") || url.includes("512x512"))
     score += 320;
-  if (src.includes("jsonld_logo") || (src.includes("logo") && !src.includes("jsonld_image"))) {
-    score += 180;
-  }
+  if (src.includes("og_image") || src.includes("og-image")) score += 200;
+  if (src.includes("twitter")) score += 150;
+  if (src.includes("jsonld") || src.includes("logo")) score += 180;
   if (src === "official_favicon" || src === "favicon") score += 20;
   if (src.startsWith("spider:")) {
+    // spider inherits inner source name after colon
     if (src.includes("apple")) score += 300;
-    else if (src.includes("jsonld_logo") || src.includes("logo")) score += 160;
+    else if (src.includes("og")) score += 180;
     else if (src.includes("favicon")) score += 10;
     else score += 50;
   }
