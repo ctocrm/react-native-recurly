@@ -11,12 +11,14 @@ import {
   isIconLoading,
 } from "@/services/iconLoadingRegistry";
 import { nameToSlug } from "@/services/iconScraper";
+import { mimeForFormat as mimeForCachedFormat } from "@/services/iconUpscaler";
+import { isBase64IconValid } from "@/services/iconValidation";
 import clsx from "clsx";
 import dayjs from "dayjs";
 import { usePostHog } from "posthog-react-native";
+import { Image } from "expo-image";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -76,18 +78,6 @@ const CreateSubscriptionModal = ({
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const liveKeyRef = useRef<string | null>(null);
 
-  // Helpers to map a cached icon format to a data URI
-  const mimeForFormat = (format: string): string => {
-    switch (format) {
-      case "svg":
-        return "image/svg+xml";
-      case "ico":
-        return "image/x-icon";
-      default:
-        return "image/png";
-    }
-  };
-
   // Reflect a freshly crawled icon into the live preview as soon as it lands.
   useEffect(() => {
     const refreshLiveIcon = async () => {
@@ -97,9 +87,13 @@ const CreateSubscriptionModal = ({
         return;
       }
       const cached = await getCachedIcon(key);
+      const valid =
+        !!cached?.imageData &&
+        !cached.imageData.startsWith("local_asset:") &&
+        isBase64IconValid(cached.imageData, cached.format);
       setLiveIconUri(
-        cached?.imageData
-          ? `data:${mimeForFormat(cached.format)};base64,${cached.imageData}`
+        valid
+          ? `data:${mimeForCachedFormat(cached!.format)};base64,${cached!.imageData}`
           : null,
       );
     };
@@ -148,8 +142,9 @@ const CreateSubscriptionModal = ({
 
       // Kick off background icon discovery the moment the user types.
       // Debounced so we don't spam the crawler on every keystroke.
+      // Ignore 1-char slugs (e.g. mid-word "S" from Stripe) — they pollute cache.
       const slug = nameToSlug(text);
-      liveKeyRef.current = slug;
+      liveKeyRef.current = slug.length >= 2 ? slug : null;
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
       debounceTimer.current = setTimeout(() => {
         if (slug.length >= 2 && !isIconLoading(slug)) {
@@ -269,9 +264,14 @@ const CreateSubscriptionModal = ({
                   <Image
                     source={{ uri: liveIconUri }}
                     className="size-16 rounded-lg"
+                    contentFit="contain"
                   />
                 ) : (
-                  <Image source={selectedIcon} className="size-16 rounded-lg" />
+                  <Image
+                    source={selectedIcon}
+                    className="size-16 rounded-lg"
+                    contentFit="contain"
+                  />
                 )}
               </View>
 

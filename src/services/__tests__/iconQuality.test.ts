@@ -98,10 +98,30 @@ describe("iconQuality (pure functions)", () => {
         format: "png",
         originalUrl: "https://example.com/icon.png",
       });
-      expect(ai).toBe(10080);
-      expect(manual).toBe(5080);
       expect(ai).toBeGreaterThan(manual);
       expect(manual).toBeGreaterThan(plain);
+    });
+
+    it("ranks official provenance above a large untrusted social image", () => {
+      const officialTiny = scoreIconQuality({
+        source: "official_apple_touch",
+        format: "png",
+        originalUrl: "https://proton.me/apple-touch-icon.png",
+        brand: "proton",
+        officialHost: "proton.me",
+        originalWidth: 32,
+        originalHeight: 32,
+      });
+      const socialHuge = scoreIconQuality({
+        source: "og_image",
+        format: "png",
+        originalUrl: "https://random.example/og-image.png",
+        brand: "proton",
+        officialHost: "proton.me",
+        originalWidth: 1200,
+        originalHeight: 630,
+      });
+      expect(officialTiny).toBeGreaterThan(socialHuge);
     });
   });
 

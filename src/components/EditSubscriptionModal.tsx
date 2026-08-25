@@ -8,13 +8,15 @@ import {
   isIconLoading,
 } from "@/services/iconLoadingRegistry";
 import { nameToSlug } from "@/services/iconScraper";
+import { mimeForFormat as mimeForCachedFormat } from "@/services/iconUpscaler";
+import { isBase64IconValid } from "@/services/iconValidation";
 import clsx from "clsx";
 import dayjs from "dayjs";
 import { usePostHog } from "posthog-react-native";
+import { Image } from "expo-image";
 import React, { useEffect, useRef, useState } from "react";
 import {
   FlatList,
-  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -79,17 +81,6 @@ const EditSubscriptionModal = ({
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const liveKeyRef = useRef<string | null>(null);
 
-  const mimeForFormat = (format: string): string => {
-    switch (format) {
-      case "svg":
-        return "image/svg+xml";
-      case "ico":
-        return "image/x-icon";
-      default:
-        return "image/png";
-    }
-  };
-
   useEffect(() => {
     const refreshLiveIcon = async () => {
       const key = liveKeyRef.current;
@@ -98,9 +89,13 @@ const EditSubscriptionModal = ({
         return;
       }
       const cached = await getCachedIcon(key);
+      const valid =
+        !!cached?.imageData &&
+        !cached.imageData.startsWith("local_asset:") &&
+        isBase64IconValid(cached.imageData, cached.format);
       setLiveIconUri(
-        cached?.imageData
-          ? `data:${mimeForFormat(cached.format)};base64,${cached.imageData}`
+        valid
+          ? `data:${mimeForCachedFormat(cached!.format)};base64,${cached!.imageData}`
           : null,
       );
     };
@@ -264,9 +259,14 @@ const EditSubscriptionModal = ({
                   <Image
                     source={{ uri: liveIconUri }}
                     className="size-16 rounded-lg"
+                    contentFit="contain"
                   />
                 ) : (
-                  <Image source={selectedIcon} className="size-16 rounded-lg" />
+                  <Image
+                    source={selectedIcon}
+                    className="size-16 rounded-lg"
+                    contentFit="contain"
+                  />
                 )}
               </View>
 

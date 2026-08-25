@@ -36,11 +36,11 @@ import {
 import { detectWhiteBg, removeWhiteBg } from "@/services/whiteBgRemoval";
 import { usePostHog } from "posthog-react-native";
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { Image } from "expo-image";
 import {
   ActivityIndicator,
   Alert,
   FlatList,
-  Image,
   ImageSourcePropType,
   Modal,
   Pressable,
@@ -682,7 +682,7 @@ const SubscriptionIconPickerModal = ({
           <Image
             source={imageSource}
             className="size-12"
-            resizeMode="contain"
+            contentFit="contain"
           />
           {item.source === "ai_upscale" ? (
             <View className="absolute -right-1 -top-1 rounded bg-purple-600 px-1">

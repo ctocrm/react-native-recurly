@@ -23,11 +23,12 @@ import {
   officialSiteUrlForHost,
   sanitizeOfficialHost,
 } from "@/services/domain/officialDomain";
+import { officialHostsForBrand } from "@/services/domain/provenance";
 import {
-  classifyCandidate,
-  isTrustedProvenance,
-  officialHostsForBrand,
-} from "@/services/domain/provenance";
+  classifyTrustedCandidate,
+  isPublishableExtractedIcon,
+  looksLikeDirectImage,
+} from "@/services/iconCandidate";
 import { extractFavicon } from "@/services/faviconExtractor";
 import { extractIconsFromUrls } from "@/services/htmlIconExtractor";
 import {
@@ -80,7 +81,7 @@ const MAX_SPIDERED_URLS = ICON_CRAWL_POLICY.spideredPages;
 const MAX_SPIDERED_ICONS = ICON_CRAWL_POLICY.spideredIcons;
 const MAX_WEB_SEARCH_RESULTS = ICON_CRAWL_POLICY.webSearchResults;
 /** How many high-quality candidates to fetch before returning work to the queue. */
-const IMMEDIATE_FETCH_BATCH = 2;
+const IMMEDIATE_FETCH_BATCH = 6;
 /**
  * Each download includes base64 conversion, image validation, and database
  * writes. Keep this deliberately small so a crawl cannot monopolize the JS
@@ -993,21 +994,6 @@ export async function findIconUrls(iconKey: string): Promise<number> {
   const isSearchEngineHost = (u: string) =>
     /google\.|bing\.|duckduckgo\.|yandex\./i.test(u);
 
-  // Match peak-era (5b7c1a0) image gate: extension OR logo/icon token in URL.
-  const looksLikeDirectImage = (url: string): boolean => {
-    const lower = url.toLowerCase();
-    if (/\.(svg|png|jpg|jpeg|ico|webp|gif)(\?|#|$)/i.test(lower)) return true;
-    if (lower.includes("logo") || lower.includes("icon")) return true;
-    if (
-      /(?:^|[/?#_.=-])(favicon|brand|apple-touch|android-chrome)(?:$|[/?#_.=-])/i.test(
-        lower,
-      )
-    ) {
-      return true;
-    }
-    return false;
-  };
-
   const [searchResults, linkResults] = await Promise.all([
     searchAllSources(iconKey).catch((e) => {
       providerFailures++;
@@ -1037,13 +1023,12 @@ export async function findIconUrls(iconKey: string): Promise<number> {
     if (existingUrls.has(result.url)) continue;
     if (isSearchEngineHost(result.url)) continue;
 
-    // Tranche D: gate publication on provenance. Arbitrary-domain images with no
-    // brand evidence (random pictures) are rejected even if they look like images.
-    if (
-      !isTrustedProvenance(
-        classifyCandidate(iconKey, officialHosts, result.url).prov,
-      )
-    ) {
+    const classified = classifyTrustedCandidate(
+      iconKey,
+      officialHosts,
+      result.url,
+    );
+    if (!classified.trusted) {
       untrustedRejected++;
       continue;
     }
@@ -1065,6 +1050,15 @@ export async function findIconUrls(iconKey: string): Promise<number> {
   const linkUrls: string[] = [];
   const queueDirectFromLink = async (linkUrl: string) => {
     if (existingUrls.has(linkUrl)) return;
+    const classified = classifyTrustedCandidate(
+      iconKey,
+      officialHosts,
+      linkUrl,
+    );
+    if (!classified.trusted) {
+      untrustedRejected++;
+      return;
+    }
     const fmt = detectUrlFormat(linkUrl);
     await saveCrawlResult(iconKey, "", "web_search", fmt, linkUrl);
     urlsToFetch.push({ url: linkUrl, source: "web_search", format: fmt });
@@ -1112,22 +1106,25 @@ export async function findIconUrls(iconKey: string): Promise<number> {
       const spideredIcons = await extractIconsFromUrls(uncrawledLinks, iconKey);
       console.log(`[SEARCH] SPIDER: Found ${spideredIcons.length} icon URLs`);
       for (const icon of spideredIcons.slice(0, MAX_SPIDERED_ICONS)) {
-        if (!existingUrls.has(icon.url)) {
-          await saveCrawlResult(
-            iconKey,
-            "",
-            `spider:${icon.source}`,
-            icon.format,
-            icon.url,
-          );
-          urlsToFetch.push({
-            url: icon.url,
-            source: `spider:${icon.source}`,
-            format: icon.format,
-          });
-          existingUrls.add(icon.url);
-          counts.discovered++;
+        if (existingUrls.has(icon.url)) continue;
+        if (!isPublishableExtractedIcon(icon.url, icon.source)) {
+          untrustedRejected++;
+          continue;
         }
+        await saveCrawlResult(
+          iconKey,
+          "",
+          `spider:${icon.source}`,
+          icon.format,
+          icon.url,
+        );
+        urlsToFetch.push({
+          url: icon.url,
+          source: `spider:${icon.source}`,
+          format: icon.format,
+        });
+        existingUrls.add(icon.url);
+        counts.discovered++;
       }
     }
   }

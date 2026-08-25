@@ -5,8 +5,9 @@ import {
   formatSubscriptionDateTime,
 } from "@/lib/utils";
 import clsx from "clsx";
+import { Image } from "expo-image";
 import React, { useState } from "react";
-import { ActivityIndicator, Image, Pressable, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import SubscriptionCardMenu from "./SubscriptionCardMenu";
 
 interface SubscriptionCardProps {
@@ -91,14 +92,16 @@ const SubscriptionCard = ({
         <Image
           source={{ uri: iconUri }}
           className="size-16 rounded-xl"
-          resizeMode="contain"
+          contentFit="contain"
         />
       );
     }
 
     // No cached icon available - use the static icon asset
     // This is either the brand icon or the "plus" default icon set at creation time
-    return <Image source={icon} className="size-16 rounded-xl" />;
+    return (
+      <Image source={icon} className="size-16 rounded-xl" contentFit="contain" />
+    );
   };
 
   return (
