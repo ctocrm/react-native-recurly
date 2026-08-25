@@ -10,7 +10,7 @@ import {
   isIconLoading,
 } from "@/services/iconLoadingRegistry";
 import { mimeForFormat, upscaleIconIfSmall } from "@/services/iconUpscaler";
-import { isBase64IconValid } from "@/services/iconValidation";
+import { isPaintableCardIcon } from "@/services/iconValidation";
 
 export type IconStatus =
   "placeholder" | "loading" | "cached" | "error" | "no_icon";
@@ -49,8 +49,8 @@ export function useCachedIcon(iconKey: string | undefined): IconState {
         if (cached.imageData.startsWith("local_asset:")) {
           setIconUri(null);
           setFormat(null);
-        } else if (!isBase64IconValid(cached.imageData, cached.format)) {
-          // Invalid/blank cache stays healable by hop 2; do not paint it.
+        } else if (!isPaintableCardIcon(cached.imageData, cached.format)) {
+          // Invalid/blank/SVG cache stays healable by hop 2; do not paint it.
           setIconUri(null);
           setFormat(null);
         } else {
@@ -110,7 +110,7 @@ export function useCachedIcon(iconKey: string | undefined): IconState {
         if (cached.imageData.startsWith("local_asset:")) {
           setIconUri(null);
           setFormat(null);
-        } else if (!isBase64IconValid(cached.imageData, cached.format)) {
+        } else if (!isPaintableCardIcon(cached.imageData, cached.format)) {
           setIconUri(null);
           setFormat(null);
         } else {

@@ -21,8 +21,8 @@ const MIN_VISIBLE_ALPHA_RATIO = 0.01;
 
 // Alpha above this counts as "visible" (not fully transparent).
 const VISIBLE_ALPHA_THRESHOLD = 12;
-const MIN_DISTINCT_COLORS = 4;
 const UNIFORM_LUMA_SPREAD = 8;
+const NEAR_WHITE_LUMA = 230;
 
 /**
  * Read width/height from a PNG IHDR (bytes 16-24) synchronously.
@@ -53,16 +53,15 @@ function decodeBase64ToBytes(base64: string): Uint8Array | null {
   }
 }
 
-function sampleDistinctAndLuma(
+function sampleVisiblePixels(
   rgba: Uint8Array,
   w: number,
   h: number,
-): { visibleRatio: number; distinct: number; lumaSpread: number } {
+): { visibleRatio: number; minLuma: number; maxLuma: number } {
   const totalPixels = w * h;
   const step = Math.max(1, Math.floor(Math.sqrt(totalPixels) / 20));
   let sampled = 0;
   let visible = 0;
-  const colors = new Set<number>();
   let minLuma = 255;
   let maxLuma = 0;
   for (let y = 0; y < h; y += step) {
@@ -75,7 +74,6 @@ function sampleDistinctAndLuma(
       sampled++;
       if (a > VISIBLE_ALPHA_THRESHOLD) {
         visible++;
-        colors.add(((r >> 3) << 10) | ((g >> 3) << 5) | (b >> 3));
         const luma = (r * 299 + g * 587 + b * 114) / 1000;
         if (luma < minLuma) minLuma = luma;
         if (luma > maxLuma) maxLuma = luma;
@@ -84,8 +82,8 @@ function sampleDistinctAndLuma(
   }
   return {
     visibleRatio: sampled === 0 ? 0 : visible / sampled,
-    distinct: colors.size,
-    lumaSpread: maxLuma - minLuma,
+    minLuma,
+    maxLuma,
   };
 }
 
@@ -107,11 +105,13 @@ function pngHasVisiblePixels(bytes: Uint8Array): boolean {
     if (w < MIN_DIMENSION_PX || h < MIN_DIMENSION_PX) return false;
 
     const rgba = new Uint8Array(UPNG.toRGBA8(decoded)[0]);
-    const sample = sampleDistinctAndLuma(rgba, w, h);
+    const sample = sampleVisiblePixels(rgba, w, h);
     if (sample.visibleRatio < MIN_VISIBLE_ALPHA_RATIO) return false;
+    // Only refuse a flat cream/white plate. Monochrome brand marks
+    // (Netflix N, simple-icons) have few colors but real dark ink.
     if (
-      sample.distinct < MIN_DISTINCT_COLORS &&
-      sample.lumaSpread < UNIFORM_LUMA_SPREAD
+      sample.maxLuma - sample.minLuma < UNIFORM_LUMA_SPREAD &&
+      sample.minLuma > NEAR_WHITE_LUMA
     ) {
       return false;
     }
@@ -205,10 +205,6 @@ export function isBase64IconValid(base64: string, format: string): boolean {
     ) {
       return false;
     }
-    // Tiny chrome (hamburger, chevron, user-circle) is a real <path> but not a
-    // brand mark. RN Image also cannot paint SVG on the card, so auto-assign
-    // must not promote these as the default.
-    if (bytes.length < 1200) return false;
     return true;
   }
 
@@ -246,6 +242,16 @@ export function isBase64IconValid(base64: string, format: string): boolean {
   if (fmt === "ico") return icoHasContent(bytes);
 
   return true;
+}
+
+/**
+ * Card / create-preview default. RN Image cannot paint SVG, so a valid SVG
+ * must not become the auto-selected icon (picker can still list it).
+ */
+export function isPaintableCardIcon(base64: string, format: string): boolean {
+  const fmt = (format || "").toLowerCase();
+  if (fmt === "svg") return false;
+  return isBase64IconValid(base64, format);
 }
 
 /**

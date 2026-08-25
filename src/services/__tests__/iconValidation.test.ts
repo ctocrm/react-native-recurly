@@ -1,4 +1,4 @@
-import { isBase64IconValid } from "../iconValidation";
+import { isBase64IconValid, isPaintableCardIcon } from "../iconValidation";
 
 function btoaUtf8(text: string): string {
   return Buffer.from(text, "utf8").toString("base64");
@@ -16,20 +16,16 @@ describe("isBase64IconValid (hop 4)", () => {
     expect(isBase64IconValid("abcd", "png")).toBe(false);
   });
 
-  it("accepts substantial SVGs with drawing commands and rejects empty or chrome SVGs", () => {
-    const mark = '<path d="' + "M0 0h10v10H0z ".repeat(120) + '"/>';
+  it("accepts SVGs with drawing commands and rejects empty SVGs", () => {
     const good = btoaUtf8(
-      `<svg xmlns="http://www.w3.org/2000/svg">${mark}</svg>`,
+      '<svg xmlns="http://www.w3.org/2000/svg"><path d="M0 0h10v10H0z"/></svg>',
     );
     const empty = btoaUtf8(
       '<svg xmlns="http://www.w3.org/2000/svg"><g></g></svg>',
     );
-    const chrome = btoaUtf8(
-      '<svg xmlns="http://www.w3.org/2000/svg"><path d="M0 0h10v10H0z"/></svg>',
-    );
     expect(isBase64IconValid(good, "svg")).toBe(true);
     expect(isBase64IconValid(empty, "svg")).toBe(false);
-    expect(isBase64IconValid(chrome, "svg")).toBe(false);
+    expect(isPaintableCardIcon(good, "svg")).toBe(false);
   });
 
   it("rejects tiny/uniform JPEGs and undersized ICO headers", () => {

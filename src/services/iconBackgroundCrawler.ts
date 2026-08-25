@@ -43,7 +43,7 @@ import {
 import { getReportsForIcon, hashImageData } from "@/services/iconReportService";
 import { findAllIconSources } from "@/services/iconScraper";
 import { mimeForFormat, upscaleIconIfSmall } from "@/services/iconUpscaler";
-import { isBase64IconValid } from "@/services/iconValidation";
+import { isBase64IconValid, isPaintableCardIcon } from "@/services/iconValidation";
 import {
   isDomainRateLimited,
   recordRateLimit,
@@ -1300,7 +1300,7 @@ export async function processIconQueue(): Promise<void> {
           if (canAutoAssignCache(!!cached?.imageData, cachedValid, userChosen)) {
             const all = await getCrawlResults(item.icon_key);
             const withData = all.filter(
-              (r) => r.imageData && isBase64IconValid(r.imageData, r.format),
+              (r) => r.imageData && isPaintableCardIcon(r.imageData, r.format),
             );
             if (withData.length > 0) {
               const best = pickBestIcon(
@@ -1379,9 +1379,9 @@ export async function promoteFirstIconToCache(iconKey: string): Promise<void> {
     }
 
     const all = await getCrawlResults(iconKey);
-    // Never auto-assign empty / fully-transparent images to the card.
+    // Never auto-assign empty / fully-transparent / unpaintable SVG to the card.
     const withData = all.filter(
-      (r) => r.imageData && isBase64IconValid(r.imageData, r.format),
+      (r) => r.imageData && isPaintableCardIcon(r.imageData, r.format),
     );
     if (withData.length === 0) {
       console.log(

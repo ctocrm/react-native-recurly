@@ -8,7 +8,7 @@ import {
   isIconLoading,
 } from "@/services/iconLoadingRegistry";
 import { nameToSlug } from "@/services/iconScraper";
-import { isBase64IconValid } from "@/services/iconValidation";
+import { isPaintableCardIcon } from "@/services/iconValidation";
 import clsx from "clsx";
 import dayjs from "dayjs";
 import { usePostHog } from "posthog-react-native";
@@ -102,7 +102,7 @@ const EditSubscriptionModal = ({
       const valid =
         !!cached?.imageData &&
         !cached.imageData.startsWith("local_asset:") &&
-        isBase64IconValid(cached.imageData, cached.format);
+        isPaintableCardIcon(cached.imageData, cached.format);
       setLiveIconUri(
         valid
           ? `data:${mimeForFormat(cached!.format)};base64,${cached!.imageData}`
