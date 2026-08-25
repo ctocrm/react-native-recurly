@@ -1,6 +1,6 @@
 # Lessons Learned — jsmastery Project
 
-**Last updated:** 2026-08-23
+**Last updated:** 2026-08-25
   
 **Purpose:** Document every mistake made during the jsmastery development cycle so they are never repeated. This file is the single source of truth for what went wrong and why.
 
@@ -212,6 +212,19 @@ From GARBAGE_REPORT.md:
 
 `main`, `dev`, `feature-dev` (current), `fix/training-crash-and-quality`, `temp-fix` — unfinished recovery branches.
 
+### 3.8 Treating a blank card as a restored crawler (2026-08-25)
+
+User: _"something happened with the icon crawling, think you restored a previous bad shit. like we used to automatically select."_
+
+`git diff 210c908 HEAD -- src/services/iconBackgroundCrawler.ts` was empty. Last-good crawler (`7309add` + spinner `210c908`) was still on disk. Hop 4 (`2d0ba23`) had:
+
+1. treated monochrome logos (Netflix N, Icons8 PNG) as cream/white plates
+2. auto-assigned valid SVGs that RN `Image` cannot paint, so create preview stayed plus (`No valid icons to auto-assign for netflix` until a later ICO)
+
+`32521cb` restored auto-select by refusing only near-white plates and using `isPaintableCardIcon` for the card default. Device: typed Spotify auto-selected `icons8` PNG.
+
+**Lesson:** compare crawler files to last-good before assuming a restore. A plus preview after crawl is often unpaintable SVG or over-strict validation, not a checkout of `063ac4b`. Do not put `expo-image` / `SmartIcon` on `SubscriptionCard`.
+
 ---
 
 ## 4. Key Lessons
@@ -233,4 +246,5 @@ From GARBAGE_REPORT.md:
 15. **Verify the semantics and storage/discovery format of named product features before implementing them**
 16. **After a tool/infrastructure failure, diagnose and change mechanism instead of repeating the same call**
 17. **The user's named outcome is the only definition of done — a plan note or fail report is not the task**
+18. **A plus after crawl is not proof the crawler was restored — diff the crawler file; check SVG vs RN Image and over-strict validation**
 
