@@ -37,6 +37,7 @@ import { detectWhiteBg, removeWhiteBg } from "@/services/whiteBgRemoval";
 import { usePostHog } from "posthog-react-native";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Image } from "expo-image";
+import { SmartIcon } from "./SmartIcon";
 import {
   ActivityIndicator,
   Alert,
@@ -661,9 +662,6 @@ const SubscriptionIconPickerModal = ({
     const isLocalAsset = item.imageData.startsWith("local_asset:");
     // Build a safe data URI for non-local assets
     const dataUri = `data:image/${item.format === "svg" ? "svg+xml" : item.format};base64,${item.imageData}`;
-    const imageSource = isLocalAsset
-      ? (subscriptionIcon ?? icons.plus)
-      : { uri: dataUri };
 
     const isReported = !!item.reportedType;
     const detection = detections[item.id];
@@ -679,11 +677,19 @@ const SubscriptionIconPickerModal = ({
           className="relative size-16 items-center justify-center rounded-xl border-2 border-border bg-card"
           onPress={() => handleSelectIcon(item)}
         >
-          <Image
-            source={imageSource}
-            className="size-12"
-            contentFit="contain"
-          />
+          {isLocalAsset ? (
+            <Image
+              source={subscriptionIcon ?? icons.plus}
+              className="size-12"
+              contentFit="contain"
+            />
+          ) : (
+            <SmartIcon
+              uri={dataUri}
+              format={item.format}
+              className="size-12"
+            />
+          )}
           {item.source === "ai_upscale" ? (
             <View className="absolute -right-1 -top-1 rounded bg-purple-600 px-1">
               <Text className="text-[8px] font-sans-bold text-white">AI</Text>

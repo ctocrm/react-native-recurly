@@ -17,6 +17,7 @@ import clsx from "clsx";
 import dayjs from "dayjs";
 import { usePostHog } from "posthog-react-native";
 import { Image } from "expo-image";
+import { SmartIcon } from "./SmartIcon";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   KeyboardAvoidingView,
@@ -261,10 +262,9 @@ const CreateSubscriptionModal = ({
               {/* Logo preview — prefer the live web-discovered icon if found */}
               <View className="mb-2 items-center">
                 {liveIconUri ? (
-                  <Image
-                    source={{ uri: liveIconUri }}
+                  <SmartIcon
+                    uri={liveIconUri}
                     className="size-16 rounded-lg"
-                    contentFit="contain"
                   />
                 ) : (
                   <Image

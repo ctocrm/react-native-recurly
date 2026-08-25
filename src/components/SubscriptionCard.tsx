@@ -9,6 +9,7 @@ import { Image } from "expo-image";
 import React, { useState } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import SubscriptionCardMenu from "./SubscriptionCardMenu";
+import { SmartIcon } from "./SmartIcon";
 
 interface SubscriptionCardProps {
   id: string;
@@ -72,7 +73,7 @@ const SubscriptionCard = ({
   onCyclePeriod,
 }: SubscriptionCardProps) => {
   const [menuVisible, setMenuVisible] = useState(false);
-  const { status: iconStatus, iconUri } = useCachedIcon(icon_key);
+  const { status: iconStatus, iconUri, format: iconFormat } = useCachedIcon(icon_key);
 
   // Determine which icon to display
   // Priority: cached web icon > static icon asset from subscription
@@ -89,10 +90,10 @@ const SubscriptionCard = ({
     // Cached icon from web crawl (take priority)
     if (iconStatus === "cached" && iconUri) {
       return (
-        <Image
-          source={{ uri: iconUri }}
+        <SmartIcon
+          uri={iconUri}
+          format={iconFormat}
           className="size-16 rounded-xl"
-          contentFit="contain"
         />
       );
     }
