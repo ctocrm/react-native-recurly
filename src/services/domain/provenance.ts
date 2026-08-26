@@ -53,6 +53,23 @@ export function officialHostsForBrand(
   return hosts;
 }
 
+function pathnameOf(url: string): string {
+  try {
+    return new URL(url).pathname.toLowerCase();
+  } catch {
+    return "";
+  }
+}
+
+/** Token must appear as its own path/host segment, not inside a JWT or filename. */
+function hasBrandToken(haystack: string, token: string): boolean {
+  if (!token) return false;
+  const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(?:^|[^a-z0-9])${escaped}(?:$|[^a-z0-9])`, "i").test(
+    haystack,
+  );
+}
+
 function isLibraryHost(host: string): boolean {
   return LIBRARY_HOSTS.some((l) => host === l || host.endsWith(`.${l}`));
 }
@@ -81,8 +98,8 @@ export function classifyCandidate(
   const tokens = [compact, hyphenated, dotted].filter(
     (t) => t && t.length >= 3,
   );
-  const lower = url.toLowerCase();
-  if (tokens.some((token) => lower.includes(token))) {
+  const haystack = `${host} ${pathnameOf(url)}`.toLowerCase();
+  if (tokens.some((token) => hasBrandToken(haystack, token))) {
     return { prov: "brand-token", reason: "url contains brand token" };
   }
 

@@ -85,4 +85,17 @@ describe("provenance (Tranche C/D precision gating)", () => {
     expect(r.prov).toBe("untrusted");
     expect(isTrustedProvenance(r.prov)).toBe(false);
   });
+
+  it("REJECTS JWT/query substring matches for short brands like xai", () => {
+    const wallpaper =
+      "https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/e0429dbd-4be2-4c45-b523-03b3c07eaf8b/dh3a9nn-15390c33-f0ee-4708-b930-e9e20cb1b070.jpg?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9";
+    const r = classifyCandidate("xai", officialHostsForBrand("xai", "x.ai"), wallpaper);
+    expect(r.prov).toBe("untrusted");
+    const logo = classifyCandidate(
+      "xai",
+      officialHostsForBrand("xai", "x.ai"),
+      "https://cdn.example/logos/xai-logo.png",
+    );
+    expect(logo.prov).toBe("brand-token");
+  });
 });

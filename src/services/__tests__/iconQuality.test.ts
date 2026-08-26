@@ -145,6 +145,29 @@ describe("iconQuality (pure functions)", () => {
       });
       expect(officialIcon).toBeGreaterThan(newsOg);
     });
+
+    it("ranks official x.ai apple-touch above a huge Bing wallpaper", () => {
+      const official = scoreIconQuality({
+        source: "official_apple_touch",
+        format: "png",
+        originalUrl: "https://x.ai/apple-icon.png",
+        brand: "xai",
+        officialHost: "x.ai",
+        originalWidth: 180,
+        originalHeight: 180,
+      });
+      const bing = scoreIconQuality({
+        source: "bing_images",
+        format: "jpg",
+        originalUrl:
+          "https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/e0429dbd/yuji.jpg?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9",
+        brand: "xai",
+        officialHost: "x.ai",
+        originalWidth: 1920,
+        originalHeight: 1076,
+      });
+      expect(official).toBeGreaterThan(bing);
+    });
   });
 
   describe("pickBestIcon", () => {

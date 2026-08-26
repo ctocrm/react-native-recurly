@@ -1386,11 +1386,16 @@ export async function promoteFirstIconToCache(iconKey: string): Promise<void> {
       return;
     }
 
+    const session = await getIconCrawlSession(iconKey);
+    const officialHost = session?.officialDomain
+      ? sanitizeOfficialHost(session.officialDomain)
+      : officialHostFromCompoundSlug(iconKey);
     const best = pickBestIcon(
       withData.map((r) => ({
         ...r,
         imageDataLength: r.imageData?.length,
         brand: iconKey,
+        officialHost,
       })),
     )!;
     const bestUpscaled = await upscaleIconIfSmall(best.imageData, best.format);
