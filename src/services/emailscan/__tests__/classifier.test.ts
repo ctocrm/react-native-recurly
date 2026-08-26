@@ -34,7 +34,19 @@ describe("emailscan classifier (subject-first)", () => {
       merchantName: "Proton",
     });
     expect(merchantFromAddress("hello@linear.app").merchantKey).toBe("linear");
-    expect(merchantFromAddress("billing@x.ai").merchantKey).toBe("x");
+    expect(merchantFromAddress("billing@x.ai")).toEqual({
+      merchantKey: "xai",
+      merchantName: "xAI",
+    });
+    expect(merchantFromAddress("hello@ok.ai")).toEqual({
+      merchantKey: "okai",
+      merchantName: "okAI",
+    });
+    // 3-letter TLD stays the left label (`x.com` is not xCOM).
+    expect(merchantFromAddress("noreply@x.com")).toEqual({
+      merchantKey: "x",
+      merchantName: "X",
+    });
   });
 
   it("classifies the planned fixture subjects", () => {
@@ -377,5 +389,32 @@ describe("emailscan subject amounts + no fake $0", () => {
     expect(sub.priceUnknown).toBe(true);
     expect(sub.price).toBe(0);
     expect(sub.icon_key).toBe("proton");
+  });
+
+  it("names billing@x.ai as xAI and imports crawl key xai", () => {
+    const hit = classifyMessage({
+      mailboxId: "proton:david@picksandshovels.app",
+      messageId: "xai-invoice",
+      from: "xAI <billing@x.ai>",
+      subject: "Your invoice $20.00",
+      date: "2026-08-01T12:00:00.000Z",
+    });
+    expect(hit.merchantKey).toBe("xai");
+    expect(hit.merchantName).toBe("xAI");
+    expect(hit.officialDomain).toBe("x.ai");
+    const sub = candidateToSubscription({
+      mailboxId: hit.message.mailboxId,
+      merchantKey: hit.merchantKey,
+      merchant: hit.merchantName,
+      officialDomain: hit.officialDomain,
+      kind: "sparse",
+      amount: 20,
+      amountUnknown: false,
+      evidence: hit.evidence,
+      messageIds: [hit.message.messageId],
+      confidence: "high",
+    });
+    expect(sub.name).toBe("xAI");
+    expect(sub.icon_key).toBe("xai");
   });
 });

@@ -153,6 +153,28 @@ export function extractEmailAddress(from: string): string {
   return raw;
 }
 
+/**
+ * Two-label hosts with a 2-letter TLD whose `label.tld` is ≤5 chars
+ * (`x.ai`) keep the TLD in the display name so the crawl key is not a
+ * 1–2 letter leftover (`x` is skipped; `xai` is crawlable).
+ * `x.com` is excluded (3-letter TLD). `proton.me` is too long.
+ */
+function shortTwoLetterTldMerchant(domain: string): {
+  merchantKey: string;
+  merchantName: string;
+} | null {
+  const host = domain.replace(/^www\./, "").toLowerCase();
+  const parts = host.split(".").filter(Boolean);
+  if (parts.length !== 2) return null;
+  const [left, tld] = parts;
+  if (!left || tld.length !== 2) return null;
+  if (host.length > 5) return null;
+  return {
+    merchantKey: `${left}${tld}`,
+    merchantName: `${left}${tld.toUpperCase()}`,
+  };
+}
+
 export function merchantFromAddress(from: string): {
   merchantKey: string;
   merchantName: string;
@@ -160,6 +182,8 @@ export function merchantFromAddress(from: string): {
   const email = extractEmailAddress(from);
   const at = email.lastIndexOf("@");
   const domain = at >= 0 ? email.slice(at + 1) : email;
+  const short = shortTwoLetterTldMerchant(domain);
+  if (short) return short;
   const labels = domain.split(".").filter(Boolean);
   let label = "";
   for (let i = labels.length - 1; i >= 0; i -= 1) {
