@@ -84,8 +84,8 @@ const MAX_LIBRARY_CANDIDATES = ICON_CRAWL_POLICY.libraryCandidates;
 const MAX_SPIDERED_URLS = ICON_CRAWL_POLICY.spideredPages;
 const MAX_SPIDERED_ICONS = ICON_CRAWL_POLICY.spideredIcons;
 const MAX_WEB_SEARCH_RESULTS = ICON_CRAWL_POLICY.webSearchResults;
-/** How many high-quality candidates to fetch before returning work to the queue. */
-const IMMEDIATE_FETCH_BATCH = 2;
+/** How many high-quality first-party/library candidates to fetch before returning work to the queue. */
+const IMMEDIATE_FETCH_BATCH = 6;
 /**
  * Each download includes base64 conversion, image validation, and database
  * writes. Keep this deliberately small so a crawl cannot monopolize the JS
@@ -1156,7 +1156,7 @@ export async function findIconUrls(iconKey: string): Promise<number> {
     const immediate = orderedFetch.slice(0, IMMEDIATE_FETCH_BATCH);
     const rest = orderedFetch.slice(IMMEDIATE_FETCH_BATCH);
 
-    // Fetch only a couple of high-quality candidates right away. Each fetch
+    // Fetch a slightly larger first-party/library batch right away. Each fetch
     // performs CPU-heavy base64/image validation work, so unlimited parallelism
     // makes the app look frozen despite the network calls themselves being async.
     for (let i = 0; i < immediate.length; i += DOWNLOAD_CONCURRENCY) {
