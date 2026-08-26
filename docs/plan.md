@@ -1,8 +1,8 @@
 # Product plan — icons, crawl, DB, sync (no training)
 
-**Last updated:** 2026-08-25
+**Last updated:** 2026-08-26
 
-**Status:** Phases **1–5.5 complete**. **MAJOR FIX (Tranches A–F) landed**. **Icon hops 1–5 proven on device** (`466cde7`, `71a3840`, `6d54b0d`+`6c47871`, `2d0ba23`+`32521cb`, `5dc46ed`). **UI Improvements Phase 0–3 complete** (`ba66478`, `e4e383e`, `77a83bb`, `913b08f`). **Home/Insights hops A–E proven on device** (`ff3f3b9`, `ed16b0f`, `30de520`, `a6e6774`, `b510a35`). **UI Phase 4 is still not complete:** H1 catalog leftovers, H2 IMAP socket, H3 HTTPS completeness, and live Gmail/Outlook connect remain. Proton/Tuta **have** imported live rows (H4/H5 code hops): Proton **$29.98**, Linode this-month **$93**, Porkbun **$47.74** yearly. Phase 5 graph is not started. Phase 6 remains later ship polish. Training frozen.
+**Status:** Phases **1–5.5 complete**. **MAJOR FIX (Tranches A–F) landed**. **Icon hops 1–5 proven on device** (`466cde7`, `71a3840`, `6d54b0d`+`6c47871`, `2d0ba23`+`32521cb`, `5dc46ed`). **xAI compound-label hop proven** (`029c509`). **UI Improvements Phase 0–3 complete** (`ba66478`, `e4e383e`, `77a83bb`, `913b08f`). **Home/Insights hops A–E proven on device** (`ff3f3b9`, `ed16b0f`, `30de520`, `a6e6774`, `b510a35`). **UI Phase 4 is still not complete:** H1 catalog leftovers, H2 IMAP socket, H3 HTTPS completeness, and live Gmail/Outlook connect remain. Proton/Tuta **have** imported live rows (H4/H5 code hops): Proton **$29.98**, Linode this-month **$93**, Porkbun **$47.74** yearly. Phase 5 graph is not started. Phase 6 remains later ship polish. Training frozen.
 
 This is the living execution plan for app-side quality and reliability **without** retraining TFLite models. AI upscale strategy remains frozen in [`docs/AI_UPSCALING.md`](./AI_UPSCALING.md) (now under `docs/`).
 
@@ -859,7 +859,21 @@ Leftover-slug crawls (`ac` / `ne` / `sp`) closed on device by `6c47871` (Hop 3 g
 
 Wipe icon cache + crawl results for the test keys. Crawl at least 5 real, diverse names including Proton (scan **and** typed) and an uncommon company. Watch progressive results. Confirm brand-correct icons. Long-press the card icon. Check logs for official host, untrusted rejects, and rate limits.
 
-**Act next:** UI Phase 4 (H1 catalog leftovers, H2 IMAP socket, H3 HTTPS completeness, live Gmail/Outlook). Icon hops 1–5 are closed on this APK. Do not restore `063ac4b`.
+**Act next:** UI Phase 4 H1 catalog leftovers, then live Gmail/Outlook **only after** `EXPO_PUBLIC_GOOGLE_MAIL_CLIENT_ID` and `EXPO_PUBLIC_MICROSOFT_MAIL_CLIENT_ID` exist in `.env`. Icon hops 1–5 and the xAI compound-label hop are closed. Do not restore `063ac4b`. Do not start the `x.` social-exclusion hop — this crawl used `official=x.ai`, not Twitter.
+
+---
+
+## xAI compound-label hop — proven (`029c509`, 2026-08-26)
+
+**Named outcome:** Scan of `billing@x.ai` must display **xAI** (not **X**) and start icon crawl with slug `xai` / `official=x.ai`.
+
+**Cause:** `merchantFromAddress` took the left label only (`x`). `nameToSlug("X")` → `x`. `startIconCrawl` refuses slugs shorter than 3 chars, so the picker stayed empty.
+
+**Rule (user-locked):** two-label host, TLD exactly 2 letters, `label.tld` length ≤5 → display `label` + uppercased TLD, no dot. `x.ai` → **xAI** / `xai`. `ok.ai` → **okAI**. `x.com` stays **X** (3-letter TLD). `proton.me` stays Proton (host longer than 5).
+
+**Code:** `shortTwoLetterTldMerchant` in `classifier.ts`. `PARSER_VERSION` 10 → 11 so cached From-hosts reclassify. Classifier tests cover `x.ai` / `ok.ai` / `x.com`. Existing Home **X** rows do not auto-rename (`name::mailbox`); delete then Scan.
+
+**Gate (device, 2026-08-26):** `029c509` x86_64 release APK installed on `emulator-5554` (`lastUpdateTime=2026-08-26 00:05:15`). Deleted leftover Home **X**. Live Scan: “Added 1 subscription(s).” Card **xAI** sparse. Logs: `[CRAWL] startIconCrawl for xai (sub: 1787718296217; official=x.ai)`; TIER 0 seeded `https://x.ai`; `[CRAWL] Auto-assigned best valid icon for xai (source=official_site)` from `https://x.ai/images/news/grok-bot-more-plans-og.webp`. Long-press picker: **4 icons available**, first-party x.ai tiles (not Twitter). Social `x.` exclusion did not fire on this path.
 
 ---
 
@@ -1434,4 +1448,5 @@ Parked until a documented API exists. Do not implement as Connect-without-scan.
 | 2026-08-24 | **Hop 2 cache-ownership code landed.** `icon_cache.chosen` marks picker/AI rows. Crawler-owned cards may upgrade via `pickBestIcon` as better valid icons land. User/AI choices stay locked. Device gate still open. |
 | 2026-08-25 | **Hop 4 blank-refuse + paintable auto-select proven.** `2d0ba23` refused empty/invalid cache on card/previews (RN `Image` kept). Follow-up `32521cb`: cream-plate only for near-white; `isPaintableCardIcon` skips SVG as card default. Crawler still `210c908` (not `063ac4b`). Device: Ace ACE; typed Spotify auto-selected `icons8` PNG. Leftover slugs / Bing junk remain Hop 3. |
 | 2026-08-25 | **Icon hops 1–2 + 5 proven on `5dc46ed`.** x86_64 APK installed `-r` on existing `emulator-5554` (`lastUpdateTime=22:22:41`). Typed Linear: TIER 0 `linear.app`; first `official_favicon` then upgrade to `spider:apple_touch_icon`; picker 19 / 20 valid. Typed Proton: seeded `proton.me`; picker 33. Typed Ground News: TIER 0 `ground.news`. `IMMEDIATE_FETCH_BATCH=6`. Not `063ac4b`. Scan From-host seed not re-proven (Scan: no new rows). |
+| 2026-08-26 | **xAI compound-label hop proven (`029c509`).** Two-label 2-letter TLD hosts ≤5 chars keep TLD in the name (`x.ai` → **xAI** / `xai`; `x.com` stays **X**). `PARSER_VERSION` 11. Device: deleted leftover **X**, Scan added **xAI**; `[CRAWL] startIconCrawl for xai … official=x.ai`; auto-assigned `official_site` from `x.ai` (not Twitter); picker 4 first-party tiles. |
 
