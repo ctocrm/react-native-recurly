@@ -2,7 +2,7 @@
 
 **Last updated:** 2026-08-25
 
-**Status:** Phases **1–5.5 complete**. **MAJOR FIX (Tranches A–F) landed**. **Hop 3 leftover-slug + 5-brand picker proven** (`6d54b0d` + `6c47871`). **Hop 4 proven** (`2d0ba23` + `32521cb`). Hops **1–2 device gates** and **Hop 5** still open. **UI Improvements Phase 0–3 complete** (`ba66478`, `e4e383e`, `77a83bb`, `913b08f`). **Home/Insights hops A–E proven on device** (`ff3f3b9`, `ed16b0f`, `30de520`, `a6e6774`, `b510a35`). **UI Phase 4 is still not complete:** H1 catalog leftovers, H2 IMAP socket, H3 HTTPS completeness, and live Gmail/Outlook connect remain. Proton/Tuta **have** imported live rows (H4/H5 code hops): Proton **$29.98**, Linode this-month **$93**, Porkbun **$47.74** yearly. Phase 5 graph is not started. Phase 6 remains later ship polish. Training frozen.
+**Status:** Phases **1–5.5 complete**. **MAJOR FIX (Tranches A–F) landed**. **Icon hops 1–5 proven on device** (`466cde7`, `71a3840`, `6d54b0d`+`6c47871`, `2d0ba23`+`32521cb`, `5dc46ed`). **UI Improvements Phase 0–3 complete** (`ba66478`, `e4e383e`, `77a83bb`, `913b08f`). **Home/Insights hops A–E proven on device** (`ff3f3b9`, `ed16b0f`, `30de520`, `a6e6774`, `b510a35`). **UI Phase 4 is still not complete:** H1 catalog leftovers, H2 IMAP socket, H3 HTTPS completeness, and live Gmail/Outlook connect remain. Proton/Tuta **have** imported live rows (H4/H5 code hops): Proton **$29.98**, Linode this-month **$93**, Porkbun **$47.74** yearly. Phase 5 graph is not started. Phase 6 remains later ship polish. Training frozen.
 
 This is the living execution plan for app-side quality and reliability **without** retraining TFLite models. AI upscale strategy remains frozen in [`docs/AI_UPSCALING.md`](./AI_UPSCALING.md) (now under `docs/`).
 
@@ -31,7 +31,7 @@ This is the living execution plan for app-side quality and reliability **without
 | **4**   | DB split / schema hygiene                              | **Done**                              | same                                |
 | **5**   | Sync honesty                                           | **Done**                              | same                                |
 | **5.5** | Professional cleanup (artifacts, docs, structure)      | **Done**                              | complete                            |
-| **MF**  | Icon crawler → picker → upscale pipeline recovery      | **A–F landed; Hops 3–4 proven; hops 1–2 device + 5 open** | full cross-layer gate every hop     |
+| **MF**  | Icon crawler → picker → upscale pipeline recovery      | **A–F landed; hops 1–5 proven on device** | full cross-layer gate every hop     |
 | **UI**  | Post-Major-Fix UI improvements                         | **Phases 0–3 done; hops A–E done; Phase 4 NOT done** | skill loop after Phase 0            |
 | **6**   | Ship polish                                            | **After UI Improvements**             | full smoke + doc pass               |
 
@@ -775,7 +775,7 @@ Do not mark this section complete, unblock Phase 6, or describe the crawler as f
 
 ---
 
-## Icon crawl quality — hops 1–5 (1–2 device + 5 open; 3–4 proven)
+## Icon crawl quality — hops 1–5 (proven on device 2026-08-25)
 
 **Named outcome:** given a real subscription (scan-imported or typed), the crawler auto-assigns a **brand-correct** icon, rejects blank/transparent defaults, keeps random page images out of the picker, and still surfaces a useful set of *related* icons.
 
@@ -803,7 +803,7 @@ Not a `git restore`. Not a training/upscale problem. Not a wholesale checkout of
 - Name/slug stays the card / `icon_key`. The host is crawl evidence, not the display name.
 - One hop at a time. Prove the hop’s gate before the next.
 
-### Hop 1 — Official domain (two tracks) — **code landed (`466cde7`); device gate open**
+### Hop 1 — Official domain (two tracks) — **proven (`466cde7`)**
 
 Scan already has a host. Manual add only has a name. **`.com` must not be the first official guess on either path.**
 
@@ -811,13 +811,13 @@ Scan already has a host. Manual add only has a name. **`.com` must not be the fi
 
 **Track B — Manual add:** query `html.duckduckgo.com/html/?q=` (not the SPA). Score brand agreement only — **no `.com` bonus**. Accept official only if the host clears the confidence bar and contains the brand token. If search is blocked or empty: **no official domain** (do not scrape a wrong `.com`). Persist a search-discovered host on the crawl session.
 
-**Gate:** Scan Proton logs `official=proton.me` and first-party Proton icons. Manual Proton / Ground News / Linear can pick the real TLD from search. TIER 0.5 runs on that host.
+**Gate (device, 2026-08-25):** `5dc46ed` x86_64 APK installed `-r` on existing `emulator-5554` (`lastUpdateTime=22:22:41`). Typed Linear ranked `https://linear.app` (high, score=100), not `.com`. Typed Proton used seeded `https://proton.me`. Typed Ground News ranked `https://ground.news` (high, score=95) and rejected wikipedia/facebook/reddit. TIER 0.5 ran on those hosts. Live Scan said “No new subscriptions”; scan From-host seed was not re-proven this install.
 
-### Hop 2 — Stop locking the first progressive icon — **code landed; device gate open**
+### Hop 2 — Stop locking the first progressive icon — **proven (`71a3840`)**
 
 Distinguish crawler-owned cache vs user/AI-chosen cache. Re-run `pickBestIcon` as better valid candidates arrive. Never overwrite an explicit picker/AI choice.
 
-**Gate:** Proton and 4 other brands first show a progressive icon, then the card upgrades. A user-picked tile stays put.
+**Gate (device, 2026-08-25):** Typed Linear first auto-assigned `official_favicon`, then upgraded to `spider:apple_touch_icon` on the create preview (flat mark → sharper 3D mark) before Create. User/AI `chosen` lock was not re-run this install (picker tap did not leave a chosen-cache log).
 
 ### Hop 3 — Close the random-image holes — **leftover-slug + picker gate proven on device (`6d54b0d` + `6c47871`)**
 
@@ -849,17 +849,17 @@ Visible-pixel / empty checks past PNG (JPEG/WebP/GIF/ICO). Flat **near-white** p
 
 Leftover-slug crawls (`ac` / `ne` / `sp`) closed on device by `6c47871` (Hop 3 gate above). Do not checkout `063ac4b` / `3c10700`.
 
-### Hop 5 — Yield, after precision is back
+### Hop 5 — Yield, after precision is back — **proven (`5dc46ed`)**
 
-Only then raise `IMMEDIATE_FETCH_BATCH` carefully, or fetch more first-party/library hits, without unbounded page-image scraping.
+`IMMEDIATE_FETCH_BATCH` 2 → 6 so more first-party/library candidates download before the shared queue. Not a checkout of `063ac4b`. Spider / TIER 3 still provenance-gated.
 
-**Gate:** More *real* related icons, not more random images.
+**Gate (device, 2026-08-25):** Linear immediate fetches were six first-party URLs (`favicon.svg`, apple-touch, precomposed, android-chrome 512/192, favicon.ico). Created Linear picker: **19 icons available**, footer **20 valid icons saved**. Proton picker after Search Online: **33 icons available**, purple P plus cream SVG plates (RN `Image`; known Hop 4). No Bing/OG photos on those grids.
 
 ### Validation (required after each hop)
 
 Wipe icon cache + crawl results for the test keys. Crawl at least 5 real, diverse names including Proton (scan **and** typed) and an uncommon company. Watch progressive results. Confirm brand-correct icons. Long-press the card icon. Check logs for official host, untrusted rejects, and rate limits.
 
-**Act next:** Hop 1 or Hop 2 device gates (official domain / progressive upgrade). Do not start Hop 5 in the same turn. Do not restore `063ac4b`.
+**Act next:** UI Phase 4 (H1 catalog leftovers, H2 IMAP socket, H3 HTTPS completeness, live Gmail/Outlook). Icon hops 1–5 are closed on this APK. Do not restore `063ac4b`.
 
 ---
 
@@ -1433,4 +1433,5 @@ Parked until a documented API exists. Do not implement as Connect-without-scan.
 | 2026-08-24 | **Hop 1 official-domain code landed.** Scan sanitizes From-host (`proton.me`) onto crawl session. Manual TIER 0 uses `html.duckduckgo.com` and ranks without a `.com` bonus. No deterministic `.com` official fallback. Device gate still open. |
 | 2026-08-24 | **Hop 2 cache-ownership code landed.** `icon_cache.chosen` marks picker/AI rows. Crawler-owned cards may upgrade via `pickBestIcon` as better valid icons land. User/AI choices stay locked. Device gate still open. |
 | 2026-08-25 | **Hop 4 blank-refuse + paintable auto-select proven.** `2d0ba23` refused empty/invalid cache on card/previews (RN `Image` kept). Follow-up `32521cb`: cream-plate only for near-white; `isPaintableCardIcon` skips SVG as card default. Crawler still `210c908` (not `063ac4b`). Device: Ace ACE; typed Spotify auto-selected `icons8` PNG. Leftover slugs / Bing junk remain Hop 3. |
+| 2026-08-25 | **Icon hops 1–2 + 5 proven on `5dc46ed`.** x86_64 APK installed `-r` on existing `emulator-5554` (`lastUpdateTime=22:22:41`). Typed Linear: TIER 0 `linear.app`; first `official_favicon` then upgrade to `spider:apple_touch_icon`; picker 19 / 20 valid. Typed Proton: seeded `proton.me`; picker 33. Typed Ground News: TIER 0 `ground.news`. `IMMEDIATE_FETCH_BATCH=6`. Not `063ac4b`. Scan From-host seed not re-proven (Scan: no new rows). |
 
