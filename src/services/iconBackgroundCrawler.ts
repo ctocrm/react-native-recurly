@@ -20,6 +20,7 @@ import {
 } from "@/services/database";
 import { rankOfficialDomainCandidates } from "@/services/domain/domainDiscovery";
 import {
+  officialHostFromCompoundSlug,
   officialSiteUrlForHost,
   sanitizeOfficialHost,
 } from "@/services/domain/officialDomain";
@@ -732,10 +733,20 @@ export async function findIconUrls(iconKey: string): Promise<number> {
   const seededHost = sessionHint?.officialDomain
     ? sanitizeOfficialHost(sessionHint.officialDomain)
     : null;
+  const reconstructedHost = officialHostFromCompoundSlug(iconKey);
   if (seededHost) {
     officialSiteUrl = officialSiteUrlForHost(seededHost);
     officialHosts = officialHostsForBrand(iconKey, seededHost);
     console.log(`[SEARCH] TIER 0: Using seeded official site: ${officialSiteUrl}`);
+  } else if (reconstructedHost) {
+    officialSiteUrl = officialSiteUrlForHost(reconstructedHost);
+    officialHosts = officialHostsForBrand(iconKey, reconstructedHost);
+    await updateIconCrawlSession(iconKey, {
+      officialDomain: reconstructedHost,
+    });
+    console.log(
+      `[SEARCH] TIER 0: Reconstructed compound-label site: ${officialSiteUrl}`,
+    );
   } else {
     try {
       const ddgHtmlUrl = "https://html.duckduckgo.com";

@@ -95,6 +95,23 @@ export function sanitizeOfficialHost(rawHost: string): string | null {
   return host;
 }
 
+/**
+ * Inverse of emailscan shortTwoLetterTldMerchant (`x.ai` → `xai`).
+ * Only `ai` so ordinary slugs (`home`, `figma`) are not turned into hosts.
+ */
+const COMPOUND_SLUG_TLDS = new Set(["ai"]);
+
+export function officialHostFromCompoundSlug(slug: string): string | null {
+  const s = slug.toLowerCase().trim().replace(/[^a-z0-9]/g, "");
+  if (s.length < 3 || s.length > 5) return null;
+  const tld = s.slice(-2);
+  const left = s.slice(0, -2);
+  if (!left || !COMPOUND_SLUG_TLDS.has(tld)) return null;
+  const host = `${left}.${tld}`;
+  if (host.length > 5) return null;
+  return host;
+}
+
 export function officialDomainFromAddress(from: string): string | null {
   const angled = from.match(/<([^>]+)>/);
   const raw = (angled ? angled[1] : from).trim().toLowerCase();

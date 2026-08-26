@@ -1,5 +1,6 @@
 import {
   officialDomainFromAddress,
+  officialHostFromCompoundSlug,
   sanitizeOfficialHost,
 } from "../officialDomain";
 
@@ -27,5 +28,14 @@ describe("officialDomain (Hop 1 scan seed)", () => {
     expect(officialDomainFromAddress("GitHub <noreply@github.com>")).toBe(
       "github.com",
     );
+  });
+
+  it("reconstructs x.ai from crawl slug xai", () => {
+    expect(officialHostFromCompoundSlug("xai")).toBe("x.ai");
+    expect(officialHostFromCompoundSlug("okai")).toBe("ok.ai");
+    expect(officialHostFromCompoundSlug("proton")).toBeNull();
+    expect(officialHostFromCompoundSlug("home")).toBeNull();
+    expect(officialHostFromCompoundSlug("figma")).toBeNull();
+    expect(officialHostFromCompoundSlug("netflix")).toBeNull();
   });
 });
