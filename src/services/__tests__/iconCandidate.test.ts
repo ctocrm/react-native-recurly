@@ -51,6 +51,36 @@ describe("iconCandidate (hop 3 gates)", () => {
     );
   });
 
+  it("rejects first-party news/OG photos even when tagged official_site", () => {
+    expect(
+      isGenericSocialImage(
+        "https://x.ai/images/news/grok-bot-more-plans-og.webp",
+        "official_site",
+      ),
+    ).toBe(true);
+    expect(
+      isPublishableExtractedIcon(
+        "https://x.ai/images/news/grok-bot-more-plans-og.webp",
+        "official_site",
+      ),
+    ).toBe(false);
+    expect(
+      isPublishableExtractedIcon(
+        "https://x.ai/images/news/grok-bot-more-plans-og.webp 5120w",
+        "official_site",
+      ),
+    ).toBe(false);
+    expect(
+      isPublishableExtractedIcon("https://x.ai/icon.png", "favicon"),
+    ).toBe(true);
+    expect(
+      isPublishableExtractedIcon(
+        "https://x.ai/apple-icon.png",
+        "apple_touch_icon",
+      ),
+    ).toBe(true);
+  });
+
   it("rejects untrusted random-domain images and accepts brand-token URLs", () => {
     const hosts = officialHostsForBrand("netflix", "netflix.com");
     const random = classifyTrustedCandidate(

@@ -146,7 +146,7 @@ async function extractIconsFromManifest(
 /**
  * Extract all icon-related URLs from a page's HTML.
  */
-function extractIconsFromHtml(html: string, pageUrl: string): ExtractedIcon[] {
+export function extractIconsFromHtml(html: string, pageUrl: string): ExtractedIcon[] {
   const icons: ExtractedIcon[] = [];
   const seen = new Set<string>();
 

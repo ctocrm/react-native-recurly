@@ -123,6 +123,28 @@ describe("iconQuality (pure functions)", () => {
       });
       expect(officialTiny).toBeGreaterThan(socialHuge);
     });
+
+    it("ranks a first-party icon above a first-party news OG photo", () => {
+      const officialIcon = scoreIconQuality({
+        source: "official_favicon",
+        format: "png",
+        originalUrl: "https://x.ai/icon.png",
+        brand: "xai",
+        officialHost: "x.ai",
+        originalWidth: 512,
+        originalHeight: 512,
+      });
+      const newsOg = scoreIconQuality({
+        source: "official_site",
+        format: "webp",
+        originalUrl: "https://x.ai/images/news/grok-bot-more-plans-og.webp",
+        brand: "xai",
+        officialHost: "x.ai",
+        originalWidth: 1200,
+        originalHeight: 630,
+      });
+      expect(officialIcon).toBeGreaterThan(newsOg);
+    });
   });
 
   describe("pickBestIcon", () => {

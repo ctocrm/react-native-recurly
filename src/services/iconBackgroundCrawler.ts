@@ -29,7 +29,10 @@ import {
   looksLikeDirectImage,
 } from "@/services/iconCandidate";
 import { extractFavicon } from "@/services/faviconExtractor";
-import { extractIconsFromUrls } from "@/services/htmlIconExtractor";
+import {
+  extractIconsFromHtml,
+  extractIconsFromUrls,
+} from "@/services/htmlIconExtractor";
 import {
   notifyCacheUpdate,
   setIconCrawlProgress,
@@ -96,7 +99,7 @@ const DOWNLOAD_CONCURRENCY = 2;
 const MAX_ICON_DOWNLOAD_BYTES = 1_500_000;
 const BASE64_CONVERSION_CHUNK_BYTES = 8_192;
 const BASE64_CONVERSION_YIELD_BYTES = 65_536;
-/** Max <img> candidates from official homepage scrape. */
+/** Max icon candidates queued from official homepage HTML. */
 const MAX_OFFICIAL_SITE_IMGS = ICON_CRAWL_POLICY.officialSiteImages;
 
 type CrawlCandidate = { url: string; source: string; format: string };
@@ -855,63 +858,32 @@ export async function findIconUrls(iconKey: string): Promise<number> {
         });
         if (siteResponse.ok) {
           const siteHtml = await siteResponse.text();
-          // Find all image URLs on the site
-          const imgMatches =
-            siteHtml.match(
-              /<(?:img|source)[^>]+(?:src|srcset)=["']([^"']+\.(?:svg|png|jpg|jpeg|ico|webp)[^"']*)["'][^>]*>/gi,
-            ) ||
-            siteHtml.match(
-              /src=["']([^"']+\.(?:svg|png|jpg|jpeg|ico|webp))["']/gi,
-            ) ||
-            [];
-          // Tranche C: only keep <img> with a real logo/brand signal. Removes
-          // unconstrained generic page-image pollution (menu chrome, avatars).
-          const imgScore = (s: string) => {
-            const l = s.toLowerCase();
-            let n = 0;
-            if (l.includes("logo")) n += 5;
-            if (l.includes("icon") || l.includes("brand")) n += 3;
-            if (l.includes("apple-touch") || l.includes("512")) n += 2;
-            if (l.includes("avatar") || l.includes("hero")) n -= 2;
-            return n;
-          };
-          const ranked = [...imgMatches]
-            .filter((mm) => imgScore(mm) > 0)
-            .sort((a, b) => imgScore(b) - imgScore(a));
+          const extracted = extractIconsFromHtml(siteHtml, officialSiteUrl);
           let added = 0;
-          for (const match of ranked) {
+          for (const icon of extracted) {
             if (added >= MAX_OFFICIAL_SITE_IMGS) break;
-            const urlMatch =
-              match.match(/(?:src|srcset)=["']([^"'\s,]+)/i) ||
-              match.match(/src=["']([^"']+)["']/i);
-            if (!urlMatch) continue;
-            let imgUrl = urlMatch[1];
-            if (!imgUrl.startsWith("http")) {
-              try {
-                imgUrl = new URL(imgUrl, officialSiteUrl).toString();
-              } catch {
-                continue;
-              }
-            }
-            if (existingUrls.has(imgUrl)) continue;
-            await saveCrawlResult(
-              iconKey,
-              "",
-              "official_site",
-              detectUrlFormat(imgUrl),
-              imgUrl,
-            );
+            if (!isPublishableExtractedIcon(icon.url, icon.source)) continue;
+            if (existingUrls.has(icon.url)) continue;
+            const source =
+              icon.source === "favicon" || icon.source === "common_path"
+                ? "official_favicon"
+                : icon.source === "apple_touch_icon"
+                  ? "official_apple_touch"
+                  : icon.source === "web_manifest"
+                    ? "official_pwa"
+                    : `official_${icon.source}`;
+            await saveCrawlResult(iconKey, "", source, icon.format, icon.url);
             urlsToFetch.push({
-              url: imgUrl,
-              source: "official_site",
-              format: detectUrlFormat(imgUrl),
+              url: icon.url,
+              source,
+              format: icon.format,
             });
-            existingUrls.add(imgUrl);
+            existingUrls.add(icon.url);
             added++;
             counts.discovered++;
           }
           console.log(
-            `[SEARCH] TIER 0.5: Found ${imgMatches.length} imgs, queued ${added} on official site`,
+            `[SEARCH] TIER 0.5: Extracted ${extracted.length} icon URLs, queued ${added} on official site`,
           );
         }
       }

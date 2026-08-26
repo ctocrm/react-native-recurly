@@ -13,7 +13,7 @@ const IMAGE_EXT_RE = /\.(svg|png|jpg|jpeg|ico|webp|gif)(\?|#|$)/i;
 const LOGO_TOKEN_RE =
   /(?:^|[/?#_.=-])(logo|icon|favicon|brand|apple-touch|android-chrome|mask-icon)(?:$|[/?#_.=-])/i;
 const GENERIC_SOCIAL_RE =
-  /(?:og[-_]?image|twitter[-_]?image|opengraph|social[-_]?card|share[-_]?image|card[-_]?image)/i;
+  /(?:og[-_]?image|twitter[-_]?image|opengraph|social[-_]?card|share[-_]?image|card[-_]?image|[-_]og\.(?:webp|png|jpe?g)|\/images\/news\/)/i;
 const BRAND_LOGO_RE =
   /(?:^|[/?#_.=-])(logo|logomark|wordmark|brandmark|favicon|apple-touch|android-chrome|mask-icon)(?:$|[/?#_.=-])/i;
 
@@ -59,13 +59,16 @@ export function isSocialOrGenericImageSource(source: string): boolean {
   );
 }
 
-/** Drop OG/Twitter/generic JSON-LD image unless a real logo signal is present. */
+/** Drop OG/Twitter/generic JSON-LD image unless a real logo signal is present.
+ *  Also drop first-party news/share photos tagged official_site / img. */
 export function isPublishableExtractedIcon(
   url: string,
   source: string,
 ): boolean {
-  if (!isSocialOrGenericImageSource(source)) return true;
-  return hasLogoSignal(url, source);
+  if (hasLogoSignal(url, source)) return true;
+  if (isSocialOrGenericImageSource(source)) return false;
+  if (isGenericSocialImage(url, source)) return false;
+  return true;
 }
 
 export function classifyTrustedCandidate(
