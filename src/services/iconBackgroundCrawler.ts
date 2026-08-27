@@ -27,6 +27,7 @@ import {
 import {
   classifyTrustedCandidate,
   isPublishableExtractedIcon,
+  isUiChromeImage,
   looksLikeDirectImage,
 } from "@/services/iconCandidate";
 import { extractFavicon } from "@/services/faviconExtractor";
@@ -523,7 +524,8 @@ export async function getIconCollection(iconKey: string): Promise<{
     // Add cached icon to collection FIRST (upscale small raster icons on view)
     if (
       cached?.imageData &&
-      isBase64IconValid(cached.imageData, cached.format) &&
+      isPaintableCardIcon(cached.imageData, cached.format) &&
+      !isUiChromeImage(cached.originalUrl || "", cached.source) &&
       !reportedHashes.has(cached.imageData)
     ) {
       console.log(`[COLLECTION] Found cached icon for ${iconKey}`);
@@ -544,14 +546,29 @@ export async function getIconCollection(iconKey: string): Promise<{
       });
     }
 
+    const session = await getIconCrawlSession(iconKey);
+    const officialHost = session?.officialDomain
+      ? sanitizeOfficialHost(session.officialDomain)
+      : officialHostFromCompoundSlug(iconKey);
+    const officialHosts = officialHostsForBrand(iconKey, officialHost);
+
     // Add database crawl results to collection (only valid, non-reported images)
     for (const r of results) {
       if (
         r.imageData &&
         !iconMap.has(r.imageData) &&
-        isBase64IconValid(r.imageData, r.format) &&
+        isPaintableCardIcon(r.imageData, r.format) &&
+        !isUiChromeImage(r.originalUrl || "", r.source) &&
         !reportedHashes.has(r.imageData)
       ) {
+        if (r.originalUrl) {
+          const classified = classifyTrustedCandidate(
+            iconKey,
+            officialHosts,
+            r.originalUrl,
+          );
+          if (!classified.trusted) continue;
+        }
         const displayData = await upscaleIconIfSmall(r.imageData, r.format);
         iconMap.set(r.imageData, {
           id: hashImageData(r.imageData),
@@ -1295,11 +1312,16 @@ export async function processIconQueue(): Promise<void> {
               (r) => r.imageData && isPaintableCardIcon(r.imageData, r.format),
             );
             if (withData.length > 0) {
+              const session = await getIconCrawlSession(item.icon_key);
+              const officialHost = session?.officialDomain
+                ? sanitizeOfficialHost(session.officialDomain)
+                : officialHostFromCompoundSlug(item.icon_key);
               const best = pickBestIcon(
                 withData.map((r) => ({
                   ...r,
                   imageDataLength: r.imageData?.length,
                   brand: item.icon_key,
+                  officialHost,
                 })),
               )!;
               const bestUpscaled = await upscaleIconIfSmall(
@@ -1318,6 +1340,33 @@ export async function processIconQueue(): Promise<void> {
               ) {
                 console.log(
                   `[QUEUE] Best icon already cached for ${item.icon_key}`,
+                );
+              } else if (
+                cachedValid &&
+                cached &&
+                scoreIconQuality({
+                  source: best.source,
+                  format: bestUpscaled.format,
+                  originalUrl: best.originalUrl,
+                  originalWidth: best.originalWidth,
+                  originalHeight: best.originalHeight,
+                  imageDataLength: bestUpscaled.base64.length,
+                  brand: item.icon_key,
+                  officialHost,
+                }) <=
+                  scoreIconQuality({
+                    source: cached.source,
+                    format: cached.format,
+                    originalUrl: cached.originalUrl,
+                    originalWidth: cached.originalWidth,
+                    originalHeight: cached.originalHeight,
+                    imageDataLength: cached.imageData.length,
+                    brand: item.icon_key,
+                    officialHost,
+                  })
+              ) {
+                console.log(
+                  `[QUEUE] Skip downgrade for ${item.icon_key} (${best.source} not better than ${cached.source})`,
                 );
               } else {
                 await setCachedIcon(
@@ -1406,6 +1455,35 @@ export async function promoteFirstIconToCache(iconKey: string): Promise<void> {
       return;
     }
     if (cachedValid && cached?.imageData === bestUpscaled.base64) {
+      return;
+    }
+    if (
+      cachedValid &&
+      cached &&
+      scoreIconQuality({
+        source: best.source,
+        format: bestUpscaled.format,
+        originalUrl: best.originalUrl,
+        originalWidth: best.originalWidth,
+        originalHeight: best.originalHeight,
+        imageDataLength: bestUpscaled.base64.length,
+        brand: iconKey,
+        officialHost,
+      }) <=
+        scoreIconQuality({
+          source: cached.source,
+          format: cached.format,
+          originalUrl: cached.originalUrl,
+          originalWidth: cached.originalWidth,
+          originalHeight: cached.originalHeight,
+          imageDataLength: cached.imageData.length,
+          brand: iconKey,
+          officialHost,
+        })
+    ) {
+      console.log(
+        `[CRAWL] Skip downgrade for ${iconKey} (${best.source} not better than ${cached.source})`,
+      );
       return;
     }
     await setCachedIcon(

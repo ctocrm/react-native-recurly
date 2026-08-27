@@ -17,6 +17,22 @@ const GENERIC_SOCIAL_RE =
 const BRAND_LOGO_RE =
   /(?:^|[/?#_.=-])(logo|logomark|wordmark|brandmark|favicon|apple-touch|android-chrome|mask-icon)(?:$|[/?#_.=-])/i;
 
+/** True when a URL looks like UI chrome (header SVGs, cart, hamburger), not a logo. */
+export function isUiChromeImage(url: string, source = ""): boolean {
+  const blob = `${source} ${url}`.toLowerCase();
+  return (
+    blob.includes("header-") ||
+    blob.includes("hamburger") ||
+    blob.includes("circle-user") ||
+    blob.includes("shopping-cart") ||
+    blob.includes("cart-") ||
+    blob.includes("search-icon") ||
+    blob.includes("menu-icon") ||
+    blob.includes("nav-icon") ||
+    /\/(?:icon-)?(?:user|cart|menu|search|close|chevron|arrow)[-_]/i.test(blob)
+  );
+}
+
 export function looksLikeDirectImage(url: string): boolean {
   const lower = url.toLowerCase();
   if (IMAGE_EXT_RE.test(lower)) return true;
@@ -65,10 +81,57 @@ export function isPublishableExtractedIcon(
   url: string,
   source: string,
 ): boolean {
+  if (isUiChromeImage(url, source)) return false;
   if (hasLogoSignal(url, source)) return true;
   if (isSocialOrGenericImageSource(source)) return false;
   if (isGenericSocialImage(url, source)) return false;
   return true;
+}
+
+/** Partner/sponsor marks hosted on the official site (Scotts on Ace, etc.). */
+const GENERIC_FILE_TOKENS = new Set([
+  "logo",
+  "icon",
+  "favicon",
+  "apple",
+  "touch",
+  "android",
+  "chrome",
+  "mask",
+  "brand",
+  "wordmark",
+  "logomark",
+  "brandmark",
+  "precomposed",
+  "default",
+  "static",
+  "images",
+  "assets",
+  "dark",
+  "light",
+  "white",
+  "black",
+  "color",
+  "colour",
+  "large",
+  "small",
+]);
+
+function isPartnerOrUnrelatedMark(brand: string, url: string): boolean {
+  const compact = brand.toLowerCase().replace(/[^a-z0-9]+/g, "");
+  let path = "";
+  try {
+    path = new URL(url).pathname.toLowerCase();
+  } catch {
+    path = url.toLowerCase();
+  }
+  const file = (path.split("/").pop() ?? "").replace(/\.[a-z0-9]+$/i, "");
+  const tokens = file.split(/[^a-z0-9]+/).filter((t) => t.length >= 4);
+  return tokens.some((token) => {
+    if (GENERIC_FILE_TOKENS.has(token)) return false;
+    if (compact.includes(token) || token.includes(compact)) return false;
+    return true;
+  });
 }
 
 export function classifyTrustedCandidate(
@@ -77,6 +140,16 @@ export function classifyTrustedCandidate(
   url: string,
 ): { trusted: boolean; prov: Provenance; reason: string } {
   const classified = classifyCandidate(brand, officialHosts, url);
+  if (
+    isTrustedProvenance(classified.prov) &&
+    isPartnerOrUnrelatedMark(brand, url)
+  ) {
+    return {
+      trusted: false,
+      prov: "untrusted",
+      reason: "official host asset is a partner/unrelated mark",
+    };
+  }
   return {
     trusted: isTrustedProvenance(classified.prov),
     prov: classified.prov,

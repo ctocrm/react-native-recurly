@@ -168,6 +168,30 @@ describe("iconQuality (pure functions)", () => {
       });
       expect(official).toBeGreaterThan(bing);
     });
+
+    it("does not prefer a tiny favicon over a large official logo", () => {
+      const lockup = scoreIconQuality({
+        source: "official_img_logo",
+        format: "png",
+        originalUrl: "https://acehardware.com/assets/ace-logo.png",
+        brand: "acehardware",
+        officialHost: "acehardware.com",
+        originalWidth: 512,
+        originalHeight: 512,
+        imageDataLength: 40_000,
+      });
+      const favicon = scoreIconQuality({
+        source: "favicon",
+        format: "ico",
+        originalUrl: "https://acehardware.com/favicon.ico",
+        brand: "acehardware",
+        officialHost: "acehardware.com",
+        originalWidth: 16,
+        originalHeight: 16,
+        imageDataLength: 800,
+      });
+      expect(lockup).toBeGreaterThan(favicon);
+    });
   });
 
   describe("pickBestIcon", () => {

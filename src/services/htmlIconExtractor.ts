@@ -4,7 +4,7 @@
  * JSON-LD logos, Apple touch icons).
  */
 
-import { isPublishableExtractedIcon } from "@/services/iconCandidate";
+import { isPublishableExtractedIcon, isUiChromeImage } from "@/services/iconCandidate";
 
 interface ExtractedIcon {
   url: string;
@@ -347,14 +347,14 @@ export function extractIconsFromHtml(html: string, pageUrl: string): ExtractedIc
     const tag = match[0].toLowerCase();
     const href = match[1];
     const blob = `${tag} ${href}`.toLowerCase();
-    // Require logo/brand/icon signal in tag or URL — not every raster on the page
+    // Require a real logo/brand mark — not header chrome matching class="icon"
     const looksLogo =
       blob.includes("logo") ||
       blob.includes("brand") ||
-      /(^|[^a-z])icon([^a-z]|$)/i.test(blob) ||
       blob.includes("apple-touch") ||
-      /\/(?:logo|brand|icon|favicon)[^/]*\.(?:svg|png|webp|ico)/i.test(href);
+      /\/(?:logo|brand|favicon)[^/]*\.(?:svg|png|webp|ico)/i.test(href);
     if (!looksLogo) continue;
+    if (isUiChromeImage(href, tag)) continue;
     // Skip obvious non-icons
     if (
       blob.includes("avatar") ||

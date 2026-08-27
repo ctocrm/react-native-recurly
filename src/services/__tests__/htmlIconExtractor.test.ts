@@ -54,4 +54,16 @@ describe("extractIconsFromHtml (official homepage)", () => {
     expect(urls).toContain("https://proton.me/assets/logo.svg");
     expect(urls).not.toContain("https://proton.me/share-card.jpg");
   });
+
+  it("does not queue Ace header chrome as img_logo", () => {
+    const html = `
+      <img class="icon" src="/on/demandware.static/-/Sites/default/dw/images/header-circle-user-regular.svg" alt="" />
+      <img class="icon" src="/on/demandware.static/-/Sites/default/dw/images/header-hamburger.svg" alt="" />
+      <img src="/assets/ace-logo.png" alt="ACE logo" />
+    `;
+    const icons = extractIconsFromHtml(html, "https://acehardware.com");
+    const urls = icons.map((i) => i.url);
+    expect(urls.some((u) => u.includes("header-"))).toBe(false);
+    expect(urls).toContain("https://acehardware.com/assets/ace-logo.png");
+  });
 });

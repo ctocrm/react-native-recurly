@@ -4,6 +4,7 @@ import {
   hasLogoSignal,
   isGenericSocialImage,
   isPublishableExtractedIcon,
+  isUiChromeImage,
   looksLikeDirectImage,
   provenanceRank,
 } from "../iconCandidate";
@@ -111,5 +112,38 @@ describe("iconCandidate (hop 3 gates)", () => {
     );
     expect(leftover.trusted).toBe(false);
     expect(leftover.prov).toBe("untrusted");
+  });
+
+  it("rejects header chrome and Ace header SVGs", () => {
+    expect(
+      isUiChromeImage(
+        "https://acehardware.com/on/demandware.static/-/Sites/default/dw/images/header-circle-user-regular.svg",
+      ),
+    ).toBe(true);
+    expect(
+      isPublishableExtractedIcon(
+        "https://acehardware.com/on/demandware.static/-/Sites/default/dw/images/header-circle-user-regular.svg",
+        "img_logo",
+      ),
+    ).toBe(false);
+    expect(
+      isUiChromeImage("https://acehardware.com/assets/logo.svg", "img_logo"),
+    ).toBe(false);
+  });
+
+  it("rejects a partner mark on the official host", () => {
+    const hosts = officialHostsForBrand("acehardware", "acehardware.com");
+    const partner = classifyTrustedCandidate(
+      "acehardware",
+      hosts,
+      "https://acehardware.com/on/demandware.static/scotts-logo.png",
+    );
+    expect(partner.trusted).toBe(false);
+    const own = classifyTrustedCandidate(
+      "acehardware",
+      hosts,
+      "https://acehardware.com/on/demandware.static/ace-logo.png",
+    );
+    expect(own.trusted).toBe(true);
   });
 });
