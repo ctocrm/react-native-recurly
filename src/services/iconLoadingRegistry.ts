@@ -2,6 +2,26 @@
 
 const loadingIcons = new Set<string>();
 
+export interface IconCrawlProgress {
+  status:
+    | "idle"
+    | "discovering"
+    | "fetching"
+    | "deep_search"
+    | "waiting_for_rate_limit"
+    | "complete"
+    | "partial"
+    | "failed";
+  detail: string;
+  discoveredCount?: number;
+  downloadedCount?: number;
+  rejectedCount?: number;
+  deferredCount?: number;
+  spideredPages?: number;
+}
+
+const crawlProgressByIcon = new Map<string, IconCrawlProgress>();
+
 // Force update listeners
 const listenerCallbacks: (() => void)[] = [];
 
@@ -17,6 +37,20 @@ export function setIconLoading(iconKey: string, loading: boolean): void {
 
 export function isIconLoading(iconKey: string): boolean {
   return loadingIcons.has(iconKey);
+}
+
+export function setIconCrawlProgress(
+  iconKey: string,
+  progress: IconCrawlProgress,
+): void {
+  crawlProgressByIcon.set(iconKey, progress);
+  listenerCallbacks.forEach((callback) => callback());
+}
+
+export function getIconCrawlProgress(
+  iconKey: string,
+): IconCrawlProgress | null {
+  return crawlProgressByIcon.get(iconKey) ?? null;
 }
 
 export function addLoadingListener(callback: () => void): () => void {

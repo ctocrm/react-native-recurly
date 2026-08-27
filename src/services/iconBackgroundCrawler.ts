@@ -1,40 +1,219 @@
 import { icons } from "@/constants/icons";
 import {
+  CrawlGenerationRegistry,
+  canAutoAssignCache,
+  isUserChosenCacheSource,
+  terminalStatusFor,
+} from "@/services/crawlLifecycle";
+import {
+  beginIconCrawlSession,
   dequeueIcon,
   enqueueIconScrape,
   getCachedIcon,
   getCrawlResults,
+  getIconCrawlSession,
   getQueuedIcons,
-  isUrlAlreadyCrawled,
-  isUrlAlreadyCrawledBatch,
   markUrlAsCrawled,
   saveCrawlResult,
   setCachedIcon,
+  updateIconCrawlSession,
 } from "@/services/database";
-import { extractFavicon } from "@/src/services/faviconExtractor";
-import { extractIconsFromUrls } from "@/src/services/htmlIconExtractor";
+import { rankOfficialDomainCandidates } from "@/services/domain/domainDiscovery";
+import {
+  officialHostFromCompoundSlug,
+  officialSiteUrlForHost,
+  sanitizeOfficialHost,
+} from "@/services/domain/officialDomain";
+import {
+  classifyTrustedCandidate,
+  isPickerPublishableCandidate,
+  isPublishableExtractedIcon,
+  isUiChromeImage,
+  looksLikeDirectImage,
+} from "@/services/iconCandidate";
+import { extractFavicon } from "@/services/faviconExtractor";
+import {
+  extractIconsFromHtml,
+  extractIconsFromUrls,
+} from "@/services/htmlIconExtractor";
 import {
   notifyCacheUpdate,
+  setIconCrawlProgress,
   setIconLoading,
-} from "@/src/services/iconLoadingRegistry";
+} from "@/services/iconLoadingRegistry";
 import {
-  getReportsForIcon,
-  hashImageData,
-} from "@/src/services/iconReportService";
-import { findAllIconSources } from "@/src/services/iconScraper";
-import { mimeForFormat, upscaleIconIfSmall } from "@/src/services/iconUpscaler";
-import { isBase64IconValid } from "@/src/services/iconValidation";
-import { isDomainRateLimited } from "@/src/services/rateLimitTracker";
-import { searchForLinksToSpider } from "@/src/services/searchEngines";
+  pickBestIcon,
+  scoreIconQuality,
+  sortUrlsByQuality,
+} from "@/services/iconQuality";
+import { getReportsForIcon, hashImageData } from "@/services/iconReportService";
+import { officialHostsForBrand } from "@/services/domain/provenance";
+import {
+  findAllIconSources,
+  isLeftoverTypingSlug,
+  leftoverSlugSkipReason,
+} from "@/services/iconScraper";
+import { mimeForFormat, upscaleIconIfSmall } from "@/services/iconUpscaler";
+import { isBase64IconValid, isPaintableCardIcon } from "@/services/iconValidation";
+import {
+  isDomainRateLimited,
+  recordRateLimit,
+  recordSuccess,
+} from "@/services/rateLimitTracker";
+import {
+  extractDuckDuckGoUddgLinks,
+  searchAllSources,
+  searchForLinksToSpider,
+} from "@/services/searchEngines";
 import { Image } from "react-native";
 
 // In-flight guard
 let isProcessingQueue = false;
+/** If processIconQueue was skipped because busy, run again when free. */
+let queueRerunRequested = false;
+/** In-flight crawls so double-tap Search does not stack workers for same key. */
+const activeCrawls = new Set<string>();
 
-const MAX_LIBRARY_CANDIDATES = 50;
-const MAX_SPIDERED_URLS = 20;
-const MAX_SPIDERED_ICONS = 15;
-const MAX_WEB_SEARCH_RESULTS = 50;
+/**
+ * Explicit mobile-safe deep-discovery policy. These caps are deliberately
+ * high enough to retain source diversity, while bounding hostile/misleading
+ * web results so discovery cannot consume all network, battery, or JS time.
+ */
+export const ICON_CRAWL_POLICY = Object.freeze({
+  libraryCandidates: 120,
+  officialSiteImages: 50,
+  webSearchResults: 150,
+  spideredPages: 80,
+  spideredIcons: 160,
+});
+const MAX_LIBRARY_CANDIDATES = ICON_CRAWL_POLICY.libraryCandidates;
+const MAX_SPIDERED_URLS = ICON_CRAWL_POLICY.spideredPages;
+const MAX_SPIDERED_ICONS = ICON_CRAWL_POLICY.spideredIcons;
+const MAX_WEB_SEARCH_RESULTS = ICON_CRAWL_POLICY.webSearchResults;
+/** How many high-quality first-party/library candidates to fetch before returning work to the queue. */
+const IMMEDIATE_FETCH_BATCH = 6;
+/**
+ * Each download includes base64 conversion, image validation, and database
+ * writes. Keep this deliberately small so a crawl cannot monopolize the JS
+ * runtime while the user is navigating or typing.
+ */
+const DOWNLOAD_CONCURRENCY = 2;
+/** Reject arbitrary web images before their bytes are copied into a JS string. */
+const MAX_ICON_DOWNLOAD_BYTES = 1_500_000;
+const BASE64_CONVERSION_CHUNK_BYTES = 8_192;
+const BASE64_CONVERSION_YIELD_BYTES = 65_536;
+/** Max icon candidates queued from official homepage HTML. */
+const MAX_OFFICIAL_SITE_IMGS = ICON_CRAWL_POLICY.officialSiteImages;
+
+type CrawlCandidate = { url: string; source: string; format: string };
+
+interface CrawlCounts {
+  discovered: number;
+  downloaded: number;
+  rejected: number;
+  deferred: number;
+  spideredPages: number;
+}
+
+async function reportCrawlProgress(
+  iconKey: string,
+  status:
+    | "discovering"
+    | "fetching"
+    | "deep_search"
+    | "waiting_for_rate_limit"
+    | "complete"
+    | "partial"
+    | "failed",
+  detail: string,
+  counts: CrawlCounts,
+  completed = false,
+): Promise<void> {
+  await updateIconCrawlSession(iconKey, {
+    status,
+    detail,
+    discoveredCount: counts.discovered,
+    downloadedCount: counts.downloaded,
+    rejectedCount: counts.rejected,
+    deferredCount: counts.deferred,
+    spideredPages: counts.spideredPages,
+    completed,
+  });
+  setIconCrawlProgress(iconKey, {
+    status,
+    detail,
+    discoveredCount: counts.discovered,
+    downloadedCount: counts.downloaded,
+    rejectedCount: counts.rejected,
+    deferredCount: counts.deferred,
+    spideredPages: counts.spideredPages,
+  });
+}
+
+/**
+ * Reject HTML/JSON/error documents served from image-looking URLs before they
+ * enter the picker. URL extensions are useful discovery hints, not validation.
+ */
+function detectDownloadedIconFormat(
+  bytes: Uint8Array,
+  contentType: string | null,
+  fallbackFormat: string,
+): string | null {
+  const normalizedType = contentType?.split(";")[0].trim().toLowerCase() ?? "";
+  if (
+    normalizedType.includes("text/html") ||
+    normalizedType.includes("application/json")
+  ) {
+    return null;
+  }
+  const hasPngSignature =
+    bytes.length >= 8 &&
+    bytes[0] === 0x89 &&
+    bytes[1] === 0x50 &&
+    bytes[2] === 0x4e &&
+    bytes[3] === 0x47;
+  const hasJpegSignature =
+    bytes.length >= 3 &&
+    bytes[0] === 0xff &&
+    bytes[1] === 0xd8 &&
+    bytes[2] === 0xff;
+  const hasGifSignature =
+    bytes.length >= 6 &&
+    String.fromCharCode(...bytes.subarray(0, 6)).startsWith("GIF");
+  const hasIcoSignature =
+    bytes.length >= 4 &&
+    bytes[0] === 0 &&
+    bytes[1] === 0 &&
+    bytes[2] === 1 &&
+    bytes[3] === 0;
+  const hasWebpSignature =
+    bytes.length >= 12 &&
+    String.fromCharCode(...bytes.subarray(0, 4)) === "RIFF" &&
+    String.fromCharCode(...bytes.subarray(8, 12)) === "WEBP";
+  const textHead = String.fromCharCode(
+    ...bytes.subarray(0, Math.min(bytes.length, 512)),
+  );
+  const hasSvg = /<svg[\s>]/i.test(textHead);
+
+  if (hasSvg || normalizedType === "image/svg+xml")
+    return hasSvg ? "svg" : null;
+  if (hasPngSignature) return "png";
+  if (hasJpegSignature) return "jpeg";
+  if (hasGifSignature) return "gif";
+  if (hasIcoSignature) return "ico";
+  if (hasWebpSignature) return "webp";
+
+  // Some icon CDNs use application/octet-stream for legitimate image files.
+  // Only accept a known image MIME when the URL supplied a supported format.
+  if (normalizedType.startsWith("image/")) {
+    return ["svg", "png", "ico", "jpg", "jpeg", "webp", "gif"].includes(
+      fallbackFormat,
+    )
+      ? fallbackFormat
+      : null;
+  }
+  return null;
+}
 
 function detectUrlFormat(url: string): string {
   const clean = url.toLowerCase().split("?")[0].split("#")[0];
@@ -57,90 +236,225 @@ async function loadLocalIconAsBase64(iconKey: string): Promise<string | null> {
   return `local_asset:${iconKey}`;
 }
 
-// Download image and save to DB
+// Download image and save to DB (rate-limit aware, short transient retries)
+const FETCH_TIMEOUT_MS = 15_000;
+const FETCH_MAX_ATTEMPTS = 3;
+
+function parseRetryAfterMs(header: string | null): number | undefined {
+  if (!header) return undefined;
+  const asInt = parseInt(header, 10);
+  if (!Number.isNaN(asInt) && asInt >= 0) {
+    // Retry-After: seconds
+    return Math.min(asInt * 1000, 14_400_000);
+  }
+  const when = Date.parse(header);
+  if (!Number.isNaN(when)) {
+    return Math.min(Math.max(when - Date.now(), 0), 14_400_000);
+  }
+  return undefined;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+/** Give React Native a turn to render/respond between background work batches. */
+function yieldToUi(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
 async function downloadImageAsBase64(
   url: string,
   source: string,
   iconKey: string,
 ): Promise<boolean> {
-  try {
-    console.log(`[FETCH] DOWNLOAD: ${source} ${url}`);
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 15000);
-    const response = await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        Accept: "image/*,*/*;q=0.8",
-      },
-    });
-    clearTimeout(timer);
-    if (!response.ok) {
-      console.log(`[FETCH] FAILED ${url}: ${response.status}`);
-      return false;
-    }
-
-    const arrayBuffer = await response.arrayBuffer();
-    const uint8Array = new Uint8Array(arrayBuffer);
-    let binary = "";
-    for (let i = 0; i < uint8Array.byteLength; i++) {
-      binary += String.fromCharCode(uint8Array[i]);
-    }
-    const b64 = btoa(binary);
-    console.log(`[FETCH] SUCCESS: ${url} (${b64.length} bytes)`);
-
-    // Measure original dimensions BEFORE upscaling so we can determine if the
-    // icon is truly low-res and show the "Upscale (AI)" button in the picker.
-    const format = detectUrlFormat(url);
-    const mime = mimeForFormat(format);
-    const dataUri = `data:${mime};base64,${b64}`;
-    const origSize = await new Promise<{ width: number; height: number }>(
-      (resolve, reject) => {
-        Image.getSize(
-          dataUri,
-          (width, height) => resolve({ width, height }),
-          (err) => reject(err),
-        );
-      },
-    ).catch(() => null);
-
-    // Rudimentary upscale for low-res icons (e.g. favicons) before storing.
-    const { base64: finalB64, format: finalFormat } = await upscaleIconIfSmall(
-      b64,
-      format,
-    );
-
-    await saveCrawlResult(
-      iconKey,
-      finalB64,
-      source,
-      finalFormat,
-      url,
-      0,
-      origSize?.width,
-      origSize?.height,
-    );
-    notifyCacheUpdate();
-    return true;
-  } catch (err: any) {
-    if (err.name !== "AbortError") {
-      console.log(`[FETCH] ERROR ${url}:`, err);
-    } else {
-      console.log(`[FETCH] TIMEOUT ${url}`);
-    }
+  if (await isDomainRateLimited(url)) {
+    console.log(`[FETCH] SKIP rate-limited domain: ${url}`);
     return false;
   }
+
+  let lastErr: unknown = null;
+  for (let attempt = 1; attempt <= FETCH_MAX_ATTEMPTS; attempt++) {
+    try {
+      console.log(
+        `[FETCH] DOWNLOAD${attempt > 1 ? ` retry ${attempt}/${FETCH_MAX_ATTEMPTS}` : ""}: ${source} ${url}`,
+      );
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+      let response: Response;
+      try {
+        response = await fetch(url, {
+          signal: controller.signal,
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            Accept: "image/*,*/*;q=0.8",
+          },
+        });
+      } finally {
+        clearTimeout(timer);
+      }
+
+      // Only true rate-limits (429) cool down the whole domain.
+      // 403 is usually hotlink/bot block for one URL — do not blacklist CDNs.
+      if (response.status === 429) {
+        const retryMs = parseRetryAfterMs(response.headers.get("Retry-After"));
+        await recordRateLimit(url, retryMs);
+        console.log(`[FETCH] RATE_LIMITED ${url}: 429`);
+        return false;
+      }
+      if (response.status === 403) {
+        console.log(`[FETCH] FORBIDDEN ${url}: 403 (no domain cooldown)`);
+        return false;
+      }
+
+      if (response.status >= 500 && attempt < FETCH_MAX_ATTEMPTS) {
+        const backoff = 400 * attempt + Math.floor(Math.random() * 200);
+        console.log(
+          `[FETCH] ${response.status} on ${url}, backoff ${backoff}ms`,
+        );
+        await sleep(backoff);
+        continue;
+      }
+
+      if (!response.ok) {
+        console.log(`[FETCH] FAILED ${url}: ${response.status}`);
+        return false;
+      }
+
+      const arrayBuffer = await response.arrayBuffer();
+      // Empty body is not a usable icon
+      if (!arrayBuffer || arrayBuffer.byteLength < 16) {
+        console.log(`[FETCH] EMPTY body ${url}`);
+        return false;
+      }
+      // A search result is untrusted. Converting a multi-megabyte response to a
+      // JS binary string is both unnecessary for an app icon and a common UI
+      // stall on mobile devices.
+      if (arrayBuffer.byteLength > MAX_ICON_DOWNLOAD_BYTES) {
+        console.log(
+          `[FETCH] SKIP oversized icon ${url} (${arrayBuffer.byteLength} bytes)`,
+        );
+        return false;
+      }
+      const uint8Array = new Uint8Array(arrayBuffer);
+      const format = detectDownloadedIconFormat(
+        uint8Array,
+        response.headers.get("Content-Type"),
+        detectUrlFormat(url),
+      );
+      if (!format) {
+        console.log(
+          `[FETCH] REJECT non-image response ${url} (content-type=${response.headers.get("Content-Type") ?? "unknown"})`,
+        );
+        return false;
+      }
+      let binary = "";
+      for (
+        let i = 0;
+        i < uint8Array.byteLength;
+        i += BASE64_CONVERSION_CHUNK_BYTES
+      ) {
+        const end = Math.min(
+          i + BASE64_CONVERSION_CHUNK_BYTES,
+          uint8Array.byteLength,
+        );
+        binary += String.fromCharCode(...uint8Array.subarray(i, end));
+        if (
+          end < uint8Array.byteLength &&
+          end % BASE64_CONVERSION_YIELD_BYTES === 0
+        ) {
+          await yieldToUi();
+        }
+      }
+      const b64 = btoa(binary);
+      console.log(`[FETCH] SUCCESS: ${url} (${b64.length} bytes)`);
+
+      // Reject empty / blank / fully-transparent images before they enter the DB.
+      if (!isBase64IconValid(b64, format)) {
+        console.log(
+          `[FETCH] REJECT empty/transparent icon ${url} (format=${format}, bytes=${b64.length})`,
+        );
+        return false;
+      }
+
+      const mime = mimeForFormat(format);
+      const dataUri = `data:${mime};base64,${b64}`;
+      const origSize = await new Promise<{ width: number; height: number }>(
+        (resolve, reject) => {
+          Image.getSize(
+            dataUri,
+            (width, height) => resolve({ width, height }),
+            (err) => reject(err),
+          );
+        },
+      ).catch(() => null);
+
+      // Degenerate dimensions (when readable) are not usable card icons.
+      if (
+        origSize &&
+        (origSize.width < 8 ||
+          origSize.height < 8 ||
+          origSize.width > 100000 ||
+          origSize.height > 100000)
+      ) {
+        console.log(
+          `[FETCH] REJECT bad dimensions ${url}: ${origSize.width}x${origSize.height}`,
+        );
+        return false;
+      }
+
+      const { base64: finalB64, format: finalFormat } =
+        await upscaleIconIfSmall(b64, format);
+
+      // Re-validate after upscale (should still pass; guards against bad transforms).
+      if (!isBase64IconValid(finalB64, finalFormat)) {
+        console.log(`[FETCH] REJECT post-upscale invalid icon ${url}`);
+        return false;
+      }
+
+      await saveCrawlResult(
+        iconKey,
+        finalB64,
+        source,
+        finalFormat,
+        url,
+        0,
+        origSize?.width,
+        origSize?.height,
+      );
+      await recordSuccess(url);
+      await promoteFirstIconToCache(iconKey);
+      notifyCacheUpdate();
+      return true;
+    } catch (err: any) {
+      lastErr = err;
+      const isAbort = err?.name === "AbortError";
+      if (isAbort) {
+        console.log(`[FETCH] TIMEOUT ${url} (attempt ${attempt})`);
+      } else {
+        console.log(`[FETCH] ERROR ${url} (attempt ${attempt}):`, err);
+      }
+      // Transient network / timeout — retry with backoff
+      if (attempt < FETCH_MAX_ATTEMPTS) {
+        await sleep(500 * attempt);
+        continue;
+      }
+    }
+  }
+  if (lastErr) {
+    console.log(`[FETCH] GIVING UP ${url}`);
+  }
+  return false;
 }
 
 // Re-fetch crawl results that previously failed (empty imageData) without
 // relying on the one-shot icon_crawl_queue, which a prior crawl may have
 // already consumed. Directly downloads the pending URLs, then promotes the
 // best fetched icon to the cache so re-searches actually recover.
-// Process pending downloads in small bounded chunks (mirrors the first-5
-// batching used for newly discovered URLs) so retries stay rate-limited and
-// don't open unbounded parallel network/DB work.
-const RETRY_BATCH_SIZE = 5;
+// Process pending downloads in small bounded chunks so retries stay
+// rate-limited and do not monopolize the JS runtime.
+const RETRY_BATCH_SIZE = DOWNLOAD_CONCURRENCY;
 
 async function retryPendingDownloads(
   iconKey: string,
@@ -164,6 +478,7 @@ async function retryPendingDownloads(
         if (ok) await markUrlAsCrawled(p.originalUrl);
       }),
     );
+    await yieldToUi();
   }
   await promoteFirstIconToCache(iconKey);
 }
@@ -184,6 +499,8 @@ export async function getIconCollection(iconKey: string): Promise<{
 }> {
   try {
     console.log(`[COLLECTION] Loading icons for ${iconKey}`);
+    // Heal empty/transparent auto-assigned cache before building the picker list.
+    await promoteFirstIconToCache(iconKey);
     const cached = await getCachedIcon(iconKey);
     const results = await getCrawlResults(iconKey);
     // Build a set of reported (non-rejected) image hashes to hide by default.
@@ -208,7 +525,8 @@ export async function getIconCollection(iconKey: string): Promise<{
     // Add cached icon to collection FIRST (upscale small raster icons on view)
     if (
       cached?.imageData &&
-      isBase64IconValid(cached.imageData, cached.format) &&
+      isPaintableCardIcon(cached.imageData, cached.format) &&
+      !isUiChromeImage(cached.originalUrl || "", cached.source) &&
       !reportedHashes.has(cached.imageData)
     ) {
       console.log(`[COLLECTION] Found cached icon for ${iconKey}`);
@@ -229,14 +547,31 @@ export async function getIconCollection(iconKey: string): Promise<{
       });
     }
 
+    const session = await getIconCrawlSession(iconKey);
+    const officialHost = session?.officialDomain
+      ? sanitizeOfficialHost(session.officialDomain)
+      : officialHostFromCompoundSlug(iconKey);
+    const officialHosts = officialHostsForBrand(iconKey, officialHost);
+
     // Add database crawl results to collection (only valid, non-reported images)
     for (const r of results) {
       if (
         r.imageData &&
         !iconMap.has(r.imageData) &&
-        isBase64IconValid(r.imageData, r.format) &&
+        isPaintableCardIcon(r.imageData, r.format) &&
+        !isUiChromeImage(r.originalUrl || "", r.source) &&
         !reportedHashes.has(r.imageData)
       ) {
+        if (
+          !isPickerPublishableCandidate(
+            iconKey,
+            officialHosts,
+            r.originalUrl || "",
+            r.source,
+          )
+        ) {
+          continue;
+        }
         const displayData = await upscaleIconIfSmall(r.imageData, r.format);
         iconMap.set(r.imageData, {
           id: hashImageData(r.imageData),
@@ -263,22 +598,43 @@ export async function getIconCollection(iconKey: string): Promise<{
       console.log(`[COLLECTION] Added subscription icon to collection`);
     }
 
-    // Sort: subscription first, then cached, then others
+    // Sort: AI / subscription first, then by source quality (SVG, large touch icons, …)
     const sorted = Array.from(iconMap.values()).sort((a, b) => {
-      if (a.source === "subscription") return -1;
-      if (b.source === "subscription") return 1;
-      return 0;
+      return (
+        scoreIconQuality({
+          source: b.source,
+          format: b.format,
+          originalUrl: b.originalUrl,
+          originalWidth: b.originalWidth,
+          originalHeight: b.originalHeight,
+          imageDataLength: b.imageData?.length,
+          brand: iconKey,
+        }) -
+        scoreIconQuality({
+          source: a.source,
+          format: a.format,
+          originalUrl: a.originalUrl,
+          originalWidth: a.originalWidth,
+          originalHeight: a.originalHeight,
+          imageDataLength: a.imageData?.length,
+          brand: iconKey,
+        })
+      );
     });
 
-    // Derive the MIME subtype directly from the format string
+    // Only expose cached URI when the cached icon itself is valid (not empty/transparent).
+    const cachedValid =
+      !!cached?.imageData && isBase64IconValid(cached.imageData, cached.format);
     const mimeSubtype =
       cached?.format === "svg" ? "svg+xml" : (cached?.format ?? "png");
-    console.log(`[COLLECTION] Returning ${sorted.length} icons`);
+    console.log(
+      `[COLLECTION] Returning ${sorted.length} icons (cachedValid=${cachedValid})`,
+    );
     return {
-      cachedIconUri: cached?.imageData
-        ? `data:image/${mimeSubtype};base64,${cached.imageData}`
+      cachedIconUri: cachedValid
+        ? `data:image/${mimeSubtype};base64,${cached!.imageData}`
         : null,
-      cachedFormat: cached?.format ?? null,
+      cachedFormat: cachedValid ? (cached?.format ?? null) : null,
       icons: sorted,
     };
   } catch (err) {
@@ -303,10 +659,76 @@ async function fetchAndSaveUrl(
   return false;
 }
 
+/**
+ * Start the high-confidence candidates immediately. Deep search continues to
+ * expand the same persistent per-icon collection; it never gates first icons.
+ */
+async function fetchInitialCandidates(
+  iconKey: string,
+  candidates: CrawlCandidate[],
+  counts: CrawlCounts,
+  officialHost?: string | null,
+): Promise<Set<string>> {
+  const immediate = sortUrlsByQuality(candidates, iconKey, officialHost).slice(
+    0,
+    IMMEDIATE_FETCH_BATCH,
+  );
+  const attempted = new Set(immediate.map((candidate) => candidate.url));
+  if (immediate.length === 0) return attempted;
+
+  await reportCrawlProgress(
+    iconKey,
+    "fetching",
+    `Fetching ${immediate.length} high-confidence icon candidates`,
+    counts,
+  );
+  for (let i = 0; i < immediate.length; i += DOWNLOAD_CONCURRENCY) {
+    const batch = immediate.slice(i, i + DOWNLOAD_CONCURRENCY);
+    const outcomes = await Promise.all(
+      batch.map((candidate) =>
+        fetchAndSaveUrl(
+          candidate.url,
+          candidate.source,
+          iconKey,
+          candidate.format,
+        ),
+      ),
+    );
+    counts.downloaded += outcomes.filter(Boolean).length;
+    counts.rejected += outcomes.filter((result) => !result).length;
+    await reportCrawlProgress(
+      iconKey,
+      "fetching",
+      `Found ${counts.discovered} candidates; ${counts.downloaded} valid icons saved`,
+      counts,
+    );
+    await yieldToUi();
+  }
+
+  // Let the durable worker continue with the rest while web/spider discovery
+  // is still running. It has its own bounded, yielding download loop.
+  await enqueueIconScrape(iconKey, undefined);
+  void processIconQueue().catch(console.error);
+  return attempted;
+}
+
+/** Per-key crawl generations for stale-cancellation (Tranche E). */
+const crawlGens = new CrawlGenerationRegistry();
+
 // PHASE 1: Find URLs to download (LOCAL + LIBRARIES + CDN + FAVICON + SEARCH + SPIDER)
-// This is called when user types or taps search - spinner stops after this returns
-export async function findIconUrls(iconKey: string): Promise<void> {
+// This is called when user types or taps search - spinner stops after this returns.
+// Returns the number of provider failures so the caller can report a truthful
+// terminal status (a provider outage must not read as a clean "complete").
+export async function findIconUrls(iconKey: string): Promise<number> {
   console.log(`[SEARCH] ===== STARTING SEARCH for ${iconKey} =====`);
+  let providerFailures = 0;
+  const counts: CrawlCounts = {
+    discovered: 0,
+    downloaded: 0,
+    rejected: 0,
+    deferred: 0,
+    spideredPages: 0,
+  };
 
   const existing = await getCrawlResults(iconKey);
   const existingUrls = new Set(
@@ -321,71 +743,100 @@ export async function findIconUrls(iconKey: string): Promise<void> {
   }
 
   // Track URLs we need to fetch immediately
-  const urlsToFetch: { url: string; source: string; format: string }[] = [];
+  const urlsToFetch: CrawlCandidate[] = [];
 
-  // TIER 0: Discover official website - smarter first step
-  // Use a simple text search to find the brand's official site
+  // TIER 0: Discover official website. Scan seeds skip search.
   console.log(`[SEARCH] TIER 0: Discovering official website`);
   let officialSiteUrl: string | null = null;
-  try {
-    const ddgUrl = "https://duckduckgo.com";
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 15000);
-    const response = await fetch(
-      `${ddgUrl}/?q=${encodeURIComponent(iconKey)}&ia=web`,
-      {
-        signal: controller.signal,
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        },
-      },
+  let officialHosts = officialHostsForBrand(iconKey);
+  const sessionHint = await getIconCrawlSession(iconKey);
+  const seededHost = sessionHint?.officialDomain
+    ? sanitizeOfficialHost(sessionHint.officialDomain)
+    : null;
+  const reconstructedHost = officialHostFromCompoundSlug(iconKey);
+  if (seededHost) {
+    officialSiteUrl = officialSiteUrlForHost(seededHost);
+    officialHosts = officialHostsForBrand(iconKey, seededHost);
+    console.log(`[SEARCH] TIER 0: Using seeded official site: ${officialSiteUrl}`);
+  } else if (reconstructedHost) {
+    officialSiteUrl = officialSiteUrlForHost(reconstructedHost);
+    officialHosts = officialHostsForBrand(iconKey, reconstructedHost);
+    await updateIconCrawlSession(iconKey, {
+      officialDomain: reconstructedHost,
+    });
+    console.log(
+      `[SEARCH] TIER 0: Reconstructed compound-label site: ${officialSiteUrl}`,
     );
-    clearTimeout(timer);
+  } else {
+    try {
+      const ddgHtmlUrl = "https://html.duckduckgo.com";
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 15000);
+      const response = await fetch(
+        `${ddgHtmlUrl}/html/?q=${encodeURIComponent(iconKey)}`,
+        {
+          signal: controller.signal,
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            Accept:
+              "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          },
+        },
+      );
+      clearTimeout(timer);
 
-    if (response.ok) {
-      const html = await response.text();
-      // DDG web results use different structure - try multiple patterns
-      const patterns = [
-        /<a[^>]+class="result__a"[^>]*href\s*=\s*["'](https?:\/\/[^"']+)["']/i,
-        /<a[^>]+href\s*=\s*["'](https?:\/\/[^"']+)"[^>]*class="result__a"/i,
-        /<div[^>]*class="result__body"[^>]*>[\s\S]*?<a[^>]+href\s*=\s*["'](https?:\/\/[^"']+)["']/i,
-        /<a[^>]+class="result__a"[^>]*href="([^"]+)"/i,
-      ];
-      for (const pattern of patterns) {
-        const match = html.match(pattern);
-        if (match) {
-          officialSiteUrl = match[1];
-          console.log(
-            `[SEARCH] TIER 0: Found official site: ${officialSiteUrl}`,
-          );
-          break;
+      if (response.ok) {
+        const html = await response.text();
+        const candidateUrls = extractDuckDuckGoUddgLinks(html);
+        if (candidateUrls.length === 0) {
+          const linkRe = /<a[^>]+href\s*=\s*["'](https?:\/\/[^"']+)["'][^>]*>/gi;
+          let m: RegExpExecArray | null;
+          while ((m = linkRe.exec(html)) !== null) {
+            if (
+              !m[1].includes("duckduckgo.com") &&
+              !m[1].includes("google.com")
+            ) {
+              candidateUrls.push(m[1]);
+            }
+          }
         }
-      }
-      // If no match, try generic link extraction
-      if (!officialSiteUrl) {
-        const linkMatch = html.match(
-          /<a[^>]+href\s*=\s*["'](https?:\/\/[^"']+)["'][^>]*>/i,
-        );
-        if (linkMatch) {
-          officialSiteUrl = linkMatch[1];
+
+        const ranking = rankOfficialDomainCandidates(iconKey, candidateUrls);
+        if (ranking.best) {
+          officialSiteUrl = ranking.best.url;
+          officialHosts = officialHostsForBrand(iconKey, ranking.best.host);
+          await updateIconCrawlSession(iconKey, {
+            officialDomain: ranking.best.host,
+          });
           console.log(
-            `[SEARCH] TIER 0: Found official site (fallback): ${officialSiteUrl}`,
+            `[SEARCH] TIER 0: Ranked official site: ${officialSiteUrl} (${ranking.best.confidence}, ${ranking.best.reason})`,
+          );
+        } else {
+          console.log(
+            `[SEARCH] TIER 0: no confident official domain among ${candidateUrls.length} links`,
           );
         }
+        if (ranking.rejected.length > 0) {
+          console.log(
+            `[SEARCH] TIER 0: rejected ${ranking.rejected.length} non-brand hosts: ${ranking.rejected
+              .slice(0, 5)
+              .map((r) => `${r.host}(${r.reason})`)
+              .join(", ")}`,
+          );
+        }
+      } else if (response.status === 429) {
+        await recordRateLimit(ddgHtmlUrl);
+      } else {
+        providerFailures++;
       }
-    } else {
-      // Record rate limit for non-200 responses
-      if (response.status === 429 || response.status === 403) {
-        const { recordRateLimit } = await import("./rateLimitTracker");
-        await recordRateLimit(ddgUrl);
+    } catch (err: any) {
+      providerFailures++;
+      if (err.name !== "AbortError") {
+        console.log(`[SEARCH] TIER 0: Error finding official site: ${err}`);
+      } else {
+        console.log(`[SEARCH] TIER 0: Timeout finding official site`);
       }
-    }
-  } catch (err: any) {
-    if (err.name !== "AbortError") {
-      console.log(`[SEARCH] TIER 0: Error finding official site: ${err}`);
-    } else {
-      console.log(`[SEARCH] TIER 0: Timeout finding official site`);
     }
   }
 
@@ -393,15 +844,38 @@ export async function findIconUrls(iconKey: string): Promise<void> {
   if (officialSiteUrl) {
     console.log(`[SEARCH] TIER 0.5: Scraping official site for icons`);
 
-    // Get favicon from official site - use origin URL
-    const faviconUrl = new URL("/favicon.ico", officialSiteUrl).toString();
-    if (!existingUrls.has(faviconUrl)) {
-      await saveCrawlResult(iconKey, "", "official_favicon", "ico", faviconUrl);
-      urlsToFetch.push({
-        url: faviconUrl,
-        source: "official_favicon",
-        format: "ico",
-      });
+    // Prefer large / vector brand assets on the official origin before tiny .ico
+    const officialPaths: { path: string; source: string; format: string }[] = [
+      { path: "/favicon.svg", source: "official_favicon", format: "svg" },
+      {
+        path: "/apple-touch-icon.png",
+        source: "official_apple_touch",
+        format: "png",
+      },
+      {
+        path: "/apple-touch-icon-precomposed.png",
+        source: "official_apple_touch",
+        format: "png",
+      },
+      {
+        path: "/android-chrome-512x512.png",
+        source: "official_pwa",
+        format: "png",
+      },
+      {
+        path: "/android-chrome-192x192.png",
+        source: "official_pwa",
+        format: "png",
+      },
+      { path: "/favicon.ico", source: "official_favicon", format: "ico" },
+    ];
+    for (const op of officialPaths) {
+      const u = new URL(op.path, officialSiteUrl).toString();
+      if (existingUrls.has(u)) continue;
+      await saveCrawlResult(iconKey, "", op.source, op.format, u);
+      urlsToFetch.push({ url: u, source: op.source, format: op.format });
+      existingUrls.add(u);
+      counts.discovered++;
     }
 
     // Scrape official site for images
@@ -415,40 +889,32 @@ export async function findIconUrls(iconKey: string): Promise<void> {
         });
         if (siteResponse.ok) {
           const siteHtml = await siteResponse.text();
-          // Find all image URLs on the site
-          const imgMatches =
-            siteHtml.match(
-              /src=["']([^"']+\.(?:svg|png|jpg|jpeg|ico|webp))["']/gi,
-            ) || [];
-          for (const match of imgMatches.slice(0, 5)) {
-            const urlMatch = match.match(/src=["']([^"']+)["']/i);
-            if (urlMatch) {
-              let imgUrl = urlMatch[1];
-              // Use URL constructor for all relative URLs - works for both relative and root-relative
-              if (!imgUrl.startsWith("http")) {
-                imgUrl = new URL(imgUrl, officialSiteUrl).toString();
-              }
-              if (
-                !existingUrls.has(imgUrl) &&
-                !imgUrl.toLowerCase().includes("favicon")
-              ) {
-                await saveCrawlResult(
-                  iconKey,
-                  "",
-                  "official_site",
-                  detectUrlFormat(imgUrl),
-                  imgUrl,
-                );
-                urlsToFetch.push({
-                  url: imgUrl,
-                  source: "official_site",
-                  format: detectUrlFormat(imgUrl),
-                });
-              }
-            }
+          const extracted = extractIconsFromHtml(siteHtml, officialSiteUrl);
+          let added = 0;
+          for (const icon of extracted) {
+            if (added >= MAX_OFFICIAL_SITE_IMGS) break;
+            if (!isPublishableExtractedIcon(icon.url, icon.source)) continue;
+            if (existingUrls.has(icon.url)) continue;
+            const source =
+              icon.source === "favicon" || icon.source === "common_path"
+                ? "official_favicon"
+                : icon.source === "apple_touch_icon"
+                  ? "official_apple_touch"
+                  : icon.source === "web_manifest"
+                    ? "official_pwa"
+                    : `official_${icon.source}`;
+            await saveCrawlResult(iconKey, "", source, icon.format, icon.url);
+            urlsToFetch.push({
+              url: icon.url,
+              source,
+              format: icon.format,
+            });
+            existingUrls.add(icon.url);
+            added++;
+            counts.discovered++;
           }
           console.log(
-            `[SEARCH] TIER 0.5: Found ${imgMatches.length} potential images on official site`,
+            `[SEARCH] TIER 0.5: Extracted ${extracted.length} icon URLs, queued ${added} on official site`,
           );
         }
       }
@@ -461,16 +927,12 @@ export async function findIconUrls(iconKey: string): Promise<void> {
   console.log(`[SEARCH] TIER 1: Library CDNs`);
   const libraryIcons = await findAllIconSources(iconKey);
   console.log(`[SEARCH] TIER 1: Found ${libraryIcons.length} library icons`);
-  const alreadyCrawledLibraries = await isUrlAlreadyCrawledBatch(
-    libraryIcons.slice(0, MAX_LIBRARY_CANDIDATES).map((i) => i.url),
-  );
-
-  // Add library URLs to crawl_results AND queue for immediate fetch
+  // Candidates belong to an icon key. Universal URL history is telemetry, not
+  // ownership: a valid library URL fetched for one subscription must still be
+  // saved and selectable for another subscription with the same candidate.
+  // Add library URLs to crawl_results AND queue for immediate fetch.
   for (const libIcon of libraryIcons.slice(0, MAX_LIBRARY_CANDIDATES)) {
-    if (
-      !existingUrls.has(libIcon.url) &&
-      !alreadyCrawledLibraries.has(libIcon.url)
-    ) {
+    if (!existingUrls.has(libIcon.url)) {
       await saveCrawlResult(
         iconKey,
         "",
@@ -483,12 +945,17 @@ export async function findIconUrls(iconKey: string): Promise<void> {
         source: libIcon.source,
         format: libIcon.format,
       });
+      existingUrls.add(libIcon.url);
+      counts.discovered++;
     }
   }
 
   // TIER 2: Favicon extraction - FIND URL
   console.log(`[SEARCH] TIER 2: Favicon`);
-  const faviconResult = await extractFavicon(iconKey);
+  const faviconResult = await extractFavicon(
+    iconKey,
+    officialSiteUrl ? new URL(officialSiteUrl).hostname : null,
+  );
   if (faviconResult && !existingUrls.has(faviconResult.url)) {
     await saveCrawlResult(
       iconKey,
@@ -502,47 +969,152 @@ export async function findIconUrls(iconKey: string): Promise<void> {
       source: "favicon",
       format: faviconResult.format,
     });
+    existingUrls.add(faviconResult.url);
+    counts.discovered++;
     console.log(`[SEARCH] TIER 2: Found favicon URL`);
   } else {
     console.log(`[SEARCH] TIER 2: No favicon found`);
   }
 
-  // TIER 3: Web search + SPIDER - FIND URLs
-  console.log(`[SEARCH] TIER 3: Web search for links to spider`);
-  const linkResults = await searchForLinksToSpider(iconKey);
-  console.log(`[SEARCH] TIER 3: Found ${linkResults.length} links to spider`);
-  const linkUrls: string[] = [];
+  // Fetch curated/official candidates before unreliable web discovery. This
+  // keeps maximum-search behavior without making first results wait on DDG,
+  // Bing, Google, or a multi-page spider crawl.
+  const officialHostHint = [...officialHosts][0] ?? null;
+  const immediatelyAttempted = await fetchInitialCandidates(
+    iconKey,
+    urlsToFetch,
+    counts,
+    officialHostHint,
+  );
 
-  // searchForLinksToSpider returns website URLs - all should be spidered
-  for (const linkUrl of linkResults.slice(0, MAX_WEB_SEARCH_RESULTS)) {
-    if (existingUrls.has(linkUrl)) continue;
-    if (
-      !linkUrl.includes("google.com") &&
-      !linkUrl.includes("bing.com") &&
-      !linkUrl.includes("duckduckgo.com") &&
-      !linkUrl.includes("yandex.com")
-    ) {
-      linkUrls.push(linkUrl);
+  // TIER 3: Multi-engine image/dork search (direct logo URLs) + page links to spider
+  // Restored searchAllSources — removed in 1a7cf9c and left as dead code.
+  console.log(`[SEARCH] TIER 3: Image/dork search + links to spider`);
+  await reportCrawlProgress(
+    iconKey,
+    "deep_search",
+    `Continuing deep search after ${counts.downloaded} valid icons`,
+    counts,
+  );
+  const isSearchEngineHost = (u: string) =>
+    /google\.|bing\.|duckduckgo\.|yandex\./i.test(u);
+
+  const [searchResults, linkResults] = await Promise.all([
+    searchAllSources(iconKey).catch((e) => {
+      providerFailures++;
+      console.log(
+        `[SEARCH] TIER 3: searchAllSources failed:`,
+        e instanceof Error ? e.message : e,
+      );
+      return [] as Awaited<ReturnType<typeof searchAllSources>>;
+    }),
+    searchForLinksToSpider(iconKey).catch((e) => {
+      providerFailures++;
+      console.log(
+        `[SEARCH] TIER 3: searchForLinksToSpider failed:`,
+        e instanceof Error ? e.message : e,
+      );
+      return [] as string[];
+    }),
+  ]);
+
+  console.log(
+    `[SEARCH] TIER 3: ${searchResults.length} image/dork hits, ${linkResults.length} spider links`,
+  );
+
+  let directAdded = 0;
+  let untrustedRejected = 0;
+  for (const result of searchResults.slice(0, MAX_WEB_SEARCH_RESULTS)) {
+    if (existingUrls.has(result.url)) continue;
+    if (isSearchEngineHost(result.url)) continue;
+
+    const classified = classifyTrustedCandidate(
+      iconKey,
+      officialHosts,
+      result.url,
+    );
+    if (!classified.trusted) {
+      untrustedRejected++;
+      continue;
     }
+
+    if (looksLikeDirectImage(result.url)) {
+      const fmt = result.format || detectUrlFormat(result.url);
+      const src = result.source || "web_search";
+      await saveCrawlResult(iconKey, "", src, fmt, result.url);
+      urlsToFetch.push({ url: result.url, source: src, format: fmt });
+      existingUrls.add(result.url);
+      directAdded++;
+      counts.discovered++;
+    }
+  }
+  console.log(
+    `[SEARCH] TIER 3: Queued ${directAdded} direct image URLs; rejected ${untrustedRejected} untrusted-provenance URLs`,
+  );
+
+  const linkUrls: string[] = [];
+  const queueDirectFromLink = async (linkUrl: string) => {
+    if (existingUrls.has(linkUrl)) return;
+    const classified = classifyTrustedCandidate(
+      iconKey,
+      officialHosts,
+      linkUrl,
+    );
+    if (!classified.trusted) {
+      untrustedRejected++;
+      return;
+    }
+    const fmt = detectUrlFormat(linkUrl);
+    await saveCrawlResult(iconKey, "", "web_search", fmt, linkUrl);
+    urlsToFetch.push({ url: linkUrl, source: "web_search", format: fmt });
+    existingUrls.add(linkUrl);
+    directAdded++;
+    counts.discovered++;
+  };
+
+  // Non-image search hits → spider candidates; image-like → direct fetch
+  for (const result of searchResults.slice(0, MAX_WEB_SEARCH_RESULTS)) {
+    if (looksLikeDirectImage(result.url)) continue;
+    if (existingUrls.has(result.url) || isSearchEngineHost(result.url))
+      continue;
+    if (!linkUrls.includes(result.url)) linkUrls.push(result.url);
+  }
+  for (const linkUrl of linkResults.slice(0, MAX_WEB_SEARCH_RESULTS)) {
+    if (existingUrls.has(linkUrl) || isSearchEngineHost(linkUrl)) continue;
+    if (looksLikeDirectImage(linkUrl)) {
+      await queueDirectFromLink(linkUrl);
+      continue;
+    }
+    if (!linkUrls.includes(linkUrl)) linkUrls.push(linkUrl);
   }
 
   // SPIDER: Extract icons from link pages - FIND URLs
-  console.log(`[SEARCH] SPIDER: Processing ${linkUrls.length} links`);
-  if (linkUrls.length > 0) {
-    const uncrawledLinks = (
-      await Promise.all(
-        linkUrls
-          .slice(0, MAX_SPIDERED_URLS)
-          .map(async (u) => ((await isUrlAlreadyCrawled(u)) ? null : u)),
-      )
-    ).filter((u): u is string => u !== null);
+  // Tranche D: only spider first-party (official-host) pages. Arbitrary pages
+  // contribute their OWN favicon/og:image/logo and pollute the picker.
+  const officialLinks = linkUrls.filter((u) => {
+    try {
+      const h = new URL(u).hostname.replace(/^www\./, "").toLowerCase();
+      return officialHosts.has(h);
+    } catch {
+      return false;
+    }
+  });
+  console.log(
+    `[SEARCH] SPIDER: Processing ${officialLinks.length} official-host links (of ${linkUrls.length})`,
+  );
+  if (officialLinks.length > 0) {
+    const uncrawledLinks = officialLinks.slice(0, MAX_SPIDERED_URLS);
 
     if (uncrawledLinks.length > 0) {
       console.log(`[SEARCH] SPIDER: Fetching ${uncrawledLinks.length} pages`);
+      counts.spideredPages += uncrawledLinks.length;
       const spideredIcons = await extractIconsFromUrls(uncrawledLinks, iconKey);
       console.log(`[SEARCH] SPIDER: Found ${spideredIcons.length} icon URLs`);
       for (const icon of spideredIcons.slice(0, MAX_SPIDERED_ICONS)) {
-        if (!existingUrls.has(icon.url)) {
+        if (
+          !existingUrls.has(icon.url) &&
+          isPublishableExtractedIcon(icon.url, icon.source)
+        ) {
           await saveCrawlResult(
             iconKey,
             "",
@@ -555,25 +1127,50 @@ export async function findIconUrls(iconKey: string): Promise<void> {
             source: `spider:${icon.source}`,
             format: icon.format,
           });
+          existingUrls.add(icon.url);
+          counts.discovered++;
         }
       }
     }
   }
 
   console.log(`[SEARCH] Search completed for ${iconKey}`);
+  await reportCrawlProgress(
+    iconKey,
+    "fetching",
+    `Discovered ${counts.discovered} candidates across all sources`,
+    counts,
+  );
 
   // START IMMEDIATE FETCH of discovered URLs in parallel
   // This replaces the old queue-based approach which had race conditions
-  console.log(`[SEARCH] Immediately fetching ${urlsToFetch.length} URLs`);
-  if (urlsToFetch.length > 0) {
-    // Fetch first 5 immediately (user gets instant feedback)
-    const immediate = urlsToFetch.slice(0, 5);
-    const rest = urlsToFetch.slice(5);
+  // High-quality sources first so the first batch is not all tiny favicons
+  const orderedFetch = sortUrlsByQuality(
+    urlsToFetch.filter((candidate) => !immediatelyAttempted.has(candidate.url)),
+    iconKey,
+    [...officialHosts][0] ?? null,
+  );
+  console.log(
+    `[SEARCH] Immediately fetching ${orderedFetch.length} URLs (quality-ordered)`,
+  );
+  if (orderedFetch.length > 0) {
+    // Fetch a bounded next batch; the early batch already gave the picker a
+    // head start before deep search completed.
+    const immediate = orderedFetch.slice(0, IMMEDIATE_FETCH_BATCH);
+    const rest = orderedFetch.slice(IMMEDIATE_FETCH_BATCH);
 
-    // Fetch first batch in parallel
-    await Promise.all(
-      immediate.map((u) => fetchAndSaveUrl(u.url, u.source, iconKey, u.format)),
-    );
+    // Fetch a slightly larger first-party/library batch right away. Each fetch
+    // performs CPU-heavy base64/image validation work, so unlimited parallelism
+    // makes the app look frozen despite the network calls themselves being async.
+    for (let i = 0; i < immediate.length; i += DOWNLOAD_CONCURRENCY) {
+      const batch = immediate.slice(i, i + DOWNLOAD_CONCURRENCY);
+      const outcomes = await Promise.all(
+        batch.map((u) => fetchAndSaveUrl(u.url, u.source, iconKey, u.format)),
+      );
+      counts.downloaded += outcomes.filter(Boolean).length;
+      counts.rejected += outcomes.filter((result) => !result).length;
+      await yieldToUi();
+    }
 
     // For remaining URLs, queue via the old method but also try fetching now
     if (rest.length > 0) {
@@ -624,112 +1221,274 @@ export async function findIconUrls(iconKey: string): Promise<void> {
   }
 
   console.log(`[SEARCH] ===== FINISHED SEARCH for ${iconKey} =====`);
+  await reportCrawlProgress(
+    iconKey,
+    "fetching",
+    `Deep discovery complete: ${counts.discovered} candidates, ${counts.downloaded} saved so far`,
+    counts,
+  );
+  return providerFailures;
 }
 
-// PHASE 2: Background fetch worker - processes queued downloads
+// Background fetch worker — processes queued downloads
 export async function processIconQueue(): Promise<void> {
   console.log(`[QUEUE] processIconQueue starting`);
   if (isProcessingQueue) {
-    console.log(`[QUEUE] Already processing, skipping`);
+    queueRerunRequested = true;
+    console.log(`[QUEUE] Already processing, will re-run when free`);
     return;
   }
   isProcessingQueue = true;
   try {
-    const queued = await getQueuedIcons();
-    console.log(`[QUEUE] Found ${queued.length} items in queue`);
+    // Loop while new work arrived mid-run
 
-    for (const item of queued) {
-      console.log(`[QUEUE] Fetching icons for ${item.icon_key}`);
+    while (true) {
+      queueRerunRequested = false;
+      const queued = await getQueuedIcons();
+      console.log(`[QUEUE] Found ${queued.length} items in queue`);
 
-      try {
-        // Get URLs from crawl results (found during search)
-        const crawlResults = await getCrawlResults(item.icon_key);
-        const unfetchedUrls = crawlResults
-          .filter((r) => !r.imageData) // No image data means not yet downloaded
-          .map((r) => r.originalUrl)
-          .filter((u): u is string => Boolean(u));
+      for (const item of queued) {
+        console.log(`[QUEUE] Fetching icons for ${item.icon_key}`);
 
-        console.log(
-          `[QUEUE] Found ${unfetchedUrls.length} URLs to fetch for ${item.icon_key}`,
-        );
+        try {
+          // Get URLs from crawl results (found during search)
+          const crawlResults = await getCrawlResults(item.icon_key);
+          const unfetchedUrls = crawlResults
+            .filter((r) => !r.imageData) // No image data means not yet downloaded
+            .map((r) => r.originalUrl)
+            .filter((u): u is string => Boolean(u));
 
-        // Fetch all unfetched URLs, but mark them as crawled first to avoid duplication
-        for (const url of unfetchedUrls) {
-          const crawlResult = crawlResults.find((r) => r.originalUrl === url);
-          if (crawlResult) {
-            const alreadyCrawled = await isUrlAlreadyCrawled(url);
-            if (alreadyCrawled) continue;
+          console.log(
+            `[QUEUE] Found ${unfetchedUrls.length} URLs to fetch for ${item.icon_key}`,
+          );
 
+          // Prefer high-quality candidates; skip domains still in cooldown
+          const candidates = sortUrlsByQuality(
+            unfetchedUrls
+              .map((url) => {
+                const crawlResult = crawlResults.find(
+                  (r) => r.originalUrl === url,
+                );
+                if (!crawlResult) return null;
+                return {
+                  url,
+                  source: crawlResult.source,
+                  format: crawlResult.format,
+                };
+              })
+              .filter(
+                (x): x is { url: string; source: string; format: string } =>
+                  Boolean(x),
+              ),
+            item.icon_key,
+          );
+
+          for (const c of candidates) {
+            if (await isDomainRateLimited(c.url)) {
+              console.log(`[QUEUE] Skip rate-limited ${c.url}`);
+              continue;
+            }
             const success = await downloadImageAsBase64(
-              url,
-              crawlResult.source,
+              c.url,
+              c.source,
               item.icon_key,
             );
             if (success) {
-              await markUrlAsCrawled(url);
-              console.log(`[QUEUE] Fetched ${url}`);
+              await markUrlAsCrawled(c.url);
+              console.log(`[QUEUE] Fetched ${c.url}`);
+            }
+            // Downloads include image decoding/validation. Explicitly yield so
+            // this detached worker remains cooperative with UI interactions.
+            await yieldToUi();
+          }
+
+          // After fetching, set best *valid* icon as cached (skip empty/transparent)
+          const cached = await getCachedIcon(item.icon_key);
+          const cachedValid =
+            !!cached?.imageData &&
+            isBase64IconValid(cached.imageData, cached.format);
+          const userChosen =
+            cached?.chosen === true || isUserChosenCacheSource(cached?.source);
+          if (canAutoAssignCache(!!cached?.imageData, cachedValid, userChosen)) {
+            const all = await getCrawlResults(item.icon_key);
+            const withData = all.filter(
+              (r) => r.imageData && isPaintableCardIcon(r.imageData, r.format),
+            );
+            if (withData.length > 0) {
+              const session = await getIconCrawlSession(item.icon_key);
+              const officialHost = session?.officialDomain
+                ? sanitizeOfficialHost(session.officialDomain)
+                : officialHostFromCompoundSlug(item.icon_key);
+              const best = pickBestIcon(
+                withData.map((r) => ({
+                  ...r,
+                  imageDataLength: r.imageData?.length,
+                  brand: item.icon_key,
+                  officialHost,
+                })),
+              )!;
+              const bestUpscaled = await upscaleIconIfSmall(
+                best.imageData,
+                best.format,
+              );
+              if (
+                !isBase64IconValid(bestUpscaled.base64, bestUpscaled.format)
+              ) {
+                console.log(
+                  `[QUEUE] Skip caching invalid best icon for ${item.icon_key}`,
+                );
+              } else if (
+                cachedValid &&
+                cached?.imageData === bestUpscaled.base64
+              ) {
+                console.log(
+                  `[QUEUE] Best icon already cached for ${item.icon_key}`,
+                );
+              } else if (
+                cachedValid &&
+                cached &&
+                scoreIconQuality({
+                  source: best.source,
+                  format: bestUpscaled.format,
+                  originalUrl: best.originalUrl,
+                  originalWidth: best.originalWidth,
+                  originalHeight: best.originalHeight,
+                  imageDataLength: bestUpscaled.base64.length,
+                  brand: item.icon_key,
+                  officialHost,
+                }) <=
+                  scoreIconQuality({
+                    source: cached.source,
+                    format: cached.format,
+                    originalUrl: cached.originalUrl,
+                    originalWidth: cached.originalWidth,
+                    originalHeight: cached.originalHeight,
+                    imageDataLength: cached.imageData.length,
+                    brand: item.icon_key,
+                    officialHost,
+                  })
+              ) {
+                console.log(
+                  `[QUEUE] Skip downgrade for ${item.icon_key} (${best.source} not better than ${cached.source})`,
+                );
+              } else {
+                await setCachedIcon(
+                  item.icon_key,
+                  bestUpscaled.base64,
+                  best.source,
+                  bestUpscaled.format,
+                  best.originalUrl,
+                  0,
+                  best.originalWidth,
+                  best.originalHeight,
+                  false,
+                  false,
+                );
+                console.log(`[QUEUE] Set best icon as cached: ${best.source}`);
+              }
             }
           }
+        } catch (error) {
+          console.error(`[QUEUE] Error:`, error);
+        } finally {
+          // Searching… is owned by startIconCrawl for THIS iconKey's discovery
+          // + first batch. Do not clear it here; also do not keep it on for
+          // leftover shared-queue fetches of other brands.
+          await dequeueIcon(item.icon_key);
         }
-
-        // After fetching, set best icon as cached
-        const cached = await getCachedIcon(item.icon_key);
-        if (!cached?.imageData) {
-          const all = await getCrawlResults(item.icon_key);
-          const withData = all.filter((r) => r.imageData);
-          if (withData.length > 0) {
-            const best = withData.reduce((prev, curr) =>
-              prev.fallbackTier < curr.fallbackTier ? prev : curr,
-            );
-            // Upscale low-res picks (e.g. favicons) before caching.
-            const bestUpscaled = await upscaleIconIfSmall(
-              best.imageData,
-              best.format,
-            );
-            await setCachedIcon(
-              item.icon_key,
-              bestUpscaled.base64,
-              best.source,
-              bestUpscaled.format,
-              best.originalUrl,
-              0,
-              best.originalWidth,
-              best.originalHeight,
-            );
-            console.log(`[QUEUE] Set best icon as cached: ${best.source}`);
-          }
-        }
-      } catch (error) {
-        console.error(`[QUEUE] Error:`, error);
-      } finally {
-        // NOTE: intentionally do NOT clear the icon-loading flag here. The
-        // crawl-wide loading state is owned by startIconCrawl and cleared only
-        // when the whole crawl finishes, so the UI stays in "loading" until the
-        // crawl that started it is actually done.
-        await dequeueIcon(item.icon_key);
       }
-    }
+      if (!queueRerunRequested) break;
+      console.log(`[QUEUE] Re-running after mid-flight enqueue`);
+    } // while
   } finally {
     isProcessingQueue = false;
+    if (queueRerunRequested) {
+      queueRerunRequested = false;
+      void processIconQueue().catch(console.error);
+    }
   }
 }
 
-// Promote the first already-fetched crawl result to icon_cache so the
-// subscription card auto-assigns the icon without reopening any modal.
+// Promote the best already-fetched *valid* crawl result to icon_cache so the
+// subscription card auto-assigns a non-empty icon without reopening any modal.
 export async function promoteFirstIconToCache(iconKey: string): Promise<void> {
+  if (isLeftoverTypingSlug(iconKey)) {
+    return;
+  }
   try {
     const cached = await getCachedIcon(iconKey);
-    if (cached?.imageData) return;
+    const cachedValid =
+      !!cached?.imageData && isBase64IconValid(cached.imageData, cached.format);
+    const userChosen =
+      cached?.chosen === true || isUserChosenCacheSource(cached?.source);
+    // Never overwrite a user/AI-chosen cache. Crawler-owned rows may upgrade.
+    if (!canAutoAssignCache(!!cached?.imageData, cachedValid, userChosen)) {
+      return;
+    }
 
     const all = await getCrawlResults(iconKey);
-    const withData = all.filter((r) => r.imageData);
-    if (withData.length === 0) return;
-
-    const best = withData.reduce((prev, curr) =>
-      prev.fallbackTier < curr.fallbackTier ? prev : curr,
+    // Never auto-assign empty / fully-transparent / unpaintable SVG to the card.
+    const withData = all.filter(
+      (r) => r.imageData && isPaintableCardIcon(r.imageData, r.format),
     );
-    // Upscale low-res picks (e.g. favicons) before caching.
+    if (withData.length === 0) {
+      console.log(
+        `[CRAWL] No valid icons to auto-assign for ${iconKey} (${all.filter((r) => r.imageData).length} with data, all invalid/empty)`,
+      );
+      return;
+    }
+
+    const session = await getIconCrawlSession(iconKey);
+    const officialHost = session?.officialDomain
+      ? sanitizeOfficialHost(session.officialDomain)
+      : officialHostFromCompoundSlug(iconKey);
+    const best = pickBestIcon(
+      withData.map((r) => ({
+        ...r,
+        imageDataLength: r.imageData?.length,
+        brand: iconKey,
+        officialHost,
+      })),
+    )!;
     const bestUpscaled = await upscaleIconIfSmall(best.imageData, best.format);
+    if (!isBase64IconValid(bestUpscaled.base64, bestUpscaled.format)) {
+      console.log(
+        `[CRAWL] Best icon for ${iconKey} became invalid after upscale — skip auto-assign`,
+      );
+      return;
+    }
+    if (cachedValid && cached?.imageData === bestUpscaled.base64) {
+      return;
+    }
+    if (
+      cachedValid &&
+      cached &&
+      scoreIconQuality({
+        source: best.source,
+        format: bestUpscaled.format,
+        originalUrl: best.originalUrl,
+        originalWidth: best.originalWidth,
+        originalHeight: best.originalHeight,
+        imageDataLength: bestUpscaled.base64.length,
+        brand: iconKey,
+        officialHost,
+      }) <=
+        scoreIconQuality({
+          source: cached.source,
+          format: cached.format,
+          originalUrl: cached.originalUrl,
+          originalWidth: cached.originalWidth,
+          originalHeight: cached.originalHeight,
+          imageDataLength: cached.imageData.length,
+          brand: iconKey,
+          officialHost,
+        })
+    ) {
+      console.log(
+        `[CRAWL] Skip downgrade for ${iconKey} (${best.source} not better than ${cached.source})`,
+      );
+      return;
+    }
     await setCachedIcon(
       iconKey,
       bestUpscaled.base64,
@@ -739,8 +1498,13 @@ export async function promoteFirstIconToCache(iconKey: string): Promise<void> {
       0,
       best.originalWidth,
       best.originalHeight,
+      false,
+      false,
     );
-    console.log(`[CRAWL] Auto-assigned first icon for ${iconKey}`);
+    console.log(
+      `[CRAWL] Auto-assigned best valid icon for ${iconKey} (source=${best.source})`,
+    );
+    notifyCacheUpdate();
   } catch (err) {
     console.error(`[CRAWL] Failed to promote icon for ${iconKey}:`, err);
   }
@@ -748,41 +1512,102 @@ export async function promoteFirstIconToCache(iconKey: string): Promise<void> {
 
 // Detached, persistent background crawler.
 // - Writes a durable record to the DB icon_crawl_queue (survives modal unmount).
-// - Flags the icon as "loading" in the global registry for the FULL crawl.
-// - Runs the actual discovery/fetch as a detached promise that is never awaited
-//   by any UI, so closing any modal cannot cancel it.
+// - Flags THIS iconKey as "loading" for discovery + the first fetch batch.
+//   Searching… must not wait on the shared leftover queue for other brands.
+// - Runs discovery as a detached promise never awaited by any UI.
+export type IconCrawlOptions = {
+  officialDomain?: string | null;
+};
+
 export async function startIconCrawl(
   iconKey: string,
   subscriptionId?: string,
+  options?: IconCrawlOptions,
 ): Promise<void> {
+  if (isLeftoverTypingSlug(iconKey)) {
+    console.log(
+      `[CRAWL] skip leftover slug "${iconKey}" (${leftoverSlugSkipReason(iconKey)})`,
+    );
+    return;
+  }
+  const seeded = options?.officialDomain
+    ? sanitizeOfficialHost(options.officialDomain)
+    : null;
   console.log(
-    `[CRAWL] startIconCrawl for ${iconKey} (sub: ${subscriptionId ?? "none"})`,
+    `[CRAWL] startIconCrawl for ${iconKey} (sub: ${subscriptionId ?? "none"}; official=${seeded ?? "search"})`,
   );
-  // Durable DB record — this is what makes the search persistent/observable.
-  // enqueueIconScrape also kicks off the fetch worker, so the crawl is
-  // self-sustaining in the background without startIconCrawl awaiting the
-  // queue directly.
-  await enqueueIconScrape(iconKey, subscriptionId);
+  if (activeCrawls.has(iconKey)) {
+    console.log(`[CRAWL] Already crawling ${iconKey}, skip duplicate start`);
+    await enqueueIconScrape(iconKey, subscriptionId);
+    if (seeded) {
+      await updateIconCrawlSession(iconKey, { officialDomain: seeded });
+    }
+    return;
+  }
+  activeCrawls.add(iconKey);
+  const gen = crawlGens.begin(iconKey);
 
-  // Flag the icon as "loading" for the FULL crawl duration. This is the
-  // crawl-wide loading state — only startIconCrawl clears it, never the
-  // per-item completion inside processIconQueue.
+  await enqueueIconScrape(iconKey, subscriptionId);
+  await beginIconCrawlSession(iconKey, seeded);
+  setIconCrawlProgress(iconKey, {
+    status: "discovering",
+    detail: "Discovering icon sources",
+  });
+
+  // Searching… follows THIS iconKey's discovery + first fetch batch, not the
+  // shared leftover queue (other brands' Bing/pngkey drains).
   setIconLoading(iconKey, true);
 
   // Fire-and-forget background worker. Not awaited by any caller/modal.
   void (async () => {
     try {
-      // findIconUrls triggers background queue processing as it discovers URLs,
-      // so we only enqueue work here and let it run; promoteFirstIconToCache
-      // still runs to auto-assign the first fetched icon to the subscription.
-      await findIconUrls(iconKey);
+      // findIconUrls runs discovery and a small immediate fetch, then enqueues
+      // remaining URLs on the shared worker without awaiting that worker.
+      const providerFailures = await findIconUrls(iconKey);
+      // Stale-cancellation: a newer crawl for this key owns publication now.
+      if (!crawlGens.isCurrent(iconKey, gen)) return;
       await promoteFirstIconToCache(iconKey);
+      const finalResults = await getCrawlResults(iconKey);
+      const saved = finalResults.filter((result) => Boolean(result.imageData));
+      const remaining = finalResults.filter((result) => !result.imageData);
+      const finalCounts: CrawlCounts = {
+        discovered: finalResults.length,
+        downloaded: saved.length,
+        rejected: 0,
+        deferred: remaining.length,
+        spideredPages: 0,
+      };
+      const terminalStatus = terminalStatusFor(
+        saved.length,
+        remaining.length,
+        providerFailures,
+      );
+      await reportCrawlProgress(
+        iconKey,
+        terminalStatus,
+        terminalStatus === "complete"
+          ? `${saved.length} valid icons saved from ${finalResults.length} candidates`
+          : `${saved.length} valid icons saved; ${remaining.length} retryable; ${providerFailures} provider failure(s)`,
+        finalCounts,
+        true,
+      );
     } catch (err) {
       console.error(`[CRAWL] Error crawling ${iconKey}:`, err);
+      await updateIconCrawlSession(iconKey, {
+        status: "failed",
+        detail: err instanceof Error ? err.message : "Crawler failed",
+        completed: true,
+      });
+      setIconCrawlProgress(iconKey, {
+        status: "failed",
+        detail: "Crawler failed; saved candidates can be retried",
+      });
     } finally {
-      // Only clear the crawl-wide loading flag from here, never from the
-      // per-item completion in processIconQueue.
+      // Clear THIS key as soon as its discovery + first batch finished.
+      // Background queue may still fetch remaining candidates; picker reloads
+      // via notifyCacheUpdate. Do not wait on other keys' leftover URLs.
       setIconLoading(iconKey, false);
+      activeCrawls.delete(iconKey);
     }
   })();
 }

@@ -1,0 +1,5 @@
+# CPU training requirements — guaranteed to work anywhere, no GPU/driver needed.
+# Python 3.9-3.12 required (TF 2.19 does NOT support 3.13+).
+tensorflow-cpu==2.19.0
+cairosvg==2.7.1
+pillow==11.1.0

@@ -18,10 +18,16 @@ import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
 import { Image } from "react-native";
 
 // Below this max dimension an icon is considered "low-res" and worth upscaling.
-const UPSCALE_THRESHOLD_PX = 64;
+// DISABLED for crawl-time: we now store ORIGINAL resolution and only upscale
+// on-demand when user taps "Upscale (AI)". This prevents bilinear garbage
+// from polluting the training/upscaling pipeline.
+// const UPSCALE_THRESHOLD_PX = 64;
 
 // Target size for upscaled icons (power-of-two friendly, crisp at card size).
 const TARGET_SIZE_PX = 256;
+
+// Crawl-time upscaling is DISABLED. Set to true ONLY for manual "Upscale (AI)" button.
+const CRAWL_TIME_UPSCALE_ENABLED = false;
 
 export function mimeForFormat(format: string): string {
   switch (format) {
@@ -96,9 +102,16 @@ export async function upscaleIconIfSmall(
     );
 
     const maxDim = Math.max(size.width, size.height);
-    if (maxDim >= UPSCALE_THRESHOLD_PX && !force) {
-      // Already large enough — no upscaling needed (unless forced by an
-      // explicit user tap on the "Upscale (AI)" button).
+
+    // Crawl-time upscaling is disabled - only upscale when explicitly forced
+    // (user taps "Upscale (AI)" button). This preserves original resolution
+    // for better AI upscaling quality.
+    if (!CRAWL_TIME_UPSCALE_ENABLED && !force) {
+      return { base64, format };
+    }
+
+    if (maxDim >= TARGET_SIZE_PX && !force) {
+      // Already at or above target size — no upscaling needed.
       return { base64, format };
     }
 

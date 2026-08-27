@@ -3,13 +3,14 @@ import {
   getCachedIcon,
   getQueuedIcons,
   setCachedIcon,
-} from "../../services/database";
+} from "@/services/database";
 import {
   addCacheUpdateListener,
   addLoadingListener,
   isIconLoading,
-} from "../services/iconLoadingRegistry";
-import { mimeForFormat, upscaleIconIfSmall } from "../services/iconUpscaler";
+} from "@/services/iconLoadingRegistry";
+import { mimeForFormat, upscaleIconIfSmall } from "@/services/iconUpscaler";
+import { isPaintableCardIcon } from "@/services/iconValidation";
 
 export type IconStatus =
   "placeholder" | "loading" | "cached" | "error" | "no_icon";
@@ -46,6 +47,10 @@ export function useCachedIcon(iconKey: string | undefined): IconState {
         // means "use the static brand asset". Treat it as no override so the
         // card falls back to the bundled icon instead of a blank/broken URI.
         if (cached.imageData.startsWith("local_asset:")) {
+          setIconUri(null);
+          setFormat(null);
+        } else if (!isPaintableCardIcon(cached.imageData, cached.format)) {
+          // Invalid/blank/SVG cache stays healable by hop 2; do not paint it.
           setIconUri(null);
           setFormat(null);
         } else {
@@ -105,6 +110,9 @@ export function useCachedIcon(iconKey: string | undefined): IconState {
         if (cached.imageData.startsWith("local_asset:")) {
           setIconUri(null);
           setFormat(null);
+        } else if (!isPaintableCardIcon(cached.imageData, cached.format)) {
+          setIconUri(null);
+          setFormat(null);
         } else {
           await applyCachedImage(cached, active);
         }
@@ -142,12 +150,18 @@ export function useCachedIcon(iconKey: string | undefined): IconState {
       cached.format,
     );
     if (upscaled !== cached.imageData && active) {
+      const existing = await getCachedIcon(iconKey!);
       await setCachedIcon(
         iconKey!,
         upscaled,
         cached.source ?? "local",
         outFormat,
         cached.originalUrl ?? undefined,
+        0,
+        undefined,
+        undefined,
+        false,
+        existing?.chosen === true,
       );
     }
     if (!active) return;

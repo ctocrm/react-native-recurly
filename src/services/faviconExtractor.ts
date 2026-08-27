@@ -60,13 +60,17 @@ function extractDomain(url: string): string {
 async function tryCommonFaviconPaths(
   domain: string,
 ): Promise<FaviconResult | null> {
+  // Prefer vector / large touch icons before tiny classic favicon.ico
   const paths = [
-    `/favicon.ico`,
     `/favicon.svg`,
     `/apple-touch-icon.png`,
+    `/apple-touch-icon-precomposed.png`,
+    `/apple-touch-icon-180x180.png`,
     `/apple-touch-icon-152x152.png`,
-    `/android-chrome-192x192.png`,
     `/android-chrome-512x512.png`,
+    `/android-chrome-192x192.png`,
+    `/favicon-32x32.png`,
+    `/favicon.ico`,
   ];
 
   for (const path of paths) {
@@ -149,7 +153,15 @@ async function checkDomain(domain: string): Promise<FaviconResult | null> {
 // Main favicon extraction function with bounded concurrency
 export async function extractFavicon(
   brandName: string,
+  officialHost?: string | null,
 ): Promise<FaviconResult | null> {
+  const seeded = officialHost?.replace(/^www\./, "").toLowerCase();
+  if (seeded) {
+    const direct = await checkDomain(`https://${seeded}`);
+    if (direct) return direct;
+    return null;
+  }
+
   const domains = generateLikelyDomains(brandName);
 
   // Process domains with bounded concurrency, short-circuit on first success

@@ -1,0 +1,1307 @@
+08-13 20:35:00.007  2132  2161 I ReactNativeJS: [CRAWL] startIconCrawl for ne (sub: none)
+08-13 20:35:00.182  2132  2161 I ReactNativeJS: [SEARCH] ===== STARTING SEARCH for ne =====
+08-13 20:35:00.198  2132  2161 I ReactNativeJS: [SEARCH] LOCAL: Checking for ne
+08-13 20:35:00.199  2132  2161 I ReactNativeJS: [SEARCH] TIER 0: Discovering official website
+08-13 20:35:01.194  2132  2161 I ReactNativeJS: [CRAWL] startIconCrawl for net (sub: none)
+08-13 20:35:01.323  2132  2161 I ReactNativeJS: [SEARCH] ===== STARTING SEARCH for net =====
+08-13 20:35:01.331  2132  2161 I ReactNativeJS: [SEARCH] LOCAL: Checking for net
+08-13 20:35:01.331  2132  2161 I ReactNativeJS: [SEARCH] TIER 0: Discovering official website
+08-13 20:35:02.071  2132  2161 I ReactNativeJS: [CRAWL] startIconCrawl for netf (sub: none)
+08-13 20:35:02.074  2132  2161 I ReactNativeJS: [SEARCH] TIER 1: Library CDNs
+08-13 20:35:02.076  2132  2161 I ReactNativeJS: [ICON_SCRAPER] findAllIconSources: "ne" -> slug="ne", alternatives=[]
+08-13 20:35:02.143  2132  2161 I ReactNativeJS: [SEARCH] TIER 1: Library CDNs
+08-13 20:35:02.167  2132  2161 I ReactNativeJS: [ICON_SCRAPER] findAllIconSources: "net" -> slug="net", alternatives=[]
+08-13 20:35:02.361  2132  2161 I ReactNativeJS: [SEARCH] ===== STARTING SEARCH for netf =====
+08-13 20:35:02.367  2132  2161 I ReactNativeJS: [SEARCH] LOCAL: Checking for netf
+08-13 20:35:02.367  2132  2161 I ReactNativeJS: [SEARCH] TIER 0: Discovering official website
+08-13 20:35:02.538  2132  2161 I ReactNativeJS: [SEARCH] TIER 1: Library CDNs
+08-13 20:35:02.539  2132  2161 I ReactNativeJS: [ICON_SCRAPER] findAllIconSources: "netf" -> slug="netf", alternatives=[]
+08-13 20:35:03.754  2132  2161 I ReactNativeJS: [CRAWL] startIconCrawl for netflix (sub: none)
+08-13 20:35:03.885  2132  2161 I ReactNativeJS: [SEARCH] ===== STARTING SEARCH for netflix =====
+08-13 20:35:03.890  2132  2161 I ReactNativeJS: [SEARCH] LOCAL: Checking for netflix
+08-13 20:35:03.890  2132  2161 I ReactNativeJS: [SEARCH] LOCAL: Found local icon
+08-13 20:35:03.890  2132  2161 I ReactNativeJS: [SEARCH] TIER 0: Discovering official website
+08-13 20:35:04.078  2132  2161 I ReactNativeJS: [SEARCH] TIER 1: Library CDNs
+08-13 20:35:04.089  2132  2161 I ReactNativeJS: [ICON_SCRAPER] findAllIconSources: "netflix" -> slug="netflix", alternatives=[]
+08-13 20:35:04.589  2132  2161 I ReactNativeJS: [BUTTON] Search pressed for netflix
+08-13 20:35:04.590  2132  2161 I ReactNativeJS: [CRAWL] startIconCrawl for netflix (sub: none)
+08-13 20:35:04.590  2132  2161 I ReactNativeJS: [CRAWL] Already crawling netflix, skip duplicate start
+08-13 20:35:10.751  2132  2161 I ReactNativeJS: [ICON_SCRAPER] findAllIconSources: Found 0 icons for "ne"
+08-13 20:35:10.752  2132  2161 I ReactNativeJS: [SEARCH] TIER 1: Found 0 library icons
+08-13 20:35:10.752  2132  2161 I ReactNativeJS: [SEARCH] TIER 2: Favicon
+08-13 20:35:11.152  2132  2161 I ReactNativeJS: [ICON_SCRAPER] findAllIconSources: Found 0 icons for "net"
+08-13 20:35:11.155  2132  2161 I ReactNativeJS: [SEARCH] TIER 1: Found 0 library icons
+08-13 20:35:11.155  2132  2161 I ReactNativeJS: [SEARCH] TIER 2: Favicon
+08-13 20:35:11.675  2132  2161 I ReactNativeJS: [ICON_SCRAPER] Found icon: simple-icons https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/netflix.svg
+08-13 20:35:11.680  2132  2161 I ReactNativeJS: [ICON_SCRAPER] Found icon: icons8 https://img.icons8.com/color/512/netflix.png
+08-13 20:35:11.685  2132  2161 I ReactNativeJS: [ICON_SCRAPER] findAllIconSources: Found 2 icons for "netflix"
+08-13 20:35:11.685  2132  2161 I ReactNativeJS: [SEARCH] TIER 1: Found 2 library icons
+08-13 20:35:11.846  2132  2161 I ReactNativeJS: [SEARCH] TIER 2: Favicon
+08-13 20:35:12.287  2132  2161 I ReactNativeJS: [ICON_SCRAPER] findAllIconSources: Found 0 icons for "netf"
+08-13 20:35:12.287  2132  2161 I ReactNativeJS: [SEARCH] TIER 1: Found 0 library icons
+08-13 20:35:12.287  2132  2161 I ReactNativeJS: [SEARCH] TIER 2: Favicon
+08-13 20:35:14.516  2132  2161 I ReactNativeJS: [SEARCH] TIER 2: Found favicon URL
+08-13 20:35:14.779  2132  2161 I ReactNativeJS: [FETCH] Immediate fetch: favicon https://netplus.com/favicon.ico
+08-13 20:35:14.849  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: favicon https://netplus.com/favicon.ico
+08-13 20:35:15.156  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://netplus.com/favicon.ico (9812 bytes)
+08-13 20:35:15.531  2132  2161 I ReactNativeJS: [SEARCH] TIER 2: Found favicon URL
+08-13 20:35:15.541  2132  2161 I ReactNativeJS: [FETCH] Immediate fetch: favicon https://img1.wsimg.com/isteam/ip/static/pwa-app/logo-default.png/:/rs=w:57,h:57,m
+08-13 20:35:15.542  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: favicon https://img1.wsimg.com/isteam/ip/static/pwa-app/logo-default.png/:/rs=w:57,h:57,m
+08-13 20:35:15.591  2132  2161 I ReactNativeJS: [QUEUE] processIconQueue starting
+08-13 20:35:15.591  2132  2161 I ReactNativeJS: [SEARCH] TIER 3: Image/dork search + links to spider
+08-13 20:35:15.603  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] ===== searchAllSources starting for "net" =====
+08-13 20:35:15.603  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Running DuckDuckGo searches (primary engine)
+08-13 20:35:15.604  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] ===== searchForLinksToSpider starting for "net" =====
+08-13 20:35:15.606  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Added 14 deterministic official-site guesses for "net"
+08-13 20:35:15.608  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo search starting for "net" (variation 0)
+08-13 20:35:15.608  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo URL: https://html.duckduckgo.com/html/?q=net%20logo
+08-13 20:35:15.608  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo search starting for "net" (variation 1)
+08-13 20:35:15.609  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo URL: https://html.duckduckgo.com/html/?q=net%20icon
+08-13 20:35:15.609  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo search starting for "net" (variation 2)
+08-13 20:35:15.609  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo URL: https://html.duckduckgo.com/html/?q=net%20logo%20svg
+08-13 20:35:15.609  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo search starting for "net" (variation 3)
+08-13 20:35:15.609  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo URL: https://html.duckduckgo.com/html/?q=net%20icon%20svg
+08-13 20:35:15.609  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo search starting for "net" (variation 4)
+08-13 20:35:15.609  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo URL: https://html.duckduckgo.com/html/?q=net%20logo%20transparent%20png
+08-13 20:35:15.609  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Fetch attempt 1: https://html.duckduckgo.com/html/?q=net
+08-13 20:35:15.614  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Fetch attempt 1: https://html.duckduckgo.com/html/?q=net%20logo
+08-13 20:35:15.620  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Fetch attempt 1: https://html.duckduckgo.com/html/?q=net%20icon
+08-13 20:35:15.623  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Fetch attempt 1: https://html.duckduckgo.com/html/?q=net%20logo%20svg
+08-13 20:35:15.643  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Fetch attempt 1: https://html.duckduckgo.com/html/?q=net%20icon%20svg
+08-13 20:35:15.643  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Fetch attempt 1: https://html.duckduckgo.com/html/?q=net%20logo%20transparent%20png
+08-13 20:35:15.648  2132  2161 I ReactNativeJS: [QUEUE] Found 4 items in queue
+08-13 20:35:15.648  2132  2161 I ReactNativeJS: [QUEUE] Fetching icons for ne
+08-13 20:35:15.652  2132  2161 I ReactNativeJS: [QUEUE] Found 0 URLs to fetch for ne
+08-13 20:35:15.806  2132  2161 I ReactNativeJS: [QUEUE] Fetching icons for net
+08-13 20:35:15.886  2132  2161 I ReactNativeJS: [QUEUE] Found 0 URLs to fetch for net
+08-13 20:35:16.053  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://img1.wsimg.com/isteam/ip/static/pwa-app/logo-default.png/:/rs=w:57,h:57,m (1300 bytes)
+08-13 20:35:16.122  2132  2161 I ReactNativeJS: [QUEUE] Set best icon as cached: favicon
+08-13 20:35:16.135  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Success (202): https://html.duckduckgo.com/html/?q=net%20icon
+08-13 20:35:16.161  2132  2161 I ReactNativeJS: [QUEUE] Fetching icons for netf
+08-13 20:35:16.202  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo: Got 14216 chars of HTML for "net"
+08-13 20:35:16.215  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo DEBUG: Found 10 <img> tags but none matched extraction patterns
+08-13 20:35:16.219  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo DEBUG: Sample src/data-src: ../assets/anomaly/images/challenge/377ca22cef8125255602cdf7140cb5b8.jpg, ../assets/anomaly/images/challenge/fef2bb691207c89d20c830bf54fa99a1.jpg, ../assets/anomaly/images/challenge/1c9b42beb9508c93bbf86ead0292bb14.jpg
+08-13 20:35:16.220  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo extracted 0 unique image URLs for "net"
+08-13 20:35:16.221  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo: Returning 0 results for "net"
+08-13 20:35:16.245  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Success (202): https://html.duckduckgo.com/html/?q=net%20logo%20transparent%20png
+08-13 20:35:16.274  2132  2161 I ReactNativeJS: [QUEUE] Found 0 URLs to fetch for netf
+08-13 20:35:16.283  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo: Got 14266 chars of HTML for "net"
+08-13 20:35:16.287  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo DEBUG: Found 10 <img> tags but none matched extraction patterns
+08-13 20:35:16.287  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo DEBUG: Sample src/data-src: ../assets/anomaly/images/challenge/afb559c3e57558791e2ccde213e98dbb.jpg, ../assets/anomaly/images/challenge/c4265459ef57c6a30c7bca3f80465c43.jpg, ../assets/anomaly/images/challenge/d6b4642fabe209017fb2700a23bf3cf9.jpg
+08-13 20:35:16.287  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo extracted 0 unique image URLs for "net"
+08-13 20:35:16.288  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo: Returning 0 results for "net"
+08-13 20:35:16.447  2132  2161 I ReactNativeJS: [QUEUE] Set best icon as cached: favicon
+08-13 20:35:16.534  2132  2161 I ReactNativeJS: [QUEUE] Fetching icons for netflix
+08-13 20:35:16.537  2132  2161 I ReactNativeJS: [QUEUE] processIconQueue starting
+08-13 20:35:16.537  2132  2161 I ReactNativeJS: [QUEUE] Already processing, will re-run when free
+08-13 20:35:16.537  2132  2161 I ReactNativeJS: [SEARCH] TIER 3: Image/dork search + links to spider
+08-13 20:35:16.602  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] ===== searchAllSources starting for "netf" =====
+08-13 20:35:16.602  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Running DuckDuckGo searches (primary engine)
+08-13 20:35:16.628  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] ===== searchForLinksToSpider starting for "netf" =====
+08-13 20:35:16.633  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Added 14 deterministic official-site guesses for "netf"
+08-13 20:35:16.645  2132  2161 I ReactNativeJS: [QUEUE] Found 2 URLs to fetch for netflix
+08-13 20:35:16.648  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: simple-icons https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/netflix.svg
+08-13 20:35:16.699  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Success (200): https://html.duckduckgo.com/html/?q=net%20logo
+08-13 20:35:16.704  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Success (200): https://html.duckduckgo.com/html/?q=net%20logo%20svg
+08-13 20:35:16.710  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo search starting for "netf" (variation 0)
+08-13 20:35:16.710  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo URL: https://html.duckduckgo.com/html/?q=netf%20logo
+08-13 20:35:16.868  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Success (200): https://html.duckduckgo.com/html/?q=net%20icon%20svg
+08-13 20:35:16.871  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Success (200): https://html.duckduckgo.com/html/?q=net
+08-13 20:35:16.986  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo search starting for "netf" (variation 1)
+08-13 20:35:16.986  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo URL: https://html.duckduckgo.com/html/?q=netf%20icon
+08-13 20:35:17.006  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo search starting for "netf" (variation 2)
+08-13 20:35:17.007  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo URL: https://html.duckduckgo.com/html/?q=netf%20logo%20svg
+08-13 20:35:17.024  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo search starting for "netf" (variation 3)
+08-13 20:35:17.024  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo URL: https://html.duckduckgo.com/html/?q=netf%20icon%20svg
+08-13 20:35:17.036  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo search starting for "netf" (variation 4)
+08-13 20:35:17.036  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo URL: https://html.duckduckgo.com/html/?q=netf%20logo%20transparent%20png
+08-13 20:35:17.074  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Fetch attempt 1: https://html.duckduckgo.com/html/?q=netf
+08-13 20:35:17.094  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo: Got 31702 chars of HTML for "net"
+08-13 20:35:17.110  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo DEBUG: Found 11 <img> tags but none matched extraction patterns
+08-13 20:35:17.110  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo DEBUG: Sample src/data-src: //external-content.duckduckgo.com/ip3/www.netlogo.org.ico, //external-content.duckduckgo.com/ip3/netlogoweb.org.ico, //external-content.duckduckgo.com/ip3/www.netlogo.org.ico
+08-13 20:35:17.110  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo extracted 0 unique image URLs for "net"
+08-13 20:35:17.111  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo: Returning 0 results for "net"
+08-13 20:35:17.117  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo: Got 32679 chars of HTML for "net"
+08-13 20:35:17.129  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo DEBUG: Found 11 <img> tags but none matched extraction patterns
+08-13 20:35:17.129  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo DEBUG: Sample src/data-src: //external-content.duckduckgo.com/ip3/commons.wikimedia.org.ico, //external-content.duckduckgo.com/ip3/commons.wikimedia.org.ico, //external-content.duckduckgo.com/ip3/seeklogo.com.ico
+08-13 20:35:17.130  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo extracted 0 unique image URLs for "net"
+08-13 20:35:17.134  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo: Returning 4 results for "net"
+08-13 20:35:17.135  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Fetch attempt 1: https://html.duckduckgo.com/html/?q=netf%20logo
+08-13 20:35:17.157  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo: Got 27293 chars of HTML for "net"
+08-13 20:35:17.182  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo extracted 3 unique image URLs for "net"
+08-13 20:35:17.183  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo: Returning 3 results for "net"
+08-13 20:35:17.187  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo total: 7 results
+08-13 20:35:17.191  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Running Bing image searches
+08-13 20:35:17.194  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Bing Images URL: https://www.bing.com/images/search?q=net%20logo&form=HDRSC2&first=1
+08-13 20:35:17.194  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Bing Images URL: https://www.bing.com/images/search?q=net%20icon&form=HDRSC2&first=1
+08-13 20:35:17.194  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Bing Images URL: https://www.bing.com/images/search?q=net%20logo%20svg&form=HDRSC2&first=1
+08-13 20:35:17.201  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Fetch attempt 1: https://www.bing.com/images/search?q=net%20logo&form=HDRSC2&first=1
+08-13 20:35:17.214  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Fetch attempt 1: https://www.bing.com/images/search?q=net%20icon&form=HDRSC2&first=1
+08-13 20:35:17.217  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Fetch attempt 1: https://www.bing.com/images/search?q=net%20logo%20svg&form=HDRSC2&first=1
+08-13 20:35:17.223  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/netflix.svg (368 bytes)
+08-13 20:35:17.260  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Text search found 42 links (uddg=10)
+08-13 20:35:17.260  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] ===== searchForLinksToSpider done for "net": 42 links =====
+08-13 20:35:17.260  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Fetch attempt 1: https://html.duckduckgo.com/html/?q=netf%20icon
+08-13 20:35:17.310  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Success (202): https://html.duckduckgo.com/html/?q=netf
+08-13 20:35:17.319  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Success (202): https://html.duckduckgo.com/html/?q=netf%20logo
+08-13 20:35:17.442  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Fetch attempt 1: https://html.duckduckgo.com/html/?q=netf%20logo%20svg
+08-13 20:35:17.464  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Success (202): https://html.duckduckgo.com/html/?q=netf%20icon
+08-13 20:35:17.489  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Fetch attempt 1: https://html.duckduckgo.com/html/?q=netf%20icon%20svg
+08-13 20:35:17.509  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Fetch attempt 1: https://html.duckduckgo.com/html/?q=netf%20logo%20transparent%20png
+08-13 20:35:17.525  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Text search found 28 links (uddg=0)
+08-13 20:35:17.525  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Fetch returned 0 links, trying WebView fallback for "netf"
+08-13 20:35:17.526  2132  2161 I ReactNativeJS: [WEBVIEW_SEARCH] Ready for WebView search: "netf" (requestId: search_1786667717525_1)
+08-13 20:35:17.526  2132  2161 I ReactNativeJS: [WEBVIEW_COMPONENT] Triggering search for "netf" (requestId: search_1786667717525_1)
+08-13 20:35:17.551  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo: Got 14230 chars of HTML for "netf"
+08-13 20:35:17.554  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo DEBUG: Found 10 <img> tags but none matched extraction patterns
+08-13 20:35:17.554  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo DEBUG: Sample src/data-src: ../assets/anomaly/images/challenge/377ca22cef8125255602cdf7140cb5b8.jpg, ../assets/anomaly/images/challenge/fef2bb691207c89d20c830bf54fa99a1.jpg, ../assets/anomaly/images/challenge/1c9b42beb9508c93bbf86ead0292bb14.jpg
+08-13 20:35:17.554  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo extracted 0 unique image URLs for "netf"
+08-13 20:35:17.555  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo: Returning 0 results for "netf"
+08-13 20:35:17.566  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo: Got 14235 chars of HTML for "netf"
+08-13 20:35:17.572  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo DEBUG: Found 10 <img> tags but none matched extraction patterns
+08-13 20:35:17.573  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo DEBUG: Sample src/data-src: ../assets/anomaly/images/challenge/c102c6a3d55354923ff4412b77a97d27.jpg, ../assets/anomaly/images/challenge/ff52c2d2cf8c0e166879e2805506e2c9.jpg, ../assets/anomaly/images/challenge/3d060c8a662c0eebee05e939a4833282.jpg
+08-13 20:35:17.573  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo extracted 0 unique image URLs for "netf"
+08-13 20:35:17.573  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo: Returning 0 results for "netf"
+08-13 20:35:17.619  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Success (202): https://html.duckduckgo.com/html/?q=netf%20logo%20transparent%20png
+08-13 20:35:17.638  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/netflix.svg
+08-13 20:35:17.649  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: icons8 https://img.icons8.com/color/512/netflix.png
+08-13 20:35:17.655  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo: Got 14262 chars of HTML for "netf"
+08-13 20:35:17.662  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo DEBUG: Found 10 <img> tags but none matched extraction patterns
+08-13 20:35:17.662  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo DEBUG: Sample src/data-src: ../assets/anomaly/images/challenge/c102c6a3d55354923ff4412b77a97d27.jpg, ../assets/anomaly/images/challenge/ff52c2d2cf8c0e166879e2805506e2c9.jpg, ../assets/anomaly/images/challenge/3d060c8a662c0eebee05e939a4833282.jpg
+08-13 20:35:17.663  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo extracted 0 unique image URLs for "netf"
+08-13 20:35:17.663  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo: Returning 0 results for "netf"
+08-13 20:35:17.743  2132  2161 I ReactNativeJS: [SEARCH] TIER 2: Found favicon URL
+08-13 20:35:17.909  2132  2161 I ReactNativeJS: [FETCH] Immediate fetch: favicon https://cicgroup.com/nooter-eriksen/wp-content/uploads/sites/3/2024/08/ne-favicon-150x150.png
+08-13 20:35:17.933  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: favicon https://cicgroup.com/nooter-eriksen/wp-content/uploads/sites/3/2024/08/ne-favicon-150x150.png
+08-13 20:35:18.042  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Success (200): https://www.bing.com/images/search?q=net%20logo&form=HDRSC2&first=1
+08-13 20:35:18.334  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Bing: Got 483147 chars of HTML for "net"
+08-13 20:35:18.526  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Bing: Returning 55 results for "net"
+08-13 20:35:18.608  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://cicgroup.com/nooter-eriksen/wp-content/uploads/sites/3/2024/08/ne-favicon-150x150.png (1008 bytes)
+08-13 20:35:18.635  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Success (200): https://html.duckduckgo.com/html/?q=netf%20logo%20svg
+08-13 20:35:18.670  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Success (200): https://www.bing.com/images/search?q=net%20logo%20svg&form=HDRSC2&first=1
+08-13 20:35:18.673  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Success (200): https://html.duckduckgo.com/html/?q=netf%20icon%20svg
+08-13 20:35:18.729  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Success (200): https://www.bing.com/images/search?q=net%20icon&form=HDRSC2&first=1
+08-13 20:35:19.336  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://img.icons8.com/color/512/netflix.png (11688 bytes)
+08-13 20:35:20.539  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo: Got 28714 chars of HTML for "netf"
+08-13 20:35:20.547  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo extracted 3 unique image URLs for "netf"
+08-13 20:35:20.548  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo: Returning 3 results for "netf"
+08-13 20:35:20.554  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Bing: Got 360826 chars of HTML for "net"
+08-13 20:35:20.574  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Bing: Returning 13 results for "net"
+08-13 20:35:20.575  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo: Got 28387 chars of HTML for "netf"
+08-13 20:35:20.578  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo extracted 2 unique image URLs for "netf"
+08-13 20:35:20.580  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo: Returning 2 results for "netf"
+08-13 20:35:20.580  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo total: 5 results
+08-13 20:35:20.581  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Running Bing image searches
+08-13 20:35:20.609  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Bing: Got 425513 chars of HTML for "net"
+08-13 20:35:20.662  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Bing: Returning 34 results for "net"
+08-13 20:35:20.662  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Bing total: 87 results
+08-13 20:35:20.663  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Short-circuiting with 93 results from DDG+Bing
+08-13 20:35:20.664  2132  2161 I ReactNativeJS: [SEARCH] TIER 3: 50 image/dork hits, 42 spider links
+08-13 20:35:20.670  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Bing Images URL: https://www.bing.com/images/search?q=netf%20logo&form=HDRSC2&first=1
+08-13 20:35:20.674  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Bing Images URL: https://www.bing.com/images/search?q=netf%20icon&form=HDRSC2&first=1
+08-13 20:35:20.676  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Bing Images URL: https://www.bing.com/images/search?q=netf%20logo%20svg&form=HDRSC2&first=1
+08-13 20:35:21.532  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Fetch attempt 1: https://www.bing.com/images/search?q=netf%20logo&form=HDRSC2&first=1
+08-13 20:35:21.538  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Fetch attempt 1: https://www.bing.com/images/search?q=netf%20icon&form=HDRSC2&first=1
+08-13 20:35:21.540  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Fetch attempt 1: https://www.bing.com/images/search?q=netf%20logo%20svg&form=HDRSC2&first=1
+08-13 20:35:21.567  2132  2161 I ReactNativeJS: [WEBVIEW_COMPONENT] Page loaded, injecting script
+08-13 20:35:21.673  2132  2161 I ReactNativeJS: [SEARCH] TIER 2: Found favicon URL
+08-13 20:35:21.871  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Success (200): https://www.bing.com/images/search?q=netf%20logo&form=HDRSC2&first=1
+08-13 20:35:22.031  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Success (200): https://www.bing.com/images/search?q=netf%20icon&form=HDRSC2&first=1
+08-13 20:35:22.047  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Bing: Got 297268 chars of HTML for "netf"
+08-13 20:35:22.067  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Bing: Returning 19 results for "netf"
+08-13 20:35:22.067  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Success (200): https://www.bing.com/images/search?q=netf%20logo%20svg&form=HDRSC2&first=1
+08-13 20:35:22.107  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Bing: Got 451432 chars of HTML for "netf"
+08-13 20:35:22.154  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Bing: Returning 45 results for "netf"
+08-13 20:35:22.158  2132  2161 I ReactNativeJS: [FETCH] Immediate fetch: simple-icons https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/netflix.svg
+08-13 20:35:22.158  2132  2161 I ReactNativeJS: [FETCH] Immediate fetch: icons8 https://img.icons8.com/color/512/netflix.png
+08-13 20:35:22.181  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Bing: Got 430464 chars of HTML for "netf"
+08-13 20:35:22.225  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Bing: Returning 34 results for "netf"
+08-13 20:35:22.225  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Bing total: 93 results
+08-13 20:35:22.226  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Short-circuiting with 97 results from DDG+Bing
+08-13 20:35:22.229  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: simple-icons https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/netflix.svg
+08-13 20:35:22.230  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: icons8 https://img.icons8.com/color/512/netflix.png
+08-13 20:35:22.249  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/netflix.svg (368 bytes)
+08-13 20:35:22.296  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://img.icons8.com/color/512/netflix.png (11688 bytes)
+08-13 20:35:22.896  2132  2161 I ReactNativeJS: [WEBVIEW_COMPONENT] Page loaded, injecting script
+08-13 20:35:22.897  2132  2161 I ReactNativeJS: [WEBVIEW_COMPONENT] Page loaded, injecting script
+08-13 20:35:22.901  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://img.icons8.com/color/512/netflix.png
+08-13 20:35:23.687  2132  2161 I ReactNativeJS: [QUEUE] processIconQueue starting
+08-13 20:35:23.687  2132  2161 I ReactNativeJS: [QUEUE] Already processing, will re-run when free
+08-13 20:35:23.687  2132  2161 I ReactNativeJS: [SEARCH] TIER 3: Image/dork search + links to spider
+08-13 20:35:23.730  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] ===== searchAllSources starting for "ne" =====
+08-13 20:35:23.730  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Running DuckDuckGo searches (primary engine)
+08-13 20:35:23.731  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] ===== searchForLinksToSpider starting for "ne" =====
+08-13 20:35:23.734  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Added 14 deterministic official-site guesses for "ne"
+08-13 20:35:24.427  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo search starting for "ne" (variation 0)
+08-13 20:35:24.428  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo URL: https://html.duckduckgo.com/html/?q=ne%20logo
+08-13 20:35:24.437  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo search starting for "ne" (variation 1)
+08-13 20:35:24.438  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo URL: https://html.duckduckgo.com/html/?q=ne%20icon
+08-13 20:35:24.440  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo search starting for "ne" (variation 2)
+08-13 20:35:24.441  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo URL: https://html.duckduckgo.com/html/?q=ne%20logo%20svg
+08-13 20:35:24.442  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo search starting for "ne" (variation 3)
+08-13 20:35:24.442  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo URL: https://html.duckduckgo.com/html/?q=ne%20icon%20svg
+08-13 20:35:24.444  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo search starting for "ne" (variation 4)
+08-13 20:35:24.452  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo URL: https://html.duckduckgo.com/html/?q=ne%20logo%20transparent%20png
+08-13 20:35:24.455  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Fetch attempt 1: https://html.duckduckgo.com/html/?q=ne
+08-13 20:35:24.473  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Fetch attempt 1: https://html.duckduckgo.com/html/?q=ne%20logo
+08-13 20:35:24.494  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Fetch attempt 1: https://html.duckduckgo.com/html/?q=ne%20icon
+08-13 20:35:24.501  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Fetch attempt 1: https://html.duckduckgo.com/html/?q=ne%20logo%20svg
+08-13 20:35:24.512  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Fetch attempt 1: https://html.duckduckgo.com/html/?q=ne%20icon%20svg
+08-13 20:35:24.558  2132  2161 I ReactNativeJS: [QUEUE] Set best icon as cached: simple-icons
+08-13 20:35:24.566  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Fetch attempt 1: https://html.duckduckgo.com/html/?q=ne%20logo%20transparent%20png
+08-13 20:35:24.597  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Success (202): https://html.duckduckgo.com/html/?q=ne%20logo%20svg
+08-13 20:35:24.600  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Success (202): https://html.duckduckgo.com/html/?q=ne%20logo
+08-13 20:35:24.613  2132  2161 I ReactNativeJS: [QUEUE] Re-running after mid-flight enqueue
+08-13 20:35:24.620  2132  2161 I ReactNativeJS: [QUEUE] Found 2 items in queue
+08-13 20:35:24.620  2132  2161 I ReactNativeJS: [QUEUE] Fetching icons for netf
+08-13 20:35:24.624  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Success (202): https://html.duckduckgo.com/html/?q=ne%20icon%20svg
+08-13 20:35:24.648  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo: Got 14240 chars of HTML for "ne"
+08-13 20:35:24.653  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo DEBUG: Found 10 <img> tags but none matched extraction patterns
+08-13 20:35:24.653  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo DEBUG: Sample src/data-src: ../assets/anomaly/images/challenge/4a4e09200ed4a5895e9ace2bdcdd3674.jpg, ../assets/anomaly/images/challenge/987471843ddc0db1b4037267752a2fae.jpg, ../assets/anomaly/images/challenge/63ecc7cec681031e0a8ca9d07fc512b7.jpg
+08-13 20:35:24.653  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo extracted 0 unique image URLs for "ne"
+08-13 20:35:24.653  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo: Returning 0 results for "ne"
+08-13 20:35:24.671  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Success (202): https://html.duckduckgo.com/html/?q=ne%20logo%20transparent%20png
+08-13 20:35:24.672  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo: Got 14226 chars of HTML for "ne"
+08-13 20:35:24.679  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo DEBUG: Found 10 <img> tags but none matched extraction patterns
+08-13 20:35:24.679  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo DEBUG: Sample src/data-src: ../assets/anomaly/images/challenge/4a4e09200ed4a5895e9ace2bdcdd3674.jpg, ../assets/anomaly/images/challenge/987471843ddc0db1b4037267752a2fae.jpg, ../assets/anomaly/images/challenge/63ecc7cec681031e0a8ca9d07fc512b7.jpg
+08-13 20:35:24.680  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo extracted 0 unique image URLs for "ne"
+08-13 20:35:24.682  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo: Returning 0 results for "ne"
+08-13 20:35:24.710  2132  2161 I ReactNativeJS: [QUEUE] processIconQueue starting
+08-13 20:35:24.711  2132  2161 I ReactNativeJS: [QUEUE] Already processing, will re-run when free
+08-13 20:35:24.711  2132  2161 I ReactNativeJS: [SEARCH] TIER 3: Image/dork search + links to spider
+08-13 20:35:24.714  2132  2161 I ReactNativeJS: [QUEUE] Found 0 URLs to fetch for netf
+08-13 20:35:24.732  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo: Got 14234 chars of HTML for "ne"
+08-13 20:35:24.737  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo DEBUG: Found 10 <img> tags but none matched extraction patterns
+08-13 20:35:24.739  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo DEBUG: Sample src/data-src: ../assets/anomaly/images/challenge/d8fb70ae449f9f96f13e0ca013e7faf0.jpg, ../assets/anomaly/images/challenge/7b4d8a614a53951afa11107fe8f0c83d.jpg, ../assets/anomaly/images/challenge/3f4ada9e66f2bb983619b2e8bb6b3588.jpg
+08-13 20:35:24.741  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo extracted 0 unique image URLs for "ne"
+08-13 20:35:24.742  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo: Returning 0 results for "ne"
+08-13 20:35:25.084  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo: Got 14270 chars of HTML for "ne"
+08-13 20:35:25.088  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo DEBUG: Found 10 <img> tags but none matched extraction patterns
+08-13 20:35:25.088  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo DEBUG: Sample src/data-src: ../assets/anomaly/images/challenge/d8fb70ae449f9f96f13e0ca013e7faf0.jpg, ../assets/anomaly/images/challenge/7b4d8a614a53951afa11107fe8f0c83d.jpg, ../assets/anomaly/images/challenge/3f4ada9e66f2bb983619b2e8bb6b3588.jpg
+08-13 20:35:25.089  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo extracted 0 unique image URLs for "ne"
+08-13 20:35:25.093  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo: Returning 0 results for "ne"
+08-13 20:35:25.094  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] ===== searchAllSources starting for "netflix" =====
+08-13 20:35:25.094  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Running DuckDuckGo searches (primary engine)
+08-13 20:35:25.094  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] ===== searchForLinksToSpider starting for "netflix" =====
+08-13 20:35:25.103  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Added 14 deterministic official-site guesses for "netflix"
+08-13 20:35:25.234  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo search starting for "netflix" (variation 0)
+08-13 20:35:25.234  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo URL: https://html.duckduckgo.com/html/?q=netflix%20logo
+08-13 20:35:25.252  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Success (200): https://html.duckduckgo.com/html/?q=ne%20icon
+08-13 20:35:25.266  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo search starting for "netflix" (variation 1)
+08-13 20:35:25.266  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo URL: https://html.duckduckgo.com/html/?q=netflix%20icon
+08-13 20:35:25.279  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Success (200): https://html.duckduckgo.com/html/?q=ne
+08-13 20:35:25.281  2132  2161 I ReactNativeJS: [WEBVIEW_COMPONENT] Page loaded, injecting script
+08-13 20:35:25.285  2132  2161 I ReactNativeJS: [QUEUE] Fetching icons for ne
+08-13 20:35:25.299  2132  2161 I ReactNativeJS: [QUEUE] Found 0 URLs to fetch for ne
+08-13 20:35:25.306  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo search starting for "netflix" (variation 2)
+08-13 20:35:25.306  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo URL: https://html.duckduckgo.com/html/?q=netflix%20logo%20svg
+08-13 20:35:25.456  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo search starting for "netflix" (variation 3)
+08-13 20:35:25.456  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo URL: https://html.duckduckgo.com/html/?q=netflix%20icon%20svg
+08-13 20:35:25.557  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo search starting for "netflix" (variation 4)
+08-13 20:35:25.557  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo URL: https://html.duckduckgo.com/html/?q=netflix%20logo%20transparent%20png
+08-13 20:35:25.579  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Fetch attempt 1: https://html.duckduckgo.com/html/?q=netflix
+08-13 20:35:25.611  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Fetch attempt 1: https://html.duckduckgo.com/html/?q=netflix%20logo
+08-13 20:35:25.639  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo: Got 26693 chars of HTML for "ne"
+08-13 20:35:25.651  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo extracted 2 unique image URLs for "ne"
+08-13 20:35:25.652  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo: Returning 2 results for "ne"
+08-13 20:35:25.656  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo total: 2 results
+08-13 20:35:25.659  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Running Bing image searches
+08-13 20:35:25.681  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Fetch attempt 1: https://html.duckduckgo.com/html/?q=netflix%20icon
+08-13 20:35:25.698  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Text search found 28 links (uddg=0)
+08-13 20:35:25.698  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Fetch returned 0 links, trying WebView fallback for "ne"
+08-13 20:35:25.698  2132  2161 I ReactNativeJS: [WEBVIEW_SEARCH] Ready for WebView search: "ne" (requestId: search_1786667725698_2)
+08-13 20:35:25.698  2132  2161 I ReactNativeJS: [WEBVIEW_COMPONENT] Triggering search for "ne" (requestId: search_1786667725698_2)
+08-13 20:35:25.699  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Success (202): https://html.duckduckgo.com/html/?q=netflix
+08-13 20:35:25.716  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Fetch attempt 1: https://html.duckduckgo.com/html/?q=netflix%20logo%20svg
+08-13 20:35:25.731  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Fetch attempt 1: https://html.duckduckgo.com/html/?q=netflix%20icon%20svg
+08-13 20:35:25.781  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Fetch attempt 1: https://html.duckduckgo.com/html/?q=netflix%20logo%20transparent%20png
+08-13 20:35:25.793  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Bing Images URL: https://www.bing.com/images/search?q=ne%20logo&form=HDRSC2&first=1
+08-13 20:35:25.808  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Bing Images URL: https://www.bing.com/images/search?q=ne%20icon&form=HDRSC2&first=1
+08-13 20:35:25.811  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Success (202): https://html.duckduckgo.com/html/?q=netflix%20icon
+08-13 20:35:25.826  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Bing Images URL: https://www.bing.com/images/search?q=ne%20logo%20svg&form=HDRSC2&first=1
+08-13 20:35:25.837  2132  2161 I ReactNativeJS: [QUEUE] Set best icon as cached: favicon
+08-13 20:35:25.860  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Text search found 28 links (uddg=0)
+08-13 20:35:25.861  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Fetch returned 0 links, trying WebView fallback for "netflix"
+08-13 20:35:25.861  2132  2161 I ReactNativeJS: [WEBVIEW_SEARCH] Ready for WebView search: "netflix" (requestId: search_1786667725861_3)
+08-13 20:35:25.861  2132  2161 I ReactNativeJS: [WEBVIEW_COMPONENT] Triggering search for "netflix" (requestId: search_1786667725861_3)
+08-13 20:35:25.884  2132  2161 I ReactNativeJS: [QUEUE] Re-running after mid-flight enqueue
+08-13 20:35:25.905  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Fetch attempt 1: https://www.bing.com/images/search?q=ne%20logo&form=HDRSC2&first=1
+08-13 20:35:25.964  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Fetch attempt 1: https://www.bing.com/images/search?q=ne%20icon&form=HDRSC2&first=1
+08-13 20:35:26.002  2132  2161 I ReactNativeJS: [QUEUE] Found 1 items in queue
+08-13 20:35:26.002  2132  2161 I ReactNativeJS: [QUEUE] Fetching icons for netflix
+08-13 20:35:26.007  2132  2161 I ReactNativeJS: [QUEUE] Found 1 URLs to fetch for netflix
+08-13 20:35:26.007  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: favicon https://assets.nflxext.com/us/ffe/siteui/common/icons/nficon2023.ico
+08-13 20:35:26.036  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo: Got 14230 chars of HTML for "netflix"
+08-13 20:35:26.039  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo DEBUG: Found 10 <img> tags but none matched extraction patterns
+08-13 20:35:26.039  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo DEBUG: Sample src/data-src: ../assets/anomaly/images/challenge/d8fb70ae449f9f96f13e0ca013e7faf0.jpg, ../assets/anomaly/images/challenge/7b4d8a614a53951afa11107fe8f0c83d.jpg, ../assets/anomaly/images/challenge/3f4ada9e66f2bb983619b2e8bb6b3588.jpg
+08-13 20:35:26.040  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo extracted 0 unique image URLs for "netflix"
+08-13 20:35:26.040  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo: Returning 0 results for "netflix"
+08-13 20:35:26.077  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Fetch attempt 1: https://www.bing.com/images/search?q=ne%20logo%20svg&form=HDRSC2&first=1
+08-13 20:35:26.284  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Success (200): https://www.bing.com/images/search?q=ne%20icon&form=HDRSC2&first=1
+08-13 20:35:26.297  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Success (200): https://www.bing.com/images/search?q=ne%20logo&form=HDRSC2&first=1
+08-13 20:35:26.321  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Bing: Got 267027 chars of HTML for "ne"
+08-13 20:35:26.351  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Bing: Returning 1 results for "ne"
+08-13 20:35:26.374  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Bing: Got 275262 chars of HTML for "ne"
+08-13 20:35:26.481  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Bing: Returning 1 results for "ne"
+08-13 20:35:26.499  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Success (200): https://www.bing.com/images/search?q=ne%20logo%20svg&form=HDRSC2&first=1
+08-13 20:35:26.515  2132  2161 I ReactNativeJS: [WEBVIEW_SEARCH] Received 15 links from WebView
+08-13 20:35:26.521  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] WebView fallback found 51 links
+08-13 20:35:26.521  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] ===== searchForLinksToSpider done for "netf": 51 links =====
+08-13 20:35:26.521  2132  2161 I ReactNativeJS: [SEARCH] TIER 3: 50 image/dork hits, 51 spider links
+08-13 20:35:26.523  2132  2161 I ReactNativeJS: [WEBVIEW_COMPONENT] Page loaded, injecting script
+08-13 20:35:26.561  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://assets.nflxext.com/us/ffe/siteui/common/icons/nficon2023.ico (13140 bytes)
+08-13 20:35:26.584  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Success (200): https://html.duckduckgo.com/html/?q=netflix%20logo%20svg
+08-13 20:35:26.588  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Success (200): https://html.duckduckgo.com/html/?q=netflix%20logo
+08-13 20:35:26.623  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Bing: Got 320626 chars of HTML for "ne"
+08-13 20:35:26.677  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Bing: Returning 11 results for "ne"
+08-13 20:35:26.678  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Bing total: 13 results
+08-13 20:35:26.678  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Short-circuiting with 15 results from DDG+Bing
+08-13 20:35:26.692  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo: Got 32740 chars of HTML for "netflix"
+08-13 20:35:26.707  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo DEBUG: Found 11 <img> tags but none matched extraction patterns
+08-13 20:35:26.709  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo DEBUG: Sample src/data-src: //external-content.duckduckgo.com/ip3/www.svgrepo.com.ico, //external-content.duckduckgo.com/ip3/brand.netflix.com.ico, //external-content.duckduckgo.com/ip3/svgstack.com.ico
+08-13 20:35:26.710  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo extracted 0 unique image URLs for "netflix"
+08-13 20:35:26.715  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo: Returning 1 results for "netflix"
+08-13 20:35:26.724  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo: Got 27907 chars of HTML for "netflix"
+08-13 20:35:26.734  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo DEBUG: Found 11 <img> tags but none matched extraction patterns
+08-13 20:35:26.735  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo DEBUG: Sample src/data-src: //external-content.duckduckgo.com/ip3/brand.netflix.com.ico, //external-content.duckduckgo.com/ip3/seeklogo.com.ico, //external-content.duckduckgo.com/ip3/brand.netflix.com.ico
+08-13 20:35:26.740  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo extracted 0 unique image URLs for "netflix"
+08-13 20:35:26.742  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo: Returning 0 results for "netflix"
+08-13 20:35:26.744  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Success (200): https://html.duckduckgo.com/html/?q=netflix%20icon%20svg
+08-13 20:35:26.873  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Success (200): https://html.duckduckgo.com/html/?q=netflix%20logo%20transparent%20png
+08-13 20:35:26.892  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo: Got 32322 chars of HTML for "netflix"
+08-13 20:35:26.937  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo DEBUG: Found 11 <img> tags but none matched extraction patterns
+08-13 20:35:26.938  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo DEBUG: Sample src/data-src: //external-content.duckduckgo.com/ip3/commons.wikimedia.org.ico, //external-content.duckduckgo.com/ip3/icon-icons.com.ico, //external-content.duckduckgo.com/ip3/www.svgrepo.com.ico
+08-13 20:35:26.939  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo extracted 0 unique image URLs for "netflix"
+08-13 20:35:26.951  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo: Returning 1 results for "netflix"
+08-13 20:35:26.980  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo: Got 33296 chars of HTML for "netflix"
+08-13 20:35:26.993  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo DEBUG: Found 11 <img> tags but none matched extraction patterns
+08-13 20:35:26.994  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo DEBUG: Sample src/data-src: //external-content.duckduckgo.com/ip3/www.stickpng.com.ico, //external-content.duckduckgo.com/ip3/icons8.com.ico, //external-content.duckduckgo.com/ip3/www.freepnglogos.com.ico
+08-13 20:35:26.995  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo extracted 0 unique image URLs for "netflix"
+08-13 20:35:26.997  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo: Returning 1 results for "netflix"
+08-13 20:35:27.014  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] DuckDuckGo total: 3 results
+08-13 20:35:27.014  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Running Bing image searches
+08-13 20:35:27.169  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Bing Images URL: https://www.bing.com/images/search?q=netflix%20logo&form=HDRSC2&first=1
+08-13 20:35:27.186  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Bing Images URL: https://www.bing.com/images/search?q=netflix%20icon&form=HDRSC2&first=1
+08-13 20:35:27.208  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Bing Images URL: https://www.bing.com/images/search?q=netflix%20logo%20svg&form=HDRSC2&first=1
+08-13 20:35:27.254  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Fetch attempt 1: https://www.bing.com/images/search?q=netflix%20logo&form=HDRSC2&first=1
+08-13 20:35:27.291  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Fetch attempt 1: https://www.bing.com/images/search?q=netflix%20icon&form=HDRSC2&first=1
+08-13 20:35:27.298  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://assets.nflxext.com/us/ffe/siteui/common/icons/nficon2023.ico
+08-13 20:35:27.344  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Fetch attempt 1: https://www.bing.com/images/search?q=netflix%20logo%20svg&form=HDRSC2&first=1
+08-13 20:35:27.551  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Success (200): https://www.bing.com/images/search?q=netflix%20logo&form=HDRSC2&first=1
+08-13 20:35:27.756  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Bing: Got 446445 chars of HTML for "netflix"
+08-13 20:35:27.835  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Bing: Returning 35 results for "netflix"
+08-13 20:35:27.839  2132  2161 I ReactNativeJS: [WEBVIEW_COMPONENT] Page loaded, injecting script
+08-13 20:35:27.843  2132  2161 I ReactNativeJS: [WEBVIEW_COMPONENT] Page loaded, injecting script
+08-13 20:35:27.844  2132  2161 I ReactNativeJS: [WEBVIEW_COMPONENT] Page loaded, injecting script
+08-13 20:35:27.853  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Success (200): https://www.bing.com/images/search?q=netflix%20icon&form=HDRSC2&first=1
+08-13 20:35:27.869  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Success (200): https://www.bing.com/images/search?q=netflix%20logo%20svg&form=HDRSC2&first=1
+08-13 20:35:28.083  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Bing: Got 342566 chars of HTML for "netflix"
+08-13 20:35:28.210  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Bing: Returning 7 results for "netflix"
+08-13 20:35:28.271  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Bing: Got 352216 chars of HTML for "netflix"
+08-13 20:35:28.332  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Bing: Returning 25 results for "netflix"
+08-13 20:35:28.332  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Bing total: 67 results
+08-13 20:35:28.334  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] Short-circuiting with 68 results from DDG+Bing
+08-13 20:35:30.302  2132  2161 I ReactNativeJS: [WEBVIEW_SEARCH] Received 14 links from WebView
+08-13 20:35:30.310  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] WebView fallback found 46 links
+08-13 20:35:30.311  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] ===== searchForLinksToSpider done for "netflix": 46 links =====
+08-13 20:35:30.311  2132  2161 I ReactNativeJS: [SEARCH] TIER 3: 50 image/dork hits, 46 spider links
+08-13 20:35:30.316  2132  2161 I ReactNativeJS: [WEBVIEW_COMPONENT] Page loaded, injecting script
+08-13 20:35:31.199  2132  2161 I ReactNativeJS: [WEBVIEW_COMPONENT] Page loaded, injecting script
+08-13 20:35:31.420  2132  2161 I ReactNativeJS: [WEBVIEW_COMPONENT] Page loaded, injecting script
+08-13 20:35:32.361  2132  2161 I ReactNativeJS: [SEARCH] TIER 3: Queued 46 direct image URLs
+08-13 20:35:32.362  2132  2161 I ReactNativeJS: [SEARCH] SPIDER: Processing 46 links
+08-13 20:35:32.367  2132  2161 I ReactNativeJS: [SEARCH] SPIDER: Fetching 46 pages
+08-13 20:35:34.686  2132  2161 I ReactNativeJS: [SEARCH] TIER 3: Queued 49 direct image URLs
+08-13 20:35:34.725  2132  2161 I ReactNativeJS: [SEARCH] SPIDER: Processing 52 links
+08-13 20:35:34.725  2132  2161 I ReactNativeJS: [SEARCH] SPIDER: Fetching 52 pages
+08-13 20:35:35.853  2132  2161 I ReactNativeJS: [SEARCH] TIER 3: Queued 50 direct image URLs
+08-13 20:35:35.854  2132  2161 I ReactNativeJS: [SEARCH] SPIDER: Processing 46 links
+08-13 20:35:35.854  2132  2161 I ReactNativeJS: [SEARCH] SPIDER: Fetching 46 pages
+08-13 20:35:40.718  2132  2161 I ReactNativeJS: [WEBVIEW_SEARCH] Timeout after 15000ms for "ne"
+08-13 20:35:40.718  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] WebView fallback found 28 links
+08-13 20:35:40.718  2132  2161 I ReactNativeJS: [SEARCH_ENGINE] ===== searchForLinksToSpider done for "ne": 28 links =====
+08-13 20:35:40.718  2132  2161 I ReactNativeJS: [SEARCH] TIER 3: 15 image/dork hits, 28 spider links
+08-13 20:35:43.837  2132  2161 I ReactNativeJS: [SEARCH] SPIDER: Found 84 icon URLs
+08-13 20:35:44.530  2132  2161 I ReactNativeJS: [SEARCH] TIER 3: Queued 15 direct image URLs
+08-13 20:35:44.531  2132  2161 I ReactNativeJS: [SEARCH] SPIDER: Processing 28 links
+08-13 20:35:44.531  2132  2161 I ReactNativeJS: [SEARCH] SPIDER: Fetching 28 pages
+08-13 20:35:50.874  2132  2161 I ReactNativeJS: [SEARCH] SPIDER: Found 99 icon URLs
+08-13 20:35:55.454  2132  2161 I ReactNativeJS: [SEARCH] Search completed for net
+08-13 20:35:55.491  2132  2161 I ReactNativeJS: [SEARCH] Immediately fetching 130 URLs (quality-ordered)
+08-13 20:35:55.491  2132  2161 I ReactNativeJS: [FETCH] Immediate fetch: spider:img_logo https://occ.a.nflxso.net/dnmt/api/v6/iL4oJVDYZ8KLSrJ6eG2OwtghbfQ/AAAAAfwxusEeCteu-L_QQ56_G2cohyI1E4BIh2uyr5t9gDhH0CKWHw3NVhndjuF7yQ26z3cYq_lnzY5pP6OarHyiibuiy2jIIa5sIhSvgal1S6u9YDVAyVoX6osPniEKN-dYy77H_pLfOCD7.svg
+08-13 20:35:55.491  2132  2161 I ReactNativeJS: [FETCH] Immediate fetch: spider:img_logo https://dotnet.microsoft.com/blob-assets/images/customers/stackoverflow/stackoverflow.svg
+08-13 20:35:55.494  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:img_logo https://occ.a.nflxso.net/dnmt/api/v6/iL4oJVDYZ8KLSrJ6eG2OwtghbfQ/AAAAAfwxusEeCteu-L_QQ56_G2cohyI1E4BIh2uyr5t9gDhH0CKWHw3NVhndjuF7yQ26z3cYq_lnzY5pP6OarHyiibuiy2jIIa5sIhSvgal1S6u9YDVAyVoX6osPniEKN-dYy77H_pLfOCD7.svg
+08-13 20:35:55.495  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:img_logo https://dotnet.microsoft.com/blob-assets/images/customers/stackoverflow/stackoverflow.svg
+08-13 20:35:56.073  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://occ.a.nflxso.net/dnmt/api/v6/iL4oJVDYZ8KLSrJ6eG2OwtghbfQ/AAAAAfwxusEeCteu-L_QQ56_G2cohyI1E4BIh2uyr5t9gDhH0CKWHw3NVhndjuF7yQ26z3cYq_lnzY5pP6OarHyiibuiy2jIIa5sIhSvgal1S6u9YDVAyVoX6osPniEKN-dYy77H_pLfOCD7.svg (1100 bytes)
+08-13 20:35:56.439  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://dotnet.microsoft.com/blob-assets/images/customers/stackoverflow/stackoverflow.svg (9492 bytes)
+08-13 20:35:56.846  2132  2161 I ReactNativeJS: [SEARCH] Queued net for background fetching (128 remaining URLs)
+08-13 20:35:56.846  2132  2161 I ReactNativeJS: [QUEUE] processIconQueue starting
+08-13 20:35:56.887  2132  2161 I ReactNativeJS: [QUEUE] Found 1 items in queue
+08-13 20:35:56.888  2132  2161 I ReactNativeJS: [QUEUE] Fetching icons for net
+08-13 20:35:56.892  2132  2161 I ReactNativeJS: [SEARCH] ===== FINISHED SEARCH for net =====
+08-13 20:35:56.924  2132  2161 I ReactNativeJS: [QUEUE] Found 128 URLs to fetch for net
+08-13 20:35:56.949  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:img_logo https://en.wikipedia.org/static/images/icons/enwiki-25.svg
+08-13 20:35:57.591  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://en.wikipedia.org/static/images/icons/enwiki-25.svg (154560 bytes)
+08-13 20:35:59.570  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://en.wikipedia.org/static/images/icons/enwiki-25.svg
+08-13 20:35:59.706  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:img_logo https://en.wikipedia.org/static/images/mobile/copyright/wikipedia-wordmark-en-25.svg
+08-13 20:35:59.840  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://en.wikipedia.org/static/images/mobile/copyright/wikipedia-wordmark-en-25.svg (13156 bytes)
+08-13 20:36:00.396  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://en.wikipedia.org/static/images/mobile/copyright/wikipedia-wordmark-en-25.svg
+08-13 20:36:00.478  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:img_logo https://en.wikipedia.org/static/images/mobile/copyright/wikipedia-tagline-en-25.svg
+08-13 20:36:00.579  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://en.wikipedia.org/static/images/mobile/copyright/wikipedia-tagline-en-25.svg (20292 bytes)
+08-13 20:36:00.914  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://en.wikipedia.org/static/images/mobile/copyright/wikipedia-tagline-en-25.svg
+08-13 20:36:00.981  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:img_logo https://dotnet.microsoft.com/blob-assets/images/customers/blip/blip-light.svg
+08-13 20:36:01.842  2132  2161 I ReactNativeJS: [SEARCH] Search completed for netf
+08-13 20:36:01.971  2132  2161 I ReactNativeJS: [SEARCH] Immediately fetching 147 URLs (quality-ordered)
+08-13 20:36:01.971  2132  2161 I ReactNativeJS: [FETCH] Immediate fetch: spider:img_logo https://occ.a.nflxso.net/dnmt/api/v6/iL4oJVDYZ8KLSrJ6eG2OwtghbfQ/AAAAAfwxusEeCteu-L_QQ56_G2cohyI1E4BIh2uyr5t9gDhH0CKWHw3NVhndjuF7yQ26z3cYq_lnzY5pP6OarHyiibuiy2jIIa5sIhSvgal1S6u9YDVAyVoX6osPniEKN-dYy77H_pLfOCD7.svg
+08-13 20:36:01.971  2132  2161 I ReactNativeJS: [FETCH] Immediate fetch: spider:apple_touch_icon https://assets.superlander.com/newimages/webclip.png
+08-13 20:36:01.976  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:apple_touch_icon https://assets.superlander.com/newimages/webclip.png
+08-13 20:36:01.999  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://dotnet.microsoft.com/blob-assets/images/customers/blip/blip-light.svg (2548 bytes)
+08-13 20:36:02.011  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:img_logo https://occ.a.nflxso.net/dnmt/api/v6/iL4oJVDYZ8KLSrJ6eG2OwtghbfQ/AAAAAfwxusEeCteu-L_QQ56_G2cohyI1E4BIh2uyr5t9gDhH0CKWHw3NVhndjuF7yQ26z3cYq_lnzY5pP6OarHyiibuiy2jIIa5sIhSvgal1S6u9YDVAyVoX6osPniEKN-dYy77H_pLfOCD7.svg
+08-13 20:36:02.082  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://occ.a.nflxso.net/dnmt/api/v6/iL4oJVDYZ8KLSrJ6eG2OwtghbfQ/AAAAAfwxusEeCteu-L_QQ56_G2cohyI1E4BIh2uyr5t9gDhH0CKWHw3NVhndjuF7yQ26z3cYq_lnzY5pP6OarHyiibuiy2jIIa5sIhSvgal1S6u9YDVAyVoX6osPniEKN-dYy77H_pLfOCD7.svg (1100 bytes)
+08-13 20:36:02.391  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://dotnet.microsoft.com/blob-assets/images/customers/blip/blip-light.svg
+08-13 20:36:02.472  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://assets.superlander.com/newimages/webclip.png (18868 bytes)
+08-13 20:36:02.797  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:apple_touch_icon https://assets.nflxext.com/us/ffe/siteui/common/icons/nficon2016.png
+08-13 20:36:03.594  2132  2161 I ReactNativeJS: [SEARCH] Queued netf for background fetching (145 remaining URLs)
+08-13 20:36:03.594  2132  2161 I ReactNativeJS: [QUEUE] processIconQueue starting
+08-13 20:36:03.594  2132  2161 I ReactNativeJS: [QUEUE] Already processing, will re-run when free
+08-13 20:36:03.607  2132  2161 I ReactNativeJS: [SEARCH] ===== FINISHED SEARCH for netf =====
+08-13 20:36:03.786  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://assets.nflxext.com/us/ffe/siteui/common/icons/nficon2016.png (2340 bytes)
+08-13 20:36:04.062  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://assets.nflxext.com/us/ffe/siteui/common/icons/nficon2016.png
+08-13 20:36:04.106  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:apple_touch_icon https://en.wikipedia.org/static/apple-touch/wikipedia.png
+08-13 20:36:04.454  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://en.wikipedia.org/static/apple-touch/wikipedia.png (1752 bytes)
+08-13 20:36:04.593  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://en.wikipedia.org/static/apple-touch/wikipedia.png
+08-13 20:36:04.663  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:apple_touch_icon https://dotnet.microsoft.com/apple-touch-icon.png
+08-13 20:36:05.365  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://dotnet.microsoft.com/apple-touch-icon.png (10424 bytes)
+08-13 20:36:05.626  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://dotnet.microsoft.com/apple-touch-icon.png
+08-13 20:36:05.636  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:jsonld_image https://upload.wikimedia.org/wikipedia/commons/7/7d/Microsoft_.NET_logo.svg?utm_source=en.wikipedia.org&utm_campaign=index&utm_content=original
+08-13 20:36:06.053  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://upload.wikimedia.org/wikipedia/commons/7/7d/Microsoft_.NET_logo.svg?utm_source=en.wikipedia.org&utm_campaign=index&utm_content=original (1532 bytes)
+08-13 20:36:06.174  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://upload.wikimedia.org/wikipedia/commons/7/7d/Microsoft_.NET_logo.svg?utm_source=en.wikipedia.org&utm_campaign=index&utm_content=original
+08-13 20:36:06.189  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://www.netflix.com/favicon.svg
+08-13 20:36:06.421  2132  2161 I ReactNativeJS: [SEARCH] SPIDER: Found 163 icon URLs
+08-13 20:36:06.775  2132  2161 I ReactNativeJS: [FETCH] REJECT non-image response https://www.netflix.com/favicon.svg (content-type=text/html; charset=utf-8)
+08-13 20:36:06.790  2132  2161 I ReactNativeJS: [SEARCH] SPIDER: Found 60 icon URLs
+08-13 20:36:06.827  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://dotnet.microsoft.com/favicon.svg
+08-13 20:36:09.171  2132  2161 I ReactNativeJS: [FETCH] FAILED https://dotnet.microsoft.com/favicon.svg: 404
+08-13 20:36:09.600  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://en.wikipedia.org/favicon.svg
+08-13 20:36:10.383  2132  2161 I ReactNativeJS: [FETCH] FAILED https://en.wikipedia.org/favicon.svg: 404
+08-13 20:36:10.399  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://net.net/favicon.svg
+08-13 20:36:10.631  2132  2161 I ReactNativeJS: [SEARCH] Search completed for ne
+08-13 20:36:10.663  2132  2161 I ReactNativeJS: [SEARCH] Immediately fetching 74 URLs (quality-ordered)
+08-13 20:36:10.664  2132  2161 I ReactNativeJS: [FETCH] Immediate fetch: spider:img_logo https://www.ne.app/logo.svg
+08-13 20:36:10.664  2132  2161 I ReactNativeJS: [FETCH] Immediate fetch: spider:img_logo https://www.nedigital.com/hubfs/neDigital_Assets_2020/neDigital_white_logo.svg
+08-13 20:36:10.669  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:img_logo https://www.ne.app/logo.svg
+08-13 20:36:10.670  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:img_logo https://www.nedigital.com/hubfs/neDigital_Assets_2020/neDigital_white_logo.svg
+08-13 20:36:11.482  2132  2161 I ReactNativeJS: [FETCH] REJECT non-image response https://net.net/favicon.svg (content-type=text/html)
+08-13 20:36:11.498  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://www.net.net/favicon.svg
+08-13 20:36:11.545  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://www.nedigital.com/hubfs/neDigital_Assets_2020/neDigital_white_logo.svg (5628 bytes)
+08-13 20:36:11.582  2132  2161 I ReactNativeJS: [FETCH] REJECT non-image response https://www.net.net/favicon.svg (content-type=text/html)
+08-13 20:36:11.601  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://imgv2-2-f.scribdassets.com/favicon.svg
+08-13 20:36:12.007  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://www.ne.app/logo.svg (15296 bytes)
+08-13 20:36:12.593  2132  2161 I ReactNativeJS: [SEARCH] Queued ne for background fetching (72 remaining URLs)
+08-13 20:36:12.593  2132  2161 I ReactNativeJS: [QUEUE] processIconQueue starting
+08-13 20:36:12.593  2132  2161 I ReactNativeJS: [QUEUE] Already processing, will re-run when free
+08-13 20:36:12.654  2132  2161 I ReactNativeJS: [SEARCH] ===== FINISHED SEARCH for ne =====
+08-13 20:36:13.420  2132  2161 I ReactNativeJS: [FETCH] FAILED https://imgv2-2-f.scribdassets.com/favicon.svg: 404
+08-13 20:36:13.435  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: duckduckgo_images https://github.com/dotnet/brand/blob/main/logo/dotnet-logo.svg?short_path=d204a09
+08-13 20:36:14.838  2132  2161 I ReactNativeJS: [SEARCH] Search completed for netflix
+08-13 20:36:14.904  2132  2161 I ReactNativeJS: [SEARCH] Immediately fetching 210 URLs (quality-ordered)
+08-13 20:36:14.904  2132  2161 I ReactNativeJS: [FETCH] Immediate fetch: spider:img_logo https://occ.a.nflxso.net/dnmt/api/v6/iL4oJVDYZ8KLSrJ6eG2OwtghbfQ/AAAAAfwxusEeCteu-L_QQ56_G2cohyI1E4BIh2uyr5t9gDhH0CKWHw3NVhndjuF7yQ26z3cYq_lnzY5pP6OarHyiibuiy2jIIa5sIhSvgal1S6u9YDVAyVoX6osPniEKN-dYy77H_pLfOCD7.svg
+08-13 20:36:14.904  2132  2161 I ReactNativeJS: [FETCH] Immediate fetch: spider:apple_touch_icon https://www.whats-on-netflix.com/apple-touch-icon.png
+08-13 20:36:14.907  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:apple_touch_icon https://www.whats-on-netflix.com/apple-touch-icon.png
+08-13 20:36:14.921  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:img_logo https://occ.a.nflxso.net/dnmt/api/v6/iL4oJVDYZ8KLSrJ6eG2OwtghbfQ/AAAAAfwxusEeCteu-L_QQ56_G2cohyI1E4BIh2uyr5t9gDhH0CKWHw3NVhndjuF7yQ26z3cYq_lnzY5pP6OarHyiibuiy2jIIa5sIhSvgal1S6u9YDVAyVoX6osPniEKN-dYy77H_pLfOCD7.svg
+08-13 20:36:14.934  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://occ.a.nflxso.net/dnmt/api/v6/iL4oJVDYZ8KLSrJ6eG2OwtghbfQ/AAAAAfwxusEeCteu-L_QQ56_G2cohyI1E4BIh2uyr5t9gDhH0CKWHw3NVhndjuF7yQ26z3cYq_lnzY5pP6OarHyiibuiy2jIIa5sIhSvgal1S6u9YDVAyVoX6osPniEKN-dYy77H_pLfOCD7.svg (1100 bytes)
+08-13 20:36:15.278  2132  2161 I ReactNativeJS: [FETCH] REJECT non-image response https://github.com/dotnet/brand/blob/main/logo/dotnet-logo.svg?short_path=d204a09 (content-type=text/html; charset=utf-8)
+08-13 20:36:15.370  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://www.whats-on-netflix.com/apple-touch-icon.png (4192 bytes)
+08-13 20:36:15.582  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: duckduckgo_images https://en.wikipedia.org/wiki/File:NetLogo-Logo.svg
+08-13 20:36:16.022  2132  2161 I ReactNativeJS: [SEARCH] Queued netflix for background fetching (208 remaining URLs)
+08-13 20:36:16.022  2132  2161 I ReactNativeJS: [QUEUE] processIconQueue starting
+08-13 20:36:16.022  2132  2161 I ReactNativeJS: [QUEUE] Already processing, will re-run when free
+08-13 20:36:16.134  2132  2161 I ReactNativeJS: [SEARCH] ===== FINISHED SEARCH for netflix =====
+08-13 20:36:17.140  2132  2161 I ReactNativeJS: [FETCH] REJECT non-image response https://en.wikipedia.org/wiki/File:NetLogo-Logo.svg (content-type=text/html; charset=UTF-8)
+08-13 20:36:17.150  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: duckduckgo_images https://commons.wikimedia.org/wiki/File:Microsoft_NET_Logo.svg
+08-13 20:36:18.043  2132  2161 I ReactNativeJS: [FETCH] REJECT non-image response https://commons.wikimedia.org/wiki/File:Microsoft_NET_Logo.svg (content-type=text/html; charset=UTF-8)
+08-13 20:36:18.048  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: duckduckgo_images https://commons.wikimedia.org/wiki/File:Microsoft_.NET_logo.svg
+08-13 20:36:18.367  2132  2161 I ReactNativeJS: [FETCH] REJECT non-image response https://commons.wikimedia.org/wiki/File:Microsoft_.NET_logo.svg (content-type=text/html; charset=UTF-8)
+08-13 20:36:18.431  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://en.wikipedia.org/apple-touch-icon-152x152.png
+08-13 20:36:18.464  2132  2161 I ReactNativeJS: [FETCH] FAILED https://en.wikipedia.org/apple-touch-icon-152x152.png: 404
+08-13 20:36:18.546  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://en.wikipedia.org/apple-touch-icon.png
+08-13 20:36:18.602  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://en.wikipedia.org/apple-touch-icon.png (1752 bytes)
+08-13 20:36:18.672  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://en.wikipedia.org/apple-touch-icon.png
+08-13 20:36:18.735  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://en.wikipedia.org/apple-touch-icon-precomposed.png
+08-13 20:36:19.053  2132  2161 I ReactNativeJS: [FETCH] FAILED https://en.wikipedia.org/apple-touch-icon-precomposed.png: 404
+08-13 20:36:19.214  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://en.wikipedia.org/apple-touch-icon-180x180.png
+08-13 20:36:19.350  2132  2161 I ReactNativeJS: [FETCH] FAILED https://en.wikipedia.org/apple-touch-icon-180x180.png: 404
+08-13 20:36:19.393  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://imgv2-2-f.scribdassets.com/apple-touch-icon.png
+08-13 20:36:19.489  2132  2161 I ReactNativeJS: [FETCH] FAILED https://imgv2-2-f.scribdassets.com/apple-touch-icon.png: 404
+08-13 20:36:19.503  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://imgv2-2-f.scribdassets.com/apple-touch-icon-precomposed.png
+08-13 20:36:19.643  2132  2161 I ReactNativeJS: [FETCH] FAILED https://imgv2-2-f.scribdassets.com/apple-touch-icon-precomposed.png: 404
+08-13 20:36:19.652  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://imgv2-2-f.scribdassets.com/apple-touch-icon-180x180.png
+08-13 20:36:19.752  2132  2161 I ReactNativeJS: [FETCH] FAILED https://imgv2-2-f.scribdassets.com/apple-touch-icon-180x180.png: 404
+08-13 20:36:19.783  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://imgv2-2-f.scribdassets.com/apple-touch-icon-152x152.png
+08-13 20:36:19.866  2132  2161 I ReactNativeJS: [FETCH] FAILED https://imgv2-2-f.scribdassets.com/apple-touch-icon-152x152.png: 404
+08-13 20:36:19.883  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://net.net/apple-touch-icon.png
+08-13 20:36:19.933  2132  2161 I ReactNativeJS: [FETCH] REJECT non-image response https://net.net/apple-touch-icon.png (content-type=text/html)
+08-13 20:36:19.949  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://net.net/apple-touch-icon-precomposed.png
+08-13 20:36:19.999  2132  2161 I ReactNativeJS: [FETCH] REJECT non-image response https://net.net/apple-touch-icon-precomposed.png (content-type=text/html)
+08-13 20:36:20.019  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://net.net/apple-touch-icon-180x180.png
+08-13 20:36:20.065  2132  2161 I ReactNativeJS: [FETCH] REJECT non-image response https://net.net/apple-touch-icon-180x180.png (content-type=text/html)
+08-13 20:36:20.081  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://net.net/apple-touch-icon-152x152.png
+08-13 20:36:20.134  2132  2161 I ReactNativeJS: [FETCH] REJECT non-image response https://net.net/apple-touch-icon-152x152.png (content-type=text/html)
+08-13 20:36:20.157  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://www.net.net/apple-touch-icon.png
+08-13 20:36:20.254  2132  2161 I ReactNativeJS: [FETCH] REJECT non-image response https://www.net.net/apple-touch-icon.png (content-type=text/html)
+08-13 20:36:20.265  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://www.net.net/apple-touch-icon-precomposed.png
+08-13 20:36:20.439  2132  2161 I ReactNativeJS: [FETCH] REJECT non-image response https://www.net.net/apple-touch-icon-precomposed.png (content-type=text/html)
+08-13 20:36:20.450  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://www.net.net/apple-touch-icon-180x180.png
+08-13 20:36:20.501  2132  2161 I ReactNativeJS: [FETCH] REJECT non-image response https://www.net.net/apple-touch-icon-180x180.png (content-type=text/html)
+08-13 20:36:20.518  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://www.net.net/apple-touch-icon-152x152.png
+08-13 20:36:20.570  2132  2161 I ReactNativeJS: [FETCH] REJECT non-image response https://www.net.net/apple-touch-icon-152x152.png (content-type=text/html)
+08-13 20:36:20.584  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://www.netflix.com/apple-touch-icon.png
+08-13 20:36:22.101  2132  2161 I ReactNativeJS: [FETCH] REJECT non-image response https://www.netflix.com/apple-touch-icon.png (content-type=text/html; charset=utf-8)
+08-13 20:36:22.116  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://www.netflix.com/apple-touch-icon-precomposed.png
+08-13 20:36:22.522  2132  2161 I ReactNativeJS: [FETCH] REJECT non-image response https://www.netflix.com/apple-touch-icon-precomposed.png (content-type=text/html; charset=utf-8)
+08-13 20:36:22.535  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://www.netflix.com/apple-touch-icon-180x180.png
+08-13 20:36:22.979  2132  2161 I ReactNativeJS: [FETCH] REJECT non-image response https://www.netflix.com/apple-touch-icon-180x180.png (content-type=text/html; charset=utf-8)
+08-13 20:36:23.003  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://www.netflix.com/apple-touch-icon-152x152.png
+08-13 20:36:23.870  2132  2161 I ReactNativeJS: [FETCH] REJECT non-image response https://www.netflix.com/apple-touch-icon-152x152.png (content-type=text/html; charset=utf-8)
+08-13 20:36:23.979  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://dotnet.microsoft.com/apple-touch-icon-precomposed.png
+08-13 20:36:25.181  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://dotnet.microsoft.com/apple-touch-icon-precomposed.png (6548 bytes)
+08-13 20:36:25.393  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://dotnet.microsoft.com/apple-touch-icon-precomposed.png
+08-13 20:36:25.430  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://dotnet.microsoft.com/apple-touch-icon-180x180.png
+08-13 20:36:25.997  2132  2161 I ReactNativeJS: [FETCH] FAILED https://dotnet.microsoft.com/apple-touch-icon-180x180.png: 404
+08-13 20:36:26.035  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://dotnet.microsoft.com/apple-touch-icon-152x152.png
+08-13 20:36:26.614  2132  2161 I ReactNativeJS: [FETCH] FAILED https://dotnet.microsoft.com/apple-touch-icon-152x152.png: 404
+08-13 20:36:26.660  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:og_image https://upload.wikimedia.org/wikipedia/commons/thumb/7/7d/Microsoft_.NET_logo.svg/1280px-Microsoft_.NET_logo.svg.png?utm_source=en.wikipedia.org&utm_campaign=index&utm_content=thumbnail
+08-13 20:36:27.891  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://upload.wikimedia.org/wikipedia/commons/thumb/7/7d/Microsoft_.NET_logo.svg/1280px-Microsoft_.NET_logo.svg.png?utm_source=en.wikipedia.org&utm_campaign=index&utm_content=thumbnail (9420 bytes)
+08-13 20:36:31.458  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://upload.wikimedia.org/wikipedia/commons/thumb/7/7d/Microsoft_.NET_logo.svg/1280px-Microsoft_.NET_logo.svg.png?utm_source=en.wikipedia.org&utm_campaign=index&utm_content=thumbnail
+08-13 20:36:31.531  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:og_image https://dotnet.microsoft.com/blob-assets/images/dotnet-icons/square.png
+08-13 20:36:32.120  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://dotnet.microsoft.com/blob-assets/images/dotnet-icons/square.png (43728 bytes)
+08-13 20:36:32.625  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://dotnet.microsoft.com/blob-assets/images/dotnet-icons/square.png
+08-13 20:36:32.719  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://dotnet.microsoft.com/android-chrome-512x512.png
+08-13 20:36:33.049  2132  2161 I ReactNativeJS: [FETCH] FAILED https://dotnet.microsoft.com/android-chrome-512x512.png: 404
+08-13 20:36:33.124  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://dotnet.microsoft.com/android-chrome-192x192.png
+08-13 20:36:33.581  2132  2161 I ReactNativeJS: [FETCH] FAILED https://dotnet.microsoft.com/android-chrome-192x192.png: 404
+08-13 20:36:33.650  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://en.wikipedia.org/android-chrome-512x512.png
+08-13 20:36:35.172  2132  2161 I ReactNativeJS: [FETCH] FAILED https://en.wikipedia.org/android-chrome-512x512.png: 404
+08-13 20:36:35.289  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://en.wikipedia.org/android-chrome-192x192.png
+08-13 20:36:35.535  2132  2161 I ReactNativeJS: [FETCH] FAILED https://en.wikipedia.org/android-chrome-192x192.png: 404
+08-13 20:36:35.554  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://www.net.net/android-chrome-512x512.png
+08-13 20:36:35.616  2132  2161 I ReactNativeJS: [FETCH] REJECT non-image response https://www.net.net/android-chrome-512x512.png (content-type=text/html)
+08-13 20:36:35.638  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://www.net.net/android-chrome-192x192.png
+08-13 20:36:35.702  2132  2161 I ReactNativeJS: [FETCH] REJECT non-image response https://www.net.net/android-chrome-192x192.png (content-type=text/html)
+08-13 20:36:35.719  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://www.netflix.com/android-chrome-512x512.png
+08-13 20:36:36.239  2132  2161 I ReactNativeJS: [FETCH] REJECT non-image response https://www.netflix.com/android-chrome-512x512.png (content-type=text/html; charset=utf-8)
+08-13 20:36:36.257  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://www.netflix.com/android-chrome-192x192.png
+08-13 20:36:36.657  2132  2161 I ReactNativeJS: [FETCH] REJECT non-image response https://www.netflix.com/android-chrome-192x192.png (content-type=text/html; charset=utf-8)
+08-13 20:36:36.673  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://imgv2-2-f.scribdassets.com/android-chrome-512x512.png
+08-13 20:36:37.701  2132  2161 I ReactNativeJS: [FETCH] FAILED https://imgv2-2-f.scribdassets.com/android-chrome-512x512.png: 404
+08-13 20:36:37.716  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://imgv2-2-f.scribdassets.com/android-chrome-192x192.png
+08-13 20:36:37.873  2132  2161 I ReactNativeJS: [FETCH] FAILED https://imgv2-2-f.scribdassets.com/android-chrome-192x192.png: 404
+08-13 20:36:37.885  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://net.net/android-chrome-512x512.png
+08-13 20:36:37.966  2132  2161 I ReactNativeJS: [FETCH] REJECT non-image response https://net.net/android-chrome-512x512.png (content-type=text/html)
+08-13 20:36:37.992  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://net.net/android-chrome-192x192.png
+08-13 20:36:38.052  2132  2161 I ReactNativeJS: [FETCH] REJECT non-image response https://net.net/android-chrome-192x192.png (content-type=text/html)
+08-13 20:36:38.122  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:img_logo https://upload.wikimedia.org/wikipedia/en/thumb/4/4a/Commons-logo.svg/20px-Commons-logo.svg.png?utm_source=en.wikipedia.org&utm_campaign=parser&utm_content=thumbnail
+08-13 20:36:39.085  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://upload.wikimedia.org/wikipedia/en/thumb/4/4a/Commons-logo.svg/20px-Commons-logo.svg.png?utm_source=en.wikipedia.org&utm_campaign=parser&utm_content=thumbnail (1624 bytes)
+08-13 20:36:39.186  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://upload.wikimedia.org/wikipedia/en/thumb/4/4a/Commons-logo.svg/20px-Commons-logo.svg.png?utm_source=en.wikipedia.org&utm_campaign=parser&utm_content=thumbnail
+08-13 20:36:39.257  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:img_logo https://upload.wikimedia.org/wikipedia/commons/thumb/f/ff/Wikidata-logo.svg/60px-Wikidata-logo.svg.png?utm_source=en.wikipedia.org&utm_campaign=parser&utm_content=thumbnail
+08-13 20:36:39.387  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://upload.wikimedia.org/wikipedia/commons/thumb/f/ff/Wikidata-logo.svg/60px-Wikidata-logo.svg.png?utm_source=en.wikipedia.org&utm_campaign=parser&utm_content=thumbnail (740 bytes)
+08-13 20:36:39.555  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://upload.wikimedia.org/wikipedia/commons/thumb/f/ff/Wikidata-logo.svg/60px-Wikidata-logo.svg.png?utm_source=en.wikipedia.org&utm_campaign=parser&utm_content=thumbnail
+08-13 20:36:39.599  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:img_logo https://upload.wikimedia.org/wikipedia/commons/thumb/0/0c/Wikifunctions-logo.svg/40px-Wikifunctions-logo.svg.png?utm_source=en.wikipedia.org&utm_campaign=parser&utm_content=thumbnail
+08-13 20:36:39.656  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://upload.wikimedia.org/wikipedia/commons/thumb/0/0c/Wikifunctions-logo.svg/40px-Wikifunctions-logo.svg.png?utm_source=en.wikipedia.org&utm_campaign=parser&utm_content=thumbnail (2664 bytes)
+08-13 20:36:39.746  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://upload.wikimedia.org/wikipedia/commons/thumb/0/0c/Wikifunctions-logo.svg/40px-Wikifunctions-logo.svg.png?utm_source=en.wikipedia.org&utm_campaign=parser&utm_content=thumbnail
+08-13 20:36:39.851  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:img_logo https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/Wikiquote-logo.svg/40px-Wikiquote-logo.svg.png?utm_source=en.wikipedia.org&utm_campaign=parser&utm_content=thumbnail
+08-13 20:36:39.919  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/Wikiquote-logo.svg/40px-Wikiquote-logo.svg.png?utm_source=en.wikipedia.org&utm_campaign=parser&utm_content=thumbnail (3144 bytes)
+08-13 20:36:40.084  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/Wikiquote-logo.svg/40px-Wikiquote-logo.svg.png?utm_source=en.wikipedia.org&utm_campaign=parser&utm_content=thumbnail
+08-13 20:36:40.211  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:img_logo https://upload.wikimedia.org/wikipedia/commons/thumb/4/4c/Wikisource-logo.svg/40px-Wikisource-logo.svg.png?utm_source=en.wikipedia.org&utm_campaign=parser&utm_content=thumbnail
+08-13 20:36:40.287  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://upload.wikimedia.org/wikipedia/commons/thumb/4/4c/Wikisource-logo.svg/40px-Wikisource-logo.svg.png?utm_source=en.wikipedia.org&utm_campaign=parser&utm_content=thumbnail (3532 bytes)
+08-13 20:36:40.460  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://upload.wikimedia.org/wikipedia/commons/thumb/4/4c/Wikisource-logo.svg/40px-Wikisource-logo.svg.png?utm_source=en.wikipedia.org&utm_campaign=parser&utm_content=thumbnail
+08-13 20:36:40.518  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:img_logo https://upload.wikimedia.org/wikipedia/commons/thumb/d/df/Wikispecies-logo.svg/40px-Wikispecies-logo.svg.png?utm_source=en.wikipedia.org&utm_campaign=parser&utm_content=thumbnail
+08-13 20:36:40.601  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://upload.wikimedia.org/wikipedia/commons/thumb/d/df/Wikispecies-logo.svg/40px-Wikispecies-logo.svg.png?utm_source=en.wikipedia.org&utm_campaign=parser&utm_content=thumbnail (4748 bytes)
+08-13 20:36:41.021  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://upload.wikimedia.org/wikipedia/commons/thumb/d/df/Wikispecies-logo.svg/40px-Wikispecies-logo.svg.png?utm_source=en.wikipedia.org&utm_campaign=parser&utm_content=thumbnail
+08-13 20:36:41.075  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:img_logo https://upload.wikimedia.org/wikipedia/commons/thumb/7/7d/Microsoft_.NET_logo.svg/250px-Microsoft_.NET_logo.svg.png?utm_source=en.wikipedia.org&utm_campaign=parser&utm_content=thumbnail
+08-13 20:36:41.117  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://upload.wikimedia.org/wikipedia/commons/thumb/7/7d/Microsoft_.NET_logo.svg/250px-Microsoft_.NET_logo.svg.png?utm_source=en.wikipedia.org&utm_campaign=parser&utm_content=thumbnail (2144 bytes)
+08-13 20:36:41.486  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://upload.wikimedia.org/wikipedia/commons/thumb/7/7d/Microsoft_.NET_logo.svg/250px-Microsoft_.NET_logo.svg.png?utm_source=en.wikipedia.org&utm_campaign=parser&utm_content=thumbnail
+08-13 20:36:41.570  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:img_logo https://upload.wikimedia.org/wikipedia/en/thumb/8/8a/OOjs_UI_icon_edit-ltr-progressive.svg/20px-OOjs_UI_icon_edit-ltr-progressive.svg.png?utm_source=en.wikipedia.org&utm_campaign=parser&utm_content=thumbnail
+08-13 20:36:41.621  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://upload.wikimedia.org/wikipedia/en/thumb/8/8a/OOjs_UI_icon_edit-ltr-progressive.svg/20px-OOjs_UI_icon_edit-ltr-progressive.svg.png?utm_source=en.wikipedia.org&utm_campaign=parser&utm_content=thumbnail (636 bytes)
+08-13 20:36:41.775  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://upload.wikimedia.org/wikipedia/en/thumb/8/8a/OOjs_UI_icon_edit-ltr-progressive.svg/20px-OOjs_UI_icon_edit-ltr-progressive.svg.png?utm_source=en.wikipedia.org&utm_campaign=parser&utm_content=thumbnail
+08-13 20:36:41.905  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:img_logo https://upload.wikimedia.org/wikipedia/commons/thumb/0/0b/Wikiversity_logo_2017.svg/40px-Wikiversity_logo_2017.svg.png?utm_source=en.wikipedia.org&utm_campaign=parser&utm_content=thumbnail
+08-13 20:36:42.003  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://upload.wikimedia.org/wikipedia/commons/thumb/0/0b/Wikiversity_logo_2017.svg/40px-Wikiversity_logo_2017.svg.png?utm_source=en.wikipedia.org&utm_campaign=parser&utm_content=thumbnail (1412 bytes)
+08-13 20:36:42.176  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://upload.wikimedia.org/wikipedia/commons/thumb/0/0b/Wikiversity_logo_2017.svg/40px-Wikiversity_logo_2017.svg.png?utm_source=en.wikipedia.org&utm_campaign=parser&utm_content=thumbnail
+08-13 20:36:42.234  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:img_logo https://dotnet.microsoft.com/blob-assets/images/customers/chipotle/chipotle.png
+08-13 20:36:43.647  2132  2161 I ReactNativeJS: [CRAWL] startIconCrawl for netflix (sub: 1786667803618)
+08-13 20:36:43.647  2132  2161 I ReactNativeJS: [CRAWL] Already crawling netflix, skip duplicate start
+08-13 20:36:44.175  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://dotnet.microsoft.com/blob-assets/images/customers/chipotle/chipotle.png (22020 bytes)
+08-13 20:36:44.750  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://dotnet.microsoft.com/blob-assets/images/customers/chipotle/chipotle.png
+08-13 20:36:44.794  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:img_logo https://dotnet.microsoft.com/blob-assets/images/customers/nbc-sports/nbc-sports-next-light.png
+08-13 20:36:44.997  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://dotnet.microsoft.com/blob-assets/images/customers/nbc-sports/nbc-sports-next-light.png (31704 bytes)
+08-13 20:36:47.653  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://dotnet.microsoft.com/blob-assets/images/customers/nbc-sports/nbc-sports-next-light.png
+08-13 20:36:47.692  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:img_logo https://dotnet.microsoft.com/blob-assets/images/customers/microsoft/teams/microsoft-teams-logo.png
+08-13 20:36:47.831  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://dotnet.microsoft.com/blob-assets/images/customers/microsoft/teams/microsoft-teams-logo.png (7472 bytes)
+08-13 20:36:48.042  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://dotnet.microsoft.com/blob-assets/images/customers/microsoft/teams/microsoft-teams-logo.png
+08-13 20:36:48.077  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:img_logo https://dotnet.microsoft.com/blob-assets/images/customers/hrblock/hrblock.png
+08-13 20:36:48.257  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://dotnet.microsoft.com/blob-assets/images/customers/hrblock/hrblock.png (45712 bytes)
+08-13 20:36:48.484  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://dotnet.microsoft.com/blob-assets/images/customers/hrblock/hrblock.png
+08-13 20:36:48.539  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:img_logo https://dotnet.microsoft.com/blob-assets/images/customers/ge-aviation/ge-aviation.png
+08-13 20:36:48.685  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://dotnet.microsoft.com/blob-assets/images/customers/ge-aviation/ge-aviation.png (27736 bytes)
+08-13 20:36:49.161  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://dotnet.microsoft.com/blob-assets/images/customers/ge-aviation/ge-aviation.png
+08-13 20:36:49.223  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:img_logo https://dotnet.microsoft.com/blob-assets/images/customers/bing/bing-logo.png
+08-13 20:36:49.348  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://dotnet.microsoft.com/blob-assets/images/customers/bing/bing-logo.png (4044 bytes)
+08-13 20:36:49.465  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://dotnet.microsoft.com/blob-assets/images/customers/bing/bing-logo.png
+08-13 20:36:49.529  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:img_logo https://dotnet.microsoft.com/blob-assets/images/customers/github/gh-copilot.png
+08-13 20:36:49.639  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://dotnet.microsoft.com/blob-assets/images/customers/github/gh-copilot.png (8080 bytes)
+08-13 20:36:49.839  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://dotnet.microsoft.com/blob-assets/images/customers/github/gh-copilot.png
+08-13 20:36:49.885  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:img_logo https://upload.wikimedia.org/wikipedia/en/thumb/4/4a/Commons-logo.svg/40px-Commons-logo.svg.png?utm_source=en.wikipedia.org&utm_campaign=parser&utm_content=thumbnail
+08-13 20:36:49.981  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://upload.wikimedia.org/wikipedia/en/thumb/4/4a/Commons-logo.svg/40px-Commons-logo.svg.png?utm_source=en.wikipedia.org&utm_campaign=parser&utm_content=thumbnail (2864 bytes)
+08-13 20:36:50.370  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://upload.wikimedia.org/wikipedia/en/thumb/4/4a/Commons-logo.svg/40px-Commons-logo.svg.png?utm_source=en.wikipedia.org&utm_campaign=parser&utm_content=thumbnail
+08-13 20:36:50.490  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:img_logo https://upload.wikimedia.org/wikipedia/commons/thumb/a/a6/MediaWiki-2020-icon.svg/40px-MediaWiki-2020-icon.svg.png?utm_source=en.wikipedia.org&utm_campaign=parser&utm_content=thumbnail
+08-13 20:36:50.539  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://upload.wikimedia.org/wikipedia/commons/thumb/a/a6/MediaWiki-2020-icon.svg/40px-MediaWiki-2020-icon.svg.png?utm_source=en.wikipedia.org&utm_campaign=parser&utm_content=thumbnail (3716 bytes)
+08-13 20:36:50.693  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://upload.wikimedia.org/wikipedia/commons/thumb/a/a6/MediaWiki-2020-icon.svg/40px-MediaWiki-2020-icon.svg.png?utm_source=en.wikipedia.org&utm_campaign=parser&utm_content=thumbnail
+08-13 20:36:50.735  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:img_logo https://upload.wikimedia.org/wikipedia/commons/thumb/7/75/Wikimedia_Community_Logo.svg/40px-Wikimedia_Community_Logo.svg.png?utm_source=en.wikipedia.org&utm_campaign=parser&utm_content=thumbnail
+08-13 20:36:50.819  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://upload.wikimedia.org/wikipedia/commons/thumb/7/75/Wikimedia_Community_Logo.svg/40px-Wikimedia_Community_Logo.svg.png?utm_source=en.wikipedia.org&utm_campaign=parser&utm_content=thumbnail (3564 bytes)
+08-13 20:36:50.953  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://upload.wikimedia.org/wikipedia/commons/thumb/7/75/Wikimedia_Community_Logo.svg/40px-Wikimedia_Community_Logo.svg.png?utm_source=en.wikipedia.org&utm_campaign=parser&utm_content=thumbnail
+08-13 20:36:50.994  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:img_logo https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/Wikibooks-logo.svg/40px-Wikibooks-logo.svg.png?utm_source=en.wikipedia.org&utm_campaign=parser&utm_content=thumbnail
+08-13 20:36:51.057  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/Wikibooks-logo.svg/40px-Wikibooks-logo.svg.png?utm_source=en.wikipedia.org&utm_campaign=parser&utm_content=thumbnail (3496 bytes)
+08-13 20:36:51.151  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/Wikibooks-logo.svg/40px-Wikibooks-logo.svg.png?utm_source=en.wikipedia.org&utm_campaign=parser&utm_content=thumbnail
+08-13 20:36:51.201  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:og_image https://upload.wikimedia.org/wikipedia/commons/5/5f/Oryctolagus_cuniculus_-_euqirneto_-_419737670_%28cropped%29.jpeg?utm_source=en.wikipedia.org&utm_campaign=index&utm_content=thumbnail_unscaled
+08-13 20:36:52.654  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://upload.wikimedia.org/wikipedia/commons/5/5f/Oryctolagus_cuniculus_-_euqirneto_-_419737670_%28cropped%29.jpeg?utm_source=en.wikipedia.org&utm_campaign=index&utm_content=thumbnail_unscaled (736572 bytes)
+08-13 20:36:54.896  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://upload.wikimedia.org/wikipedia/commons/5/5f/Oryctolagus_cuniculus_-_euqirneto_-_419737670_%28cropped%29.jpeg?utm_source=en.wikipedia.org&utm_campaign=index&utm_content=thumbnail_unscaled
+08-13 20:36:55.030  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:twitter_image https://dotnet.microsoft.com/blob-assets/images/dotnet-icons/large.png
+08-13 20:36:55.326  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://dotnet.microsoft.com/blob-assets/images/dotnet-icons/large.png (80112 bytes)
+08-13 20:36:55.973  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://dotnet.microsoft.com/blob-assets/images/dotnet-icons/large.png
+08-13 20:36:56.004  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:jsonld_image https://upload.wikimedia.org/wikipedia/commons/5/5f/Oryctolagus_cuniculus_-_euqirneto_-_419737670_%28cropped%29.jpeg?utm_source=en.wikipedia.org&utm_campaign=index&utm_content=original
+08-13 20:36:57.507  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://upload.wikimedia.org/wikipedia/commons/5/5f/Oryctolagus_cuniculus_-_euqirneto_-_419737670_%28cropped%29.jpeg?utm_source=en.wikipedia.org&utm_campaign=index&utm_content=original (736572 bytes)
+08-13 20:37:00.294  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://upload.wikimedia.org/wikipedia/commons/5/5f/Oryctolagus_cuniculus_-_euqirneto_-_419737670_%28cropped%29.jpeg?utm_source=en.wikipedia.org&utm_campaign=index&utm_content=original
+08-13 20:37:00.320  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: bing_images https://global-uploads.webflow.com/627a1044a798e6627445c8d1/63d74ff42fb109792397bdb4_feature img 5.webp
+08-13 20:37:02.215  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://global-uploads.webflow.com/627a1044a798e6627445c8d1/63d74ff42fb109792397bdb4_feature img 5.webp (152792 bytes)
+08-13 20:37:02.877  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://global-uploads.webflow.com/627a1044a798e6627445c8d1/63d74ff42fb109792397bdb4_feature img 5.webp
+08-13 20:37:02.889  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: bing_images https://www.cafechat.com/wp-content/uploads/2025/10/free-online-chat-rooms.webp
+08-13 20:37:04.391  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://www.cafechat.com/wp-content/uploads/2025/10/free-online-chat-rooms.webp (65408 bytes)
+08-13 20:37:04.710  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://www.cafechat.com/wp-content/uploads/2025/10/free-online-chat-rooms.webp
+08-13 20:37:04.720  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: bing_images https://cdn.miniapps.ai/images/results/a6ec1b65-624d-462f-bf8f-52b29ec725e8.webp
+08-13 20:37:05.949  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://cdn.miniapps.ai/images/results/a6ec1b65-624d-462f-bf8f-52b29ec725e8.webp (21416 bytes)
+08-13 20:37:06.173  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://cdn.miniapps.ai/images/results/a6ec1b65-624d-462f-bf8f-52b29ec725e8.webp
+08-13 20:37:06.182  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: bing_images https://sp-ao.shortpixel.ai/client/to_webp,q_glossy,ret_img,w_1024,h_576/https://digitei.com/wp-content/uploads/2026/06/chat-gpt.webp
+08-13 20:37:07.654  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://sp-ao.shortpixel.ai/client/to_webp,q_glossy,ret_img,w_1024,h_576/https://digitei.com/wp-content/uploads/2026/06/chat-gpt.webp (30496 bytes)
+08-13 20:37:07.866  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://sp-ao.shortpixel.ai/client/to_webp,q_glossy,ret_img,w_1024,h_576/https://digitei.com/wp-content/uploads/2026/06/chat-gpt.webp
+08-13 20:37:07.886  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: bing_images https://i.pinimg.com/originals/cb/c8/e6/cbc8e6ef7246bc746b4b58459c1090f0.png
+08-13 20:37:09.887  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://i.pinimg.com/originals/cb/c8/e6/cbc8e6ef7246bc746b4b58459c1090f0.png (32212 bytes)
+08-13 20:37:10.719  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://i.pinimg.com/originals/cb/c8/e6/cbc8e6ef7246bc746b4b58459c1090f0.png
+08-13 20:37:10.736  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: bing_images https://brainpod.ai/wp-content/uploads/2024/12/433384.png
+08-13 20:37:13.843  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://brainpod.ai/wp-content/uploads/2024/12/433384.png (870136 bytes)
+08-13 20:37:19.826  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://brainpod.ai/wp-content/uploads/2024/12/433384.png
+08-13 20:37:19.860  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: bing_images https://www.cafechat.com/wp-content/uploads/2025/10/free-chat-room.png
+08-13 20:37:21.755  2132  2161 I ReactNativeJS: [FETCH] SKIP oversized icon https://www.cafechat.com/wp-content/uploads/2025/10/free-chat-room.png (2051393 bytes)
+08-13 20:37:21.766  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: bing_images https://tvhistoria.com.br/wp-content/uploads/2023/07/Carrossel-Hilda-Chavez-Laura.png
+08-13 20:37:25.353  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://tvhistoria.com.br/wp-content/uploads/2023/07/Carrossel-Hilda-Chavez-Laura.png (553632 bytes)
+08-13 20:37:28.946  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://tvhistoria.com.br/wp-content/uploads/2023/07/Carrossel-Hilda-Chavez-Laura.png
+08-13 20:37:28.969  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: bing_images https://br.web.img2.acsta.net/newsv7/22/04/29/18/59/4732455.png
+08-13 20:37:33.461  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://br.web.img2.acsta.net/newsv7/22/04/29/18/59/4732455.png (1444556 bytes)
+08-13 20:37:44.879  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://br.web.img2.acsta.net/newsv7/22/04/29/18/59/4732455.png
+08-13 20:37:44.902  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: bing_images https://dipstrategy.co.id/blog/wp-content/uploads/2023/05/7-alternatif-chat-gpt-terbaik-lengkap-dengan-review-dipstrategy-digital-agency-jakarta-1.png
+08-13 20:37:49.233  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://dipstrategy.co.id/blog/wp-content/uploads/2023/05/7-alternatif-chat-gpt-terbaik-lengkap-dengan-review-dipstrategy-digital-agency-jakarta-1.png (695384 bytes)
+08-13 20:37:59.489  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://dipstrategy.co.id/blog/wp-content/uploads/2023/05/7-alternatif-chat-gpt-terbaik-lengkap-dengan-review-dipstrategy-digital-agency-jakarta-1.png
+08-13 20:37:59.518  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: bing_images https://i.pinimg.com/originals/cf/1f/5c/cf1f5c0042f839566b67d1256caac6e2.png
+08-13 20:38:02.244  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://i.pinimg.com/originals/cf/1f/5c/cf1f5c0042f839566b67d1256caac6e2.png (514428 bytes)
+08-13 20:38:10.515  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://i.pinimg.com/originals/cf/1f/5c/cf1f5c0042f839566b67d1256caac6e2.png
+08-13 20:38:10.533  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: bing_images https://cfn.tweaking.in/content/wp/tweaklibrary_com/uploads/2023/09/Chatous.png
+08-13 20:38:12.240  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://cfn.tweaking.in/content/wp/tweaklibrary_com/uploads/2023/09/Chatous.png (152604 bytes)
+08-13 20:38:15.016  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://cfn.tweaking.in/content/wp/tweaklibrary_com/uploads/2023/09/Chatous.png
+08-13 20:38:15.031  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: bing_images https://lp.simplified.com/siteimages/all/ai-chat.png
+08-13 20:38:17.316  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://lp.simplified.com/siteimages/all/ai-chat.png (106576 bytes)
+08-13 20:38:20.821  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://lp.simplified.com/siteimages/all/ai-chat.png
+08-13 20:38:20.847  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: bing_images https://image.video.skool.com/coCnvysrXGCHewN18lATmh801Y3cHpWSHj02ESu89op4I/thumbnail.png?token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJ0IiwiZXhwIjo0OTIwMzE4MzE5LCJraWQiOiJPVjIwMHZ6SWZuZFVCNHdXdTAxbDRjb0hrYTVQQUd3TlYwMEtZSkJrQkppVlFrIiwic3ViIjoiY29DbnZ5c3JYR0NIZXdOMThsQVRtaDgwMVkzY0hwV1NIajAyRVN1ODlvcDRJIiwid2lkdGgiOjEyODB9.YnGugMsLHFfywzFJ_vqXzFW3iUvcHv4BoEP7U_dyDH-4fXIp_dx0QD9iPnmAWsoxBZuyFJ4UW075xKWILQYbO_Qw3EHW3XP1E6ugKs4wlyy__JO2DMAw8sYEiFrewQxKVRUsmtRutxSrTO0Wq0SyFCJiz6R-B69VjZS9R0R7Qj5sAddh2Nxso6kAf-kwGYpGLAkIM4G21FizGqsuw7vXy6J7XpfnpD591soWn6l0znkSYaTdckTHdbEfS92XeP1U-WGvdXkxtMoeQAYaM1yKId-vgnXPNPMWKKw8HoAVW2HHKWwgHB-0vB-bvz24JanpduiLvZZeniSV1XvQmg1uKQ
+08-13 20:38:23.103  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://image.video.skool.com/coCnvysrXGCHewN18lATmh801Y3cHpWSHj02ESu89op4I/thumbnail.png?token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJ0IiwiZXhwIjo0OTIwMzE4MzE5LCJraWQiOiJPVjIwMHZ6SWZuZFVCNHdXdTAxbDRjb0hrYTVQQUd3TlYwMEtZSkJrQkppVlFrIiwic3ViIjoiY29DbnZ5c3JYR0NIZXdOMThsQVRtaDgwMVkzY0hwV1NIajAyRVN1ODlvcDRJIiwid2lkdGgiOjEyODB9.YnGugMsLHFfywzFJ_vqXzFW3iUvcHv4BoEP7U_dyDH-4fXIp_dx0QD9iPnmAWsoxBZuyFJ4UW075xKWILQYbO_Qw3EHW3XP1E6ugKs4wlyy__JO2DMAw8sYEiFrewQxKVRUsmtRutxSrTO0Wq0SyFCJiz6R-B69VjZS9R0R7Qj5sAddh2Nxso6kAf-kwGYpGLAkIM4G21FizGqsuw7vXy6J7XpfnpD591soWn6l0znkSYaTdckTHdbEfS92XeP1U-WGvdXkxtMoeQAYaM1yKId-vgnXPNPMWKKw8HoAVW2HHKWwgHB-0vB-bvz24JanpduiLvZZeniSV1XvQmg1uKQ (39680 bytes)
+08-13 20:38:27.084  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://image.video.skool.com/coCnvysrXGCHewN18lATmh801Y3cHpWSHj02ESu89op4I/thumbnail.png?token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJ0IiwiZXhwIjo0OTIwMzE4MzE5LCJraWQiOiJPVjIwMHZ6SWZuZFVCNHdXdTAxbDRjb0hrYTVQQUd3TlYwMEtZSkJrQkppVlFrIiwic3ViIjoiY29DbnZ5c3JYR0NIZXdOMThsQVRtaDgwMVkzY0hwV1NIajAyRVN1ODlvcDRJIiwid2lkdGgiOjEyODB9.YnGugMsLHFfywzFJ_vqXzFW3iUvcHv4BoEP7U_dyDH-4fXIp_dx0QD9iPnmAWsoxBZuyFJ4UW075xKWILQYbO_Qw3EHW3XP1E6ugKs4wlyy__JO2DMAw8sYEiFrewQxKVRUsmtRutxSrTO0Wq0SyFCJiz6R-B69VjZS9R0R7Qj5sAddh2Nxso6kAf-kwGYpGLAkIM4G21FizGqsuw7vXy6J7XpfnpD591soWn6l0znkSYaTdckTHdbEfS92XeP1U-WGvdXkxtMoeQAYaM1yKId-vgnXPNPMWKKw8HoAVW2HHKWwgHB-0vB-bvz24JanpduiLvZZeniSV1XvQmg1uKQ
+08-13 20:38:27.098  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: bing_images https://aichattings.com/wp-content/uploads/2025/12/cropped-ChatUp-AI-Logo-03.png
+08-13 20:38:30.632  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://aichattings.com/wp-content/uploads/2025/12/cropped-ChatUp-AI-Logo-03.png (310868 bytes)
+08-13 20:38:33.367  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://aichattings.com/wp-content/uploads/2025/12/cropped-ChatUp-AI-Logo-03.png
+08-13 20:38:33.383  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: bing_images https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/06/19/6b/06196b1d-ceca-b32b-192e-99ec178b6964/AppIcon-0-0-1x_U007emarketing-0-7-0-0-85-220.png/1200x630wa.png
+08-13 20:38:35.076  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/06/19/6b/06196b1d-ceca-b32b-192e-99ec178b6964/AppIcon-0-0-1x_U007emarketing-0-7-0-0-85-220.png/1200x630wa.png (56920 bytes)
+08-13 20:38:37.640  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/06/19/6b/06196b1d-ceca-b32b-192e-99ec178b6964/AppIcon-0-0-1x_U007emarketing-0-7-0-0-85-220.png/1200x630wa.png
+08-13 20:38:37.648  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: bing_images https://logomakerr.ai/blog/wp-content/uploads/2023/03/ChatGBT-logo-1.png
+08-13 20:38:41.033  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://logomakerr.ai/blog/wp-content/uploads/2023/03/ChatGBT-logo-1.png (964800 bytes)
+08-13 20:38:57.898  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://logomakerr.ai/blog/wp-content/uploads/2023/03/ChatGBT-logo-1.png
+08-13 20:38:57.925  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: bing_images https://i.ytimg.com/vi/x1SUxvRh7N0/hqdefault.jpg
+08-13 20:38:59.357  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://i.ytimg.com/vi/x1SUxvRh7N0/hqdefault.jpg (46916 bytes)
+08-13 20:38:59.637  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://i.ytimg.com/vi/x1SUxvRh7N0/hqdefault.jpg
+08-13 20:38:59.652  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: bing_images https://us1.discourse-cdn.com/openai1/original/4X/d/1/f/d1f2fec9903be4d5cf6aa243c86aa6cd337ecf50.jpeg
+08-13 20:39:00.721  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://us1.discourse-cdn.com/openai1/original/4X/d/1/f/d1f2fec9903be4d5cf6aa243c86aa6cd337ecf50.jpeg (222348 bytes)
+08-13 20:39:01.341  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://us1.discourse-cdn.com/openai1/original/4X/d/1/f/d1f2fec9903be4d5cf6aa243c86aa6cd337ecf50.jpeg
+08-13 20:39:01.348  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: bing_images https://br.web.img3.acsta.net/c_640_360/img/64/30/64301f8e697bc6d57441fde22931c422.jpg
+08-13 20:39:03.086  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://br.web.img3.acsta.net/c_640_360/img/64/30/64301f8e697bc6d57441fde22931c422.jpg (63676 bytes)
+08-13 20:39:03.313  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://br.web.img3.acsta.net/c_640_360/img/64/30/64301f8e697bc6d57441fde22931c422.jpg
+08-13 20:39:03.370  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: bing_images https://i.pinimg.com/originals/ee/5d/3e/ee5d3e4a1312b9b0c93bc879556a8576.jpg
+08-13 20:39:04.975  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://i.pinimg.com/originals/ee/5d/3e/ee5d3e4a1312b9b0c93bc879556a8576.jpg (77312 bytes)
+08-13 20:39:05.263  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://i.pinimg.com/originals/ee/5d/3e/ee5d3e4a1312b9b0c93bc879556a8576.jpg
+08-13 20:39:05.285  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: bing_images https://static.vecteezy.com/system/resources/thumbnails/022/605/268/small_2x/chat-bot-robot-service-icons-set-vector.jpg
+08-13 20:39:07.177  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://static.vecteezy.com/system/resources/thumbnails/022/605/268/small_2x/chat-bot-robot-service-icons-set-vector.jpg (97368 bytes)
+08-13 20:39:07.758  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://static.vecteezy.com/system/resources/thumbnails/022/605/268/small_2x/chat-bot-robot-service-icons-set-vector.jpg
+08-13 20:39:07.765  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: bing_images https://www.antenne.de/media/cache/3/version/15625/230224_chatgpt_adobe.1897860d-v1.jpg/6ddea9988edf06288c38457dbc8db409.jpg
+08-13 20:39:09.558  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://www.antenne.de/media/cache/3/version/15625/230224_chatgpt_adobe.1897860d-v1.jpg/6ddea9988edf06288c38457dbc8db409.jpg (138772 bytes)
+08-13 20:39:10.098  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://www.antenne.de/media/cache/3/version/15625/230224_chatgpt_adobe.1897860d-v1.jpg/6ddea9988edf06288c38457dbc8db409.jpg
+08-13 20:39:10.122  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: bing_images https://cdn-bgp.bluestacks.com/BGP/us/app_page_chat.gpt.ai.assistant.chatbot.chatgpt.jpg
+08-13 20:39:11.914  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://cdn-bgp.bluestacks.com/BGP/us/app_page_chat.gpt.ai.assistant.chatbot.chatgpt.jpg (59848 bytes)
+08-13 20:39:12.228  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://cdn-bgp.bluestacks.com/BGP/us/app_page_chat.gpt.ai.assistant.chatbot.chatgpt.jpg
+08-13 20:39:12.273  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: bing_images https://i.pinimg.com/originals/3c/dd/c7/3cddc7ed380f9a86e1a4de73f0a37dbc.jpg
+08-13 20:39:13.133  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://i.pinimg.com/originals/3c/dd/c7/3cddc7ed380f9a86e1a4de73f0a37dbc.jpg (318784 bytes)
+08-13 20:39:14.192  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://i.pinimg.com/originals/3c/dd/c7/3cddc7ed380f9a86e1a4de73f0a37dbc.jpg
+08-13 20:39:14.236  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: bing_images https://static.vecteezy.com/system/resources/previews/024/603/030/non_2x/sankt-petersburg-russia-05-14-2023-chatgpt-logo-icon-artificial-intelligence-in-eps-10-format-free-vector.jpg
+08-13 20:39:14.527  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://static.vecteezy.com/system/resources/previews/024/603/030/non_2x/sankt-petersburg-russia-05-14-2023-chatgpt-logo-icon-artificial-intelligence-in-eps-10-format-free-vector.jpg (93064 bytes)
+08-13 20:39:14.929  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://static.vecteezy.com/system/resources/previews/024/603/030/non_2x/sankt-petersburg-russia-05-14-2023-chatgpt-logo-icon-artificial-intelligence-in-eps-10-format-free-vector.jpg
+08-13 20:39:15.008  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: bing_images https://i.pinimg.com/736x/b2/ea/93/b2ea93e3103d863a21e934079d68b240.jpg
+08-13 20:39:15.333  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://i.pinimg.com/736x/b2/ea/93/b2ea93e3103d863a21e934079d68b240.jpg (86056 bytes)
+08-13 20:39:15.674  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://i.pinimg.com/736x/b2/ea/93/b2ea93e3103d863a21e934079d68b240.jpg
+08-13 20:39:15.691  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: bing_images https://cdn.imagearchive.com/ukworkshop/data/attach/150/150236-chat.jpg
+08-13 20:39:18.891  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://cdn.imagearchive.com/ukworkshop/data/attach/150/150236-chat.jpg (182440 bytes)
+08-13 20:39:19.828  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://cdn.imagearchive.com/ukworkshop/data/attach/150/150236-chat.jpg
+08-13 20:39:19.920  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: bing_images https://i.pinimg.com/originals/52/4a/03/524a0329a32a5f8a0fe0172642c7b15c.jpg
+08-13 20:39:20.405  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://i.pinimg.com/originals/52/4a/03/524a0329a32a5f8a0fe0172642c7b15c.jpg (129136 bytes)
+08-13 20:39:21.024  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://i.pinimg.com/originals/52/4a/03/524a0329a32a5f8a0fe0172642c7b15c.jpg
+08-13 20:39:21.033  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: bing_images https://static1.xdaimages.com/wordpress/wp-content/uploads/2023/07/bing-chat-1.jpg
+08-13 20:39:22.505  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://static1.xdaimages.com/wordpress/wp-content/uploads/2023/07/bing-chat-1.jpg (122020 bytes)
+08-13 20:39:23.090  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://static1.xdaimages.com/wordpress/wp-content/uploads/2023/07/bing-chat-1.jpg
+08-13 20:39:23.104  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: bing_images https://i.redd.it/chat-gbt-helping-me-with-macro-v0-zdr14816809c1.jpeg?s=fbc05c40c2bb3de7501e117f45bc719ba2d7ac4b
+08-13 20:39:27.168  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://i.redd.it/chat-gbt-helping-me-with-macro-v0-zdr14816809c1.jpeg?s=fbc05c40c2bb3de7501e117f45bc719ba2d7ac4b (1196532 bytes)
+08-13 20:39:31.584  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://i.redd.it/chat-gbt-helping-me-with-macro-v0-zdr14816809c1.jpeg?s=fbc05c40c2bb3de7501e117f45bc719ba2d7ac4b
+08-13 20:39:31.606  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: bing_images https://miro.medium.com/v2/resize:fit:1200/1*pfpbHIYuYFkYE3R9zQclaA@2x.jpeg
+08-13 20:39:33.761  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://miro.medium.com/v2/resize:fit:1200/1*pfpbHIYuYFkYE3R9zQclaA@2x.jpeg (84200 bytes)
+08-13 20:39:34.173  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://miro.medium.com/v2/resize:fit:1200/1*pfpbHIYuYFkYE3R9zQclaA@2x.jpeg
+08-13 20:39:34.217  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: bing_images https://i.ytimg.com/vi/lKfU6oPA5d8/maxresdefault.jpg
+08-13 20:39:35.497  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://i.ytimg.com/vi/lKfU6oPA5d8/maxresdefault.jpg (95820 bytes)
+08-13 20:39:35.925  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://i.ytimg.com/vi/lKfU6oPA5d8/maxresdefault.jpg
+08-13 20:39:35.965  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: bing_images https://i.pinimg.com/originals/70/92/51/709251c1ce401b1ef7460a90a0ec431a.jpg
+08-13 20:39:36.803  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://i.pinimg.com/originals/70/92/51/709251c1ce401b1ef7460a90a0ec431a.jpg (329084 bytes)
+08-13 20:39:38.010  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://i.pinimg.com/originals/70/92/51/709251c1ce401b1ef7460a90a0ec431a.jpg
+08-13 20:39:38.051  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: bing_images https://i.pinimg.com/originals/81/e7/67/81e7678412658b2f3d0cb4076c38ddf5.jpg
+08-13 20:39:38.399  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://i.pinimg.com/originals/81/e7/67/81e7678412658b2f3d0cb4076c38ddf5.jpg (126644 bytes)
+08-13 20:39:38.908  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://i.pinimg.com/originals/81/e7/67/81e7678412658b2f3d0cb4076c38ddf5.jpg
+08-13 20:39:38.951  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: bing_images https://i.pinimg.com/736x/c6/8e/11/c68e11f4f1fd70dcfef5ef8e0ba84793.jpg
+08-13 20:39:39.516  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://i.pinimg.com/736x/c6/8e/11/c68e11f4f1fd70dcfef5ef8e0ba84793.jpg (170524 bytes)
+08-13 20:39:40.192  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://i.pinimg.com/736x/c6/8e/11/c68e11f4f1fd70dcfef5ef8e0ba84793.jpg
+08-13 20:39:40.228  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: bing_images https://i.pinimg.com/originals/5e/0a/83/5e0a83e7451660b8736ef08aaa12dceb.jpg
+08-13 20:39:41.305  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://i.pinimg.com/originals/5e/0a/83/5e0a83e7451660b8736ef08aaa12dceb.jpg (367688 bytes)
+08-13 20:39:42.881  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://i.pinimg.com/originals/5e/0a/83/5e0a83e7451660b8736ef08aaa12dceb.jpg
+08-13 20:39:42.957  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: bing_images https://i.pinimg.com/736x/ec/38/dd/ec38dd1d97ba1674667a807b92e20a98.jpg
+08-13 20:39:43.330  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://i.pinimg.com/736x/ec/38/dd/ec38dd1d97ba1674667a807b92e20a98.jpg (75044 bytes)
+08-13 20:39:43.703  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://i.pinimg.com/736x/ec/38/dd/ec38dd1d97ba1674667a807b92e20a98.jpg
+08-13 20:39:43.716  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: bing_images https://esportsku.com/tech/wp-content/uploads/2022/12/Chat-GPT-welcome.jpg
+08-13 20:39:44.871  2132  2161 I ReactNativeJS: [COLLECTION] Loading icons for netflix
+08-13 20:39:45.184  2132  2161 I ReactNativeJS: [COLLECTION] Found cached icon for netflix
+08-13 20:39:46.183  2132  2161 I ReactNativeJS: [LOCAL] Using local icon for netflix
+08-13 20:39:46.188  2132  2161 I ReactNativeJS: [COLLECTION] Added subscription icon to collection
+08-13 20:39:46.189  2132  2161 I ReactNativeJS: [COLLECTION] Returning 6 icons (cachedValid=true)
+08-13 20:39:46.192  2132  2161 I ReactNativeJS: [PICKER] Loaded 6 icons for netflix (6 total, reports hidden by default)
+08-13 20:39:46.675  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://esportsku.com/tech/wp-content/uploads/2022/12/Chat-GPT-welcome.jpg (44816 bytes)
+08-13 20:39:47.368  2132  2161 I ReactNativeJS: [COLLECTION] Loading icons for netflix
+08-13 20:39:47.649  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://esportsku.com/tech/wp-content/uploads/2022/12/Chat-GPT-welcome.jpg
+08-13 20:39:47.667  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: bing_images https://nextbigfuture.s3.amazonaws.com/uploads/2023/02/chatgpt-1536x806.jpeg
+08-13 20:39:47.681  2132  2161 I ReactNativeJS: [COLLECTION] Found cached icon for netflix
+08-13 20:39:49.066  2132  2161 I ReactNativeJS: [LOCAL] Using local icon for netflix
+08-13 20:39:49.069  2132  2161 I ReactNativeJS: [COLLECTION] Added subscription icon to collection
+08-13 20:39:49.070  2132  2161 I ReactNativeJS: [COLLECTION] Returning 6 icons (cachedValid=true)
+08-13 20:39:49.072  2132  2161 I ReactNativeJS: [PICKER] Loaded 6 icons for netflix (6 total, reports hidden by default)
+08-13 20:39:50.122  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://nextbigfuture.s3.amazonaws.com/uploads/2023/02/chatgpt-1536x806.jpeg (87168 bytes)
+08-13 20:39:51.161  2132  2161 I ReactNativeJS: [COLLECTION] Loading icons for netflix
+08-13 20:39:51.241  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://nextbigfuture.s3.amazonaws.com/uploads/2023/02/chatgpt-1536x806.jpeg
+08-13 20:39:51.373  2132  2161 I ReactNativeJS: [COLLECTION] Found cached icon for netflix
+08-13 20:39:52.019  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: bing_images https://i.pinimg.com/736x/65/20/59/652059f0c5dc2ff017a8099c7b8bd802.jpg
+08-13 20:39:53.470  2132  2161 I ReactNativeJS: [LOCAL] Using local icon for netflix
+08-13 20:39:53.470  2132  2161 I ReactNativeJS: [COLLECTION] Added subscription icon to collection
+08-13 20:39:53.475  2132  2161 I ReactNativeJS: [COLLECTION] Returning 6 icons (cachedValid=true)
+08-13 20:39:53.725  2132  2161 I ReactNativeJS: [PICKER] Loaded 6 icons for netflix (6 total, reports hidden by default)
+08-13 20:39:53.852  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://i.pinimg.com/736x/65/20/59/652059f0c5dc2ff017a8099c7b8bd802.jpg (113840 bytes)
+08-13 20:39:55.376  2132  2161 I ReactNativeJS: [COLLECTION] Loading icons for netflix
+08-13 20:39:55.396  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://i.pinimg.com/736x/65/20/59/652059f0c5dc2ff017a8099c7b8bd802.jpg
+08-13 20:39:55.434  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: bing_images https://sorunrehberi.com/wp-content/uploads/2022/12/chat-gbt-kayit-olma.jpg
+08-13 20:39:55.539  2132  2161 I ReactNativeJS: [COLLECTION] Found cached icon for netflix
+08-13 20:39:57.080  2132  2161 I ReactNativeJS: [LOCAL] Using local icon for netflix
+08-13 20:39:57.080  2132  2161 I ReactNativeJS: [COLLECTION] Added subscription icon to collection
+08-13 20:39:57.082  2132  2161 I ReactNativeJS: [COLLECTION] Returning 6 icons (cachedValid=true)
+08-13 20:39:57.085  2132  2161 I ReactNativeJS: [PICKER] Loaded 6 icons for netflix (6 total, reports hidden by default)
+08-13 20:39:57.528  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://sorunrehberi.com/wp-content/uploads/2022/12/chat-gbt-kayit-olma.jpg (12048 bytes)
+08-13 20:39:57.965  2132  2161 I ReactNativeJS: [COLLECTION] Loading icons for netflix
+08-13 20:39:58.042  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://sorunrehberi.com/wp-content/uploads/2022/12/chat-gbt-kayit-olma.jpg
+08-13 20:39:58.058  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://www.netflix.com/favicon.ico
+08-13 20:39:58.108  2132  2161 I ReactNativeJS: [COLLECTION] Found cached icon for netflix
+08-13 20:39:59.691  2132  2161 I ReactNativeJS: [LOCAL] Using local icon for netflix
+08-13 20:39:59.692  2132  2161 I ReactNativeJS: [COLLECTION] Added subscription icon to collection
+08-13 20:39:59.693  2132  2161 I ReactNativeJS: [COLLECTION] Returning 6 icons (cachedValid=true)
+08-13 20:39:59.695  2132  2161 I ReactNativeJS: [PICKER] Loaded 6 icons for netflix (6 total, reports hidden by default)
+08-13 20:40:00.425  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://www.netflix.com/favicon.ico (22612 bytes)
+08-13 20:40:00.815  2132  2161 I ReactNativeJS: [COLLECTION] Loading icons for netflix
+08-13 20:40:00.898  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://www.netflix.com/favicon.ico
+08-13 20:40:01.260  2132  2161 I ReactNativeJS: [COLLECTION] Found cached icon for netflix
+08-13 20:40:01.722  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://dotnet.microsoft.com/favicon.ico
+08-13 20:40:02.919  2132  2161 I ReactNativeJS: [LOCAL] Using local icon for netflix
+08-13 20:40:02.920  2132  2161 I ReactNativeJS: [COLLECTION] Added subscription icon to collection
+08-13 20:40:02.922  2132  2161 I ReactNativeJS: [COLLECTION] Returning 6 icons (cachedValid=true)
+08-13 20:40:02.926  2132  2161 I ReactNativeJS: [PICKER] Loaded 6 icons for netflix (6 total, reports hidden by default)
+08-13 20:40:04.480  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://dotnet.microsoft.com/favicon.ico (221064 bytes)
+08-13 20:40:05.661  2132  2161 I ReactNativeJS: [COLLECTION] Loading icons for netflix
+08-13 20:40:05.733  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://dotnet.microsoft.com/favicon.ico
+08-13 20:40:05.788  2132  2161 I ReactNativeJS: [COLLECTION] Found cached icon for netflix
+08-13 20:40:06.193  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://en.wikipedia.org/favicon.ico
+08-13 20:40:07.105  2132  2161 I ReactNativeJS: [LOCAL] Using local icon for netflix
+08-13 20:40:07.105  2132  2161 I ReactNativeJS: [COLLECTION] Added subscription icon to collection
+08-13 20:40:07.107  2132  2161 I ReactNativeJS: [COLLECTION] Returning 6 icons (cachedValid=true)
+08-13 20:40:07.130  2132  2161 I ReactNativeJS: [PICKER] Loaded 6 icons for netflix (6 total, reports hidden by default)
+08-13 20:40:07.526  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://en.wikipedia.org/favicon.ico (3648 bytes)
+08-13 20:40:07.653  2132  2161 I ReactNativeJS: [COLLECTION] Loading icons for netflix
+08-13 20:40:07.700  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://en.wikipedia.org/favicon.ico
+08-13 20:40:07.717  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://imgv2-2-f.scribdassets.com/favicon.ico
+08-13 20:40:07.749  2132  2161 I ReactNativeJS: [COLLECTION] Found cached icon for netflix
+08-13 20:40:08.688  2132  2161 I ReactNativeJS: [LOCAL] Using local icon for netflix
+08-13 20:40:08.688  2132  2161 I ReactNativeJS: [COLLECTION] Added subscription icon to collection
+08-13 20:40:08.689  2132  2161 I ReactNativeJS: [COLLECTION] Returning 6 icons (cachedValid=true)
+08-13 20:40:08.694  2132  2161 I ReactNativeJS: [PICKER] Loaded 6 icons for netflix (6 total, reports hidden by default)
+08-13 20:40:09.176  2132  2161 I ReactNativeJS: [FETCH] FAILED https://imgv2-2-f.scribdassets.com/favicon.ico: 404
+08-13 20:40:09.269  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://net.net/favicon.ico
+08-13 20:40:10.785  2132  2161 I ReactNativeJS: [FETCH] REJECT non-image response https://net.net/favicon.ico (content-type=text/html)
+08-13 20:40:10.800  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://www.net.net/favicon.ico
+08-13 20:40:10.891  2132  2161 I ReactNativeJS: [FETCH] REJECT non-image response https://www.net.net/favicon.ico (content-type=text/html)
+08-13 20:40:10.965  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:favicon https://assets.nflxext.com/us/ffe/siteui/common/icons/nficon2023.ico
+08-13 20:40:12.467  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://assets.nflxext.com/us/ffe/siteui/common/icons/nficon2023.ico (13140 bytes)
+08-13 20:40:12.725  2132  2161 I ReactNativeJS: [COLLECTION] Loading icons for netflix
+08-13 20:40:12.747  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://assets.nflxext.com/us/ffe/siteui/common/icons/nficon2023.ico
+08-13 20:40:12.792  2132  2161 I ReactNativeJS: [COLLECTION] Found cached icon for netflix
+08-13 20:40:13.090  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:favicon https://en.wikipedia.org/static/favicon/wikipedia.ico
+08-13 20:40:13.700  2132  2161 I ReactNativeJS: [LOCAL] Using local icon for netflix
+08-13 20:40:13.700  2132  2161 I ReactNativeJS: [COLLECTION] Added subscription icon to collection
+08-13 20:40:13.702  2132  2161 I ReactNativeJS: [COLLECTION] Returning 6 icons (cachedValid=true)
+08-13 20:40:13.717  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://en.wikipedia.org/static/favicon/wikipedia.ico (3648 bytes)
+08-13 20:40:13.722  2132  2161 I ReactNativeJS: [PICKER] Loaded 6 icons for netflix (6 total, reports hidden by default)
+08-13 20:40:14.150  2132  2161 I ReactNativeJS: [COLLECTION] Loading icons for netflix
+08-13 20:40:14.183  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://en.wikipedia.org/static/favicon/wikipedia.ico
+08-13 20:40:14.213  2132  2161 I ReactNativeJS: [COLLECTION] Found cached icon for netflix
+08-13 20:40:15.030  2132  2161 I ReactNativeJS: [QUEUE] Re-running after mid-flight enqueue
+08-13 20:40:15.036  2132  2161 I ReactNativeJS: [LOCAL] Using local icon for netflix
+08-13 20:40:15.037  2132  2161 I ReactNativeJS: [COLLECTION] Added subscription icon to collection
+08-13 20:40:15.038  2132  2161 I ReactNativeJS: [COLLECTION] Returning 6 icons (cachedValid=true)
+08-13 20:40:15.040  2132  2161 I ReactNativeJS: [QUEUE] Found 3 items in queue
+08-13 20:40:15.041  2132  2161 I ReactNativeJS: [QUEUE] Fetching icons for netf
+08-13 20:40:15.045  2132  2161 I ReactNativeJS: [PICKER] Loaded 6 icons for netflix (6 total, reports hidden by default)
+08-13 20:40:15.210  2132  2161 I ReactNativeJS: [QUEUE] Found 145 URLs to fetch for netf
+08-13 20:40:15.539  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:apple_touch_icon https://img1.wsimg.com/isteam/ip/static/pwa-app/logo-default.png/:/rs=w:120,h:120,m
+08-13 20:40:17.044  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://img1.wsimg.com/isteam/ip/static/pwa-app/logo-default.png/:/rs=w:120,h:120,m (2124 bytes)
+08-13 20:40:17.269  2132  2161 I ReactNativeJS: [COLLECTION] Loading icons for netflix
+08-13 20:40:17.290  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://img1.wsimg.com/isteam/ip/static/pwa-app/logo-default.png/:/rs=w:120,h:120,m
+08-13 20:40:17.332  2132  2161 I ReactNativeJS: [COLLECTION] Found cached icon for netflix
+08-13 20:40:17.560  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:apple_touch_icon https://img1.wsimg.com/isteam/ip/static/pwa-app/logo-default.png/:/rs=w:144,h:144,m
+08-13 20:40:18.157  2132  2161 I ReactNativeJS: [LOCAL] Using local icon for netflix
+08-13 20:40:18.158  2132  2161 I ReactNativeJS: [COLLECTION] Added subscription icon to collection
+08-13 20:40:18.159  2132  2161 I ReactNativeJS: [COLLECTION] Returning 6 icons (cachedValid=true)
+08-13 20:40:18.165  2132  2161 I ReactNativeJS: [PICKER] Loaded 6 icons for netflix (6 total, reports hidden by default)
+08-13 20:40:18.275  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://img1.wsimg.com/isteam/ip/static/pwa-app/logo-default.png/:/rs=w:144,h:144,m (2476 bytes)
+08-13 20:40:18.688  2132  2161 I ReactNativeJS: [COLLECTION] Loading icons for netflix
+08-13 20:40:18.702  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://img1.wsimg.com/isteam/ip/static/pwa-app/logo-default.png/:/rs=w:144,h:144,m
+08-13 20:40:18.738  2132  2161 I ReactNativeJS: [COLLECTION] Found cached icon for netflix
+08-13 20:40:19.013  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:apple_touch_icon https://img1.wsimg.com/isteam/ip/static/pwa-app/logo-default.png/:/rs=w:152,h:152,m
+08-13 20:40:19.636  2132  2161 I ReactNativeJS: [LOCAL] Using local icon for netflix
+08-13 20:40:19.641  2132  2161 I ReactNativeJS: [COLLECTION] Added subscription icon to collection
+08-13 20:40:19.643  2132  2161 I ReactNativeJS: [COLLECTION] Returning 6 icons (cachedValid=true)
+08-13 20:40:19.653  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://img1.wsimg.com/isteam/ip/static/pwa-app/logo-default.png/:/rs=w:152,h:152,m (2620 bytes)
+08-13 20:40:19.672  2132  2161 I ReactNativeJS: [PICKER] Loaded 6 icons for netflix (6 total, reports hidden by default)
+08-13 20:40:19.975  2132  2161 I ReactNativeJS: [COLLECTION] Loading icons for netflix
+08-13 20:40:20.008  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://img1.wsimg.com/isteam/ip/static/pwa-app/logo-default.png/:/rs=w:152,h:152,m
+08-13 20:40:20.043  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:apple_touch_icon https://img1.wsimg.com/isteam/ip/static/pwa-app/logo-default.png/:/rs=w:180,h:180,m
+08-13 20:40:20.096  2132  2161 I ReactNativeJS: [COLLECTION] Found cached icon for netflix
+08-13 20:40:20.343  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://img1.wsimg.com/isteam/ip/static/pwa-app/logo-default.png/:/rs=w:180,h:180,m (3112 bytes)
+08-13 20:40:21.113  2132  2161 I ReactNativeJS: [LOCAL] Using local icon for netflix
+08-13 20:40:21.114  2132  2161 I ReactNativeJS: [COLLECTION] Added subscription icon to collection
+08-13 20:40:21.114  2132  2161 I ReactNativeJS: [COLLECTION] Returning 6 icons (cachedValid=true)
+08-13 20:40:21.119  2132  2161 I ReactNativeJS: [PICKER] Loaded 6 icons for netflix (6 total, reports hidden by default)
+08-13 20:40:21.270  2132  2161 I ReactNativeJS: [COLLECTION] Loading icons for netflix
+08-13 20:40:21.521  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://img1.wsimg.com/isteam/ip/static/pwa-app/logo-default.png/:/rs=w:180,h:180,m
+08-13 20:40:21.637  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:apple_touch_icon https://assets.nflxext.com/us/ffe/siteui/common/icons/nficon2016.png
+08-13 20:40:21.641  2132  2161 I ReactNativeJS: [COLLECTION] Found cached icon for netflix
+08-13 20:40:22.048  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://assets.nflxext.com/us/ffe/siteui/common/icons/nficon2016.png (2340 bytes)
+08-13 20:40:22.740  2132  2161 I ReactNativeJS: [LOCAL] Using local icon for netflix
+08-13 20:40:22.741  2132  2161 I ReactNativeJS: [COLLECTION] Added subscription icon to collection
+08-13 20:40:22.742  2132  2161 I ReactNativeJS: [COLLECTION] Returning 6 icons (cachedValid=true)
+08-13 20:40:22.758  2132  2161 I ReactNativeJS: [PICKER] Loaded 6 icons for netflix (6 total, reports hidden by default)
+08-13 20:40:23.045  2132  2161 I ReactNativeJS: [COLLECTION] Loading icons for netflix
+08-13 20:40:23.199  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://assets.nflxext.com/us/ffe/siteui/common/icons/nficon2016.png
+08-13 20:40:23.257  2132  2161 I ReactNativeJS: [COLLECTION] Found cached icon for netflix
+08-13 20:40:23.644  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:apple_touch_icon https://img1.wsimg.com/isteam/ip/static/pwa-app/logo-default.png/:/rs=w:60,h:60,m
+08-13 20:40:24.388  2132  2161 I ReactNativeJS: [LOCAL] Using local icon for netflix
+08-13 20:40:24.388  2132  2161 I ReactNativeJS: [COLLECTION] Added subscription icon to collection
+08-13 20:40:24.389  2132  2161 I ReactNativeJS: [COLLECTION] Returning 6 icons (cachedValid=true)
+08-13 20:40:24.391  2132  2161 I ReactNativeJS: [PICKER] Loaded 6 icons for netflix (6 total, reports hidden by default)
+08-13 20:40:24.501  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://img1.wsimg.com/isteam/ip/static/pwa-app/logo-default.png/:/rs=w:60,h:60,m (1128 bytes)
+08-13 20:40:24.726  2132  2161 I ReactNativeJS: [COLLECTION] Loading icons for netflix
+08-13 20:40:24.805  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://img1.wsimg.com/isteam/ip/static/pwa-app/logo-default.png/:/rs=w:60,h:60,m
+08-13 20:40:24.906  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:apple_touch_icon https://img1.wsimg.com/isteam/ip/static/pwa-app/logo-default.png/:/rs=w:72,h:72,m
+08-13 20:40:24.910  2132  2161 I ReactNativeJS: [COLLECTION] Found cached icon for netflix
+08-13 20:40:25.232  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://img1.wsimg.com/isteam/ip/static/pwa-app/logo-default.png/:/rs=w:72,h:72,m (1308 bytes)
+08-13 20:40:25.789  2132  2161 I ReactNativeJS: [LOCAL] Using local icon for netflix
+08-13 20:40:25.790  2132  2161 I ReactNativeJS: [COLLECTION] Added subscription icon to collection
+08-13 20:40:25.791  2132  2161 I ReactNativeJS: [COLLECTION] Returning 6 icons (cachedValid=true)
+08-13 20:40:25.795  2132  2161 I ReactNativeJS: [PICKER] Loaded 6 icons for netflix (6 total, reports hidden by default)
+08-13 20:40:26.124  2132  2161 I ReactNativeJS: [COLLECTION] Loading icons for netflix
+08-13 20:40:26.200  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://img1.wsimg.com/isteam/ip/static/pwa-app/logo-default.png/:/rs=w:72,h:72,m
+08-13 20:40:26.272  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:apple_touch_icon https://img1.wsimg.com/isteam/ip/static/pwa-app/logo-default.png/:/rs=w:114,h:114,m
+08-13 20:40:26.274  2132  2161 I ReactNativeJS: [COLLECTION] Found cached icon for netflix
+08-13 20:40:26.622  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://img1.wsimg.com/isteam/ip/static/pwa-app/logo-default.png/:/rs=w:114,h:114,m (2080 bytes)
+08-13 20:40:27.275  2132  2161 I ReactNativeJS: [LOCAL] Using local icon for netflix
+08-13 20:40:27.277  2132  2161 I ReactNativeJS: [COLLECTION] Added subscription icon to collection
+08-13 20:40:27.278  2132  2161 I ReactNativeJS: [COLLECTION] Returning 6 icons (cachedValid=true)
+08-13 20:40:27.295  2132  2161 I ReactNativeJS: [PICKER] Loaded 6 icons for netflix (6 total, reports hidden by default)
+08-13 20:40:27.502  2132  2161 I ReactNativeJS: [COLLECTION] Loading icons for netflix
+08-13 20:40:27.697  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://img1.wsimg.com/isteam/ip/static/pwa-app/logo-default.png/:/rs=w:114,h:114,m
+08-13 20:40:27.728  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://www.netf.io/favicon.svg
+08-13 20:40:27.737  2132  2161 I ReactNativeJS: [COLLECTION] Found cached icon for netflix
+08-13 20:40:28.755  2132  2161 I ReactNativeJS: [LOCAL] Using local icon for netflix
+08-13 20:40:28.755  2132  2161 I ReactNativeJS: [COLLECTION] Added subscription icon to collection
+08-13 20:40:28.758  2132  2161 I ReactNativeJS: [COLLECTION] Returning 6 icons (cachedValid=true)
+08-13 20:40:28.759  2132  2161 I ReactNativeJS: '[FETCH] ERROR https://www.netf.io/favicon.svg (attempt 1):', [TypeError: Network request failed]
+08-13 20:40:28.771  2132  2161 I ReactNativeJS: [PICKER] Loaded 6 icons for netflix (6 total, reports hidden by default)
+08-13 20:40:29.266  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD retry 2/3: spider:common_path https://www.netf.io/favicon.svg
+08-13 20:40:30.666  2132  2161 I ReactNativeJS: '[FETCH] ERROR https://www.netf.io/favicon.svg (attempt 2):', [TypeError: Network request failed]
+08-13 20:40:31.688  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD retry 3/3: spider:common_path https://www.netf.io/favicon.svg
+08-13 20:40:33.739  2132  2161 I ReactNativeJS: '[FETCH] ERROR https://www.netf.io/favicon.svg (attempt 3):', [TypeError: Network request failed]
+08-13 20:40:33.739  2132  2161 I ReactNativeJS: [FETCH] GIVING UP https://www.netf.io/favicon.svg
+08-13 20:40:34.098  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://www.netflix.com/favicon.svg
+08-13 20:40:35.850  2132  2161 I ReactNativeJS: [FETCH] REJECT non-image response https://www.netflix.com/favicon.svg (content-type=text/html; charset=utf-8)
+08-13 20:40:35.873  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://app.netflix.com/favicon.svg
+08-13 20:40:38.293  2132  2161 I ReactNativeJS: [FETCH] REJECT non-image response https://app.netflix.com/favicon.svg (content-type=text/html; charset=utf-8)
+08-13 20:40:38.299  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://apps.microsoft.com/favicon.svg
+08-13 20:40:40.779  2132  2161 I ReactNativeJS: [FETCH] REJECT non-image response https://apps.microsoft.com/favicon.svg (content-type=text/html; charset=utf-8)
+08-13 20:40:40.802  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://qr.netflix.com/favicon.svg
+08-13 20:40:43.145  2132  2161 I ReactNativeJS: [FETCH] REJECT non-image response https://qr.netflix.com/favicon.svg (content-type=text/html; charset=utf-8)
+08-13 20:40:43.150  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://lh3.googleusercontent.com/favicon.svg
+08-13 20:40:45.882  2132  2161 I ReactNativeJS: [FETCH] FAILED https://lh3.googleusercontent.com/favicon.svg: 400
+08-13 20:40:45.899  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://netf.com/favicon.svg
+08-13 20:40:47.630  2132  2161 I ReactNativeJS: [FETCH] FAILED https://netf.com/favicon.svg: 404
+08-13 20:40:47.652  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://www.netf.com/favicon.svg
+08-13 20:40:48.852  2132  2161 I ReactNativeJS: [FETCH] FAILED https://www.netf.com/favicon.svg: 404
+08-13 20:40:48.866  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://netf.io/favicon.svg
+08-13 20:40:50.448  2132  2161 I ReactNativeJS: '[FETCH] ERROR https://netf.io/favicon.svg (attempt 1):', [TypeError: Network request failed]
+08-13 20:40:50.974  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD retry 2/3: spider:common_path https://netf.io/favicon.svg
+08-13 20:40:52.947  2132  2161 I ReactNativeJS: '[FETCH] ERROR https://netf.io/favicon.svg (attempt 2):', [TypeError: Network request failed]
+08-13 20:40:53.970  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD retry 3/3: spider:common_path https://netf.io/favicon.svg
+08-13 20:40:55.981  2132  2161 I ReactNativeJS: '[FETCH] ERROR https://netf.io/favicon.svg (attempt 3):', [TypeError: Network request failed]
+08-13 20:40:55.981  2132  2161 I ReactNativeJS: [FETCH] GIVING UP https://netf.io/favicon.svg
+08-13 20:40:56.053  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: duckduckgo_images https://en.wikipedia.org/wiki/File:Netflix_logo.svg
+08-13 20:40:57.434  2132  2161 I ReactNativeJS: [FETCH] REJECT non-image response https://en.wikipedia.org/wiki/File:Netflix_logo.svg (content-type=text/html; charset=UTF-8)
+08-13 20:40:57.459  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: duckduckgo_images https://commons.m.wikimedia.org/wiki/File:Netflix_icon.svg
+08-13 20:40:58.594  2132  2161 I ReactNativeJS: [FETCH] REJECT non-image response https://commons.m.wikimedia.org/wiki/File:Netflix_icon.svg (content-type=text/html; charset=UTF-8)
+08-13 20:40:58.614  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://apps.microsoft.com/apple-touch-icon.png
+08-13 20:41:01.167  2132  2161 I ReactNativeJS: [FETCH] REJECT non-image response https://apps.microsoft.com/apple-touch-icon.png (content-type=text/html; charset=utf-8)
+08-13 20:41:01.186  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://apps.microsoft.com/apple-touch-icon-precomposed.png
+08-13 20:41:01.519  2132  2161 I ReactNativeJS: [FETCH] REJECT non-image response https://apps.microsoft.com/apple-touch-icon-precomposed.png (content-type=text/html; charset=utf-8)
+08-13 20:41:01.531  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://apps.microsoft.com/apple-touch-icon-180x180.png
+08-13 20:41:02.537  2132  2161 I ReactNativeJS: [FETCH] REJECT non-image response https://apps.microsoft.com/apple-touch-icon-180x180.png (content-type=text/html; charset=utf-8)
+08-13 20:41:02.553  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://apps.microsoft.com/apple-touch-icon-152x152.png
+08-13 20:41:03.557  2132  2161 I ReactNativeJS: [FETCH] REJECT non-image response https://apps.microsoft.com/apple-touch-icon-152x152.png (content-type=text/html; charset=utf-8)
+08-13 20:41:03.566  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://qr.netflix.com/apple-touch-icon.png
+08-13 20:41:05.398  2132  2161 I ReactNativeJS: [FETCH] REJECT non-image response https://qr.netflix.com/apple-touch-icon.png (content-type=text/html; charset=utf-8)
+08-13 20:41:05.420  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://qr.netflix.com/apple-touch-icon-precomposed.png
+08-13 20:41:05.891  2132  2161 I ReactNativeJS: [FETCH] REJECT non-image response https://qr.netflix.com/apple-touch-icon-precomposed.png (content-type=text/html; charset=utf-8)
+08-13 20:41:05.909  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://qr.netflix.com/apple-touch-icon-180x180.png
+08-13 20:41:06.284  2132  2161 I ReactNativeJS: [FETCH] REJECT non-image response https://qr.netflix.com/apple-touch-icon-180x180.png (content-type=text/html; charset=utf-8)
+08-13 20:41:06.298  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://qr.netflix.com/apple-touch-icon-152x152.png
+08-13 20:41:07.144  2132  2161 I ReactNativeJS: [FETCH] REJECT non-image response https://qr.netflix.com/apple-touch-icon-152x152.png (content-type=text/html; charset=utf-8)
+08-13 20:41:07.222  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://www.netflix.com/apple-touch-icon.png
+08-13 20:41:09.018  2132  2161 I ReactNativeJS: [FETCH] REJECT non-image response https://www.netflix.com/apple-touch-icon.png (content-type=text/html; charset=utf-8)
+08-13 20:41:09.078  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://www.netflix.com/apple-touch-icon-precomposed.png
+08-13 20:41:09.421  2132  2161 I ReactNativeJS: [FETCH] REJECT non-image response https://www.netflix.com/apple-touch-icon-precomposed.png (content-type=text/html; charset=utf-8)
+08-13 20:41:09.545  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://www.netflix.com/apple-touch-icon-180x180.png
+08-13 20:41:09.926  2132  2161 I ReactNativeJS: [FETCH] REJECT non-image response https://www.netflix.com/apple-touch-icon-180x180.png (content-type=text/html; charset=utf-8)
+08-13 20:41:09.994  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://www.netflix.com/apple-touch-icon-152x152.png
+08-13 20:41:10.430  2132  2161 I ReactNativeJS: [FETCH] REJECT non-image response https://www.netflix.com/apple-touch-icon-152x152.png (content-type=text/html; charset=utf-8)
+08-13 20:41:10.450  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://app.netflix.com/apple-touch-icon.png
+08-13 20:41:12.379  2132  2161 I ReactNativeJS: [FETCH] REJECT non-image response https://app.netflix.com/apple-touch-icon.png (content-type=text/html; charset=utf-8)
+08-13 20:41:12.411  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://app.netflix.com/apple-touch-icon-precomposed.png
+08-13 20:41:13.023  2132  2161 I ReactNativeJS: [FETCH] REJECT non-image response https://app.netflix.com/apple-touch-icon-precomposed.png (content-type=text/html; charset=utf-8)
+08-13 20:41:13.047  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://app.netflix.com/apple-touch-icon-180x180.png
+08-13 20:41:14.066  2132  2161 I ReactNativeJS: [FETCH] REJECT non-image response https://app.netflix.com/apple-touch-icon-180x180.png (content-type=text/html; charset=utf-8)
+08-13 20:41:14.090  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://app.netflix.com/apple-touch-icon-152x152.png
+08-13 20:41:14.593  2132  2161 I ReactNativeJS: [FETCH] REJECT non-image response https://app.netflix.com/apple-touch-icon-152x152.png (content-type=text/html; charset=utf-8)
+08-13 20:41:14.604  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://netf.io/apple-touch-icon.png
+08-13 20:41:16.498  2132  2161 I ReactNativeJS: '[FETCH] ERROR https://netf.io/apple-touch-icon.png (attempt 1):', [TypeError: Network request failed]
+08-13 20:41:17.014  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD retry 2/3: spider:common_path https://netf.io/apple-touch-icon.png
+08-13 20:41:19.171  2132  2161 I ReactNativeJS: '[FETCH] ERROR https://netf.io/apple-touch-icon.png (attempt 2):', [TypeError: Network request failed]
+08-13 20:41:20.180  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD retry 3/3: spider:common_path https://netf.io/apple-touch-icon.png
+08-13 20:41:22.148  2132  2161 I ReactNativeJS: '[FETCH] ERROR https://netf.io/apple-touch-icon.png (attempt 3):', [TypeError: Network request failed]
+08-13 20:41:22.148  2132  2161 I ReactNativeJS: [FETCH] GIVING UP https://netf.io/apple-touch-icon.png
+08-13 20:41:22.165  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://netf.io/apple-touch-icon-precomposed.png
+08-13 20:41:24.081  2132  2161 I ReactNativeJS: '[FETCH] ERROR https://netf.io/apple-touch-icon-precomposed.png (attempt 1):', [TypeError: Network request failed]
+08-13 20:41:24.599  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD retry 2/3: spider:common_path https://netf.io/apple-touch-icon-precomposed.png
+08-13 20:41:26.707  2132  2161 I ReactNativeJS: '[FETCH] ERROR https://netf.io/apple-touch-icon-precomposed.png (attempt 2):', [TypeError: Network request failed]
+08-13 20:41:27.720  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD retry 3/3: spider:common_path https://netf.io/apple-touch-icon-precomposed.png
+08-13 20:41:29.685  2132  2161 I ReactNativeJS: '[FETCH] ERROR https://netf.io/apple-touch-icon-precomposed.png (attempt 3):', [TypeError: Network request failed]
+08-13 20:41:29.688  2132  2161 I ReactNativeJS: [FETCH] GIVING UP https://netf.io/apple-touch-icon-precomposed.png
+08-13 20:41:29.718  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://netf.io/apple-touch-icon-180x180.png
+08-13 20:41:31.751  2132  2161 I ReactNativeJS: '[FETCH] ERROR https://netf.io/apple-touch-icon-180x180.png (attempt 1):', [TypeError: Network request failed]
+08-13 20:41:32.273  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD retry 2/3: spider:common_path https://netf.io/apple-touch-icon-180x180.png
+08-13 20:41:34.185  2132  2161 I ReactNativeJS: '[FETCH] ERROR https://netf.io/apple-touch-icon-180x180.png (attempt 2):', [TypeError: Network request failed]
+08-13 20:41:35.198  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD retry 3/3: spider:common_path https://netf.io/apple-touch-icon-180x180.png
+08-13 20:41:37.171  2132  2161 I ReactNativeJS: '[FETCH] ERROR https://netf.io/apple-touch-icon-180x180.png (attempt 3):', [TypeError: Network request failed]
+08-13 20:41:37.171  2132  2161 I ReactNativeJS: [FETCH] GIVING UP https://netf.io/apple-touch-icon-180x180.png
+08-13 20:41:37.187  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://netf.io/apple-touch-icon-152x152.png
+08-13 20:41:39.167  2132  2161 I ReactNativeJS: '[FETCH] ERROR https://netf.io/apple-touch-icon-152x152.png (attempt 1):', [TypeError: Network request failed]
+08-13 20:41:39.683  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD retry 2/3: spider:common_path https://netf.io/apple-touch-icon-152x152.png
+08-13 20:41:41.866  2132  2161 I ReactNativeJS: '[FETCH] ERROR https://netf.io/apple-touch-icon-152x152.png (attempt 2):', [TypeError: Network request failed]
+08-13 20:41:42.885  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD retry 3/3: spider:common_path https://netf.io/apple-touch-icon-152x152.png
+08-13 20:41:44.753  2132  2161 I ReactNativeJS: '[FETCH] ERROR https://netf.io/apple-touch-icon-152x152.png (attempt 3):', [TypeError: Network request failed]
+08-13 20:41:44.754  2132  2161 I ReactNativeJS: [FETCH] GIVING UP https://netf.io/apple-touch-icon-152x152.png
+08-13 20:41:44.771  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://www.netf.io/apple-touch-icon.png
+08-13 20:41:46.714  2132  2161 I ReactNativeJS: '[FETCH] ERROR https://www.netf.io/apple-touch-icon.png (attempt 1):', [TypeError: Network request failed]
+08-13 20:41:47.234  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD retry 2/3: spider:common_path https://www.netf.io/apple-touch-icon.png
+08-13 20:41:49.252  2132  2161 I ReactNativeJS: '[FETCH] ERROR https://www.netf.io/apple-touch-icon.png (attempt 2):', [TypeError: Network request failed]
+08-13 20:41:50.269  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD retry 3/3: spider:common_path https://www.netf.io/apple-touch-icon.png
+08-13 20:41:52.247  2132  2161 I ReactNativeJS: '[FETCH] ERROR https://www.netf.io/apple-touch-icon.png (attempt 3):', [TypeError: Network request failed]
+08-13 20:41:52.247  2132  2161 I ReactNativeJS: [FETCH] GIVING UP https://www.netf.io/apple-touch-icon.png
+08-13 20:41:52.315  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://www.netf.io/apple-touch-icon-precomposed.png
+08-13 20:41:54.398  2132  2161 I ReactNativeJS: '[FETCH] ERROR https://www.netf.io/apple-touch-icon-precomposed.png (attempt 1):', [TypeError: Network request failed]
+08-13 20:41:54.919  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD retry 2/3: spider:common_path https://www.netf.io/apple-touch-icon-precomposed.png
+08-13 20:41:56.971  2132  2161 I ReactNativeJS: '[FETCH] ERROR https://www.netf.io/apple-touch-icon-precomposed.png (attempt 2):', [TypeError: Network request failed]
+08-13 20:41:58.001  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD retry 3/3: spider:common_path https://www.netf.io/apple-touch-icon-precomposed.png
+08-13 20:42:00.166  2132  2161 I ReactNativeJS: '[FETCH] ERROR https://www.netf.io/apple-touch-icon-precomposed.png (attempt 3):', [TypeError: Network request failed]
+08-13 20:42:00.167  2132  2161 I ReactNativeJS: [FETCH] GIVING UP https://www.netf.io/apple-touch-icon-precomposed.png
+08-13 20:42:00.185  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://www.netf.io/apple-touch-icon-180x180.png
+08-13 20:42:02.209  2132  2161 I ReactNativeJS: '[FETCH] ERROR https://www.netf.io/apple-touch-icon-180x180.png (attempt 1):', [TypeError: Network request failed]
+08-13 20:42:02.713  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD retry 2/3: spider:common_path https://www.netf.io/apple-touch-icon-180x180.png
+08-13 20:42:04.767  2132  2161 I ReactNativeJS: '[FETCH] ERROR https://www.netf.io/apple-touch-icon-180x180.png (attempt 2):', [TypeError: Network request failed]
+08-13 20:42:05.782  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD retry 3/3: spider:common_path https://www.netf.io/apple-touch-icon-180x180.png
+08-13 20:42:07.650  2132  2161 I ReactNativeJS: '[FETCH] ERROR https://www.netf.io/apple-touch-icon-180x180.png (attempt 3):', [TypeError: Network request failed]
+08-13 20:42:07.650  2132  2161 I ReactNativeJS: [FETCH] GIVING UP https://www.netf.io/apple-touch-icon-180x180.png
+08-13 20:42:07.684  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://www.netf.io/apple-touch-icon-152x152.png
+08-13 20:42:09.831  2132  2161 I ReactNativeJS: '[FETCH] ERROR https://www.netf.io/apple-touch-icon-152x152.png (attempt 1):', [TypeError: Network request failed]
+08-13 20:42:10.348  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD retry 2/3: spider:common_path https://www.netf.io/apple-touch-icon-152x152.png
+08-13 20:42:12.214  2132  2161 I ReactNativeJS: '[FETCH] ERROR https://www.netf.io/apple-touch-icon-152x152.png (attempt 2):', [TypeError: Network request failed]
+08-13 20:42:13.268  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD retry 3/3: spider:common_path https://www.netf.io/apple-touch-icon-152x152.png
+08-13 20:42:14.945  2132  2161 I ReactNativeJS: '[FETCH] ERROR https://www.netf.io/apple-touch-icon-152x152.png (attempt 3):', [TypeError: Network request failed]
+08-13 20:42:14.945  2132  2161 I ReactNativeJS: [FETCH] GIVING UP https://www.netf.io/apple-touch-icon-152x152.png
+08-13 20:42:14.984  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://lh3.googleusercontent.com/apple-touch-icon.png
+08-13 20:42:17.834  2132  2161 I ReactNativeJS: [FETCH] FAILED https://lh3.googleusercontent.com/apple-touch-icon.png: 400
+08-13 20:42:17.860  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://lh3.googleusercontent.com/apple-touch-icon-precomposed.png
+08-13 20:42:19.134  2132  2161 I ReactNativeJS: [FETCH] FAILED https://lh3.googleusercontent.com/apple-touch-icon-precomposed.png: 400
+08-13 20:42:19.170  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://lh3.googleusercontent.com/apple-touch-icon-180x180.png
+08-13 20:42:20.624  2132  2161 I ReactNativeJS: [FETCH] FAILED https://lh3.googleusercontent.com/apple-touch-icon-180x180.png: 400
+08-13 20:42:20.653  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://lh3.googleusercontent.com/apple-touch-icon-152x152.png
+08-13 20:42:21.882  2132  2161 I ReactNativeJS: [FETCH] FAILED https://lh3.googleusercontent.com/apple-touch-icon-152x152.png: 400
+08-13 20:42:21.915  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://netf.com/apple-touch-icon.png
+08-13 20:42:23.747  2132  2161 I ReactNativeJS: [FETCH] FAILED https://netf.com/apple-touch-icon.png: 404
+08-13 20:42:23.768  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://netf.com/apple-touch-icon-precomposed.png
+08-13 20:42:24.124  2132  2161 I ReactNativeJS: [FETCH] FAILED https://netf.com/apple-touch-icon-precomposed.png: 404
+08-13 20:42:24.134  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://netf.com/apple-touch-icon-180x180.png
+08-13 20:42:24.450  2132  2161 I ReactNativeJS: [FETCH] FAILED https://netf.com/apple-touch-icon-180x180.png: 404
+08-13 20:42:24.466  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://netf.com/apple-touch-icon-152x152.png
+08-13 20:42:24.815  2132  2161 I ReactNativeJS: [FETCH] FAILED https://netf.com/apple-touch-icon-152x152.png: 404
+08-13 20:42:24.837  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://www.netf.com/apple-touch-icon.png
+08-13 20:42:26.316  2132  2161 I ReactNativeJS: [FETCH] FAILED https://www.netf.com/apple-touch-icon.png: 404
+08-13 20:42:26.362  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://www.netf.com/apple-touch-icon-precomposed.png
+08-13 20:42:26.580  2132  2161 I ReactNativeJS: [FETCH] FAILED https://www.netf.com/apple-touch-icon-precomposed.png: 404
+08-13 20:42:26.602  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://www.netf.com/apple-touch-icon-180x180.png
+08-13 20:42:26.870  2132  2161 I ReactNativeJS: [FETCH] FAILED https://www.netf.com/apple-touch-icon-180x180.png: 404
+08-13 20:42:26.898  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://www.netf.com/apple-touch-icon-152x152.png
+08-13 20:42:27.147  2132  2161 I ReactNativeJS: [FETCH] FAILED https://www.netf.com/apple-touch-icon-152x152.png: 404
+08-13 20:42:27.180  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:og_image https://store-images.s-microsoft.com/image/apps.56161.9007199266246365.1d5a6a53-3c49-4f80-95d7-78d76b0e05d0.a3e87fea-e03e-4c0a-8f26-9ecef205fa7b
+08-13 20:42:28.942  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://store-images.s-microsoft.com/image/apps.56161.9007199266246365.1d5a6a53-3c49-4f80-95d7-78d76b0e05d0.a3e87fea-e03e-4c0a-8f26-9ecef205fa7b (6788 bytes)
+08-13 20:42:29.925  2132  2161 I ReactNativeJS: [COLLECTION] Loading icons for netflix
+08-13 20:42:29.999  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://store-images.s-microsoft.com/image/apps.56161.9007199266246365.1d5a6a53-3c49-4f80-95d7-78d76b0e05d0.a3e87fea-e03e-4c0a-8f26-9ecef205fa7b
+08-13 20:42:30.015  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:og_image https://apps.microsoft.com/assets/icons/logo-plated-256x256.png
+08-13 20:42:30.067  2132  2161 I ReactNativeJS: [COLLECTION] Found cached icon for netflix
+08-13 20:42:31.339  2132  2161 I ReactNativeJS: [LOCAL] Using local icon for netflix
+08-13 20:42:31.340  2132  2161 I ReactNativeJS: [COLLECTION] Added subscription icon to collection
+08-13 20:42:31.341  2132  2161 I ReactNativeJS: [COLLECTION] Returning 6 icons (cachedValid=true)
+08-13 20:42:31.355  2132  2161 I ReactNativeJS: [PICKER] Loaded 6 icons for netflix (6 total, reports hidden by default)
+08-13 20:42:31.688  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://apps.microsoft.com/assets/icons/logo-plated-256x256.png (28288 bytes)
+08-13 20:42:32.894  2132  2161 I ReactNativeJS: [COLLECTION] Loading icons for netflix
+08-13 20:42:32.942  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://apps.microsoft.com/assets/icons/logo-plated-256x256.png
+08-13 20:42:33.026  2132  2161 I ReactNativeJS: [COLLECTION] Found cached icon for netflix
+08-13 20:42:33.460  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:og_image https://img1.wsimg.com/isteam/videos/uA41GmyyG8IMaxXdb
+08-13 20:42:34.354  2132  2161 I ReactNativeJS: [LOCAL] Using local icon for netflix
+08-13 20:42:34.354  2132  2161 I ReactNativeJS: [COLLECTION] Added subscription icon to collection
+08-13 20:42:34.356  2132  2161 I ReactNativeJS: [COLLECTION] Returning 6 icons (cachedValid=true)
+08-13 20:42:34.361  2132  2161 I ReactNativeJS: [PICKER] Loaded 6 icons for netflix (6 total, reports hidden by default)
+08-13 20:42:35.442  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://img1.wsimg.com/isteam/videos/uA41GmyyG8IMaxXdb (79832 bytes)
+08-13 20:42:36.385  2132  2161 I ReactNativeJS: [COLLECTION] Loading icons for netflix
+08-13 20:42:36.441  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://img1.wsimg.com/isteam/videos/uA41GmyyG8IMaxXdb
+08-13 20:42:36.470  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:web_manifest https://apps.microsoft.com/assets/icons/logo-maskable-512x512.png
+08-13 20:42:36.486  2132  2161 I ReactNativeJS: [COLLECTION] Found cached icon for netflix
+08-13 20:42:37.255  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://apps.microsoft.com/assets/icons/logo-maskable-512x512.png (66284 bytes)
+08-13 20:42:39.028  2132  2161 I ReactNativeJS: [LOCAL] Using local icon for netflix
+08-13 20:42:39.028  2132  2161 I ReactNativeJS: [COLLECTION] Added subscription icon to collection
+08-13 20:42:39.030  2132  2161 I ReactNativeJS: [COLLECTION] Returning 6 icons (cachedValid=true)
+08-13 20:42:40.404  2132  2161 I ReactNativeJS: [PICKER] Loaded 6 icons for netflix (6 total, reports hidden by default)
+08-13 20:42:41.048  2132  2161 I ReactNativeJS: [COLLECTION] Loading icons for netflix
+08-13 20:42:41.250  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://apps.microsoft.com/assets/icons/logo-maskable-512x512.png
+08-13 20:42:41.299  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://qr.netflix.com/android-chrome-512x512.png
+08-13 20:42:41.339  2132  2161 I ReactNativeJS: [COLLECTION] Found cached icon for netflix
+08-13 20:42:42.628  2132  2161 I ReactNativeJS: [LOCAL] Using local icon for netflix
+08-13 20:42:42.631  2132  2161 I ReactNativeJS: [COLLECTION] Added subscription icon to collection
+08-13 20:42:42.633  2132  2161 I ReactNativeJS: [COLLECTION] Returning 6 icons (cachedValid=true)
+08-13 20:42:42.653  2132  2161 I ReactNativeJS: [PICKER] Loaded 6 icons for netflix (6 total, reports hidden by default)
+08-13 20:42:44.600  2132  2161 I ReactNativeJS: [FETCH] REJECT non-image response https://qr.netflix.com/android-chrome-512x512.png (content-type=text/html; charset=utf-8)
+08-13 20:42:44.615  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://qr.netflix.com/android-chrome-192x192.png
+08-13 20:42:45.441  2132  2161 I ReactNativeJS: [FETCH] REJECT non-image response https://qr.netflix.com/android-chrome-192x192.png (content-type=text/html; charset=utf-8)
+08-13 20:42:45.451  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://www.netf.io/android-chrome-512x512.png
+08-13 20:42:47.708  2132  2161 I ReactNativeJS: '[FETCH] ERROR https://www.netf.io/android-chrome-512x512.png (attempt 1):', [TypeError: Network request failed]
+08-13 20:42:48.216  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD retry 2/3: spider:common_path https://www.netf.io/android-chrome-512x512.png
+08-13 20:43:03.253  2132  2161 I ReactNativeJS: [FETCH] TIMEOUT https://www.netf.io/android-chrome-512x512.png (attempt 2)
+08-13 20:43:04.270  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD retry 3/3: spider:common_path https://www.netf.io/android-chrome-512x512.png
+08-13 20:43:19.496  2132  2161 I ReactNativeJS: [FETCH] TIMEOUT https://www.netf.io/android-chrome-512x512.png (attempt 3)
+08-13 20:43:19.497  2132  2161 I ReactNativeJS: [FETCH] GIVING UP https://www.netf.io/android-chrome-512x512.png
+08-13 20:43:19.651  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://www.netf.io/android-chrome-192x192.png
+08-13 20:43:28.678  2132  2161 I ReactNativeJS: [COLLECTION] Loading icons for netflix
+08-13 20:43:28.772  2132  2161 I ReactNativeJS: [COLLECTION] Found cached icon for netflix
+08-13 20:43:30.105  2132  2161 I ReactNativeJS: [LOCAL] Using local icon for netflix
+08-13 20:43:30.105  2132  2161 I ReactNativeJS: [COLLECTION] Added subscription icon to collection
+08-13 20:43:30.107  2132  2161 I ReactNativeJS: [COLLECTION] Returning 6 icons (cachedValid=true)
+08-13 20:43:30.109  2132  2161 I ReactNativeJS: [PICKER] Loaded 6 icons for netflix (6 total, reports hidden by default)
+08-13 20:43:34.680  2132  2161 I ReactNativeJS: [FETCH] TIMEOUT https://www.netf.io/android-chrome-192x192.png (attempt 1)
+08-13 20:43:35.200  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD retry 2/3: spider:common_path https://www.netf.io/android-chrome-192x192.png
+08-13 20:43:50.255  2132  2161 I ReactNativeJS: [FETCH] TIMEOUT https://www.netf.io/android-chrome-192x192.png (attempt 2)
+08-13 20:43:51.282  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD retry 3/3: spider:common_path https://www.netf.io/android-chrome-192x192.png
+08-13 20:44:06.332  2132  2161 I ReactNativeJS: [FETCH] TIMEOUT https://www.netf.io/android-chrome-192x192.png (attempt 3)
+08-13 20:44:06.333  2132  2161 I ReactNativeJS: [FETCH] GIVING UP https://www.netf.io/android-chrome-192x192.png
+08-13 20:44:06.842  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://www.netflix.com/android-chrome-512x512.png
+08-13 20:44:09.052  2132  2161 I ReactNativeJS: [FETCH] REJECT non-image response https://www.netflix.com/android-chrome-512x512.png (content-type=text/html; charset=utf-8)
+08-13 20:44:09.670  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://www.netflix.com/android-chrome-192x192.png
+08-13 20:44:10.489  2132  2161 I ReactNativeJS: [FETCH] REJECT non-image response https://www.netflix.com/android-chrome-192x192.png (content-type=text/html; charset=utf-8)
+08-13 20:44:10.500  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://app.netflix.com/android-chrome-512x512.png
+08-13 20:44:13.717  2132  2161 I ReactNativeJS: [FETCH] REJECT non-image response https://app.netflix.com/android-chrome-512x512.png (content-type=text/html; charset=utf-8)
+08-13 20:44:13.731  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://app.netflix.com/android-chrome-192x192.png
+08-13 20:44:14.551  2132  2161 I ReactNativeJS: [FETCH] REJECT non-image response https://app.netflix.com/android-chrome-192x192.png (content-type=text/html; charset=utf-8)
+08-13 20:44:14.957  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://apps.microsoft.com/android-chrome-512x512.png
+08-13 20:44:18.516  2132  2161 I ReactNativeJS: [FETCH] REJECT non-image response https://apps.microsoft.com/android-chrome-512x512.png (content-type=text/html; charset=utf-8)
+08-13 20:44:19.404  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://apps.microsoft.com/android-chrome-192x192.png
+08-13 20:44:21.014  2132  2161 I ReactNativeJS: [FETCH] REJECT non-image response https://apps.microsoft.com/android-chrome-192x192.png (content-type=text/html; charset=utf-8)
+08-13 20:44:21.145  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:web_manifest https://apps.microsoft.com/assets/icons/logo-512x512.png
+08-13 20:44:22.144  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://apps.microsoft.com/assets/icons/logo-512x512.png (176884 bytes)
+08-13 20:44:25.872  2132  2161 I ReactNativeJS: [COLLECTION] Loading icons for netflix
+08-13 20:44:26.017  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://apps.microsoft.com/assets/icons/logo-512x512.png
+08-13 20:44:26.038  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://lh3.googleusercontent.com/android-chrome-512x512.png
+08-13 20:44:26.058  2132  2161 I ReactNativeJS: [COLLECTION] Found cached icon for netflix
+08-13 20:44:27.517  2132  2161 I ReactNativeJS: [LOCAL] Using local icon for netflix
+08-13 20:44:27.517  2132  2161 I ReactNativeJS: [COLLECTION] Added subscription icon to collection
+08-13 20:44:27.518  2132  2161 I ReactNativeJS: [COLLECTION] Returning 6 icons (cachedValid=true)
+08-13 20:44:27.530  2132  2161 I ReactNativeJS: [PICKER] Loaded 6 icons for netflix (6 total, reports hidden by default)
+08-13 20:44:28.610  2132  2161 I ReactNativeJS: [FETCH] FAILED https://lh3.googleusercontent.com/android-chrome-512x512.png: 400
+08-13 20:44:28.624  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://lh3.googleusercontent.com/android-chrome-192x192.png
+08-13 20:44:30.151  2132  2161 I ReactNativeJS: [FETCH] FAILED https://lh3.googleusercontent.com/android-chrome-192x192.png: 400
+08-13 20:44:30.164  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://netf.com/android-chrome-512x512.png
+08-13 20:44:31.933  2132  2161 I ReactNativeJS: [FETCH] FAILED https://netf.com/android-chrome-512x512.png: 404
+08-13 20:44:31.951  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://netf.com/android-chrome-192x192.png
+08-13 20:44:32.135  2132  2161 I ReactNativeJS: [FETCH] FAILED https://netf.com/android-chrome-192x192.png: 404
+08-13 20:44:32.163  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://www.netf.com/android-chrome-512x512.png
+08-13 20:44:33.880  2132  2161 I ReactNativeJS: [FETCH] FAILED https://www.netf.com/android-chrome-512x512.png: 404
+08-13 20:44:33.898  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://www.netf.com/android-chrome-192x192.png
+08-13 20:44:34.140  2132  2161 I ReactNativeJS: [FETCH] FAILED https://www.netf.com/android-chrome-192x192.png: 404
+08-13 20:44:34.149  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://netf.io/android-chrome-512x512.png
+08-13 20:44:49.198  2132  2161 I ReactNativeJS: [FETCH] TIMEOUT https://netf.io/android-chrome-512x512.png (attempt 1)
+08-13 20:44:49.733  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD retry 2/3: spider:common_path https://netf.io/android-chrome-512x512.png
+08-13 20:45:04.771  2132  2161 I ReactNativeJS: [FETCH] TIMEOUT https://netf.io/android-chrome-512x512.png (attempt 2)
+08-13 20:45:05.785  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD retry 3/3: spider:common_path https://netf.io/android-chrome-512x512.png
+08-13 20:45:20.845  2132  2161 I ReactNativeJS: [FETCH] TIMEOUT https://netf.io/android-chrome-512x512.png (attempt 3)
+08-13 20:45:20.845  2132  2161 I ReactNativeJS: [FETCH] GIVING UP https://netf.io/android-chrome-512x512.png
+08-13 20:45:20.866  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:common_path https://netf.io/android-chrome-192x192.png
+08-13 20:45:35.931  2132  2161 I ReactNativeJS: [FETCH] TIMEOUT https://netf.io/android-chrome-192x192.png (attempt 1)
+08-13 20:45:36.481  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD retry 2/3: spider:common_path https://netf.io/android-chrome-192x192.png
+08-13 20:45:51.531  2132  2161 I ReactNativeJS: [FETCH] TIMEOUT https://netf.io/android-chrome-192x192.png (attempt 2)
+08-13 20:45:52.547  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD retry 3/3: spider:common_path https://netf.io/android-chrome-192x192.png
+08-13 20:46:07.586  2132  2161 I ReactNativeJS: [FETCH] TIMEOUT https://netf.io/android-chrome-192x192.png (attempt 3)
+08-13 20:46:07.590  2132  2161 I ReactNativeJS: [FETCH] GIVING UP https://netf.io/android-chrome-192x192.png
+08-13 20:46:07.599  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:img_logo https://grails.replit.app/logo.png
+08-13 20:46:13.352  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://grails.replit.app/logo.png (371340 bytes)
+08-13 20:46:25.482  2132  2161 I ReactNativeJS: [COLLECTION] Loading icons for netflix
+08-13 20:46:25.979  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://grails.replit.app/logo.png
+08-13 20:46:26.019  2132  2161 I ReactNativeJS: [COLLECTION] Found cached icon for netflix
+08-13 20:46:26.877  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:web_manifest https://apps.microsoft.com/assets/icons/logo-64x64.png
+08-13 20:46:27.582  2132  2161 I ReactNativeJS: [LOCAL] Using local icon for netflix
+08-13 20:46:27.583  2132  2161 I ReactNativeJS: [COLLECTION] Added subscription icon to collection
+08-13 20:46:27.584  2132  2161 I ReactNativeJS: [COLLECTION] Returning 6 icons (cachedValid=true)
+08-13 20:46:27.587  2132  2161 I ReactNativeJS: [PICKER] Loaded 6 icons for netflix (6 total, reports hidden by default)
+08-13 20:46:28.388  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://apps.microsoft.com/assets/icons/logo-64x64.png (3456 bytes)
+08-13 20:46:28.541  2132  2161 I ReactNativeJS: [COLLECTION] Loading icons for netflix
+08-13 20:46:28.610  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://apps.microsoft.com/assets/icons/logo-64x64.png
+08-13 20:46:28.753  2132  2161 I ReactNativeJS: [COLLECTION] Found cached icon for netflix
+08-13 20:46:28.974  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:web_manifest https://apps.microsoft.com/assets/icons/logo-256x256.png
+08-13 20:46:29.796  2132  2161 I ReactNativeJS: [LOCAL] Using local icon for netflix
+08-13 20:46:29.797  2132  2161 I ReactNativeJS: [COLLECTION] Added subscription icon to collection
+08-13 20:46:29.798  2132  2161 I ReactNativeJS: [COLLECTION] Returning 6 icons (cachedValid=true)
+08-13 20:46:29.994  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://apps.microsoft.com/assets/icons/logo-256x256.png (59232 bytes)
+08-13 20:46:30.331  2132  2161 I ReactNativeJS: [PICKER] Loaded 6 icons for netflix (6 total, reports hidden by default)
+08-13 20:46:31.458  2132  2161 I ReactNativeJS: [COLLECTION] Loading icons for netflix
+08-13 20:46:31.543  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://apps.microsoft.com/assets/icons/logo-256x256.png
+08-13 20:46:31.601  2132  2161 I ReactNativeJS: [COLLECTION] Found cached icon for netflix
+08-13 20:46:31.876  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:web_manifest https://apps.microsoft.com/assets/icons/logo-monochrome-256x256.png
+08-13 20:46:32.822  2132  2161 I ReactNativeJS: [LOCAL] Using local icon for netflix
+08-13 20:46:32.823  2132  2161 I ReactNativeJS: [COLLECTION] Added subscription icon to collection
+08-13 20:46:32.825  2132  2161 I ReactNativeJS: [COLLECTION] Returning 6 icons (cachedValid=true)
+08-13 20:46:32.851  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://apps.microsoft.com/assets/icons/logo-monochrome-256x256.png (2252 bytes)
+08-13 20:46:33.026  2132  2161 I ReactNativeJS: [PICKER] Loaded 6 icons for netflix (6 total, reports hidden by default)
+08-13 20:46:33.898  2132  2161 I ReactNativeJS: [COLLECTION] Loading icons for netflix
+08-13 20:46:34.035  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://apps.microsoft.com/assets/icons/logo-monochrome-256x256.png
+08-13 20:46:34.118  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:web_manifest https://apps.microsoft.com/assets/icons/logo-maskable-700x700.png
+08-13 20:46:34.123  2132  2161 I ReactNativeJS: [COLLECTION] Found cached icon for netflix
+08-13 20:46:35.519  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://apps.microsoft.com/assets/icons/logo-maskable-700x700.png (95444 bytes)
+08-13 20:46:37.162  2132  2161 I ReactNativeJS: [LOCAL] Using local icon for netflix
+08-13 20:46:37.162  2132  2161 I ReactNativeJS: [COLLECTION] Added subscription icon to collection
+08-13 20:46:37.162  2132  2161 I ReactNativeJS: [COLLECTION] Returning 6 icons (cachedValid=true)
+08-13 20:46:37.165  2132  2161 I ReactNativeJS: [PICKER] Loaded 6 icons for netflix (6 total, reports hidden by default)
+08-13 20:46:39.861  2132  2161 I ReactNativeJS: [COLLECTION] Loading icons for netflix
+08-13 20:46:39.903  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://apps.microsoft.com/assets/icons/logo-maskable-700x700.png
+08-13 20:46:39.960  2132  2161 I ReactNativeJS: [COLLECTION] Found cached icon for netflix
+08-13 20:46:40.346  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:web_manifest https://img1.wsimg.com/isteam/ip/static/pwa-app/logo-default.png/:/rs=w:192,h:192,m
+08-13 20:46:41.080  2132  2161 I ReactNativeJS: [LOCAL] Using local icon for netflix
+08-13 20:46:41.081  2132  2161 I ReactNativeJS: [COLLECTION] Added subscription icon to collection
+08-13 20:46:41.086  2132  2161 I ReactNativeJS: [COLLECTION] Returning 6 icons (cachedValid=true)
+08-13 20:46:41.093  2132  2161 I ReactNativeJS: [PICKER] Loaded 6 icons for netflix (6 total, reports hidden by default)
+08-13 20:46:41.890  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://img1.wsimg.com/isteam/ip/static/pwa-app/logo-default.png/:/rs=w:192,h:192,m (3396 bytes)
+08-13 20:46:42.044  2132  2161 I ReactNativeJS: [COLLECTION] Loading icons for netflix
+08-13 20:46:42.114  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://img1.wsimg.com/isteam/ip/static/pwa-app/logo-default.png/:/rs=w:192,h:192,m
+08-13 20:46:42.145  2132  2161 I ReactNativeJS: [COLLECTION] Found cached icon for netflix
+08-13 20:46:42.441  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:web_manifest https://img1.wsimg.com/isteam/ip/static/pwa-app/logo-default.png/:/rs=w:512,h:512,m
+08-13 20:46:43.443  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://img1.wsimg.com/isteam/ip/static/pwa-app/logo-default.png/:/rs=w:512,h:512,m (7896 bytes)
+08-13 20:46:43.478  2132  2161 I ReactNativeJS: [LOCAL] Using local icon for netflix
+08-13 20:46:43.479  2132  2161 I ReactNativeJS: [COLLECTION] Added subscription icon to collection
+08-13 20:46:43.480  2132  2161 I ReactNativeJS: [COLLECTION] Returning 6 icons (cachedValid=true)
+08-13 20:46:43.482  2132  2161 I ReactNativeJS: [PICKER] Loaded 6 icons for netflix (6 total, reports hidden by default)
+08-13 20:46:44.139  2132  2161 I ReactNativeJS: [COLLECTION] Loading icons for netflix
+08-13 20:46:44.198  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://img1.wsimg.com/isteam/ip/static/pwa-app/logo-default.png/:/rs=w:512,h:512,m
+08-13 20:46:44.250  2132  2161 I ReactNativeJS: [COLLECTION] Found cached icon for netflix
+08-13 20:46:44.509  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:web_manifest https://apps.microsoft.com/assets/icons/logo-16x16.png
+08-13 20:46:45.441  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://apps.microsoft.com/assets/icons/logo-16x16.png (604 bytes)
+08-13 20:46:45.453  2132  2161 I ReactNativeJS: [LOCAL] Using local icon for netflix
+08-13 20:46:45.454  2132  2161 I ReactNativeJS: [COLLECTION] Added subscription icon to collection
+08-13 20:46:45.455  2132  2161 I ReactNativeJS: [COLLECTION] Returning 6 icons (cachedValid=true)
+08-13 20:46:45.457  2132  2161 I ReactNativeJS: [PICKER] Loaded 6 icons for netflix (6 total, reports hidden by default)
+08-13 20:46:46.278  2132  2161 I ReactNativeJS: [COLLECTION] Loading icons for netflix
+08-13 20:46:46.634  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://apps.microsoft.com/assets/icons/logo-16x16.png
+08-13 20:46:46.790  2132  2161 I ReactNativeJS: [COLLECTION] Found cached icon for netflix
+08-13 20:46:47.155  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:web_manifest https://apps.microsoft.com/assets/icons/logo-40x40.png
+08-13 20:46:47.905  2132  2161 I ReactNativeJS: [LOCAL] Using local icon for netflix
+08-13 20:46:47.905  2132  2161 I ReactNativeJS: [COLLECTION] Added subscription icon to collection
+08-13 20:46:47.908  2132  2161 I ReactNativeJS: [COLLECTION] Returning 6 icons (cachedValid=true)
+08-13 20:46:47.914  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://apps.microsoft.com/assets/icons/logo-40x40.png (1792 bytes)
+08-13 20:46:47.935  2132  2161 I ReactNativeJS: [PICKER] Loaded 6 icons for netflix (6 total, reports hidden by default)
+08-13 20:46:48.437  2132  2161 I ReactNativeJS: [COLLECTION] Loading icons for netflix
+08-13 20:46:48.523  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://apps.microsoft.com/assets/icons/logo-40x40.png
+08-13 20:46:48.578  2132  2161 I ReactNativeJS: [COLLECTION] Found cached icon for netflix
+08-13 20:46:48.962  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: spider:favicon https://assets.superlander.com/newimages/favicon.png
+08-13 20:46:49.884  2132  2161 I ReactNativeJS: [LOCAL] Using local icon for netflix
+08-13 20:46:49.884  2132  2161 I ReactNativeJS: [COLLECTION] Added subscription icon to collection
+08-13 20:46:49.886  2132  2161 I ReactNativeJS: [COLLECTION] Returning 6 icons (cachedValid=true)
+08-13 20:46:49.894  2132  2161 I ReactNativeJS: [PICKER] Loaded 6 icons for netflix (6 total, reports hidden by default)
+08-13 20:46:50.388  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://assets.superlander.com/newimages/favicon.png (788 bytes)
+08-13 20:46:50.519  2132  2161 I ReactNativeJS: [COLLECTION] Loading icons for netflix
+08-13 20:46:50.561  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://assets.superlander.com/newimages/favicon.png
+08-13 20:46:50.571  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: bing_images https://fitliferegime.com/wp-content/uploads/2021/09/Inchworm.webp
+08-13 20:46:50.642  2132  2161 I ReactNativeJS: [COLLECTION] Found cached icon for netflix
+08-13 20:46:51.746  2132  2161 I ReactNativeJS: [LOCAL] Using local icon for netflix
+08-13 20:46:51.746  2132  2161 I ReactNativeJS: [COLLECTION] Added subscription icon to collection
+08-13 20:46:51.749  2132  2161 I ReactNativeJS: [COLLECTION] Returning 6 icons (cachedValid=true)
+08-13 20:46:51.754  2132  2161 I ReactNativeJS: [PICKER] Loaded 6 icons for netflix (6 total, reports hidden by default)
+08-13 20:46:52.299  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://fitliferegime.com/wp-content/uploads/2021/09/Inchworm.webp (15340 bytes)
+08-13 20:46:52.472  2132  2161 I ReactNativeJS: [COLLECTION] Loading icons for netflix
+08-13 20:46:52.570  2132  2161 I ReactNativeJS: [QUEUE] Fetched https://fitliferegime.com/wp-content/uploads/2021/09/Inchworm.webp
+08-13 20:46:52.591  2132  2161 I ReactNativeJS: [FETCH] DOWNLOAD: bing_images https://wallpaperaccess.com/full/3910199.png
+08-13 20:46:52.645  2132  2161 I ReactNativeJS: [COLLECTION] Found cached icon for netflix
+08-13 20:46:53.926  2132  2161 I ReactNativeJS: [LOCAL] Using local icon for netflix
+08-13 20:46:53.926  2132  2161 I ReactNativeJS: [COLLECTION] Added subscription icon to collection
+08-13 20:46:53.927  2132  2161 I ReactNativeJS: [COLLECTION] Returning 6 icons (cachedValid=true)
+08-13 20:46:53.939  2132  2161 I ReactNativeJS: [PICKER] Loaded 6 icons for netflix (6 total, reports hidden by default)
+08-13 20:47:00.602  2132  2161 I ReactNativeJS: [FETCH] SUCCESS: https://wallpaperaccess.com/full/3910199.png (1907044 bytes)

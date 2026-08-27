@@ -6,7 +6,10 @@
  *   (determined by device pixel density), and quality mode.
  * - Two quality modes are supported:
  *     - `fast`: small ESPCN models (lower quality, fastest inference).
- *     - `sharp`: FSRCNN models trained with MAE + MS-SSIM + VGG perceptual loss.
+ *     - `sharp`: FSRCNN residual models (MAE + color preserve + light edge).
+ * - After the model runs, output is blended with bilinear (brand-safe lerp):
+ *     out = (1-t)*bilin + t*clamp(model)  with t≈0.25 (between 80/20 and 70/30).
+ *   Keeps stroke weight / branding from bilin; model only adds a little snap.
  * - If the native module or model is unavailable, it transparently falls back to
  *   the existing bilinear `upscaleIconIfSmall` so the button always works.
  * - `isLowResIcon` detects icons small enough to benefit from upscaling.
@@ -15,7 +18,7 @@
  */
 
 import { Image, PixelRatio } from "react-native";
-import { MODEL_MAP } from "./generatedModelMap";
+import { MODEL_CATALOG, MODEL_MAP } from "./generatedModelMap";
 import { mimeForFormat, upscaleIconIfSmall } from "./iconUpscaler";
 
 // Below this max dimension an icon is "low-res" and worth upscaling.
@@ -26,120 +29,11 @@ const BASE_DISPLAY_SIZE = 64;
 
 export type UpscaleQuality = "fast" | "sharp";
 
-// Model registry - maps quality -> input_size -> { scale -> model_file }
-const MODEL_REGISTRY: Record<
-  UpscaleQuality,
-  Record<number, Record<number, string>>
-> = {
-  fast: {
-    16: {
-      4: "espcn_16x_64x.tflite",
-      8: "espcn_16x_128x.tflite",
-      12: "espcn_16x_192x.tflite",
-      16: "espcn_16x_256x.tflite",
-      24: "espcn_16x_384x.tflite",
-      32: "espcn_16x_512x.tflite",
-    },
-    32: {
-      2: "espcn_32x_64x.tflite",
-      4: "espcn_32x_128x.tflite",
-      6: "espcn_32x_192x.tflite",
-      8: "espcn_32x_256x.tflite",
-      12: "espcn_32x_384x.tflite",
-      16: "espcn_32x_512x.tflite",
-    },
-    48: {
-      2: "espcn_48x_96x.tflite",
-      3: "espcn_48x_144x.tflite",
-      4: "espcn_48x_192x.tflite",
-      5: "espcn_48x_240x.tflite",
-      8: "espcn_48x_384x.tflite",
-      12: "espcn_48x_576x.tflite",
-    },
-    64: {
-      2: "espcn_64x_128x.tflite",
-      3: "espcn_64x_192x.tflite",
-      4: "espcn_64x_256x.tflite",
-      6: "espcn_64x_384x.tflite",
-      8: "espcn_64x_512x.tflite",
-    },
-    96: {
-      2: "espcn_96x_192x.tflite",
-      3: "espcn_96x_288x.tflite",
-      4: "espcn_96x_384x.tflite",
-      5: "espcn_96x_480x.tflite",
-    },
-    128: {
-      2: "espcn_128x_256x.tflite",
-      3: "espcn_128x_384x.tflite",
-    },
-    192: {
-      2: "espcn_192x_384x.tflite",
-      3: "espcn_192x_576x.tflite",
-    },
-    256: {
-      2: "espcn_256x_512x.tflite",
-    },
-  },
-  sharp: {
-    16: {
-      4: "fsrcnn_16x_64x.tflite",
-      8: "fsrcnn_16x_128x.tflite",
-      12: "fsrcnn_16x_192x.tflite",
-      16: "fsrcnn_16x_256x.tflite",
-      24: "fsrcnn_16x_384x.tflite",
-      32: "fsrcnn_16x_512x.tflite",
-    },
-    32: {
-      2: "fsrcnn_32x_64x.tflite",
-      4: "fsrcnn_32x_128x.tflite",
-      6: "fsrcnn_32x_192x.tflite",
-      8: "fsrcnn_32x_256x.tflite",
-      12: "fsrcnn_32x_384x.tflite",
-      16: "fsrcnn_32x_512x.tflite",
-    },
-    48: {
-      2: "fsrcnn_48x_96x.tflite",
-      3: "fsrcnn_48x_144x.tflite",
-      4: "fsrcnn_48x_192x.tflite",
-      5: "fsrcnn_48x_240x.tflite",
-      8: "fsrcnn_48x_384x.tflite",
-      12: "fsrcnn_48x_576x.tflite",
-    },
-    64: {
-      2: "fsrcnn_64x_128x.tflite",
-      3: "fsrcnn_64x_192x.tflite",
-      4: "fsrcnn_64x_256x.tflite",
-      6: "fsrcnn_64x_384x.tflite",
-      8: "fsrcnn_64x_512x.tflite",
-    },
-    96: {
-      2: "fsrcnn_96x_192x.tflite",
-      3: "fsrcnn_96x_288x.tflite",
-      4: "fsrcnn_96x_384x.tflite",
-      5: "fsrcnn_96x_480x.tflite",
-    },
-    128: {
-      2: "fsrcnn_128x_256x.tflite",
-      3: "fsrcnn_128x_384x.tflite",
-      4: "fsrcnn_128x_512x.tflite",
-    },
-    192: {
-      2: "fsrcnn_192x_384x.tflite",
-      3: "fsrcnn_192x_576x.tflite",
-    },
-    256: {
-      2: "fsrcnn_256x_512x.tflite",
-    },
-  },
-};
+// Selection matrix: MODEL_CATALOG from generatedModelMap.ts (registry → codegen).
+// Do not hardcode model lists here.
 
-// MODEL_MAP (the static `require()` list Metro bundles at build time) is
-// auto-generated from the `*.tflite` files present in assets/models/ by
-// `scripts/generate-model-map.js` (run during the build and via
-// `npm run generate-model-map`). It only ever references files that exist, so
-// the build never fails on missing models and newly generated ones (e.g. the
-// sharp FSRCNN family) are bundled automatically. See `./generatedModelMap`.
+// MODEL_MAP + MODEL_CATALOG are generated from assets/models/model_registry.json
+// by scripts/generate-model-map.js (build + npm run generate-model-map).
 
 // Cache for loaded models
 
@@ -168,14 +62,14 @@ function findNearestInputSize(
   actualSize: number,
   quality: UpscaleQuality,
 ): number {
-  const sizes = Object.keys(MODEL_REGISTRY[quality])
+  const sizes = Object.keys(MODEL_CATALOG[quality])
     .map(Number)
     .sort((a, b) => a - b);
 
   // Exact match
   if (sizes.includes(actualSize)) return actualSize;
 
-  // Find nearest smaller size
+  // Find nearest smaller or equal input size
   const candidates = sizes.filter((s) => s <= actualSize);
   if (candidates.length > 0) return Math.max(...candidates);
 
@@ -191,7 +85,7 @@ function findBestScale(
   targetOutput: number,
   quality: UpscaleQuality,
 ): number | null {
-  const scaleMap = MODEL_REGISTRY[quality][inputSize];
+  const scaleMap = MODEL_CATALOG[quality][inputSize];
   if (!scaleMap) return null;
 
   // Only consider scales whose model file is actually bundled. This keeps us
@@ -232,7 +126,7 @@ function findBestScale(
  * MODEL_MAP. Consumers (e.g. the picker UI) can use this to disable a mode.
  */
 export function isQualityAvailable(quality: UpscaleQuality): boolean {
-  const byInput = MODEL_REGISTRY[quality];
+  const byInput = MODEL_CATALOG[quality];
   for (const inputSize of Object.keys(byInput)) {
     const scaleMap = byInput[Number(inputSize)];
     for (const scale of Object.keys(scaleMap)) {
@@ -270,7 +164,7 @@ function resolveBundledModel(
 
   if (scale === null) return null;
 
-  const modelFile = MODEL_REGISTRY[quality][nearestInput][scale];
+  const modelFile = MODEL_CATALOG[quality][nearestInput][scale];
   // Only return models that are physically bundled (see MODEL_MAP note).
   if (!modelFile || !MODEL_MAP[modelFile]) return null;
 
@@ -312,6 +206,85 @@ export function getModelForUpscale(
  * TurboModuleRegistry.getEnforcing(...) which crashes if the native module
  * isn't linked (e.g. Expo Go), so we must avoid loading the JS module at all.
  */
+/**
+ * Brand-safe hybrid (Ace POC 2026-08-08): bilin owns stroke mass; model is a
+ * residual. Base t≈0.25 for mid/large LR; tiny favicons need stronger model mix
+ * or thumbs look identical to bilinear. See docs/AI_UPSCALING.md.
+ */
+const BRAND_SAFE_LERP_T = 0.25;
+const BRAND_SAFE_MAX_DARKEN = 0.12;
+const BRAND_SAFE_MAX_BRIGHTEN = 0.35;
+
+/** Adaptive model mix: more snap on tiny LR, still not full model (avoids hollow letters). */
+function brandSafeLerpTForInput(inputPx: number): number {
+  if (inputPx <= 24) return 0.48;
+  if (inputPx <= 48) return 0.38;
+  if (inputPx <= 96) return 0.32;
+  return BRAND_SAFE_LERP_T;
+}
+
+/** Bilinear upsample RGB float32 planar [H*W*3] in 0..1. */
+function bilinearUpsampleRgb(
+  src: Float32Array,
+  inW: number,
+  inH: number,
+  outW: number,
+  outH: number,
+): Float32Array {
+  const dst = new Float32Array(outW * outH * 3);
+  const scaleX = inW / outW;
+  const scaleY = inH / outH;
+  for (let y = 0; y < outH; y++) {
+    const fy = (y + 0.5) * scaleY - 0.5;
+    const y0 = Math.max(0, Math.min(inH - 1, Math.floor(fy)));
+    const y1 = Math.min(inH - 1, y0 + 1);
+    const wy = Math.min(1, Math.max(0, fy - y0));
+    for (let x = 0; x < outW; x++) {
+      const fx = (x + 0.5) * scaleX - 0.5;
+      const x0 = Math.max(0, Math.min(inW - 1, Math.floor(fx)));
+      const x1 = Math.min(inW - 1, x0 + 1);
+      const wx = Math.min(1, Math.max(0, fx - x0));
+      const i00 = (y0 * inW + x0) * 3;
+      const i01 = (y0 * inW + x1) * 3;
+      const i10 = (y1 * inW + x0) * 3;
+      const i11 = (y1 * inW + x1) * 3;
+      const o = (y * outW + x) * 3;
+      for (let c = 0; c < 3; c++) {
+        const v0 = src[i00 + c] * (1 - wx) + src[i01 + c] * wx;
+        const v1 = src[i10 + c] * (1 - wx) + src[i11 + c] * wx;
+        dst[o + c] = v0 * (1 - wy) + v1 * wy;
+      }
+    }
+  }
+  return dst;
+}
+
+/**
+ * out = (1-t)*bilin + t*(bilin + clamp(model-bilin))
+ *     = bilin + t*clamp(residual)
+ * Preserves brand mass; limits how much the model can carve letter fill.
+ */
+function brandSafeHybridRgb(
+  bilin: Float32Array,
+  modelOut: Float32Array,
+  t: number = BRAND_SAFE_LERP_T,
+  maxDarken: number = BRAND_SAFE_MAX_DARKEN,
+  maxBrighten: number = BRAND_SAFE_MAX_BRIGHTEN,
+): Float32Array {
+  const n = Math.min(bilin.length, modelOut.length);
+  const out = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    let r = modelOut[i] - bilin[i];
+    if (r < -maxDarken) r = -maxDarken;
+    if (r > maxBrighten) r = maxBrighten;
+    let v = bilin[i] + t * r;
+    if (v < 0) v = 0;
+    else if (v > 1) v = 1;
+    out[i] = v;
+  }
+  return out;
+}
+
 function tfliteModuleExists(): boolean {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -414,12 +387,19 @@ export function isLowResIcon(
  * `quality` selects the model family: "fast" (ESPCN) or "sharp" (FSRCNN).
  * The target output size is determined dynamically based on device pixel density.
  */
+export type AiUpscaleResult = {
+  base64: string;
+  format: string;
+  width?: number;
+  height?: number;
+};
+
 export async function upscaleIconAi(
   base64: string,
   format: string,
   force = false,
   quality: UpscaleQuality = "fast",
-): Promise<{ base64: string; format: string }> {
+): Promise<AiUpscaleResult> {
   if (format === "svg") return { base64, format };
 
   // Get actual input dimensions
@@ -476,41 +456,162 @@ export async function upscaleIconAi(
       encoding: EncodingType.Base64,
     });
 
-    // Decode PNG to get raw RGBA pixels.
-    const decoded = UPNG.decode(
-      Uint8Array.from(atob(inputB64), (c) => c.charCodeAt(0)).buffer,
-    ) as any;
-    const rgbaIn = new Uint8ClampedArray(
-      decoded.data as unknown as ArrayBuffer,
-    );
-
-    // Extract RGB planes (model expects 3 channels, no alpha).
-    const rgbIn = new Float32Array(
-      modelInfo.inputSize * modelInfo.inputSize * 3,
-    );
-    let srcP = 0;
-    for (let i = 0; i < modelInfo.inputSize * modelInfo.inputSize; i++) {
-      rgbIn[i * 3] = rgbaIn[srcP++] / 255;
-      rgbIn[i * 3 + 1] = rgbaIn[srcP++] / 255;
-      rgbIn[i * 3 + 2] = rgbaIn[srcP++] / 255;
-      srcP++; // skip alpha
+    // Decode PNG → RGBA8. UPNG.decode() only returns metadata + compressed
+    // frames; pixel bytes come from UPNG.toRGBA8(img)[0]. Using decoded.data
+    // directly fed zeros into the model (range=0 → silent bilinear fallback).
+    const pngBytes = Uint8Array.from(atob(inputB64), (c) => c.charCodeAt(0));
+    const decoded = UPNG.decode(pngBytes.buffer) as {
+      width: number;
+      height: number;
+    };
+    const frames = UPNG.toRGBA8(decoded as any) as ArrayBuffer[];
+    if (!frames?.length) {
+      console.warn("[ICON_AI] UPNG.toRGBA8 returned no frames, bilinear");
+      return upscaleIconIfSmall(base64, format, true);
+    }
+    const rgbaIn = new Uint8ClampedArray(frames[0]);
+    const pxCount = decoded.width * decoded.height;
+    if (rgbaIn.length < pxCount * 4) {
+      console.warn(
+        `[ICON_AI] RGBA buffer too small (${rgbaIn.length} < ${pxCount * 4}), bilinear`,
+      );
+      return upscaleIconIfSmall(base64, format, true);
     }
 
-    // Run the selected super-resolution model
-    const out: Float32Array[] = await model.runSync([rgbIn]);
-    const outBytes = out[0];
+    // Match training domain (train_espcn/fsrcnn_multi.py):
+    //   base = rgb * alpha + (1 - alpha)   // composite onto white
+    // Models never saw raw premultiplied-black holes under transparency.
+    // Prefer the decoded dimensions; fall back to model input size.
+    const inW = decoded.width || modelInfo.inputSize;
+    const inH = decoded.height || modelInfo.inputSize;
+    const rgbIn = new Float32Array(inW * inH * 3);
+    // Keep source alpha so we can NN-restore it on the SR output.
+    const alphaIn = new Float32Array(inW * inH);
+    let srcP = 0;
+    let inMin = 1;
+    let inMax = 0;
+    let alphaMin = 1;
+    let alphaMax = 0;
+    for (let i = 0; i < inW * inH; i++) {
+      const r = rgbaIn[srcP++] / 255;
+      const g = rgbaIn[srcP++] / 255;
+      const b = rgbaIn[srcP++] / 255;
+      const a = rgbaIn[srcP++] / 255;
+      alphaIn[i] = a;
+      if (a < alphaMin) alphaMin = a;
+      if (a > alphaMax) alphaMax = a;
+      // White composite (same formula as training rasterize path)
+      const cr = r * a + (1 - a);
+      const cg = g * a + (1 - a);
+      const cb = b * a + (1 - a);
+      rgbIn[i * 3] = cr;
+      rgbIn[i * 3 + 1] = cg;
+      rgbIn[i * 3 + 2] = cb;
+      if (cr < inMin) inMin = cr;
+      if (cg < inMin) inMin = cg;
+      if (cb < inMin) inMin = cb;
+      if (cr > inMax) inMax = cr;
+      if (cg > inMax) inMax = cg;
+      if (cb > inMax) inMax = cb;
+    }
+    console.log(
+      `[ICON_AI] input ${inW}x${inH} white-comp rgb range=${(inMax - inMin).toFixed(3)} alpha=[${alphaMin.toFixed(2)},${alphaMax.toFixed(2)}] len=${rgbIn.length} modelIn=${modelInfo.inputSize}`,
+    );
+    if (inMax - inMin < 1e-6) {
+      console.warn("[ICON_AI] input image is constant, bilinear");
+      return upscaleIconIfSmall(base64, format, true);
+    }
+
+    // `runSync` executes the native inference call synchronously and can block
+    // the JavaScript/UI runtime for the duration of a larger model. Keep the
+    // user-triggered upscale responsive by using fast-tflite's async API.
+    const out: Float32Array[] = await model.run([rgbIn]);
+    const outBytes = out?.[0];
     const outW = modelInfo.outputSize;
     const outH = modelInfo.outputSize;
+    const expectedOut = outW * outH * 3;
+
+    if (!outBytes || outBytes.length < expectedOut) {
+      console.warn(
+        `[ICON_AI] unexpected output length ${outBytes?.length ?? 0} (expected ${expectedOut}), bilinear`,
+      );
+      return upscaleIconIfSmall(base64, format, true);
+    }
+
+    // Detect useless model output: if all values are nearly identical (low
+    // variance), the model is producing a constant gray patch instead of
+    // actual upscaled content. Fall back to bilinear in that case.
+    // Sample across the full buffer (not just the first 100 floats, which can
+    // be a single flat edge of a valid image).
+    {
+      let min = Infinity;
+      let max = -Infinity;
+      const step = Math.max(1, Math.floor(outBytes.length / 256));
+      for (let i = 0; i < outBytes.length; i += step) {
+        const v = outBytes[i];
+        if (v < min) min = v;
+        if (v > max) max = v;
+      }
+      console.log(
+        `[ICON_AI] output len=${outBytes.length} range=${(max - min).toFixed(4)} sample min/max`,
+      );
+      if (max - min < 0.05) {
+        console.warn(
+          `[ICON_AI] Model output has insufficient variance (range=${(max - min).toFixed(4)}), falling back to bilinear`,
+        );
+        return upscaleIconIfSmall(base64, format, true);
+      }
+    }
+
+    // Brand-safe hybrid: bilin mass + clamped residual; adaptive t for tiny LR.
+    const bilinRgb = bilinearUpsampleRgb(rgbIn, inW, inH, outW, outH);
+    const hybridT = brandSafeLerpTForInput(inW);
+    const hybridRgb = brandSafeHybridRgb(bilinRgb, outBytes, hybridT);
+    console.log(
+      `[ICON_AI] brand-safe hybrid t=${hybridT.toFixed(2)} in=${inW}px (bilin + clamped residual)`,
+    );
+
+    // NN-upscale alpha from LR → HR (models are RGB-only; alpha is geometry).
+    const scaleX = outW / inW;
+    const scaleY = outH / inH;
+    const hasTransparency = alphaMin < 0.999;
 
     // Allocate RGBA buffer for upng-js (expects 4 channels).
-    // Model outputs float32 0-1, convert to uint8 0-255.
+    // Hybrid is white-composited RGB. If the source had transparency,
+    // un-composite via restored alpha so holes stay transparent.
     const rgba = new Uint8Array(outW * outH * 4);
     let p = 0;
-    for (let i = 0; i < outW * outH; i++) {
-      rgba[i * 4] = Math.round(outBytes[p++] * 255);
-      rgba[i * 4 + 1] = Math.round(outBytes[p++] * 255);
-      rgba[i * 4 + 2] = Math.round(outBytes[p++] * 255);
-      rgba[i * 4 + 3] = 255;
+    for (let y = 0; y < outH; y++) {
+      const sy = Math.min(inH - 1, Math.floor(y / scaleY));
+      for (let x = 0; x < outW; x++) {
+        const sx = Math.min(inW - 1, Math.floor(x / scaleX));
+        const a = hasTransparency ? alphaIn[sy * inW + sx] : 1;
+        let r = hybridRgb[p++];
+        let g = hybridRgb[p++];
+        let b = hybridRgb[p++];
+        // Clamp model output
+        r = r < 0 ? 0 : r > 1 ? 1 : r;
+        g = g < 0 ? 0 : g > 1 ? 1 : g;
+        b = b < 0 ? 0 : b > 1 ? 1 : b;
+        if (hasTransparency && a > 1e-3 && a < 0.999) {
+          // Invert white composite: rgb = (comp - (1-a)) / a
+          r = (r - (1 - a)) / a;
+          g = (g - (1 - a)) / a;
+          b = (b - (1 - a)) / a;
+          r = r < 0 ? 0 : r > 1 ? 1 : r;
+          g = g < 0 ? 0 : g > 1 ? 1 : g;
+          b = b < 0 ? 0 : b > 1 ? 1 : b;
+        } else if (hasTransparency && a <= 1e-3) {
+          r = 0;
+          g = 0;
+          b = 0;
+        }
+        const i = (y * outW + x) * 4;
+        rgba[i] = Math.round(r * 255);
+        rgba[i + 1] = Math.round(g * 255);
+        rgba[i + 2] = Math.round(b * 255);
+        rgba[i + 3] = Math.round(a * 255);
+      }
     }
 
     // Encode the upscaled RGBA back to a PNG
@@ -526,9 +627,9 @@ export async function upscaleIconAi(
 
     await deleteAsync(bounded.uri, { idempotent: true }).catch(() => {});
     console.log(
-      `[ICON_AI] Upscaled ${inputSize}px → ${outW}x${outH}px using ${modelInfo.modelFile}`,
+      `[ICON_AI] Upscaled ${inputSize}px → ${outW}x${outH}px using ${modelInfo.modelFile} + brand-safe hybrid`,
     );
-    return { base64: result, format: "png" };
+    return { base64: result, format: "png", width: outW, height: outH };
   } catch (err) {
     console.warn("[ICON_AI] model run failed, bilinear fallback:", err);
     return upscaleIconIfSmall(base64, format, true);

@@ -1,30 +1,39 @@
 import { icons } from "@/constants/icons";
-import { deleteCachedIcon, setCachedIcon } from "@/services/database";
+import { useBottomClearance } from "@/hooks/useBottomClearance";
+import {
+  deleteCachedIcon,
+  getIconCrawlSession,
+  replaceIconWithAiUpscale,
+  saveCrawlResult,
+  setCachedIcon,
+} from "@/services/database";
 import {
   getIconCollection,
   startIconCrawl,
-} from "@/src/services/iconBackgroundCrawler";
+} from "@/services/iconBackgroundCrawler";
 import {
   addCacheUpdateListener,
   addLoadingListener,
+  getIconCrawlProgress,
   isIconLoading,
-} from "@/src/services/iconLoadingRegistry";
+} from "@/services/iconLoadingRegistry";
 import {
   isLowResIcon,
   isQualityAvailable,
   upscaleIconAi,
   type UpscaleQuality,
-} from "@/src/services/iconProcessing";
+} from "@/services/iconProcessing";
 import {
   getReportsForIcon,
+  hashImageData,
   rejectReportedIcon,
   reportIcon,
-} from "@/src/services/iconReportService";
+} from "@/services/iconReportService";
 import {
   addRateLimitListener,
   getRateLimitedDomains,
-} from "@/src/services/rateLimitTracker";
-import { detectWhiteBg, removeWhiteBg } from "@/src/services/whiteBgRemoval";
+} from "@/services/rateLimitTracker";
+import { detectWhiteBg, removeWhiteBg } from "@/services/whiteBgRemoval";
 import { usePostHog } from "posthog-react-native";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -78,9 +87,11 @@ const SubscriptionIconPickerModal = ({
   onClose,
   onIconChange,
 }: IconPickerProps) => {
+  const { sheetPadding } = useBottomClearance();
   const posthog = usePostHog();
   const [availableIcons, setAvailableIcons] = useState<PickerIcon[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [crawlDetail, setCrawlDetail] = useState<string | null>(null);
   const [rateLimitedDomains, setRateLimitedDomains] = useState<string[]>([]);
   // Toggle to reveal reported ("incorrect") icons.
   const [showIncorrect, setShowIncorrect] = useState(false);
@@ -108,9 +119,34 @@ const SubscriptionIconPickerModal = ({
   );
   const isMounted = useRef(true);
   const latestKeyRef = useRef(iconKey);
+  /** True while white-bg / AI upscale runs — skip cache-driven reloads that race the list. */
+  const processingRef = useRef(false);
 
   useEffect(() => {
     latestKeyRef.current = iconKey;
+  }, [iconKey]);
+
+  const refreshCrawlDetail = useCallback(async () => {
+    if (!iconKey) {
+      setCrawlDetail(null);
+      return;
+    }
+    const requestKey = iconKey;
+    const live = getIconCrawlProgress(iconKey);
+    if (live) {
+      if (isMounted.current && latestKeyRef.current === requestKey) {
+        setCrawlDetail(live.detail);
+      }
+      return;
+    }
+    const persisted = await getIconCrawlSession(iconKey);
+    if (!isMounted.current || latestKeyRef.current !== requestKey) return;
+    if (!persisted) {
+      setCrawlDetail(null);
+      return;
+    }
+    const summary = `${persisted.detail ?? "Icon crawl"} (${persisted.downloadedCount} saved${persisted.deferredCount ? `, ${persisted.deferredCount} retryable` : ""})`;
+    setCrawlDetail(summary);
   }, [iconKey]);
 
   // Poll rate-limited domains for the red indicator
@@ -264,6 +300,14 @@ const SubscriptionIconPickerModal = ({
           return true;
         });
 
+        // Never clobber a non-empty in-progress list with empty mid-upscale.
+        if (processingRef.current && visible.length === 0) {
+          console.log(
+            `[PICKER] Skip empty collection reload while processing for ${iconKey}`,
+          );
+          return;
+        }
+
         setAvailableIcons(visible);
         console.log(
           `[PICKER] Loaded ${visible.length} icons for ${iconKey} (${mapped.length} total, reports hidden by default)`,
@@ -274,6 +318,7 @@ const SubscriptionIconPickerModal = ({
       }
     } catch (error) {
       console.error("[PICKER] Failed to load icons:", error);
+      // Do not setAvailableIcons([]) — keep current list on failure.
     }
   }, [iconKey, showIncorrect, showBroken, detectIcons]);
 
@@ -282,23 +327,30 @@ const SubscriptionIconPickerModal = ({
     if (visible && iconKey) {
       loadIcons();
       setIsSearching(isIconLoading(iconKey));
+      void refreshCrawlDetail();
     }
     return () => {
       isMounted.current = false;
     };
-  }, [visible, iconKey, loadIcons]);
+  }, [visible, iconKey, loadIcons, refreshCrawlDetail]);
 
   useEffect(() => {
     const unsubscribeLoading = addLoadingListener(() => {
       if (!isMounted.current || !iconKey) return;
       setIsSearching(isIconLoading(iconKey));
+      void refreshCrawlDetail();
     });
     return unsubscribeLoading;
-  }, [iconKey]);
+  }, [iconKey, refreshCrawlDetail]);
 
   useEffect(() => {
     const unsubscribeCache = addCacheUpdateListener(() => {
       if (!isMounted.current || !visible || !iconKey) return;
+      // Avoid racing AI/white-bg local list updates with a full reload.
+      if (processingRef.current) {
+        console.log("[PICKER] Skip cache reload while processing");
+        return;
+      }
       loadIcons();
     });
     return unsubscribeCache;
@@ -338,6 +390,11 @@ const SubscriptionIconPickerModal = ({
         icon.source,
         icon.format,
         icon.originalUrl,
+        0,
+        undefined,
+        undefined,
+        false,
+        true,
       );
       posthog.capture("icon_picker_icon_selected", {
         subscription_name: subscriptionName,
@@ -350,9 +407,7 @@ const SubscriptionIconPickerModal = ({
     onClose();
   };
 
-  // Persist a processed icon (white-bg removed or AI-upscaled) as the cached
-  // icon so the card reflects it immediately. `extraProps` are merged into the
-  // PostHog event for richer analytics (e.g. the chosen upscale quality).
+  // Persist white-bg clear (keep source label; append crawl row).
   const persistProcessedIcon = async (
     icon: PickerIcon,
     processedBase64: string,
@@ -367,16 +422,26 @@ const SubscriptionIconPickerModal = ({
       icon.source,
       newFormat,
       icon.originalUrl,
+      0,
+      undefined,
+      undefined,
+      false,
+      true,
     );
+    await saveCrawlResult(
+      iconKey,
+      processedBase64,
+      icon.source,
+      newFormat,
+      icon.originalUrl,
+    );
+    // setCachedIcon already notifies; avoid double reload thrash
     posthog.capture(event, {
       subscription_name: subscriptionName,
       icon_key: iconKey,
       source: icon.source,
       ...extraProps,
     });
-    // Update the visible tile in-place so the user sees the processed icon
-    // right away (the tapped tile's id is derived from the ORIGINAL bytes, so
-    // reloading from the crawl-result rows alone would still show the old art).
     setAvailableIcons((prev) =>
       prev.map((i) =>
         i.id === icon.id
@@ -394,7 +459,63 @@ const SubscriptionIconPickerModal = ({
     Alert.alert("Updated", "The icon has been updated.");
   };
 
+  /** AI path: replace source crawl bytes, cache as ai_upscale, show AI tile first. */
+  const persistAiUpscaledIcon = async (
+    icon: PickerIcon,
+    processedBase64: string,
+    newFormat: string,
+    width: number | undefined,
+    height: number | undefined,
+    extraProps: Record<string, unknown> = {},
+  ) => {
+    if (!iconKey) return;
+    await replaceIconWithAiUpscale(
+      iconKey,
+      icon.imageData,
+      processedBase64,
+      newFormat,
+      icon.originalUrl ?? null,
+      width,
+      height,
+    );
+    posthog.capture("icon_picker_upscale_ai", {
+      subscription_name: subscriptionName,
+      icon_key: iconKey,
+      source: "ai_upscale",
+      width: width ?? null,
+      height: height ?? null,
+      ...extraProps,
+    });
+    const newId = hashImageData(processedBase64);
+    setAvailableIcons((prev) => {
+      const rest = prev.filter(
+        (i) => i.id !== icon.id && i.imageData !== icon.imageData,
+      );
+      const aiTile: PickerIcon = {
+        id: newId,
+        imageData: processedBase64,
+        format: newFormat,
+        source: "ai_upscale",
+        originalUrl: icon.originalUrl,
+        originalWidth: width,
+        originalHeight: height,
+        reportedType: null,
+      };
+      return [aiTile, ...rest];
+    });
+    setDetections((prev) => ({
+      ...prev,
+      [newId]: { hasWhite: false, isLowRes: false },
+    }));
+    onIconChange();
+    Alert.alert(
+      "AI upscale saved",
+      "The improved icon is first in the list and set as the subscription icon. Tap it if you want to confirm selection.",
+    );
+  };
+
   const handleClearWhiteBackground = async (icon: PickerIcon) => {
+    processingRef.current = true;
     setProcessing({ id: icon.id, kind: "white" });
     try {
       const base64 = await removeWhiteBg(icon.imageData, icon.format, 60);
@@ -416,11 +537,13 @@ const SubscriptionIconPickerModal = ({
       console.error("[PICKER] white-bg removal failed:", err);
       Alert.alert("Error", "Failed to clear white background.");
     } finally {
+      processingRef.current = false;
       setProcessing(null);
     }
   };
 
   const handleUpscale = async (icon: PickerIcon) => {
+    processingRef.current = true;
     setProcessing({ id: icon.id, kind: "upscale" });
     // Track what the user requested vs. what actually ran: "sharp" transparently
     // degrades to "fast" (and then bilinear) when its models aren't bundled.
@@ -432,32 +555,23 @@ const SubscriptionIconPickerModal = ({
     try {
       // force=true so we always re-upscale even if the stored bytes were
       // already a 256px bilinear upscale from crawl time (still low quality).
-      const { base64, format } = await upscaleIconAi(
+      const { base64, format, width, height } = await upscaleIconAi(
         icon.imageData,
         icon.format,
         true,
         requestedQuality,
       );
-      await persistProcessedIcon(
-        icon,
-        base64,
-        format,
-        "icon_picker_upscale_ai",
-        {
-          requested_quality: requestedQuality,
-          effective_quality: effectiveQuality,
-          sharp_available: SHARP_AVAILABLE,
-          output_format: format,
-        },
-      );
-      setDetections((prev) => ({
-        ...prev,
-        [icon.id]: { ...prev[icon.id], isLowRes: false } as IconDetection,
-      }));
+      await persistAiUpscaledIcon(icon, base64, format, width, height, {
+        requested_quality: requestedQuality,
+        effective_quality: effectiveQuality,
+        sharp_available: SHARP_AVAILABLE,
+        output_format: format,
+      });
     } catch (err) {
       console.error("[PICKER] upscale failed:", err);
       Alert.alert("Error", "Failed to upscale icon.");
     } finally {
+      processingRef.current = false;
       setProcessing(null);
     }
   };
@@ -562,7 +676,7 @@ const SubscriptionIconPickerModal = ({
     return (
       <View className="items-center gap-2 px-2 py-3">
         <Pressable
-          className="size-16 items-center justify-center rounded-xl border-2 border-border bg-card"
+          className="relative size-16 items-center justify-center rounded-xl border-2 border-border bg-card"
           onPress={() => handleSelectIcon(item)}
         >
           <Image
@@ -570,6 +684,11 @@ const SubscriptionIconPickerModal = ({
             className="size-12"
             resizeMode="contain"
           />
+          {item.source === "ai_upscale" ? (
+            <View className="absolute -right-1 -top-1 rounded bg-purple-600 px-1">
+              <Text className="text-[8px] font-sans-bold text-white">AI</Text>
+            </View>
+          ) : null}
         </Pressable>
 
         {/* Corrective chips (white-bg / upscale) — shown based on detection */}
@@ -657,7 +776,10 @@ const SubscriptionIconPickerModal = ({
     >
       <View className="flex-1 justify-end">
         <Pressable className="flex-1 bg-black/50" onPress={onClose} />
-        <View className="rounded-t-3xl bg-background p-5">
+        <View
+          className="rounded-t-3xl bg-background p-5"
+          style={{ paddingBottom: sheetPadding }}
+        >
           <View className="mb-4 flex-row items-center justify-between">
             <Text className="text-lg font-sans-bold text-primary">
               Choose Icon
@@ -783,6 +905,11 @@ const SubscriptionIconPickerModal = ({
                 <Text className="font-sans-medium text-accent">
                   {isSearching ? "Searching..." : "Search for Icon Online"}
                 </Text>
+                {crawlDetail && (
+                  <Text className="mt-0.5 px-4 text-center text-[10px] text-muted-foreground">
+                    {crawlDetail}
+                  </Text>
+                )}
                 {/* Red rate-limit indicator */}
                 {rateLimitedDomains.length > 0 && (
                   <Text className="mt-0.5 text-[10px] text-red-500">

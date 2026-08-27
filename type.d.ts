@@ -23,6 +23,7 @@ declare global {
     status?: string;
     startDate?: string;
     price: number;
+    priceUnknown?: boolean;
     currency?: string;
     billing: string;
     frequency?: string;
@@ -46,6 +47,7 @@ declare global {
     icon: ImageSourcePropType;
     name: string;
     price: number;
+    priceUnknown?: boolean;
     currency?: string;
     daysLeft: number;
   }

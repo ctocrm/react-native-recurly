@@ -4,6 +4,8 @@
  * JSON-LD logos, Apple touch icons).
  */
 
+import { isPublishableExtractedIcon, isUiChromeImage } from "@/services/iconCandidate";
+
 interface ExtractedIcon {
   url: string;
   format: "svg" | "png" | "ico" | "jpg" | "jpeg" | "webp";
@@ -36,6 +38,10 @@ async function fetchPage(url: string): Promise<string | null> {
   } finally {
     clearTimeout(timer);
   }
+}
+
+function shouldKeepExtracted(url: string, source: string): boolean {
+  return isPublishableExtractedIcon(url, source);
 }
 
 function detectImageFormat(url: string): ExtractedIcon["format"] {
@@ -85,10 +91,62 @@ function resolveUrl(href: string, baseUrl: string): string {
   }
 }
 
+function extractManifestUrls(html: string, pageUrl: string): string[] {
+  const manifests = new Set<string>();
+  const linkTags = html.match(/<link\b[^>]*>/gi) ?? [];
+  for (const tag of linkTags) {
+    const rel = tag.match(/\brel\s*=\s*["']([^"']+)["']/i)?.[1] ?? "";
+    const href = tag.match(/\bhref\s*=\s*["']([^"']+)["']/i)?.[1];
+    if (!href || !/(^|\s)manifest(\s|$)/i.test(rel)) continue;
+    manifests.add(resolveUrl(href, pageUrl));
+  }
+  return [...manifests];
+}
+
+async function extractIconsFromManifest(
+  manifestUrl: string,
+): Promise<ExtractedIcon[]> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const response = await fetch(manifestUrl, {
+      signal: controller.signal,
+      headers: { Accept: "application/manifest+json, application/json, */*" },
+    });
+    if (!response.ok) return [];
+    const manifest = (await response.json()) as {
+      icons?: { src?: string; sizes?: string; type?: string }[];
+    };
+    const icons: ExtractedIcon[] = [];
+    for (const icon of manifest.icons ?? []) {
+      if (!icon.src) continue;
+      const url = resolveUrl(icon.src, manifestUrl);
+      const size = icon.sizes
+        ?.match(/(\d+)x(\d+)/)
+        ?.slice(1)
+        .map(Number);
+      icons.push({
+        url,
+        format: detectImageFormat(
+          icon.type?.includes("svg") ? `${url}.svg` : url,
+        ),
+        source: "web_manifest",
+        width: size?.[0],
+        height: size?.[1],
+      });
+    }
+    return icons;
+  } catch {
+    return [];
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /**
  * Extract all icon-related URLs from a page's HTML.
  */
-function extractIconsFromHtml(html: string, pageUrl: string): ExtractedIcon[] {
+export function extractIconsFromHtml(html: string, pageUrl: string): ExtractedIcon[] {
   const icons: ExtractedIcon[] = [];
   const seen = new Set<string>();
 
@@ -157,7 +215,7 @@ function extractIconsFromHtml(html: string, pageUrl: string): ExtractedIcon[] {
     /<meta[^>]+(?:property|name)\s*=\s*["']og:image["'][^>]+content\s*=\s*["']([^"']+)["'][^>]*>/gi;
   while ((match = ogRegex.exec(html)) !== null) {
     const rawUrl = resolveUrl(match[1], pageUrl);
-    if (!seen.has(rawUrl)) {
+    if (!seen.has(rawUrl) && shouldKeepExtracted(rawUrl, "og_image")) {
       seen.add(rawUrl);
       icons.push({
         url: rawUrl,
@@ -171,7 +229,7 @@ function extractIconsFromHtml(html: string, pageUrl: string): ExtractedIcon[] {
     /<meta[^>]+content\s*=\s*["']([^"']+)["'][^>]+(?:property|name)\s*=\s*["']og:image["'][^>]*>/gi;
   while ((match = ogRevRegex.exec(html)) !== null) {
     const rawUrl = resolveUrl(match[1], pageUrl);
-    if (!seen.has(rawUrl)) {
+    if (!seen.has(rawUrl) && shouldKeepExtracted(rawUrl, "og_image")) {
       seen.add(rawUrl);
       icons.push({
         url: rawUrl,
@@ -186,7 +244,7 @@ function extractIconsFromHtml(html: string, pageUrl: string): ExtractedIcon[] {
     /<meta[^>]+(?:name|property)\s*=\s*["']twitter:image["'][^>]+content\s*=\s*["']([^"']+)["'][^>]*>/gi;
   while ((match = twitterRegex.exec(html)) !== null) {
     const rawUrl = resolveUrl(match[1], pageUrl);
-    if (!seen.has(rawUrl)) {
+    if (!seen.has(rawUrl) && shouldKeepExtracted(rawUrl, "twitter_image")) {
       seen.add(rawUrl);
       icons.push({
         url: rawUrl,
@@ -200,7 +258,7 @@ function extractIconsFromHtml(html: string, pageUrl: string): ExtractedIcon[] {
     /<meta[^>]+content\s*=\s*["']([^"']+)["'][^>]+(?:name|property)\s*=\s*["']twitter:image["'][^>]*>/gi;
   while ((match = twitterRevRegex.exec(html)) !== null) {
     const rawUrl = resolveUrl(match[1], pageUrl);
-    if (!seen.has(rawUrl)) {
+    if (!seen.has(rawUrl) && shouldKeepExtracted(rawUrl, "twitter_image")) {
       seen.add(rawUrl);
       icons.push({
         url: rawUrl,
@@ -251,7 +309,7 @@ function extractIconsFromHtml(html: string, pageUrl: string): ExtractedIcon[] {
         if (item.image) {
           if (typeof item.image === "string") {
             const rawUrl = resolveUrl(item.image, pageUrl);
-            if (!seen.has(rawUrl)) {
+            if (!seen.has(rawUrl) && shouldKeepExtracted(rawUrl, "jsonld_image")) {
               seen.add(rawUrl);
               icons.push({
                 url: rawUrl,
@@ -261,7 +319,7 @@ function extractIconsFromHtml(html: string, pageUrl: string): ExtractedIcon[] {
             }
           } else if (item.image.url) {
             const rawUrl = resolveUrl(item.image.url, pageUrl);
-            if (!seen.has(rawUrl)) {
+            if (!seen.has(rawUrl) && shouldKeepExtracted(rawUrl, "jsonld_image")) {
               seen.add(rawUrl);
               icons.push({
                 url: rawUrl,
@@ -277,14 +335,59 @@ function extractIconsFromHtml(html: string, pageUrl: string): ExtractedIcon[] {
     }
   }
 
-  // 6. Common favicon paths in <head>
+  // 6. Logo-like <img> tags (homepage brand marks often only appear here)
+  const imgTagRegex =
+    /<img\b[^>]*(?:src|data-src)\s*=\s*["']([^"']+)["'][^>]*>/gi;
+  let imgCount = 0;
+  const MAX_LOGO_IMGS = 12;
+  while (
+    (match = imgTagRegex.exec(html)) !== null &&
+    imgCount < MAX_LOGO_IMGS
+  ) {
+    const tag = match[0].toLowerCase();
+    const href = match[1];
+    const blob = `${tag} ${href}`.toLowerCase();
+    // Require a real logo/brand mark — not header chrome matching class="icon"
+    const looksLogo =
+      blob.includes("logo") ||
+      blob.includes("brand") ||
+      blob.includes("apple-touch") ||
+      /\/(?:logo|brand|favicon)[^/]*\.(?:svg|png|webp|ico)/i.test(href);
+    if (!looksLogo) continue;
+    if (isUiChromeImage(href, tag)) continue;
+    // Skip obvious non-icons
+    if (
+      blob.includes("avatar") ||
+      blob.includes("hero") ||
+      blob.includes("banner") ||
+      blob.includes("sprite") ||
+      blob.includes("tracking") ||
+      blob.includes("1x1")
+    ) {
+      continue;
+    }
+    const rawUrl = resolveUrl(href, pageUrl);
+    if (!seen.has(rawUrl)) {
+      seen.add(rawUrl);
+      icons.push({
+        url: rawUrl,
+        format: detectImageFormat(rawUrl),
+        source: "img_logo",
+      });
+      imgCount++;
+    }
+  }
+
+  // 7. Common paths — large / vector first (order also helps consumers that take head)
   const commonPaths = [
-    "/favicon.ico",
     "/favicon.svg",
     "/apple-touch-icon.png",
+    "/apple-touch-icon-precomposed.png",
+    "/apple-touch-icon-180x180.png",
     "/apple-touch-icon-152x152.png",
-    "/android-chrome-192x192.png",
     "/android-chrome-512x512.png",
+    "/android-chrome-192x192.png",
+    "/favicon.ico",
   ];
 
   try {
@@ -304,6 +407,22 @@ function extractIconsFromHtml(html: string, pageUrl: string): ExtractedIcon[] {
     // Invalid page URL
   }
 
+  // Prefer SVG / apple-touch / large assets over classic favicon.ico
+  icons.sort((a, b) => {
+    const rank = (x: ExtractedIcon) => {
+      let s = 0;
+      const u = x.url.toLowerCase();
+      if (x.format === "svg") s += 50;
+      if (x.source.includes("apple") || u.includes("apple-touch")) s += 40;
+      if (u.includes("android-chrome") || u.includes("512x512")) s += 35;
+      if (x.source.includes("og")) s += 25;
+      if (x.source.includes("twitter")) s += 15;
+      if (x.source === "favicon" && x.format === "ico") s -= 10;
+      if ((x.width ?? 0) >= 180 || (x.height ?? 0) >= 180) s += 30;
+      return s;
+    };
+    return rank(b) - rank(a);
+  });
   return icons;
 }
 
@@ -318,8 +437,8 @@ export async function extractIconsFromUrls(
   const allIcons: ExtractedIcon[] = [];
   const seenUrls = new Set<string>();
 
-  // Take top 10 URLs to crawl (most relevant ones)
-  const crawlUrls = urls.slice(0, 10);
+  // Crawl more pages when the caller already capped the list
+  const crawlUrls = urls.slice(0, Math.min(urls.length, 40));
 
   // Process with concurrency limit of 3
   const CONCURRENCY = 3;
@@ -329,7 +448,12 @@ export async function extractIconsFromUrls(
       batch.map(async (pageUrl) => {
         const html = await fetchPage(pageUrl);
         if (!html) return [];
-        return extractIconsFromHtml(html, pageUrl);
+        const pageIcons = extractIconsFromHtml(html, pageUrl);
+        const manifests = extractManifestUrls(html, pageUrl);
+        const manifestIcons = (
+          await Promise.all(manifests.slice(0, 3).map(extractIconsFromManifest))
+        ).flat();
+        return [...pageIcons, ...manifestIcons];
       }),
     );
 
@@ -343,5 +467,19 @@ export async function extractIconsFromUrls(
     }
   }
 
+  // Prefer larger / vector icons across spidered pages
+  allIcons.sort((a, b) => {
+    const rank = (x: ExtractedIcon) => {
+      let s = 0;
+      const u = x.url.toLowerCase();
+      if (x.format === "svg") s += 50;
+      if (u.includes("apple-touch")) s += 40;
+      if (u.includes("512x512") || u.includes("android-chrome")) s += 35;
+      if (x.source.includes("og")) s += 25;
+      if (x.format === "ico") s -= 10;
+      return s;
+    };
+    return rank(b) - rank(a);
+  });
   return allIcons;
 }

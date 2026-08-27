@@ -7,6 +7,52 @@ interface ScrapedIcon {
   format: "svg" | "png";
 }
 
+export const MIN_CRAWL_SLUG_LENGTH = 3;
+
+/** Brands users type incrementally. Proper prefixes of these are leftover slugs. */
+const TYPING_PARENT_SLUGS = [
+  "netflix",
+  "spotify",
+  "figma",
+  "adobe",
+  "canva",
+  "github",
+  "claude",
+  "openai",
+  "chatgpt",
+  "notion",
+  "dropbox",
+  "medium",
+  "acehardware",
+  "proton",
+] as const;
+
+/**
+ * True for crumbs while typing a known brand (`ne`, `net`, `netf`) or any
+ * slug shorter than MIN_CRAWL_SLUG_LENGTH. Exact parent slugs are crawlable.
+ */
+export function isLeftoverTypingSlug(slug: string): boolean {
+  const s = slug.toLowerCase().trim();
+  if (!s || s.length < MIN_CRAWL_SLUG_LENGTH) return true;
+  if ((TYPING_PARENT_SLUGS as readonly string[]).includes(s)) return false;
+  return TYPING_PARENT_SLUGS.some(
+    (brand) => brand.length > s.length && brand.startsWith(s),
+  );
+}
+
+export function leftoverSlugSkipReason(slug: string): string {
+  const s = slug.toLowerCase().trim();
+  if (!s || s.length < MIN_CRAWL_SLUG_LENGTH) {
+    return `need ${MIN_CRAWL_SLUG_LENGTH}+ chars`;
+  }
+  return "prefix of known brand";
+}
+
+export function isCrawlableSlug(slug: string): boolean {
+  return !isLeftoverTypingSlug(slug);
+}
+
+
 /**
  * Convert brand name to slug for icon search.
  * FIXED: Handles edge cases like trailing dashes, multiple dashes,
@@ -51,9 +97,11 @@ export function generateAlternativeSlugs(name: string): string[] {
   const noHyphen = base.replace(/-/g, "");
   if (noHyphen !== base) alternatives.push(noHyphen);
 
-  // Add just the first part for compound names
+  // Add just the first part for compound names — skip leftover 1–2 letter crumbs.
   const firstPart = base.split("-")[0];
-  if (firstPart && firstPart !== base) alternatives.push(firstPart);
+  if (firstPart && firstPart !== base && firstPart.length >= MIN_CRAWL_SLUG_LENGTH) {
+    alternatives.push(firstPart);
+  }
 
   return [...new Set(alternatives)];
 }

@@ -3,8 +3,8 @@ import {
   SyncMetadata,
   updateSyncMetadata,
 } from "@/services/database";
-import { CloudSyncService } from "@/src/services/cloudsync/CloudSyncService";
-import { CloudProvider, SyncResult } from "@/src/services/cloudsync/types";
+import { CloudSyncService } from "@/services/cloudsync/CloudSyncService";
+import { CloudProvider, SyncResult } from "@/services/cloudsync/types";
 import { useUser } from "@clerk/expo";
 import * as AuthSession from "expo-auth-session";
 import * as SecureStore from "expo-secure-store";

@@ -1,16 +1,28 @@
+import CreateSubscriptionModal from "@/components/CreateSubscriptionModal";
+import EditSubscriptionModal from "@/components/EditSubscriptionModal";
+import EmailScanSection from "@/components/EmailScanSection";
 import ListHeading from "@/components/ListHeading";
 import SubscriptionCard from "@/components/SubscriptionCard";
+import SubscriptionIconPickerModal from "@/components/SubscriptionIconPickerModal";
+import SubscriptionStatsModal from "@/components/SubscriptionStatsModal";
+import { icons } from "@/constants/icons";
+import { useSubscriptions } from "@/context/SubscriptionContext";
 import "@/global.css";
-import EditSubscriptionModal from "@/src/components/EditSubscriptionModal";
-import SubscriptionIconPickerModal from "@/src/components/SubscriptionIconPickerModal";
-import SubscriptionStatsModal from "@/src/components/SubscriptionStatsModal";
-import { useSubscriptions } from "@/src/context/SubscriptionContext";
+import { useBottomClearance } from "@/hooks/useBottomClearance";
+import { useChargeDisplay } from "@/hooks/useChargeDisplay";
 import clsx from "clsx";
 import { useLocalSearchParams } from "expo-router";
 import { styled } from "nativewind";
 import { usePostHog } from "posthog-react-native";
 import React, { useEffect, useMemo, useState } from "react";
-import { FlatList, Pressable, Text, TextInput, View } from "react-native";
+import {
+  FlatList,
+  Image,
+  Pressable,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { SafeAreaView as RNSafeAreaView } from "react-native-safe-area-context";
 
 const SafeAreaView = styled(RNSafeAreaView);
@@ -18,16 +30,22 @@ const SafeAreaView = styled(RNSafeAreaView);
 const FILTER_OPTIONS = ["All", "Upcoming"] as const;
 
 const Subscriptions = () => {
+  const { tabListPadding, pagePadding } = useBottomClearance();
   const posthog = usePostHog();
-  const { filter: initialFilter } = useLocalSearchParams<{ filter?: string }>();
+  const { filter: initialFilter, addMailbox } = useLocalSearchParams<{
+    filter?: string;
+    addMailbox?: string;
+  }>();
   const {
     subscriptions,
+    addSubscription,
     updateSubscription,
     deleteSubscription,
     updateSubscriptionStatus,
     getUpcomingSubscriptions,
     refreshSubscriptions,
   } = useSubscriptions();
+  const { displayFor, cyclePeriod } = useChargeDisplay(subscriptions);
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedSubscriptionId, setExpandedSubscriptionId] = useState<
     string | null
@@ -46,6 +64,7 @@ const Subscriptions = () => {
   const [iconPickerSubscription, setIconPickerSubscription] =
     useState<Subscription | null>(null);
   const [iconPickerVisible, setIconPickerVisible] = useState(false);
+  const [createModalVisible, setCreateModalVisible] = useState(false);
 
   useEffect(() => {
     posthog.capture("subscriptions_viewed");
@@ -139,13 +158,39 @@ const Subscriptions = () => {
     refreshSubscriptions();
   };
 
+  const handleAddSubscriptionTap = () => {
+    posthog.capture("subscriptions_add_subscription_tapped");
+    setCreateModalVisible(true);
+  };
+
+  const handleCreateSubscription = async (subscription: Subscription) => {
+    await addSubscription(subscription);
+  };
+
   return (
-    <SafeAreaView className="flex-1 bg-background p-5">
+    <SafeAreaView
+      edges={["top", "left", "right"]}
+      className="flex-1 bg-background px-5 pt-5"
+      style={{ paddingBottom: pagePadding }}
+    >
       <FlatList
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         ListHeaderComponent={
           <>
+            <View className="mb-5 flex-row items-center justify-between">
+              <Text className="text-3xl font-sans-bold text-primary">
+                Subscriptions
+              </Text>
+              <Pressable
+                onPress={handleAddSubscriptionTap}
+                accessibilityLabel="Add subscription"
+                accessibilityRole="button"
+              >
+                <Image source={icons.add} className="home-add-icon" />
+              </Pressable>
+            </View>
+            <EmailScanSection openAddOnMount={addMailbox === "1"} />
             <View className="mb-5">
               <TextInput
                 className="rounded-2xl border border-border bg-card px-4 py-4 text-base font-sans-medium text-primary"
@@ -208,6 +253,10 @@ const Subscriptions = () => {
           <SubscriptionCard
             {...item}
             expanded={expandedSubscriptionId === item.id}
+            displayPrice={displayFor(item).amount}
+            displayUnknown={displayFor(item).unknown}
+            displayPeriodLabel={displayFor(item).label}
+            onCyclePeriod={() => cyclePeriod(item)}
             onPress={() => {
               const isExpanding = expandedSubscriptionId !== item.id;
               setExpandedSubscriptionId((currentId) =>
@@ -246,7 +295,13 @@ const Subscriptions = () => {
                 : "No subscription yet."}
           </Text>
         }
-        contentContainerClassName="pb-25"
+        contentContainerStyle={{ paddingBottom: tabListPadding }}
+      />
+
+      <CreateSubscriptionModal
+        visible={createModalVisible}
+        onClose={() => setCreateModalVisible(false)}
+        onCreate={handleCreateSubscription}
       />
 
       {/* Edit Modal */}

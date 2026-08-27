@@ -1,15 +1,17 @@
 import { icons } from "@/constants/icons";
+import { useBottomClearance } from "@/hooks/useBottomClearance";
 import { searchLogos } from "@/lib/resolveLogo";
 import { getCachedIcon } from "@/services/database";
 import {
   queueIconForScraping,
   startIconCrawl,
-} from "@/src/services/iconBackgroundCrawler";
+} from "@/services/iconBackgroundCrawler";
 import {
   addCacheUpdateListener,
   isIconLoading,
-} from "@/src/services/iconLoadingRegistry";
-import { nameToSlug } from "@/src/services/iconScraper";
+} from "@/services/iconLoadingRegistry";
+import { isCrawlableSlug, nameToSlug } from "@/services/iconScraper";
+import { isPaintableCardIcon } from "@/services/iconValidation";
 import clsx from "clsx";
 import dayjs from "dayjs";
 import { usePostHog } from "posthog-react-native";
@@ -59,6 +61,7 @@ const CreateSubscriptionModal = ({
   onClose,
   onCreate,
 }: CreateSubscriptionModalProps) => {
+  const { sheetPadding } = useBottomClearance();
   const posthog = usePostHog();
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
@@ -90,14 +93,18 @@ const CreateSubscriptionModal = ({
   useEffect(() => {
     const refreshLiveIcon = async () => {
       const key = liveKeyRef.current;
-      if (!key) {
+      if (!key || !isCrawlableSlug(key)) {
         setLiveIconUri(null);
         return;
       }
       const cached = await getCachedIcon(key);
+      const valid =
+        !!cached?.imageData &&
+        !cached.imageData.startsWith("local_asset:") &&
+        isPaintableCardIcon(cached.imageData, cached.format);
       setLiveIconUri(
-        cached?.imageData
-          ? `data:${mimeForFormat(cached.format)};base64,${cached.imageData}`
+        valid
+          ? `data:${mimeForFormat(cached!.format)};base64,${cached!.imageData}`
           : null,
       );
     };
@@ -150,7 +157,7 @@ const CreateSubscriptionModal = ({
       liveKeyRef.current = slug;
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
       debounceTimer.current = setTimeout(() => {
-        if (slug.length >= 2 && !isIconLoading(slug)) {
+        if (isCrawlableSlug(slug) && !isIconLoading(slug)) {
           startIconCrawl(slug);
         }
       }, 600);
@@ -395,8 +402,10 @@ const CreateSubscriptionModal = ({
                   ))}
                 </View>
               </View>
+            </ScrollView>
 
-              {/* Submit */}
+            {/* Submit pinned outside ScrollView so it stays tappable */}
+            <View className="px-5 pt-2" style={{ paddingBottom: sheetPadding }}>
               <Pressable
                 className={clsx(
                   "auth-button",
@@ -404,10 +413,12 @@ const CreateSubscriptionModal = ({
                 )}
                 onPress={handleSubmit}
                 disabled={!formValid}
+                accessibilityLabel="Create Subscription"
+                accessibilityRole="button"
               >
                 <Text className="auth-button-text">Create Subscription</Text>
               </Pressable>
-            </ScrollView>
+            </View>
           </Pressable>
         </Pressable>
       </KeyboardAvoidingView>

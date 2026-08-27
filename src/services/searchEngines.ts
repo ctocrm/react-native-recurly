@@ -126,12 +126,11 @@ async function fetchWithTimeout(
         continue;
       }
 
-      // 403 likely means blocked entirely
+      // 403 is usually bot/hotlink block for one URL — do NOT domain-ban
       if (response.status === 403) {
         console.log(
-          `[SEARCH_ENGINE] 403 forbidden, recording rate limit: ${url.substring(0, 80)}`,
+          `[SEARCH_ENGINE] 403 forbidden (no domain cooldown): ${url.substring(0, 80)}`,
         );
-        await recordRateLimit(url);
       }
 
       console.log(
@@ -164,6 +163,41 @@ function detectFormat(url: string): ImageSearchResult["format"] {
   if (clean.endsWith(".gif")) return "gif";
   if (clean.endsWith(".webp")) return "webp";
   return "png";
+}
+
+/**
+ * Search engines are optional enrichment, not the only route to an official
+ * site. These deterministic origins retain the pre-4b03 fallback behavior
+ * and make official favicon/manifest/page extraction possible when search HTML
+ * is blocked by an anti-bot response.
+ */
+export function getOfficialDomainGuesses(brand: string): string[] {
+  const compact = brand
+    .toLowerCase()
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/g, "");
+  const hyphenated = brand
+    .toLowerCase()
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+  if (compact.length < 2) return [];
+
+  const domains = new Set<string>([
+    `https://${compact}.com`,
+    `https://www.${compact}.com`,
+  ]);
+  if (hyphenated && hyphenated !== compact) {
+    domains.add(`https://${hyphenated}.com`);
+    domains.add(`https://www.${hyphenated}.com`);
+  }
+  // These are intentionally a small, deterministic supplement—not an
+  // unbounded TLD sweep that would waste requests for every new subscription.
+  for (const tld of ["io", "app", "co", "net", "org", "ca"]) {
+    domains.add(`https://${compact}.${tld}`);
+    domains.add(`https://www.${compact}.${tld}`);
+  }
+  return [...domains];
 }
 
 /**
@@ -529,17 +563,41 @@ const SEARCH_VARIATIONS = [
   (b: string) => `${b} brand icon`,
 ];
 
+/** Decode DuckDuckGo redirect links (uddg=) into real destination URLs. */
+export function extractDuckDuckGoUddgLinks(html: string): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  const re = /[?&]uddg=([^&"']+)/gi;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(html)) !== null) {
+    try {
+      const url = decodeURIComponent(match[1].replace(/&amp;/g, "&"));
+      if (
+        url.startsWith("http") &&
+        !seen.has(url) &&
+        !url.includes("duckduckgo.com")
+      ) {
+        seen.add(url);
+        out.push(url);
+      }
+    } catch {
+      // ignore bad encodings
+    }
+  }
+  return out;
+}
+
 /**
- * DuckDuckGo image search - primary search engine (most scrape-friendly)
+ * DuckDuckGo search via server-rendered HTML endpoint.
+ * The SPA at duckduckgo.com/?ia=images returns ~18k shell HTML with 0 <img> tags.
  */
 export async function searchDuckDuckGoImages(
   brand: string,
   index: number = 0,
 ): Promise<ImageSearchResult[]> {
-  const ddgUrl = "https://duckduckgo.com";
+  const ddgHtmlUrl = "https://html.duckduckgo.com";
 
-  // Check if DuckDuckGo itself is rate-limited before attempting
-  const rateLimited = await isDomainRateLimited(ddgUrl);
+  const rateLimited = await isDomainRateLimited(ddgHtmlUrl);
   if (rateLimited) {
     console.log(
       `[SEARCH_ENGINE] DuckDuckGo is rate-limited, skipping search for "${brand}"`,
@@ -553,7 +611,7 @@ export async function searchDuckDuckGoImages(
   const query = encodeURIComponent(
     SEARCH_VARIATIONS[index % SEARCH_VARIATIONS.length](brand),
   );
-  const url = `${ddgUrl}/?q=${query}&iax=images&ia=images`;
+  const url = `${ddgHtmlUrl}/html/?q=${query}`;
   console.log(`[SEARCH_ENGINE] DuckDuckGo URL: ${url}`);
 
   const response = await fetchWithTimeout(url, { method: "GET" }, 12000);
@@ -567,11 +625,113 @@ export async function searchDuckDuckGoImages(
     `[SEARCH_ENGINE] DuckDuckGo: Got ${html.length} chars of HTML for "${brand}"`,
   );
 
-  const results = extractDuckDuckGoImages(html, brand);
+  const results: ImageSearchResult[] = [];
+  const seen = new Set<string>();
+  const push = (u: string) => {
+    if (!u || seen.has(u) || u.includes("duckduckgo.com")) return;
+    seen.add(u);
+    results.push({
+      url: u,
+      format: detectFormat(u),
+      source: "duckduckgo_images",
+    });
+  };
+
+  for (const r of extractDuckDuckGoImages(html, brand)) push(r.url);
+  // Direct image destinations from result redirects
+  for (const link of extractDuckDuckGoUddgLinks(html)) {
+    if (/\.(svg|png|jpg|jpeg|ico|webp)(\?|#|$)/i.test(link)) push(link);
+  }
+
   console.log(
     `[SEARCH_ENGINE] DuckDuckGo: Returning ${results.length} results for "${brand}"`,
   );
   return results;
+}
+
+/**
+ * Bing Images — server-rendered HTML embeds murl= original image URLs.
+ */
+export async function searchBingImages(
+  brand: string,
+  index: number = 0,
+): Promise<ImageSearchResult[]> {
+  const bingUrl = "https://www.bing.com";
+  if (await isDomainRateLimited(bingUrl)) {
+    console.log(
+      `[SEARCH_ENGINE] Bing is rate-limited, skipping search for "${brand}"`,
+    );
+    return [];
+  }
+
+  const query = encodeURIComponent(
+    SEARCH_VARIATIONS[index % SEARCH_VARIATIONS.length](brand),
+  );
+  const url = `${bingUrl}/images/search?q=${query}&form=HDRSC2&first=1`;
+  console.log(`[SEARCH_ENGINE] Bing Images URL: ${url}`);
+
+  const response = await fetchWithTimeout(url, { method: "GET" }, 12000);
+  if (!response) {
+    console.log(`[SEARCH_ENGINE] Bing: No response for "${brand}"`);
+    return [];
+  }
+
+  const html = await response.text();
+  console.log(
+    `[SEARCH_ENGINE] Bing: Got ${html.length} chars of HTML for "${brand}"`,
+  );
+
+  const results: ImageSearchResult[] = [];
+  const seen = new Set<string>();
+  const push = (raw: string) => {
+    let u = raw
+      .replace(/\\u0026/g, "&")
+      .replace(/\\\//g, "/")
+      .replace(/&/g, "&");
+    try {
+      u = decodeURIComponent(u);
+    } catch {
+      // keep
+    }
+    if (
+      !u.startsWith("http") ||
+      seen.has(u) ||
+      u.includes("bing.com") ||
+      u.includes("microsoft.com") ||
+      u.includes("data:image")
+    ) {
+      return;
+    }
+    seen.add(u);
+    results.push({ url: u, format: detectFormat(u), source: "bing_images" });
+  };
+
+  const murlPatterns = [
+    new RegExp("murl&quot;:&quot;(https?:\\/\\/[^&]+?)&quot;", "gi"),
+    /"murl"\s*:\s*"(https?:\/\/[^"]+)"/gi,
+    /murl=\\?"(https?:\/\/[^"\\]+)\\?"/gi,
+    new RegExp("&amp;murl=(https?%3A%2F%2F[^&]+)", "gi"),
+  ];
+  for (const re of murlPatterns) {
+    let match: RegExpExecArray | null;
+    while ((match = re.exec(html)) !== null) {
+      push(match[1]);
+    }
+  }
+
+  if (results.length === 0) {
+    const imgRe =
+      /https?:\/\/[^"'\\\s<>]+\.(?:png|jpg|jpeg|webp|svg|ico)(?:\?[^"'\\\s<>]*)?/gi;
+    let match: RegExpExecArray | null;
+    while ((match = imgRe.exec(html)) !== null) {
+      push(match[0]);
+    }
+  }
+
+  console.log(
+    `[SEARCH_ENGINE] Bing: Returning ${results.length} results for "${brand}"`,
+  );
+  return results.slice(0, 40);
 }
 
 /**
@@ -800,10 +960,22 @@ export async function searchAllSources(
   console.log(`[SEARCH_ENGINE] DuckDuckGo total: ${ddgResults.length} results`);
   dedupe(ddgResults);
 
+  // Bing Images — high yield when DDG SPA/HTML has few direct image URLs
+  console.log(`[SEARCH_ENGINE] Running Bing image searches`);
+  const bingResults = (
+    await Promise.all(
+      [0, 1, 2].map((i) =>
+        searchBingImages(brand, i).catch(() => [] as ImageSearchResult[]),
+      ),
+    )
+  ).flat();
+  console.log(`[SEARCH_ENGINE] Bing total: ${bingResults.length} results`);
+  dedupe(bingResults);
+
   // Short-circuit if we already have enough results
   if (allResults.length >= MIN_RESULTS_FOR_SHORT_CIRCUIT) {
     console.log(
-      `[SEARCH_ENGINE] Short-circuiting with ${allResults.length} results from DuckDuckGo`,
+      `[SEARCH_ENGINE] Short-circuiting with ${allResults.length} results from DDG+Bing`,
     );
     const sorted = allResults.sort((a, b) => {
       const aScore = a.format === "svg" ? 3 : a.format === "png" ? 2 : 1;
@@ -885,36 +1057,65 @@ export async function searchForLinksToSpider(brand: string): Promise<string[]> {
   const allLinks: string[] = [];
   const seenLinks = new Set<string>();
 
-  const ddgTextUrl = "https://duckduckgo.com";
+  const addLink = (raw: string | null | undefined) => {
+    if (!raw) return;
+    let url = raw.trim();
+    if (!url) return;
+    if (url.startsWith("//")) url = `https:${url}`;
+    if (!/^https?:\/\//i.test(url)) return;
+    try {
+      const parsed = new URL(url);
+      const host = parsed.hostname.replace(/^www\./, "").toLowerCase();
+      if (
+        /(?:^|\.)(google|bing|duckduckgo|yandex)\./.test(host) ||
+        /(?:^|\.)(facebook|instagram|linkedin|twitter|x|youtube)\./.test(host)
+      ) {
+        return;
+      }
+      // Include the origin as well as a relevant result path. Brand assets
+      // often live on the home page while search results point to pricing/blog.
+      for (const candidate of [parsed.origin, parsed.href]) {
+        if (!seenLinks.has(candidate)) {
+          seenLinks.add(candidate);
+          allLinks.push(candidate);
+        }
+      }
+    } catch {
+      // Invalid search result; ignore it.
+    }
+  };
+
+  // Prefer server-rendered HTML (SPA shell has almost no result links).
   const response = await fetchWithTimeout(
-    `${ddgTextUrl}/?q=${encodeURIComponent(brand)}&ia=web`,
+    `https://html.duckduckgo.com/html/?q=${encodeURIComponent(brand)}`,
     { headers: { "User-Agent": getRandomUserAgent() } },
   );
 
   if (response && response.ok) {
     const html = await response.text();
-    const linkMatches = html.matchAll(
-      /<a[^>]+href\s*=\s*["']([^"']+)["'][^>]*>/gi,
-    );
-    for (const match of linkMatches) {
-      let url = match[1];
-      if (url.startsWith("//")) url = "https:" + url;
-      if (
-        url.startsWith("http") &&
-        !url.includes("duckduckgo.com") &&
-        !url.includes("google.com")
-      ) {
-        if (!seenLinks.has(url)) {
-          seenLinks.add(url);
-          allLinks.push(url);
+    const uddg = extractDuckDuckGoUddgLinks(html);
+    for (const url of uddg) addLink(url);
+    if (allLinks.length === 0) {
+      const linkMatches = html.matchAll(
+        /<a[^>]+href\s*=\s*["']([^"']+)["'][^>]*>/gi,
+      );
+      for (const match of linkMatches) {
+        let url = match[1];
+        if (url.startsWith("//")) url = "https:" + url;
+        if (
+          url.startsWith("http") &&
+          !url.includes("duckduckgo.com") &&
+          !url.includes("google.com")
+        ) {
+          addLink(url);
         }
       }
     }
-    console.log(`[SEARCH_ENGINE] Text search found ${allLinks.length} links`);
+    console.log(
+      `[SEARCH_ENGINE] Text search found ${allLinks.length} links (uddg=${uddg.length})`,
+    );
   }
 
-  // If fetch returned 0 links, consider using WebView as fallback
-  // This happens when anti-bot measures block the fetch response
   if (allLinks.length === 0) {
     console.log(
       `[SEARCH_ENGINE] Fetch returned 0 links, trying WebView fallback for "${brand}"`,
@@ -925,13 +1126,8 @@ export async function searchForLinksToSpider(brand: string): Promise<string[]> {
         const webViewLinks =
           await webViewModule.searchForLinksWithWebView(brand);
         for (const link of webViewLinks) {
-          if (
-            !seenLinks.has(link) &&
-            link.startsWith("http") &&
-            !link.includes("duckduckgo.com")
-          ) {
-            seenLinks.add(link);
-            allLinks.push(link);
+          if (link.startsWith("http") && !link.includes("duckduckgo.com")) {
+            addLink(link);
           }
         }
         console.log(
@@ -946,5 +1142,5 @@ export async function searchForLinksToSpider(brand: string): Promise<string[]> {
   console.log(
     `[SEARCH_ENGINE] ===== searchForLinksToSpider done for "${brand}": ${allLinks.length} links =====`,
   );
-  return allLinks.slice(0, 30);
+  return allLinks.slice(0, 80);
 }

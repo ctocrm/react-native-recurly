@@ -1,0 +1,8 @@
+# DO NOT add unpinned deps here. See CATASTROPHE_ANALYSIS_2.md.
+# Use scripts/train-setup.sh (npm run train:setup) which selects:
+#   requirements-gpu.txt  (tensorflow[and-cuda]==2.19.0, self-contained CUDA)
+#   requirements-cpu.txt  (tensorflow-cpu==2.19.0)
+# This file is kept as a safe CPU fallback for anything that still references it.
+tensorflow-cpu==2.19.0
+cairosvg==2.7.1
+pillow==11.1.0

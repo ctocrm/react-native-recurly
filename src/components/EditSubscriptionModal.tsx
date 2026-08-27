@@ -1,12 +1,14 @@
 import { icons } from "@/constants/icons";
+import { useBottomClearance } from "@/hooks/useBottomClearance";
 import { searchLogos } from "@/lib/resolveLogo";
 import { getCachedIcon } from "@/services/database";
-import { startIconCrawl } from "@/src/services/iconBackgroundCrawler";
+import { startIconCrawl } from "@/services/iconBackgroundCrawler";
 import {
   addCacheUpdateListener,
   isIconLoading,
-} from "@/src/services/iconLoadingRegistry";
-import { nameToSlug } from "@/src/services/iconScraper";
+} from "@/services/iconLoadingRegistry";
+import { isCrawlableSlug, nameToSlug } from "@/services/iconScraper";
+import { isPaintableCardIcon } from "@/services/iconValidation";
 import clsx from "clsx";
 import dayjs from "dayjs";
 import { usePostHog } from "posthog-react-native";
@@ -59,6 +61,7 @@ const EditSubscriptionModal = ({
   onClose,
   onSave,
 }: EditSubscriptionModalProps) => {
+  const { sheetPadding } = useBottomClearance();
   const posthog = usePostHog();
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
@@ -91,14 +94,18 @@ const EditSubscriptionModal = ({
   useEffect(() => {
     const refreshLiveIcon = async () => {
       const key = liveKeyRef.current;
-      if (!key) {
+      if (!key || !isCrawlableSlug(key)) {
         setLiveIconUri(null);
         return;
       }
       const cached = await getCachedIcon(key);
+      const valid =
+        !!cached?.imageData &&
+        !cached.imageData.startsWith("local_asset:") &&
+        isPaintableCardIcon(cached.imageData, cached.format);
       setLiveIconUri(
-        cached?.imageData
-          ? `data:${mimeForFormat(cached.format)};base64,${cached.imageData}`
+        valid
+          ? `data:${mimeForFormat(cached!.format)};base64,${cached!.imageData}`
           : null,
       );
     };
@@ -162,7 +169,7 @@ const EditSubscriptionModal = ({
       liveKeyRef.current = slug;
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
       debounceTimer.current = setTimeout(() => {
-        if (slug.length >= 2 && !isIconLoading(slug)) {
+        if (isCrawlableSlug(slug) && !isIconLoading(slug)) {
           startIconCrawl(slug);
         }
       }, 600);
@@ -217,7 +224,7 @@ const EditSubscriptionModal = ({
     // Start a detached background crawl for the typed name. Runs independently
     // of this modal, so the icon keeps being discovered/auto-assigned.
     const slug = nameToSlug(name);
-    if (slug.length >= 2) startIconCrawl(slug, subscription.id);
+    if (isCrawlableSlug(slug)) startIconCrawl(slug, subscription.id);
 
     onSave(subscription.id, data);
     onClose();
@@ -239,6 +246,7 @@ const EditSubscriptionModal = ({
         <Pressable className="modal-overlay" onPress={onClose}>
           <Pressable
             className="modal-container"
+            style={{ paddingBottom: sheetPadding }}
             onPress={(e) => e.stopPropagation()}
           >
             {/* Header */}

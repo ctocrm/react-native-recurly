@@ -47,3 +47,20 @@ app-example
 /android
 .env
 .emulator-device
+
+# ---------------------------------------------------------------------------
+# Phase 5.5-A — build outputs & non-product artifacts
+# ---------------------------------------------------------------------------
+app-release-*.apk
+app-debug-*.apk
+build-*.log
+/build-out/
+
+# POC / research / ad-hoc captures (not shipped)
+poc_out*/
+poc_*.png
+emu_*.png
+/research/
+/history/
+
+# Local tooling (also listed above historically)

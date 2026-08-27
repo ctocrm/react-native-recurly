@@ -1,10 +1,13 @@
+import HiddenSearchWebView from "@/components/HiddenSearchWebView";
+import ProtonCaptchaModal from "@/components/ProtonCaptchaModal";
+import { posthog } from "@/config/posthog";
+
 import { tabs } from "@/constants/data";
 import { colors, components } from "@/constants/theme";
-import HiddenSearchWebView from "@/src/components/HiddenSearchWebView";
-import { posthog } from "@/src/config/posthog";
-import { CloudSyncProvider } from "@/src/context/CloudSyncContext";
-import { DatabaseProvider } from "@/src/context/DatabaseProvider";
-import { SubscriptionProvider } from "@/src/context/SubscriptionContext";
+
+import { CloudSyncProvider } from "@/context/CloudSyncContext";
+import { DatabaseProvider } from "@/context/DatabaseProvider";
+import { SubscriptionProvider } from "@/context/SubscriptionContext";
 
 import { useAuth, useUser } from "@clerk/expo";
 import clsx from "clsx";
@@ -66,6 +69,7 @@ const TabLayout = () => {
         <CloudSyncProvider>
           {/* Hidden WebView for background scraping - bypasses anti-bot measures */}
           <HiddenSearchWebView />
+          <ProtonCaptchaModal />
           <Tabs
             screenOptions={{
               headerShown: false,
