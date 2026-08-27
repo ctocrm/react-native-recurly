@@ -192,6 +192,31 @@ describe("iconQuality (pure functions)", () => {
       });
       expect(lockup).toBeGreaterThan(favicon);
     });
+
+    it("ranks Ace homepage PWA icons above a leftover tiny favicon", () => {
+      const pwa = scoreIconQuality({
+        source: "spider:web_manifest",
+        format: "png",
+        originalUrl:
+          "https://cdn-tp3.mozu.com/24645-37138/resources/images/icons/icon-192x192.png",
+        brand: "acehardware",
+        officialHost: "acehardware.com",
+        originalWidth: 192,
+        originalHeight: 192,
+        imageDataLength: 18_480,
+      });
+      const favicon = scoreIconQuality({
+        source: "favicon",
+        format: "ico",
+        originalUrl: "https://acehardware.com/favicon.ico",
+        brand: "acehardware",
+        officialHost: "acehardware.com",
+        originalWidth: 16,
+        originalHeight: 16,
+        imageDataLength: 800,
+      });
+      expect(pwa).toBeGreaterThan(favicon);
+    });
   });
 
   describe("pickBestIcon", () => {

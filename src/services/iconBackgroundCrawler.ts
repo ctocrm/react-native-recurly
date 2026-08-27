@@ -26,6 +26,7 @@ import {
 } from "@/services/domain/officialDomain";
 import {
   classifyTrustedCandidate,
+  isPickerPublishableCandidate,
   isPublishableExtractedIcon,
   isUiChromeImage,
   looksLikeDirectImage,
@@ -561,13 +562,15 @@ export async function getIconCollection(iconKey: string): Promise<{
         !isUiChromeImage(r.originalUrl || "", r.source) &&
         !reportedHashes.has(r.imageData)
       ) {
-        if (r.originalUrl) {
-          const classified = classifyTrustedCandidate(
+        if (
+          !isPickerPublishableCandidate(
             iconKey,
             officialHosts,
-            r.originalUrl,
-          );
-          if (!classified.trusted) continue;
+            r.originalUrl || "",
+            r.source,
+          )
+        ) {
+          continue;
         }
         const displayData = await upscaleIconIfSmall(r.imageData, r.format);
         iconMap.set(r.imageData, {

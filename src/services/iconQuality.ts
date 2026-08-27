@@ -9,6 +9,7 @@ import {
   type Provenance,
 } from "@/services/domain/provenance";
 import {
+  isFirstPartyIconSource,
   isGenericSocialImage,
   provenanceRank,
 } from "@/services/iconCandidate";
@@ -28,19 +29,27 @@ export type IconQualityInput = {
 
 function provenanceFor(icon: IconQualityInput): Provenance {
   const url = icon.originalUrl || "";
+  const src = icon.source || "";
+  if (isFirstPartyIconSource(src)) {
+    if (!url) return "official";
+    const hosts = officialHostsForBrand(icon.brand || "", icon.officialHost);
+    const classified = classifyCandidate(icon.brand || "", hosts, url);
+    // Homepage/PWA extracts on a brand CDN are still first-party, not Bing junk.
+    return classified.prov === "untrusted" ? "official" : classified.prov;
+  }
   if (!url) {
-    const src = (icon.source || "").toLowerCase();
+    const lower = src.toLowerCase();
     if (
-      src === "simple-icons" ||
-      src === "devicons" ||
-      src === "tabler" ||
-      src === "boxicons" ||
-      src === "icons8"
+      lower === "simple-icons" ||
+      lower === "devicons" ||
+      lower === "tabler" ||
+      lower === "boxicons" ||
+      lower === "icons8"
     ) {
       return "library";
     }
-    if (src.startsWith("official") || src.includes("apple")) return "official";
-    if (src === "subscription" || src === "ai_upscale") return "official";
+    if (lower.startsWith("official") || lower.includes("apple")) return "official";
+    if (lower === "subscription" || lower === "ai_upscale") return "official";
     return "untrusted";
   }
   const hosts = officialHostsForBrand(icon.brand || "", icon.officialHost);

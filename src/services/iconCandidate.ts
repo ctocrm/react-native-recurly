@@ -129,9 +129,20 @@ function isPartnerOrUnrelatedMark(brand: string, url: string): boolean {
   const tokens = file.split(/[^a-z0-9]+/).filter((t) => t.length >= 4);
   return tokens.some((token) => {
     if (GENERIC_FILE_TOKENS.has(token)) return false;
+    if (/^\d+$/.test(token) || /^\d+x\d+$/i.test(token)) return false;
     if (compact.includes(token) || token.includes(compact)) return false;
+    // Distinct alphabetic brand token that is not this subscription.
+    if (!/[a-z]{4,}/.test(token)) return false;
     return true;
   });
+}
+
+/** Homepage / PWA / apple-touch extracts — first-party even on a CDN host. */
+export function isFirstPartyIconSource(source: string): boolean {
+  const src = source.toLowerCase();
+  if (src.startsWith("official")) return true;
+  if (!src.startsWith("spider:")) return false;
+  return /web_manifest|apple|favicon|img_logo|jsonld_logo|pwa|mask/.test(src);
 }
 
 export function classifyTrustedCandidate(
@@ -155,6 +166,20 @@ export function classifyTrustedCandidate(
     prov: classified.prov,
     reason: classified.reason,
   };
+}
+
+/** Picker/card: first-party extracts stay; Bing/random stay out; partner marks stay out. */
+export function isPickerPublishableCandidate(
+  brand: string,
+  officialHosts: Set<string>,
+  url: string,
+  source = "",
+): boolean {
+  if (isUiChromeImage(url, source)) return false;
+  if (url && isPartnerOrUnrelatedMark(brand, url)) return false;
+  if (isFirstPartyIconSource(source)) return true;
+  if (!url) return false;
+  return classifyTrustedCandidate(brand, officialHosts, url).trusted;
 }
 
 /** Provenance rank used before visual quality when choosing / fetching. */

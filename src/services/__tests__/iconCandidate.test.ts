@@ -3,6 +3,7 @@ import {
   classifyTrustedCandidate,
   hasLogoSignal,
   isGenericSocialImage,
+  isPickerPublishableCandidate,
   isPublishableExtractedIcon,
   isUiChromeImage,
   looksLikeDirectImage,
@@ -145,5 +146,33 @@ describe("iconCandidate (hop 3 gates)", () => {
       "https://acehardware.com/on/demandware.static/ace-logo.png",
     );
     expect(own.trusted).toBe(true);
+  });
+
+  it("keeps Ace first-party PWA icons and still rejects Bing photos", () => {
+    const hosts = officialHostsForBrand("acehardware", "acehardware.com");
+    expect(
+      isPickerPublishableCandidate(
+        "acehardware",
+        hosts,
+        "https://cdn-tp3.mozu.com/24645-37138/resources/images/icons/icon-192x192.png",
+        "spider:web_manifest",
+      ),
+    ).toBe(true);
+    expect(
+      isPickerPublishableCandidate(
+        "acehardware",
+        hosts,
+        "https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/e0429dbd/yuji.jpg",
+        "bing_images",
+      ),
+    ).toBe(false);
+    expect(
+      isPickerPublishableCandidate(
+        "acehardware",
+        hosts,
+        "https://acehardware.com/on/demandware.static/scotts-logo.png",
+        "spider:img_logo",
+      ),
+    ).toBe(false);
   });
 });
