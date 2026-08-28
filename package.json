@@ -99,6 +99,7 @@
     "@react-navigation/elements": "^2.6.3",
     "@react-navigation/native": "^7.1.8",
     "@types/upng-js": "^2.1.5",
+    "buffer": "^6.0.3",
     "clsx": "^2.1.1",
     "dayjs": "^1.11.21",
     "expo": "~54.0.34",
