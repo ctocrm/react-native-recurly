@@ -2,7 +2,7 @@
 
 **Last updated:** 2026-08-28
 
-**Status:** Phases **1–5.5 complete**. **MAJOR FIX (Tranches A–F) landed**. **Icon hops 1–5 proven on device** (`466cde7`, `71a3840`, `6d54b0d`+`6c47871`, `2d0ba23`+`32521cb`, `5dc46ed`). **xAI compound-label hop proven** (`029c509`). **UI Improvements Phase 0–3 complete** (`ba66478`, `e4e383e`, `77a83bb`, `913b08f`). **Home/Insights hops A–E proven on device** (`ff3f3b9`, `ed16b0f`, `30de520`, `a6e6774`, `b510a35`). **UI Phase 4 is still not complete:** H1 catalog leftovers, H2 IMAP socket, H3 HTTPS completeness, and live Gmail/Outlook connect remain. **Cadence display name proven** (`docs/reference/cadence-launcher-2026-08-28.png`). **Next identity hop (not started):** remove Clerk; ship local mock login (Continue); live package **`app.picksandshovels.cadence`** and scheme **`cadence://`**. Do not register mail OAuth until that APK is proven. Proton/Tuta **have** imported live rows (H4/H5 code hops): Proton **$29.98**, Linode this-month **$93**, Porkbun **$47.74** yearly. Phase 5 graph is not started. Phase 6 remains later ship polish. Training frozen.
+**Status:** Phases **1–5.5 complete**. **MAJOR FIX (Tranches A–F) landed**. **Icon hops 1–5 proven on device** (`466cde7`, `71a3840`, `6d54b0d`+`6c47871`, `2d0ba23`+`32521cb`, `5dc46ed`). **xAI compound-label hop proven** (`029c509`). **UI Improvements Phase 0–3 complete** (`ba66478`, `e4e383e`, `77a83bb`, `913b08f`). **Home/Insights hops A–E proven on device** (`ff3f3b9`, `ed16b0f`, `30de520`, `a6e6774`, `b510a35`). **UI Phase 4 is still not complete:** H1 catalog leftovers, H2 IMAP socket, H3 HTTPS completeness, and live Gmail/Outlook connect remain. **Cadence identity hop proven** (`f005865` + `ff6ecd2` + `5ac6f97`): local Continue login, package **`app.picksandshovels.cadence`**, scheme **`cadence://`**. **Next:** register mail OAuth IDs against that package + SHA-1 + `cadence://`. Then Phase 4. Proton/Tuta **have** imported live rows (H4/H5 code hops): Proton **$29.98**, Linode this-month **$93**, Porkbun **$47.74** yearly. Phase 5 graph is not started. Phase 6 remains later ship polish. Training frozen.
 
 This is the living execution plan for app-side quality and reliability **without** retraining TFLite models. AI upscale strategy remains frozen in [`docs/AI_UPSCALING.md`](./AI_UPSCALING.md) (now under `docs/`).
 
@@ -38,15 +38,13 @@ This is the living execution plan for app-side quality and reliability **without
 ---
 
 
-## Cadence identity (blocker before Phase 4 OAuth) — display name proven ✅ / Clerk-out + package+scheme ⬜
+## Cadence identity (blocker before Phase 4 OAuth) — Clerk-out + package+scheme proven ✅
 
 **User-locked 2026-08-28.** Product name is **Cadence** (correct spelling). Publisher is **Picks & Shovels Software**. Do this **before** registering Gmail / Microsoft / Zoho / Fastmail mail client IDs.
 
-**Display-name hop is closed** (`4ce927c`). Launcher is Cadence. That hop left leftover `jsmastery://` / `com.ctocrm.jsmastery` / Clerk because a Clerk dashboard click was treated as a gate. **That leftover split is not the next hop.**
+**Display-name hop is closed** (`4ce927c`). **Clerk-out + package + scheme hop is closed** (`f005865`, `ff6ecd2`, `5ac6f97`). Live APK is `app.picksandshovels.cadence` / `cadence://` / local Continue. GitHub remote and Expo `owner` / slug stay (not in the APK). A future own backend replaces mock login later; do not build that backend now.
 
-**Next hop (user-locked, plan-only until implemented):** one identity change — **remove Clerk**, ship **local mock login**, live Android package **`app.picksandshovels.cadence`**, live scheme **`cadence://`**. Drop `jsmastery://` and `com.ctocrm.jsmastery` in the same APK. GitHub remote and Expo `owner` / slug stay (not in the APK). A future own backend replaces mock login later; do not build that backend in this hop.
-
-**Proven 2026-08-28 on `emulator-5554` (`pixel_6a_API34`) — display name only:** x86_64 release `BUILD SUCCESSFUL in 6m 45s`; APK `application-label:'Cadence'` still `package: name='com.ctocrm.jsmastery'`; install `lastUpdateTime=2026-08-28 05:56:20`; Home launched (existing Clerk session); app-drawer uiautomator `text="Cadence"` and no `jsmastery` label. Frame: [`docs/reference/cadence-launcher-2026-08-28.png`](./reference/cadence-launcher-2026-08-28.png). Live redirect is still `jsmastery://` until the Clerk-out hop ships.
+**Proven 2026-08-28 on `emulator-5554` (`pixel_6a_API34`) — identity hop:** x86_64 release `BUILD SUCCESSFUL in 6m 12s`; APK `package: name='app.picksandshovels.cadence'` `application-label:'Cadence'`; install `lastUpdateTime=2026-08-28 10:22:44`; dumpsys VIEW filter `Scheme: "cadence"`; JS bundle has `cadence_local_session` / `signInLocal` and no `@clerk/expo` / `ClerkProvider` / `EXPO_PUBLIC_CLERK`. Continue → Home (heading Local). Sign-out → Continue → Home. Frames: [`docs/reference/cadence-continue-2026-08-28.png`](./reference/cadence-continue-2026-08-28.png), [`docs/reference/cadence-home-after-continue-2026-08-28.png`](./reference/cadence-home-after-continue-2026-08-28.png), [`docs/reference/cadence-signout-continue-2026-08-28.png`](./reference/cadence-signout-continue-2026-08-28.png), [`docs/reference/cadence-home-after-signout-2026-08-28.png`](./reference/cadence-home-after-signout-2026-08-28.png). Launcher display frame remains [`docs/reference/cadence-launcher-2026-08-28.png`](./reference/cadence-launcher-2026-08-28.png).
 
 ### Names
 
@@ -127,10 +125,10 @@ Confirm the domains you actually own before DNS. Scheme is `cadence://` regardle
 - [x] User confirms later Play package **`app.picksandshovels.cadence`** (not `app.cadence`).
 - [ ] User confirms domains: **cadence.app** vs fallback TLD (DNS later; not this hop).
 - [x] User-visible Cadence: `expo.name`, README off Recurly. **Proven on emulator app drawer 2026-08-28**. Launcher icon later (Phase 6).
-- [ ] **Implement hop:** remove Clerk; mock Continue login; package `app.picksandshovels.cadence`; scheme `cadence://`; Kotlin/IMAP path; emulator script; prebuild. Device gate above. This docs commit is plan-only.
+- [x] **Implement hop:** remove Clerk; mock Continue login; package `app.picksandshovels.cadence`; scheme `cadence://`; Kotlin/IMAP path; emulator script; prebuild. Device gate proven 2026-08-28 (`f005865`, `ff6ecd2`, `5ac6f97`).
 - [ ] **Then** register mail OAuth client IDs against that package + `cadence://` + SHA-1. Then Phase 4 H1 / live Gmail.
 
-**Do not mix the implement hop with H1 catalog copy or a live Gmail scan. Do not keep `jsmastery://` or Clerk as leftovers in that APK.**
+**Do not mix mail OAuth registration with H1 catalog copy or a live Gmail scan. Clerk and `jsmastery://` are gone from this APK.**
 
 ---
 ## Phase 1 — Registry → map + picker/persist ✅
