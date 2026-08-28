@@ -1,8 +1,8 @@
 # Product plan — icons, crawl, DB, sync (no training)
 
-**Last updated:** 2026-08-26
+**Last updated:** 2026-08-28
 
-**Status:** Phases **1–5.5 complete**. **MAJOR FIX (Tranches A–F) landed**. **Icon hops 1–5 proven on device** (`466cde7`, `71a3840`, `6d54b0d`+`6c47871`, `2d0ba23`+`32521cb`, `5dc46ed`). **xAI compound-label hop proven** (`029c509`). **UI Improvements Phase 0–3 complete** (`ba66478`, `e4e383e`, `77a83bb`, `913b08f`). **Home/Insights hops A–E proven on device** (`ff3f3b9`, `ed16b0f`, `30de520`, `a6e6774`, `b510a35`). **UI Phase 4 is still not complete:** H1 catalog leftovers, H2 IMAP socket, H3 HTTPS completeness, and live Gmail/Outlook connect remain. Proton/Tuta **have** imported live rows (H4/H5 code hops): Proton **$29.98**, Linode this-month **$93**, Porkbun **$47.74** yearly. Phase 5 graph is not started. Phase 6 remains later ship polish. Training frozen.
+**Status:** Phases **1–5.5 complete**. **MAJOR FIX (Tranches A–F) landed**. **Icon hops 1–5 proven on device** (`466cde7`, `71a3840`, `6d54b0d`+`6c47871`, `2d0ba23`+`32521cb`, `5dc46ed`). **xAI compound-label hop proven** (`029c509`). **UI Improvements Phase 0–3 complete** (`ba66478`, `e4e383e`, `77a83bb`, `913b08f`). **Home/Insights hops A–E proven on device** (`ff3f3b9`, `ed16b0f`, `30de520`, `a6e6774`, `b510a35`). **UI Phase 4 is still not complete:** H1 catalog leftovers, H2 IMAP socket, H3 HTTPS completeness, and live Gmail/Outlook connect remain. **Cadence display name proven** on `emulator-5554` app drawer (`docs/reference/cadence-launcher-2026-08-28.png`). **Clerk/GitHub untouched**; leftover `jsmastery://` / `com.ctocrm.jsmastery` stay until Clerk is updated. Do not register mail OAuth until the live package/scheme are final. Proton/Tuta **have** imported live rows (H4/H5 code hops): Proton **$29.98**, Linode this-month **$93**, Porkbun **$47.74** yearly. Phase 5 graph is not started. Phase 6 remains later ship polish. Training frozen.
 
 This is the living execution plan for app-side quality and reliability **without** retraining TFLite models. AI upscale strategy remains frozen in [`docs/AI_UPSCALING.md`](./AI_UPSCALING.md) (now under `docs/`).
 
@@ -37,6 +37,81 @@ This is the living execution plan for app-side quality and reliability **without
 
 ---
 
+
+## Cadence rename (blocker before Phase 4 OAuth) — display name proven ✅ / package+scheme leftover ⬜
+
+**User-locked 2026-08-28.** Product name is **Cadence** (correct spelling). Publisher is **Picks & Shovels Software**. Do this **before** registering Gmail / Microsoft / Zoho / Fastmail mail client IDs.
+
+**This hop does not require touching Clerk or GitHub.** Leave those dashboards as they are. Keep working old identifiers in the project with an explicit leftover note until the user decides to change them.
+
+**Proven 2026-08-28 on `emulator-5554` (`pixel_6a_API34`):** x86_64 release `BUILD SUCCESSFUL in 6m 45s`; APK `application-label:'Cadence'` still `package: name='com.ctocrm.jsmastery'`; install `lastUpdateTime=2026-08-28 05:56:20`; Home launched (existing Clerk session — scheme not dropped); app-drawer uiautomator `text="Cadence"` and no `jsmastery` label. Frame: [`docs/reference/cadence-launcher-2026-08-28.png`](./reference/cadence-launcher-2026-08-28.png). Live redirect remains `jsmastery://` (`app.json` scheme, `AndroidManifest` data scheme, `providers.ts` `makeRedirectUri`).
+
+### Names
+
+| Surface | Value | Notes |
+| ------- | ----- | ----- |
+| Launcher / `expo.name` | **Cadence** | User-visible now. Safe without Clerk/GitHub. |
+| Expo `slug` | keep `jsmastery` until Expo/EAS is retargeted | Leftover. Comment in `app.json`. |
+| URL scheme | keep **`jsmastery://` as the live redirect** until Clerk lists `cadence://` | Dual-scheme later is fine (`cadence` + `jsmastery`). **Do not drop `jsmastery://` first** — sign-in will not return to the app. |
+| Android `applicationId` / Kotlin `namespace` | keep **`com.ctocrm.jsmastery` until Clerk (and Play) are ready** | Leftover. Note in `app.config.js`. Preferred later: **`app.cadence`**. Fallback `app.picksandshovels.cadence`. |
+| npm `package.json` name | `cadence` or keep `jsmastery` with a comment | Local only; not Clerk. |
+| GitHub repo | **leave** `ctocrm/react-native-recurly` | Not in the APK. Rename when convenient. Recurly is the wrong brand. |
+| Expo `owner` | **leave** `ctocrm` | |
+| Clerk | **do not touch** | Same publishable key. Same users. |
+| Cloud folder leftover | `/SubTracker/` in Drive/Dropbox/OneDrive paths | Later hop; not OAuth. |
+
+**Do not use `com.picksandshovels.cadence` unless Play rejects `app.cadence`.** `&` cannot appear in a package. `com.ctocrm.*` is leftover GitHub/Expo owner, not the ship brand.
+
+### Clerk / GitHub — leave now, note leftovers
+
+| Service | Now | Later (user decides) | If we change the APK first |
+| ------- | --- | -------------------- | -------------------------- |
+| **GitHub** `ctocrm/react-native-recurly` | **No change.** Push still works. | Rename repo / org when convenient. | No issue. |
+| **Expo** `owner: ctocrm`, slug `jsmastery` | **No change** in this hop. | Slug `cadence`; owner can stay `ctocrm`. | No issue for local `expo start` / existing EAS. |
+| **Clerk** | **No dashboard change.** Keep `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY`. | Display Cadence / Picks & Shovels Software. Add native redirect `cadence://` (and new Android application ID if package changes). Then drop `jsmastery://`. | **Scheme-only or package-only swap without Clerk = sign-in never returns** if Clerk still allows only `jsmastery` / `com.ctocrm.jsmastery`. New package also wipes SecureStore (`tokenCache` empty) — user signs in again on the **same** Clerk app. |
+
+Safe without Clerk/GitHub: launcher **Cadence**, README, comments, leftover notes next to `jsmastery://` and `com.ctocrm.jsmastery`.
+
+Not safe without a Clerk click: dropping `jsmastery://`, or changing `applicationId` if Clerk has that Android ID set.
+
+### TLD — use `.app` for the product (when the site is wired)
+
+| Domain | Role |
+| ------ | ---- |
+| **cadence.app** | **Canonical product.** Matches later package `app.cadence`, Play, OAuth homepage / privacy. |
+| cadence.io | Redirect → cadence.app. `.io` reads infra/startup, not the store listing. |
+| cadence.tech | Optional redirect. `.tech` is weaker for a consumer mail/subscriptions app. |
+| picksandshovels.* | **Company**, not the app. Keep for legal/support/email (`@picksandshovels.app` already in use). Do not make this the Play package. |
+
+Confirm the domains you actually own before DNS. Scheme can stay `jsmastery://` until Clerk is updated even if the public site is cadence.app.
+
+### What waits on final package + scheme (mail OAuth)
+
+| Service | Bound to | Action |
+| ------- | -------- | ------ |
+| **Google Mail OAuth** (not Drive) | Android package + SHA-1, live redirect | Create **after** final package/scheme land **and** Clerk allows that scheme |
+| **Microsoft Graph Mail** (not OneDrive) | Redirect URIs | Same |
+| **Zoho Mail / Fastmail** | Redirect URIs | Same |
+| **Google Drive / OneDrive / Dropbox sync** | File OAuth + `/SubTracker/` | Update redirect only when scheme actually changes. Folder rename later |
+| **PostHog** | Project token in `.env` | Token can stay. Display name Cadence in PostHog whenever. Distinct ID is Clerk user |
+| **Proton / Tuta / IMAP** | Password in SecureStore | No client ID. New package later = empty sandbox; reconnect mail |
+| **SQLite / icon cache** | App private storage | New package later ≠ old data. Fresh install unless we ship export |
+| **Play / signing** | `applicationId` + upload key | First Play listing is Cadence when package is final |
+| **Native Kotlin** `com.ctocrm.jsmastery.imap.*` | Java path | Move **with** `applicationId`, not before Clerk/Play |
+| **Hardcoded scheme** `scheme: "jsmastery"` in `providers.ts` | Must match Clerk | Keep until Clerk has `cadence://`; then read from Expo config. Dual-scheme OK |
+
+### Tasks (this rename, not Phase 4 scan hops)
+
+- [ ] User confirms domains: **cadence.app** vs fallback TLD; later Play package **`app.cadence`** vs `app.picksandshovels.cadence`.
+- [x] User-visible Cadence: `expo.name`, README off Recurly as the product name. **Proven on emulator app drawer 2026-08-28** (not Recurly / not jsmastery). Launcher icon later (Phase 6).
+- [x] **Leave Clerk dashboard and GitHub remote untouched.** Comment leftovers: slug `jsmastery`, scheme `jsmastery://`, package `com.ctocrm.jsmastery`, repo `react-native-recurly`, owner `ctocrm`.
+- [x] Do **not** drop `jsmastery://` or change `applicationId` in the same hop as the display rename. Still live after this install.
+- [ ] When Clerk is updated: add `cadence://` (dual-scheme), then package `app.cadence`, Kotlin path, `withMailImap.js`, `makeRedirectUri` from Expo config. New x86_64 install; empty local DB.
+- [ ] **Then** register mail OAuth client IDs against that final package + live scheme. Then Phase 4 H1 / live Gmail.
+
+**Do not mix the display-name hop with H1 catalog copy, a live Gmail scan, or a Clerk/GitHub dashboard change.**
+
+---
 ## Phase 1 — Registry → map + picker/persist ✅
 
 **Goal:** Stop hand-maintaining a model registry; generate map from on-disk TFLite assets; picker/persist must not race or double-notify.
@@ -859,7 +934,7 @@ Leftover-slug crawls (`ac` / `ne` / `sp`) closed on device by `6c47871` (Hop 3 g
 
 Wipe icon cache + crawl results for the test keys. Crawl at least 5 real, diverse names including Proton (scan **and** typed) and an uncommon company. Watch progressive results. Confirm brand-correct icons. Long-press the card icon. Check logs for official host, untrusted rejects, and rate limits.
 
-**Act next:** UI Phase 4 H1 catalog leftovers, then live Gmail/Outlook **only after** `EXPO_PUBLIC_GOOGLE_MAIL_CLIENT_ID` and `EXPO_PUBLIC_MICROSOFT_MAIL_CLIENT_ID` exist in `.env`. Icon hops 1–5 and the xAI compound-label hop are closed. Do not restore `063ac4b`. Do not start the `x.` social-exclusion hop — this crawl used `official=x.ai`, not Twitter.
+**Act next:** lock final package + scheme, then UI Phase 4 H1 catalog leftovers, then live Gmail/Outlook **only after** mail client IDs exist in `.env` (registered against that package/scheme, not Drive/OneDrive). Icon hops 1–5 and the xAI compound-label hop are closed. Do not restore `063ac4b`. Do not start the `x.` social-exclusion hop — this crawl used `official=x.ai`, not Twitter.
 
 ---
 
@@ -1137,6 +1212,8 @@ A **subscription is an account**, not a charge. A bill is optional evidence.
 
 **Phase 4 is NOT done.** Scan-brain, catalog, Settings UI, and SQLite persist landed (`4cc7a87`, `b52e2c6`, `0d6fa10`) but **must not be treated as complete**. On 2026-08-19 IMAP-portal docs were read; on 2026-08-20 Proton/Tuta **client REST** was researched. IMAP is still the wrong Proton/Tuta path. Dropping them was also wrong. Desktop Proton Bridge / tunnels are **not** a product and must not be used to fake a test.
 
+**Blocker (user-locked, 2026-08-28) — Cadence rename before OAuth IDs.** See **Cadence rename** above. Display name **Cadence** now. **Clerk and GitHub stay untouched** this hop; keep leftover `jsmastery://` / `com.ctocrm.jsmastery` / `ctocrm/react-native-recurly` with notes. Mail client IDs wait until the **live** package and scheme are final (after Clerk allows them). Proton/Tuta/IMAP do not use those IDs. iCloud/Yahoo/AOL stay under the single IMAP row (one live IMAP test).
+
 **Rule:** branded Connect if the phone can use a real mailbox protocol:
 
 1. Documented **HTTPS mail API + OAuth** (Gmail, Workspace, Outlook, M365, Zoho, Fastmail), or
@@ -1293,7 +1370,8 @@ Scan-brain / Settings **code landed** but Phase 4 remains **NOT done** until H1�
   - **2026-08-24 Proton Almost All Mail + on-device decrypt (`596a77e`, `56675e0`):** `listWithSession` now paginates `LabelID=15` (max page 150) and decrypts every listed body. Password crosses the JS bridge. Official locked-scope hop is `POST /auth/v4/info` (`ReauthScope=locked`) then `PUT /core/v4/users/unlock` (SRP proofs). Live cache-clear Scan: `Proton listed 227 of 227 label=15 pages=2`; `Proton locked-scope unlock ok`; `Proton unlocked userKeys=1 addrKeys=9 mode=one`; `Proton decrypted 227 of 227 bodies fail=0`. Patterns `recurring=1 sparse=36 account=5 security=2 drop=183`. Home after Scan: Proton **$29.98** recurring Monthly, Linode **$17.00** sparse, Porkbun **$47.74** Yearly still there. Monthly Spend **$50.96**. Tuta listed 7 with Porkbun money hit. Not Inbox page 0. Not an allowlist. Classifier untouched.
 
 
-- [ ] Live Gmail/Workspace/Outlook connect+scan when mail client ids exist. Agent stops at the sheet.
+- [ ] **Cadence rename** (section above). Display name now; Clerk/GitHub untouched; leftover `jsmastery` package/scheme noted. Mail OAuth IDs only after live package/scheme are final.
+- [ ] Live Gmail/Workspace/Outlook connect+scan when mail client ids exist **and** package/scheme are final. Agent stops at the sheet.
 - [ ] Do **not** run a Tuta/Proton IMAP visual gate. Proton/Tuta live tests wait for H4/H5.
 
 **Do not start H2–H5 in the H1 commit. Do not mix H1 with emulator OAuth.**
@@ -1449,4 +1527,5 @@ Parked until a documented API exists. Do not implement as Connect-without-scan.
 | 2026-08-25 | **Hop 4 blank-refuse + paintable auto-select proven.** `2d0ba23` refused empty/invalid cache on card/previews (RN `Image` kept). Follow-up `32521cb`: cream-plate only for near-white; `isPaintableCardIcon` skips SVG as card default. Crawler still `210c908` (not `063ac4b`). Device: Ace ACE; typed Spotify auto-selected `icons8` PNG. Leftover slugs / Bing junk remain Hop 3. |
 | 2026-08-25 | **Icon hops 1–2 + 5 proven on `5dc46ed`.** x86_64 APK installed `-r` on existing `emulator-5554` (`lastUpdateTime=22:22:41`). Typed Linear: TIER 0 `linear.app`; first `official_favicon` then upgrade to `spider:apple_touch_icon`; picker 19 / 20 valid. Typed Proton: seeded `proton.me`; picker 33. Typed Ground News: TIER 0 `ground.news`. `IMMEDIATE_FETCH_BATCH=6`. Not `063ac4b`. Scan From-host seed not re-proven (Scan: no new rows). |
 | 2026-08-26 | **xAI compound-label hop proven (`029c509`).** Two-label 2-letter TLD hosts ≤5 chars keep TLD in the name (`x.ai` → **xAI** / `xai`; `x.com` stays **X**). `PARSER_VERSION` 11. Device: deleted leftover **X**, Scan added **xAI**; `[CRAWL] startIconCrawl for xai … official=x.ai`; auto-assigned `official_site` from `x.ai` (not Twitter); picker 4 first-party tiles. |
+| 2026-08-28 | **Cadence display-name hop proven.** x86_64 APK on `emulator-5554` (`pixel_6a_API34`): `application-label:'Cadence'`, package still `com.ctocrm.jsmastery`, scheme still `jsmastery`. Home launched with existing Clerk session. App drawer: uiautomator `text="Cadence"`; frame [`docs/reference/cadence-launcher-2026-08-28.png`](./reference/cadence-launcher-2026-08-28.png). Clerk dashboard and GitHub remote untouched. Mail OAuth IDs still wait on final package/scheme. |
 

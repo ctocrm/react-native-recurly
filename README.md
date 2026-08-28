@@ -1,6 +1,10 @@
-# Recurly (jsmastery)
+# Cadence
 
 Subscription tracker for mobile — Expo Router, SQLite, optional cloud sync, and on-device TFLite icon upscaling.
+
+Publisher: **Picks & Shovels Software**.
+
+**Identity leftovers** (do not change until Clerk / GitHub / Play are ready — see [`docs/plan.md`](./docs/plan.md) Cadence rename): Expo slug `jsmastery`, scheme `jsmastery://`, Android package `com.ctocrm.jsmastery`, Expo owner `ctocrm`, GitHub `ctocrm/react-native-recurly`. Launcher name is Cadence; do not drop `jsmastery://` first or sign-in will not return to the app.
 
 **Roadmap:** [`docs/plan.md`](./docs/plan.md) (phases **1–5.5 done**; **6** ship polish next).  
 **AI / training:** [`docs/AI_UPSCALING.md`](./docs/AI_UPSCALING.md)  
