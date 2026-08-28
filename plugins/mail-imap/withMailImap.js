@@ -14,6 +14,8 @@ const SRC_DIR = path.join(__dirname, "android");
 const BCRYPT_DEP = 'implementation("at.favre.lib:bcrypt:0.10.2")';
 const BCPROV_DEP = 'implementation("org.bouncycastle:bcprov-jdk18on:1.78.1")';
 const BCPG_DEP = 'implementation("org.bouncycastle:bcpg-jdk18on:1.78.1")';
+const OSGI_META_EXCLUDE =
+  '            "META-INF/versions/9/OSGI-INF/MANIFEST.MF",';
 
 function withMailImap(config) {
   config = withDangerousMod(config, [
@@ -73,6 +75,22 @@ function withMailImap(config) {
       cfg.modResults.contents = cfg.modResults.contents.replace(
         BCPROV_DEP,
         `${BCPROV_DEP}\n    ${BCPG_DEP}`,
+      );
+    }
+    if (
+      !cfg.modResults.contents.includes(
+        "META-INF/versions/9/OSGI-INF/MANIFEST.MF",
+      )
+    ) {
+      cfg.modResults.contents = cfg.modResults.contents.replace(
+        new RegExp("packagingOptions \\{\n        jniLibs \\{"),
+        `packagingOptions {
+        resources {
+            excludes += [
+${OSGI_META_EXCLUDE}
+            ]
+        }
+        jniLibs {`,
       );
     }
     return cfg;
