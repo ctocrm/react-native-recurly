@@ -3,15 +3,12 @@ const appJson = require("./app.json");
 module.exports = {
   expo: {
     ...appJson.expo,
-    // Leftover until Expo/EAS is retargeted. Product is Cadence.
-    // Live slug/scheme stay jsmastery / jsmastery:// until Clerk lists cadence://.
-    // npm package.json name stays jsmastery (local leftover; not Clerk).
+    // Product is Cadence. Expo slug stays jsmastery until EAS is retargeted.
+    // npm package.json name stays jsmastery (local leftover).
     owner: "ctocrm",
     android: {
       ...appJson.expo.android,
-      // Leftover until Clerk + Play are ready. Do not change this hop.
-      // Preferred later: app.cadence (see docs/plan.md Cadence rename).
-      package: "com.ctocrm.jsmastery",
+      package: "app.picksandshovels.cadence",
     },
     extra: {
       ...(appJson.expo.extra || {}),

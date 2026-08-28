@@ -21,7 +21,7 @@ function withMailImap(config) {
     async (cfg) => {
       const destDir = path.join(
         cfg.modRequest.platformProjectRoot,
-        "app/src/main/java/com/ctocrm/jsmastery/imap",
+        "app/src/main/java/app/picksandshovels/cadence/imap",
       );
       fs.mkdirSync(destDir, { recursive: true });
       for (const file of [
@@ -40,10 +40,10 @@ function withMailImap(config) {
 
   config = withMainApplication(config, (cfg) => {
     let contents = cfg.modResults.contents;
-    if (!contents.includes("com.ctocrm.jsmastery.imap.ImapPackage")) {
+    if (!contents.includes("app.picksandshovels.cadence.imap.ImapPackage")) {
       contents = contents.replace(
         /import expo\.modules\.ReactNativeHostWrapper/,
-        "import com.ctocrm.jsmastery.imap.ImapPackage\nimport expo.modules.ReactNativeHostWrapper",
+        "import app.picksandshovels.cadence.imap.ImapPackage\nimport expo.modules.ReactNativeHostWrapper",
       );
     }
     if (!contents.includes("add(ImapPackage())")) {

@@ -15,7 +15,7 @@ import { useChargeDisplay } from "@/hooks/useChargeDisplay";
 import { formatCurrency } from "@/lib/utils";
 import { importFromConnectedMailboxes } from "@/services/emailscan";
 import { listMailboxesAsync } from "@/services/emailscan/persist";
-import { useUser } from "@clerk/expo";
+import { useUser } from "@/context/AuthContext";
 import dayjs from "dayjs";
 import { useRouter } from "expo-router";
 import { styled } from "nativewind";

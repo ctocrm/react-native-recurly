@@ -16,7 +16,7 @@ import {
   mailboxIdFor,
   oauthClientId,
 } from "@/services/emailscan/providers";
-import { useUser } from "@clerk/expo";
+import { useUser } from "@/context/AuthContext";
 import { Ionicons } from "@expo/vector-icons";
 import { useCallback, useEffect, useState } from "react";
 import {

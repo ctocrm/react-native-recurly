@@ -206,8 +206,7 @@ export async function promptOAuth(
     );
   }
   const spec = oauthSpec(providerId);
-  // Leftover live scheme until Clerk lists cadence://. Do not drop jsmastery:// first.
-  const redirectUri = AuthSession.makeRedirectUri({ scheme: "jsmastery" });
+  const redirectUri = AuthSession.makeRedirectUri({ scheme: "cadence" });
   const request = new AuthSession.AuthRequest({
     clientId,
     scopes: spec.scopes,

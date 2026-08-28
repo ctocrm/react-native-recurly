@@ -1,4 +1,4 @@
-import { useAuth } from "@clerk/expo";
+import { useAuth } from "@/context/AuthContext";
 import type { SQLiteDatabase } from "expo-sqlite";
 import React, {
   createContext,

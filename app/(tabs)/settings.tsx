@@ -23,7 +23,7 @@ import {
   clearScanCacheAsync,
   countScanCacheAsync,
 } from "@/services/emailscan/persist";
-import { useClerk, useUser } from "@clerk/expo";
+import { useAuth, useUser } from "@/context/AuthContext";
 import * as DocumentPicker from "expo-document-picker";
 import * as Sharing from "expo-sharing";
 import { styled } from "nativewind";
@@ -46,7 +46,7 @@ const SafeAreaView = styled(RNSafeAreaView);
 
 const Settings = () => {
   const { tabListPadding, pagePadding } = useBottomClearance();
-  const { signOut } = useClerk();
+  const { signOut } = useAuth();
   const { user } = useUser();
   const posthog = usePostHog();
   const { isReady } = useDatabase();

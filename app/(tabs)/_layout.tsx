@@ -9,7 +9,7 @@ import { CloudSyncProvider } from "@/context/CloudSyncContext";
 import { DatabaseProvider } from "@/context/DatabaseProvider";
 import { SubscriptionProvider } from "@/context/SubscriptionContext";
 
-import { useAuth, useUser } from "@clerk/expo";
+import { useAuth, useUser } from "@/context/AuthContext";
 import clsx from "clsx";
 import { Redirect, Tabs } from "expo-router";
 import { useEffect, useRef } from "react";
@@ -37,17 +37,14 @@ const TabLayout = () => {
   const insets = useSafeAreaInsets();
   const hasIdentified = useRef(false);
 
-  // Identify returning users whose session is restored from Clerk's token cache
+  // Identify returning users whose session is restored from local SecureStore
   useEffect(() => {
     if (isLoaded && isSignedIn && user && !hasIdentified.current) {
-      const email = user.primaryEmailAddress?.emailAddress;
-      if (email) {
-        posthog.identify(email, {
-          $set: { email, name: user.fullName },
-          $set_once: { first_seen_date: new Date().toISOString() },
-        });
-        hasIdentified.current = true;
-      }
+      posthog.identify(user.id, {
+        $set: { auth: "local_mock", name: user.fullName },
+        $set_once: { first_seen_date: new Date().toISOString() },
+      });
+      hasIdentified.current = true;
     }
   }, [isLoaded, isSignedIn, user]);
 

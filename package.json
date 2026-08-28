@@ -94,7 +94,6 @@
     "test": "jest"
   },
   "dependencies": {
-    "@clerk/expo": "3.1.12",
     "@expo/vector-icons": "^15.0.3",
     "@react-navigation/bottom-tabs": "^7.4.0",
     "@react-navigation/elements": "^2.6.3",

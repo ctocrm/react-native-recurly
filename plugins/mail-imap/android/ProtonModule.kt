@@ -1,4 +1,4 @@
-package com.ctocrm.jsmastery.imap
+package app.picksandshovels.cadence.imap
 
 import android.util.Log
 import at.favre.lib.crypto.bcrypt.BCrypt

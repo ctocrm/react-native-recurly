@@ -1,4 +1,4 @@
-package com.ctocrm.jsmastery.imap
+package app.picksandshovels.cadence.imap
 
 import com.facebook.react.ReactPackage
 import com.facebook.react.bridge.NativeModule

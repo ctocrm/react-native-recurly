@@ -24,8 +24,8 @@
 set -e
 
 ANDROID_SDK="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/home/d/Android/Sdk}}"
-APP_PACKAGE="com.ctocrm.jsmastery"
-APP_ACTIVITY="com.ctocrm.jsmastery.MainActivity"
+APP_PACKAGE="app.picksandshovels.cadence"
+APP_ACTIVITY="app.picksandshovels.cadence.MainActivity"
 EMULATOR_LOG="$(mktemp -t emu-boot.XXXXXX.log)"
 CACHE_FILE=".emulator-device"
 
