@@ -1,8 +1,8 @@
 # Product plan — icons, crawl, DB, sync (no training)
 
-**Last updated:** 2026-08-28
+**Last updated:** 2026-08-30
 
-**Status:** Phases **1–5.5 complete**. **MAJOR FIX (Tranches A–F) landed**. **Icon hops 1–5 proven on device** (`466cde7`, `71a3840`, `6d54b0d`+`6c47871`, `2d0ba23`+`32521cb`, `5dc46ed`). **xAI compound-label hop proven** (`029c509`). **UI Improvements Phase 0–3 complete** (`ba66478`, `e4e383e`, `77a83bb`, `913b08f`). **Home/Insights hops A–E proven on device** (`ff3f3b9`, `ed16b0f`, `30de520`, `a6e6774`, `b510a35`). **UI Phase 4 is still not complete:** H1 catalog leftovers, H2 IMAP socket, H3 HTTPS completeness, and live Gmail/Outlook connect remain. **Cadence identity hop proven** (`f005865` + `ff6ecd2` + `5ac6f97`): local Continue login, package **`app.picksandshovels.cadence`**, scheme **`cadence://`**. **Next:** register mail OAuth IDs against that package + SHA-1 + `cadence://`. Then Phase 4. Proton/Tuta **have** imported live rows (H4/H5 code hops): Proton **$29.98**, Linode this-month **$93**, Porkbun **$47.74** yearly. Phase 5 graph is not started. Phase 6 remains later ship polish. Training frozen.
+**Status:** Phases **1–5.5 complete**. **MAJOR FIX (Tranches A–F) landed**. **Icon hops 1–5 proven on device** (`466cde7`, `71a3840`, `6d54b0d`+`6c47871`, `2d0ba23`+`32521cb`, `5dc46ed`). **xAI compound-label hop proven** (`029c509`). **UI Improvements Phase 0–3 complete** (`ba66478`, `e4e383e`, `77a83bb`, `913b08f`). **Home/Insights hops A–E proven on device** (`ff3f3b9`, `ed16b0f`, `30de520`, `a6e6774`, `b510a35`). **UI Phase 4 is still not complete:** H1 catalog leftovers, H2 IMAP socket, H3 HTTPS completeness, and live Gmail/Outlook connect remain. **Cadence identity hop proven** (`f005865` + `ff6ecd2` + `5ac6f97`): local Continue login, package **`app.picksandshovels.cadence`**, scheme **`cadence://`**. **Entra mail reply URI locked:** **`cadence://auth`** (portal rejected `cadence://` — no host). **Next:** finish mail OAuth client IDs (Google package + SHA-1; Microsoft / Zoho / Fastmail redirect **`cadence://auth`**). Later **code** hop: `providers.ts` must send exactly `cadence://auth`. Then Phase 4. Proton/Tuta **have** imported live rows (H4/H5 code hops): Proton **$29.98**, Linode this-month **$93**, Porkbun **$47.74** yearly. Phase 5 graph is not started. Phase 6 remains later ship polish. Training frozen.
 
 This is the living execution plan for app-side quality and reliability **without** retraining TFLite models. AI upscale strategy remains frozen in [`docs/AI_UPSCALING.md`](./AI_UPSCALING.md) (now under `docs/`).
 
@@ -88,7 +88,7 @@ Not a future backend. Not auto-skip.
 
 x86_64 APK: `applicationId` `app.picksandshovels.cadence`, scheme `cadence`. New install (empty sandbox). Continue → Home. Sign-out → sign-in → Continue → Home. No Clerk in the binary / no key required to boot.
 
-Then mail OAuth IDs against that package + SHA-1 + `cadence://`. Then Phase 4. Not in the implement hop: H1 catalog, live Gmail, a real backend, GitHub rename.
+Then mail OAuth IDs against that package + SHA-1 + **`cadence://auth`**. Then Phase 4. Not in the implement hop: H1 catalog, live Gmail, a real backend, GitHub rename.
 
 ### Cost
 
@@ -103,22 +103,22 @@ Old Clerk users / SQLite / mail passwords on `com.ctocrm.jsmastery` do not follo
 | cadence.tech | Optional redirect. |
 | picksandshovels.* | **Company.** Package is `app.picksandshovels.cadence` because `@picksandshovels.app` is already in use. |
 
-Confirm the domains you actually own before DNS. Scheme is `cadence://` regardless of which TLD the public site uses.
+Confirm the domains you actually own before DNS. Deep-link scheme stays `cadence://` regardless of which TLD the public site uses. Mail OAuth **reply URI** is **`cadence://auth`** (host required).
 
 ### What waits on the proven APK (mail OAuth)
 
 | Service | Bound to | Action |
 | ------- | -------- | ------ |
-| **Google Mail OAuth** (not Drive) | Android package + SHA-1, live redirect | Create **after** `app.picksandshovels.cadence` + `cadence://` APK is proven |
-| **Microsoft Graph Mail** (not OneDrive) | Redirect URIs | Same |
-| **Zoho Mail / Fastmail** | Redirect URIs | Same |
+| **Google Mail OAuth** (not Drive) | Android package + SHA-1, live redirect | Create **after** `app.picksandshovels.cadence` APK is proven. Package `app.picksandshovels.cadence`. Debug SHA-1 `5E:8F:16:06:2E:A3:CD:2C:4A:0D:54:78:76:BA:A6:F3:8C:AB:F6:25` (same keystore across rebuilds). Do not reuse Drive. |
+| **Microsoft Graph Mail** (not OneDrive) | Redirect **`cadence://auth`** | Entra **Mobile and desktop applications**. Not Web / SPA / Android / iOS. Do not check nativeclient / LiveSDK / `msal…://auth`. Personal accounts require Manifest `requestedAccessTokenVersion: 2` first. |
+| **Zoho Mail / Fastmail** | Redirect **`cadence://auth`** | Same reply URI as Microsoft. |
 | **Google Drive / OneDrive / Dropbox sync** | File OAuth + `/SubTracker/` | Update redirect when scheme actually changes. Folder rename later |
 | **PostHog** | Project token in `.env` | Token can stay. Distinct ID is mock `local` until a real backend |
 | **Proton / Tuta / IMAP** | Password in SecureStore | No client ID. New package = empty sandbox; reconnect mail |
 | **SQLite / icon cache** | App private storage | New package ≠ old data. Fresh install unless we ship export |
 | **Play / signing** | `applicationId` + upload key | First Play listing is Cadence when this package is final |
 | **Native Kotlin** | Java path | Move **with** `applicationId` in this hop |
-| **`makeRedirectUri`** | Expo scheme | Read from config; live scheme is `cadence` |
+| **`makeRedirectUri`** | Expo scheme `cadence` | **Today:** `makeRedirectUri({ scheme: "cadence" })` ≠ `cadence://auth`. **Later code hop:** send exactly `cadence://auth` (`native: "cadence://auth"`). Do not let Expo emit `cadence:///` or `cadence:///auth`. |
 
 ### Tasks
 
@@ -126,9 +126,30 @@ Confirm the domains you actually own before DNS. Scheme is `cadence://` regardle
 - [ ] User confirms domains: **cadence.app** vs fallback TLD (DNS later; not this hop).
 - [x] User-visible Cadence: `expo.name`, README off Recurly. **Proven on emulator app drawer 2026-08-28**. Launcher icon later (Phase 6).
 - [x] **Implement hop:** remove Clerk; mock Continue login; package `app.picksandshovels.cadence`; scheme `cadence://`; Kotlin/IMAP path; emulator script; prebuild. Device gate proven 2026-08-28 (`f005865`, `ff6ecd2`, `5ac6f97`).
-- [ ] **Then** register mail OAuth client IDs against that package + `cadence://` + SHA-1. Then Phase 4 H1 / live Gmail.
+- [ ] **Then** register mail OAuth client IDs against that package + SHA-1 + **`cadence://auth`**. Then Phase 4 H1 / live Gmail.
 
 **Do not mix mail OAuth registration with H1 catalog copy or a live Gmail scan. Clerk and `jsmastery://` are gone from this APK.**
+
+### Mail OAuth registration (in progress, 2026-08-30)
+
+Entra **Cadence** app exists. Client ID (`.env` only — not tenant ID / Object ID; no secret):
+
+`EXPO_PUBLIC_MICROSOFT_MAIL_CLIENT_ID=fba1737f-1879-41fc-b82d-42dc773e5a86`
+
+**Reply URI (locked):** Entra rejected `cadence://` as invalid (no host). Custom URI is **`cadence://auth`**.
+
+| Entra control | Required |
+| ------------- | -------- |
+| Platform | **Mobile and desktop applications** (last item). Not Web / SPA / Android / iOS |
+| Custom redirect | **`cadence://auth`**. Leave nativeclient / LiveSDK / `msal…://auth` **unchecked** |
+| Supported accounts | **Any Entra ID Tenant + Personal Microsoft accounts** |
+| Manifest first | `"requestedAccessTokenVersion": 2` under `api` (dropdown save fails with `null`) |
+| Public client | Allow public client flows = Yes (PKCE) |
+| Graph delegated | `Mail.Read`, `User.Read` (`offline_access` on the token request) |
+
+**Later code hop (not this docs commit):** `src/services/emailscan/providers.ts` currently `makeRedirectUri({ scheme: "cadence" })`. Change to send exactly `cadence://auth` (`native: "cadence://auth"`). Do not emit `cadence:///` or `cadence:///auth`. Google Android client still uses package + SHA-1, not this URI.
+
+Do not mix this with H1 catalog copy or a live Gmail/Outlook scan.
 
 ---
 ## Phase 1 — Registry → map + picker/persist ✅
@@ -953,7 +974,7 @@ Leftover-slug crawls (`ac` / `ne` / `sp`) closed on device by `6c47871` (Hop 3 g
 
 Wipe icon cache + crawl results for the test keys. Crawl at least 5 real, diverse names including Proton (scan **and** typed) and an uncommon company. Watch progressive results. Confirm brand-correct icons. Long-press the card icon. Check logs for official host, untrusted rejects, and rate limits.
 
-**Act next:** lock final package + scheme, then UI Phase 4 H1 catalog leftovers, then live Gmail/Outlook **only after** mail client IDs exist in `.env` (registered against that package/scheme, not Drive/OneDrive). Icon hops 1–5 and the xAI compound-label hop are closed. Do not restore `063ac4b`. Do not start the `x.` social-exclusion hop — this crawl used `official=x.ai`, not Twitter.
+**Act next:** finish mail OAuth client IDs (Google package + SHA-1; Microsoft / Zoho / Fastmail **`cadence://auth`**). Later code hop: `providers.ts` sends exactly `cadence://auth`. Then UI Phase 4 H1 catalog leftovers, then live Gmail/Outlook **only after** those IDs exist in `.env` (not Drive/OneDrive). Icon hops 1–5, the xAI compound-label hop, and Cadence identity are closed. Do not restore `063ac4b`. Do not start the `x.` social-exclusion hop — this crawl used `official=x.ai`, not Twitter.
 
 ---
 
@@ -1231,7 +1252,7 @@ A **subscription is an account**, not a charge. A bill is optional evidence.
 
 **Phase 4 is NOT done.** Scan-brain, catalog, Settings UI, and SQLite persist landed (`4cc7a87`, `b52e2c6`, `0d6fa10`) but **must not be treated as complete**. On 2026-08-19 IMAP-portal docs were read; on 2026-08-20 Proton/Tuta **client REST** was researched. IMAP is still the wrong Proton/Tuta path. Dropping them was also wrong. Desktop Proton Bridge / tunnels are **not** a product and must not be used to fake a test.
 
-**Blocker (user-locked, 2026-08-28) — Cadence identity before OAuth IDs.** See **Cadence identity** above. Display name **Cadence** is proven. **Next hop:** remove Clerk; local mock Continue login; package **`app.picksandshovels.cadence`**; scheme **`cadence://`**. Mail client IDs wait until that APK is proven. Proton/Tuta/IMAP do not use those IDs. iCloud/Yahoo/AOL stay under the single IMAP row (one live IMAP test).
+**Blocker (user-locked, 2026-08-28) — Cadence identity before OAuth IDs.** See **Cadence identity** above. Display name **Cadence**, package **`app.picksandshovels.cadence`**, scheme **`cadence://`**, and local Continue are **proven**. Mail client IDs: register against that package + SHA-1 + reply URI **`cadence://auth`**. Proton/Tuta/IMAP do not use those IDs. iCloud/Yahoo/AOL stay under the single IMAP row (one live IMAP test).
 
 **Rule:** branded Connect if the phone can use a real mailbox protocol:
 
@@ -1389,8 +1410,9 @@ Scan-brain / Settings **code landed** but Phase 4 remains **NOT done** until H1�
   - **2026-08-24 Proton Almost All Mail + on-device decrypt (`596a77e`, `56675e0`):** `listWithSession` now paginates `LabelID=15` (max page 150) and decrypts every listed body. Password crosses the JS bridge. Official locked-scope hop is `POST /auth/v4/info` (`ReauthScope=locked`) then `PUT /core/v4/users/unlock` (SRP proofs). Live cache-clear Scan: `Proton listed 227 of 227 label=15 pages=2`; `Proton locked-scope unlock ok`; `Proton unlocked userKeys=1 addrKeys=9 mode=one`; `Proton decrypted 227 of 227 bodies fail=0`. Patterns `recurring=1 sparse=36 account=5 security=2 drop=183`. Home after Scan: Proton **$29.98** recurring Monthly, Linode **$17.00** sparse, Porkbun **$47.74** Yearly still there. Monthly Spend **$50.96**. Tuta listed 7 with Porkbun money hit. Not Inbox page 0. Not an allowlist. Classifier untouched.
 
 
-- [ ] **Cadence identity** (section above). Display name proven. Implement: Clerk-out + mock Continue + `app.picksandshovels.cadence` + `cadence://`. Mail OAuth IDs only after that APK is proven.
-- [ ] Live Gmail/Workspace/Outlook connect+scan when mail client ids exist **and** package/scheme are final. Agent stops at the sheet.
+- [x] **Cadence identity** (section above). Clerk-out + mock Continue + `app.picksandshovels.cadence` + `cadence://` proven (`f005865` + `ff6ecd2` + `5ac6f97`).
+- [ ] Mail OAuth IDs against that package + SHA-1 + reply URI **`cadence://auth`**. Later code hop: `providers.ts` sends exactly `cadence://auth`.
+- [ ] Live Gmail/Workspace/Outlook connect+scan when mail client ids exist. Agent stops at the sheet.
 - [ ] Do **not** run a Tuta/Proton IMAP visual gate. Proton/Tuta live tests wait for H4/H5.
 
 **Do not start H2–H5 in the H1 commit. Do not mix H1 with emulator OAuth.**
@@ -1548,4 +1570,5 @@ Parked until a documented API exists. Do not implement as Connect-without-scan.
 | 2026-08-26 | **xAI compound-label hop proven (`029c509`).** Two-label 2-letter TLD hosts ≤5 chars keep TLD in the name (`x.ai` → **xAI** / `xai`; `x.com` stays **X**). `PARSER_VERSION` 11. Device: deleted leftover **X**, Scan added **xAI**; `[CRAWL] startIconCrawl for xai … official=x.ai`; auto-assigned `official_site` from `x.ai` (not Twitter); picker 4 first-party tiles. |
 | 2026-08-28 | **Cadence display-name hop proven.** x86_64 APK on `emulator-5554` (`pixel_6a_API34`): `application-label:'Cadence'`, package still `com.ctocrm.jsmastery`, scheme still `jsmastery`. Home launched with existing Clerk session. App drawer: uiautomator `text="Cadence"`; frame [`docs/reference/cadence-launcher-2026-08-28.png`](./reference/cadence-launcher-2026-08-28.png). That leftover package/scheme/Clerk split is **not** the next hop. |
 | 2026-08-28 | **Cadence identity hop locked (plan-only).** Next implement: remove Clerk; local mock Continue login (`userId: "local"`); package **`app.picksandshovels.cadence`**; scheme **`cadence://`**. Drop `jsmastery://`. GitHub / Expo slug stay. Mail OAuth IDs after that APK is proven. This row is docs, not the APK. |
+| 2026-08-30 | **Entra mail reply URI locked to `cadence://auth`.** Portal rejected `cadence://` (Must be a valid URI — no host). Platform **Mobile and desktop applications**; do not check nativeclient / LiveSDK / `msal…://auth`. Personal accounts need Manifest `requestedAccessTokenVersion: 2` first. Microsoft client ID `fba1737f-1879-41fc-b82d-42dc773e5a86` → `EXPO_PUBLIC_MICROSOFT_MAIL_CLIENT_ID` (not tenant/object ID; no secret). Later code hop: `providers.ts` must send exactly `cadence://auth`. This row is docs, not the APK. |
 
