@@ -151,6 +151,42 @@ Entra **Cadence** app exists. Client ID (`.env` only — not tenant ID / Object 
 
 Do not mix this with H1 catalog copy or a live Gmail/Outlook scan.
 
+### Mail OAuth — ship / public users (not Phase 4)
+
+Does **not** block Phase 4. First Connect/scan stays: test users, own Entra tenant, admin consent, Google **Testing** mode.
+
+#### Microsoft — other-tenant users
+
+The Entra banner (“End users cannot grant consent to newly registered multitenant apps without verified publishers”) is **publisher verification**, not a broken redirect. Unverified apps registered after November 2020 that request more than basic profile (`Mail.Read` is that) cannot get **end-user Accept** in **other companies’** directories.
+
+| When | What works |
+| ---- | ---------- |
+| Phase 4 / this hop | Consent in **this** directory (Default Directory). Admin consent there. Personal Outlook.com often still works; if it hits the unverified wall, use a mailbox in this tenant. |
+| Public other-org users | Partner Center **Partner One ID** (old MPN). Entra **Branding & properties → Add Partner ID to verify publisher**. Publisher domain set. App registered with a **work/school** account (personal-only registration cannot complete verification). MFA. Blue verified badge on consent. |
+
+Do **not** pause `cadence://auth` or the client ID for MPN.
+
+**Recheck before public Outlook:** reply URI **`cadence://auth`**; platform Mobile and desktop; public client / PKCE; Graph delegated `Mail.Read` + `User.Read`; `/common`; no secret; `EXPO_PUBLIC_MICROSOFT_MAIL_CLIENT_ID` is the Application (client) ID only.
+
+#### Google Gmail — public users
+
+Scope is `https://www.googleapis.com/auth/gmail.readonly`. Gmail mail scopes are **restricted**. Unverified apps stay in **Testing** (listed test users only). That is the Phase 4 path. Do not submit verification to start H1 or a first Gmail scan.
+
+**Before public Gmail users:**
+
+1. **Brand verification** — homepage (not login-only) on a domain you own; privacy policy on that domain, same URL as the consent screen; Search Console ownership of authorized domains; Google branding on the Connect control.
+2. **Restricted-scope verification** — justify `gmail.readonly` vs a narrower scope; Limited Use (no ads, no sale, no humans reading mail except disclosed exceptions); in-app disclosure that Cadence scans mail **on-device** for subscriptions.
+3. **CASA security assessment** (Google-empanelled assessor) and **annual** re-verification while restricted scopes stay.
+4. **Android client** — package still `app.picksandshovels.cadence`. Add **every** signing SHA-1: debug (`5E:8F:16:06:2E:A3:CD:2C:4A:0D:54:78:76:BA:A6:F3:8C:AB:F6:25`), Play **upload** key, Play **App Signing** key. Same OAuth client; do not mint a new client per build.
+
+**Recheck before public Gmail:** Gmail API enabled (not Drive); `EXPO_PUBLIC_GOOGLE_MAIL_CLIENT_ID` is the **mail** client; consent screen name **Cadence**; no Drive scopes on that client.
+
+#### Shared before Play
+
+- App must send **`cadence://auth`** (later `providers.ts` hop). Entra and Google reply URIs must match that string.
+- Do not reuse Drive / OneDrive / Dropbox clients for mail.
+- Privacy policy + in-app copy: mail is scanned on-device for subscriptions; not sold; not used for ads.
+
 ---
 ## Phase 1 — Registry → map + picker/persist ✅
 
@@ -1571,4 +1607,5 @@ Parked until a documented API exists. Do not implement as Connect-without-scan.
 | 2026-08-28 | **Cadence display-name hop proven.** x86_64 APK on `emulator-5554` (`pixel_6a_API34`): `application-label:'Cadence'`, package still `com.ctocrm.jsmastery`, scheme still `jsmastery`. Home launched with existing Clerk session. App drawer: uiautomator `text="Cadence"`; frame [`docs/reference/cadence-launcher-2026-08-28.png`](./reference/cadence-launcher-2026-08-28.png). That leftover package/scheme/Clerk split is **not** the next hop. |
 | 2026-08-28 | **Cadence identity hop locked (plan-only).** Next implement: remove Clerk; local mock Continue login (`userId: "local"`); package **`app.picksandshovels.cadence`**; scheme **`cadence://`**. Drop `jsmastery://`. GitHub / Expo slug stay. Mail OAuth IDs after that APK is proven. This row is docs, not the APK. |
 | 2026-08-30 | **Entra mail reply URI locked to `cadence://auth`.** Portal rejected `cadence://` (Must be a valid URI — no host). Platform **Mobile and desktop applications**; do not check nativeclient / LiveSDK / `msal…://auth`. Personal accounts need Manifest `requestedAccessTokenVersion: 2` first. Microsoft client ID `fba1737f-1879-41fc-b82d-42dc773e5a86` → `EXPO_PUBLIC_MICROSOFT_MAIL_CLIENT_ID` (not tenant/object ID; no secret). Later code hop: `providers.ts` must send exactly `cadence://auth`. This row is docs, not the APK. |
+| 2026-08-30 | **Ship-time mail OAuth notes (not Phase 4).** Microsoft other-tenant end-user consent needs Partner One / publisher verification; home-tenant / admin consent still works for Phase 4. Gmail `gmail.readonly` is restricted: Testing-mode test users for Phase 4; public users need brand verification + restricted-scope verification + CASA. Recheck package/SHA-1/`cadence://auth` before Play. |
 
