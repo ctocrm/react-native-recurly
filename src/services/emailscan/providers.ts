@@ -371,6 +371,30 @@ function gmailAttachments(payload: any): NormalizedMessage["attachments"] {
   return out.length ? out : undefined;
 }
 
+/** Provider scan errors must surface the reason: pull the API's error
+ * message out of the response body (Gmail/Graph nest it under `error`). */
+async function providerErrorReason(res: Response): Promise<string> {
+  try {
+    const json = (await res.json()) as {
+      error?: { message?: string } | string;
+      error_description?: string;
+      message?: string;
+    };
+    if (typeof json.error === "object" && json.error?.message) {
+      return json.error.message;
+    }
+    if (typeof json.error === "string") {
+      return json.error_description
+        ? `${json.error} (${json.error_description})`
+        : json.error;
+    }
+    if (json.message) return json.message;
+  } catch {
+    // Non-JSON body - nothing useful to surface.
+  }
+  return "";
+}
+
 export function createGmailFetcher(
   accessToken: string,
   mailboxId: string,
@@ -391,8 +415,9 @@ export function createGmailFetcher(
         { headers: { Authorization: `Bearer ${accessToken}` } },
       );
       if (!listRes.ok) {
+        const reason = await providerErrorReason(listRes);
         throw new MailScanUnverifiedError(
-          `Gmail list failed (${listRes.status})`,
+          `Gmail list failed (${listRes.status})${reason ? `: ${reason}` : ""}`,
         );
       }
       const listJson = (await listRes.json()) as {
@@ -456,7 +481,10 @@ export function createGraphFetcher(
         { headers: { Authorization: `Bearer ${accessToken}` } },
       );
       if (!res.ok) {
-        throw new MailScanUnverifiedError(`Graph list failed (${res.status})`);
+        const reason = await providerErrorReason(res);
+        throw new MailScanUnverifiedError(
+          `Graph list failed (${res.status})${reason ? `: ${reason}` : ""}`,
+        );
       }
       const json = (await res.json()) as {
         value?: {
