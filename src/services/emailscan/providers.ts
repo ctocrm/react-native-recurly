@@ -195,6 +195,15 @@ function oauthSpec(providerId: MailProviderId): OAuthSpec {
   }
 }
 
+// Google's secure-response-handling policy rejects arbitrary custom schemes
+// (Error 400: invalid_request on `cadence://auth`). Native Google OAuth
+// clients must redirect via the reverse-client-ID scheme instead. The same
+// scheme must be registered as an intent filter on MainActivity.
+function googleRedirectUri(clientId: string): string {
+  const bare = clientId.replace(/\.apps\.googleusercontent\.com$/, "");
+  return `com.googleusercontent.apps.${bare}:/oauthredirect`;
+}
+
 export async function promptOAuth(
   providerId: MailProviderId,
   userId: string,
@@ -206,10 +215,15 @@ export async function promptOAuth(
     );
   }
   const spec = oauthSpec(providerId);
-  const redirectUri = AuthSession.makeRedirectUri({
-    scheme: "cadence",
-    native: "cadence://auth",
-  });
+  // Google requires the reverse-client-ID redirect (secure-response-handling
+  // policy); every other provider keeps the cadence:// custom scheme.
+  const redirectUri =
+    providerId === "gmail" || providerId === "workspace"
+      ? googleRedirectUri(clientId)
+      : AuthSession.makeRedirectUri({
+          scheme: "cadence",
+          native: "cadence://auth",
+        });
   const request = new AuthSession.AuthRequest({
     clientId,
     scopes: spec.scopes,
