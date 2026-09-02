@@ -257,4 +257,5 @@ A prior `--install` spawned a **second emulator** and killed package service (`C
 16. **After a tool/infrastructure failure, diagnose and change mechanism instead of repeating the same call**
 17. **The user's named outcome is the only definition of done — a plan note or fail report is not the task**
 18. **A plus after crawl is not proof the crawler was restored — diff the crawler file; check SVG vs RN Image and over-strict validation**
+19. **Match the OAuth response shape to the flow you configured (2026-09-02):** `usePKCE: true` makes every provider return `?code=` on the redirect, but `promptOAuth` read `params.access_token` (implicit-flow shape) and alerted "OAuth returned no access token" even though Entra consent + `cadence://auth` redirect had fully worked. Fix: exchange the code via `AuthSession.exchangeCodeAsync` (`code_verifier` rides via `extraParams` — SDK 54 has no `codeVerifier` field on token requests). Live-verified: 9 real rows imported from `ctocrm@outlook.com` (`e5bde4c`).
 
