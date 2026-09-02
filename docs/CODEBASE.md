@@ -211,7 +211,7 @@ Programmatic gate is **not** a completed visual gate. Visual gates use `.cline/s
 
 `.cline/skills/emulator-ui-driving/SKILL.md` (YAML frontmatter `name: emulator-ui-driving` — required for Cline discovery).
 
-Invariant: every UI-affecting adb command is followed by `adb exec-out screencap`, read back via vision, and asserted **before** the next UI command. No button-specific coordinates in the skill.
+Invariant: every UI-affecting adb command is followed by `uiautomator dump`, read back as **text**, and asserted **before** the next UI command. Screenshots are saved to disk for the user only — never read into the conversation (one image block locks the session; see `.clinerules/01-text-only-history.md`). No button-specific coordinates in the skill.
 
 Known device facts (generic, not a button recipe): `wm size` 1080×2400; software nav occupies ~y>2320; long-press = `input swipe X Y X Y 800`; locate targets via uiautomator bounds.
 

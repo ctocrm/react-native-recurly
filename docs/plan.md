@@ -1158,16 +1158,18 @@ npx expo lint          # 0 new errors
 
 Then `npm run build:android:x86_64` (install + launch). Logcat: `Running "main"`, no RN fatal.
 
-**Visual (every implementation phase), via the generic skill:**
+**Visual (every implementation phase), via the generic skill — text-only history:**
 
 ```text
 every UI-affecting adb command
-→ adb exec-out screencap
-→ read screenshot + vision assert
+→ adb shell uiautomator dump + read the XML as text
+→ assert expected text= / content-desc= / node present-gone / activity
 → only then the next UI command
 ```
 
 Locate targets with uiautomator bounds. Do not hardcode button coordinates in the skill or in this plan.
+
+Never read a screenshot into the conversation: one image block makes every later request fail with `messages.content.type is invalid, allowed values: ['text']` and locks the task permanently (rule: `.clinerules/01-text-only-history.md`). Pixel proof for the user = save `adb exec-out screencap -p` to a file and hand over the path.
 
 A static pass or a successful build is **not** a completed phase.
 
@@ -1186,7 +1188,7 @@ A static pass or a successful build is **not** a completed phase.
 - [x] Rewrite `docs/CODEBASE.md` as a real current-code map (routes, padding facts, every component, providers, services, frozen contracts, build scripts).
 - [x] Keep `.cline/skills/emulator-ui-driving/SKILL.md` generic:
   - YAML frontmatter `name: emulator-ui-driving` (Cline discovery).
-  - Invariant: every UI-affecting adb command (`input tap/swipe/text/keyevent`, `am start/force-stop`) is followed by screencap + vision assert.
+  - Invariant: every UI-affecting adb command (`input tap/swipe/text/keyevent`, `am start/force-stop`) is followed by screencap + vision assert (pre-2026-09-02 wording — superseded by the text-only dump+assert in `.clinerules/01-text-only-history.md`).
   - Generic techniques only: live `wm size`, uiautomator bounds, nav-bar dead zone, keyboard/dropdown dismissal, long-press = `input swipe X Y X Y 800`.
   - **No button-specific coordinates.**
 - [x] Revert leftover Phase-1 import-only dirty diffs if present (`subscriptions.tsx`, safeguards one-liner).

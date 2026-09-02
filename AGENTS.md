@@ -19,6 +19,7 @@ This project enforces strict Cline rules in `.clinerules/`. These rules are **ma
 9. **Update documentation** — after the user-facing gate is proven, not after a failed attempt.
 
 10. **Follow the phased workflow** — the native Cline Workflow is `.clinerules/workflows/jsmastery-repair-loop.md`; `docs/CLINE_WORKFLOW.md` is human-readable documentation.
+11. **Text-only conversation history** — never read images or screenshots into the chat: one image block makes every later request fail (`messages.content.type is invalid, allowed values: ['text']`) and permanently locks the session. Verify UI with `uiautomator` text dumps; screenshots only as on-disk paths handed to the user (`.clinerules/01-text-only-history.md`).
 
 ## Cline Workflow
 
@@ -38,6 +39,7 @@ With the 3-strike safeguard loop: if 3 consecutive attempts of the same hypothes
 | Doc                                              | Role                                                     |
 | ------------------------------------------------ | -------------------------------------------------------- |
 | `.clinerules/00-core-safeguards.md`              | Mandatory always-on Cline safeguards                     |
+| `.clinerules/01-text-only-history.md`            | Text-only chat history (prevents fatal session locks)   |
 | `.clinerules/workflows/jsmastery-repair-loop.md` | Native Cline repair Workflow                             |
 | `.cline/skills/jsmastery-repair/SKILL.md`        | On-demand project repair Skill                           |
 | `docs/LESSONS_LEARNED.md`                        | All mistakes made during the project, with direct quotes |

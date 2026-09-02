@@ -1,6 +1,6 @@
 # Lessons Learned — jsmastery Project
 
-**Last updated:** 2026-08-25
+**Last updated:** 2026-09-02
   
 **Purpose:** Document every mistake made during the jsmastery development cycle so they are never repeated. This file is the single source of truth for what went wrong and why.
 
@@ -235,6 +235,14 @@ A prior `--install` spawned a **second emulator** and killed package service (`C
 
 **Lesson:** install the leftover-slug APK before rewriting ranking/TIER 3. Do not start Hop 5 or checkout `063ac4b` / `3c10700` to “fix” a prefix that never landed on device.
 
+### 3.10 Image blocks in chat history lock the session (2026-09-02)
+
+User: _“You bugged again on last task in the last chat — messages.content.type is invalid, allowed values: ['text'] — and the session is locked it's the third time.”_
+
+The project's own docs mandated `adb exec-out screencap` → “read screenshot + vision assert” as the visual gate (plan.md visual section, CODEBASE.md emulator invariant, `emulator-ui-driving` skill loop). Reading the screenshot put an **image content block into the task history**. The model API accepts text blocks only, so **every** later request in that task failed with `messages.content.type is invalid, allowed values: ['text']`. The poisoned block replays on every retry — no in-task recovery; the session is dead. Three sessions were lost this way.
+
+**Lesson:** conversation history must stay text-only. Verify emulator UI with `uiautomator dump` XML asserts (text); screenshots only as on-disk files handed to the user by path. Governed by `.clinerules/01-text-only-history.md`.
+
 ---
 
 ## 4. Key Lessons
@@ -258,4 +266,5 @@ A prior `--install` spawned a **second emulator** and killed package service (`C
 17. **The user's named outcome is the only definition of done — a plan note or fail report is not the task**
 18. **A plus after crawl is not proof the crawler was restored — diff the crawler file; check SVG vs RN Image and over-strict validation**
 19. **Match the OAuth response shape to the flow you configured (2026-09-02):** `usePKCE: true` makes every provider return `?code=` on the redirect, but `promptOAuth` read `params.access_token` (implicit-flow shape) and alerted "OAuth returned no access token" even though Entra consent + `cadence://auth` redirect had fully worked. Fix: exchange the code via `AuthSession.exchangeCodeAsync` (`code_verifier` rides via `extraParams` — SDK 54 has no `codeVerifier` field on token requests). Live-verified: 9 real rows imported from `ctocrm@outlook.com` (`e5bde4c`).
+20. **Keep chat history text-only (2026-09-02):** one image block (screenshot read, image file read, base64) → every later request fails `messages.content.type is invalid, allowed values: ['text']` → task locked permanently. Verify UI via `uiautomator` text dumps; hand screenshots to the user as file paths only (`.clinerules/01-text-only-history.md`).
 
