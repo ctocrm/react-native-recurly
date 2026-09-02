@@ -206,7 +206,10 @@ export async function promptOAuth(
     );
   }
   const spec = oauthSpec(providerId);
-  const redirectUri = AuthSession.makeRedirectUri({ scheme: "cadence" });
+  const redirectUri = AuthSession.makeRedirectUri({
+    scheme: "cadence",
+    native: "cadence://auth",
+  });
   const request = new AuthSession.AuthRequest({
     clientId,
     scopes: spec.scopes,
