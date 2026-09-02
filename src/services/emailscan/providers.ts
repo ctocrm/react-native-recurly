@@ -228,17 +228,40 @@ export async function promptOAuth(
     );
   }
   const params = result.params;
-  const accessToken = params.access_token || params.accessToken;
+  let accessToken = params.access_token || params.accessToken;
+  let refreshToken = params.refresh_token || params.refreshToken;
+  let expiresAt = params.expires_in
+    ? Date.now() + Number.parseInt(params.expires_in, 10) * 1000
+    : undefined;
+
+  if (!accessToken && params.code) {
+    // PKCE / authorization-code flow: the redirect carries `code`, not an
+    // access token. Exchange it at the provider's token endpoint. SDK 54 has
+    // no `codeVerifier` field on token requests, so it rides via extraParams.
+    if (!request.codeVerifier) {
+      throw new MailConnectError(
+        "OAuth PKCE verifier missing for code exchange.",
+      );
+    }
+    const token = await AuthSession.exchangeCodeAsync(
+      {
+        clientId,
+        code: params.code,
+        redirectUri,
+        scopes: spec.scopes,
+        extraParams: { code_verifier: request.codeVerifier },
+      },
+      { tokenEndpoint: spec.tokenEndpoint },
+    );
+    accessToken = token.accessToken;
+    refreshToken = token.refreshToken ?? refreshToken;
+    expiresAt = token.expiresIn ? Date.now() + token.expiresIn * 1000 : expiresAt;
+  }
+
   if (!accessToken) {
     throw new MailConnectError("OAuth returned no access token");
   }
-  return {
-    accessToken,
-    refreshToken: params.refresh_token || params.refreshToken,
-    expiresAt: params.expires_in
-      ? Date.now() + Number.parseInt(params.expires_in, 10) * 1000
-      : undefined,
-  };
+  return { accessToken, refreshToken, expiresAt };
 }
 
 async function accountHintFromToken(
