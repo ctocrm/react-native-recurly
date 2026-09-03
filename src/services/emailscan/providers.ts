@@ -8,6 +8,11 @@
 import * as AuthSession from "expo-auth-session";
 import * as SecureStore from "expo-secure-store";
 import { runPersistedScan } from "./persist";
+import {
+  refreshAccessToken,
+  TokenRefreshRejectedError,
+  tokenNeedsRefresh,
+} from "./oauthRefresh";
 import type {
   IncrementalScanResult,
   MailProvider,
@@ -690,6 +695,52 @@ export function createJmapFetcher(
   };
 }
 
+/**
+ * Refresh-before-list glue: if the stored access token is expired (or within
+ * the skew margin) and a refresh token exists, mint a fresh one at the
+ * provider's token endpoint and persist it. A rejected refresh token can only
+ * be fixed by a fresh interactive sign-in, so that surfaces as an explicit
+ * reconnect error; transient failures (network, 5xx) fall back to the stored
+ * token and let the actual list call report any error.
+ */
+async function ensureFreshOAuthTokens(
+  providerId: MailProviderId,
+  mailboxId: string,
+  tokens: TokenBlob,
+): Promise<TokenBlob> {
+  if (!tokenNeedsRefresh(tokens) || !tokens.refreshToken) {
+    return tokens;
+  }
+  const clientId = oauthClientId(providerId);
+  if (!clientId) return tokens;
+  try {
+    const refreshed = await refreshAccessToken({
+      tokenEndpoint: oauthSpec(providerId).tokenEndpoint,
+      clientId,
+      refreshToken: tokens.refreshToken,
+    });
+    const next: TokenBlob = {
+      ...tokens,
+      accessToken: refreshed.accessToken,
+      refreshToken: refreshed.refreshToken ?? tokens.refreshToken,
+      expiresAt: refreshed.expiresAt ?? tokens.expiresAt,
+    };
+    await saveTokens(mailboxId, next);
+    console.log(`[MailOAuth] ${providerId} access token refreshed (${mailboxId})`);
+    return next;
+  } catch (error) {
+    if (error instanceof TokenRefreshRejectedError) {
+      throw new MailScanUnverifiedError(
+        `${providerId} sign-in expired — reconnect the mailbox (Edit → Reconnect) to scan it.`,
+      );
+    }
+    console.log(
+      `[MailOAuth] ${providerId} token refresh failed; retrying with stored token`,
+    );
+    return tokens;
+  }
+}
+
 async function fetcherFor(
   providerId: MailProviderId,
   userId: string,
@@ -776,17 +827,20 @@ async function fetcherFor(
   if (!tokens?.accessToken) {
     throw new MailConnectError("Not connected");
   }
+  // Refresh-before-list: OAuth access tokens expire long before a typical
+  // re-scan; without this every scan after ~1h failed with a provider 401.
+  const fresh = await ensureFreshOAuthTokens(providerId, mailboxId, tokens);
   if (providerId === "gmail" || providerId === "workspace") {
-    return createGmailFetcher(tokens.accessToken, mailboxId);
+    return createGmailFetcher(fresh.accessToken, mailboxId);
   }
   if (providerId === "outlook" || providerId === "office365") {
-    return createGraphFetcher(tokens.accessToken, mailboxId);
+    return createGraphFetcher(fresh.accessToken, mailboxId);
   }
   if (providerId === "fastmail") {
-    return createJmapFetcher(tokens.accessToken, mailboxId);
+    return createJmapFetcher(fresh.accessToken, mailboxId);
   }
   if (providerId === "zoho") {
-    return createZohoFetcher(tokens.accessToken, mailboxId);
+    return createZohoFetcher(fresh.accessToken, mailboxId);
   }
   return {
     async fetchMessages() {
