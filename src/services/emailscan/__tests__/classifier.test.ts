@@ -423,6 +423,7 @@ describe("emailscan subject amounts + no fake $0", () => {
 describe("isSelfMail — owner-domain drop (R3)", () => {
   const base = {
     id: "m1",
+    messageId: "m1",
     subject: "Invoice",
     date: "2026-09-01T00:00:00Z",
   };
@@ -471,6 +472,7 @@ describe("isSelfMail — owner-domain drop (R3)", () => {
 describe("isSelfMail — provider-hosted mailboxes keep vendor mail", () => {
   const base = {
     id: "m2",
+    messageId: "m2",
     subject: "Welcome to Tuta",
     date: "2026-09-01T00:00:00Z",
   };
