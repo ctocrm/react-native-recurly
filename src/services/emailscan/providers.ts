@@ -289,7 +289,7 @@ async function accountHintFromToken(
 ): Promise<string> {
   try {
     if (providerId === "gmail" || providerId === "workspace") {
-      const res = await fetch(
+      const res = await fetchWithTimeout(
         "https://gmail.googleapis.com/gmail/v1/users/me/profile",
         { headers: { Authorization: `Bearer ${accessToken}` } },
       );
@@ -299,7 +299,7 @@ async function accountHintFromToken(
       }
     }
     if (providerId === "outlook" || providerId === "office365") {
-      const res = await fetch("https://graph.microsoft.com/v1.0/me", {
+      const res = await fetchWithTimeout("https://graph.microsoft.com/v1.0/me", {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       if (res.ok) {
@@ -415,7 +415,7 @@ export function createGmailFetcher(
         q: qParts.join(" "),
         maxResults: String(Math.min(limit, 100)),
       });
-      const listRes = await fetch(
+      const listRes = await fetchWithTimeout(
         `https://gmail.googleapis.com/gmail/v1/users/me/messages?${params}`,
         { headers: { Authorization: `Bearer ${accessToken}` } },
       );
@@ -431,7 +431,7 @@ export function createGmailFetcher(
       const ids = (listJson.messages || []).map((m) => m.id);
       const messages: NormalizedMessage[] = [];
       for (const id of ids) {
-        const getRes = await fetch(
+        const getRes = await fetchWithTimeout(
           `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=full`,
           { headers: { Authorization: `Bearer ${accessToken}` } },
         );
@@ -481,7 +481,7 @@ export function createGraphFetcher(
           ? `receivedDateTime gt ${since.date}`
           : `(${filters.join(" or ")})`,
       });
-      const res = await fetch(
+      const res = await fetchWithTimeout(
         `https://graph.microsoft.com/v1.0/me/messages?${params}`,
         { headers: { Authorization: `Bearer ${accessToken}` } },
       );
@@ -531,7 +531,7 @@ export function createZohoFetcher(
 ): MessageFetcher {
   return {
     async fetchMessages({ since, limit }) {
-      const accRes = await fetch("https://mail.zoho.com/api/accounts", {
+      const accRes = await fetchWithTimeout("https://mail.zoho.com/api/accounts", {
         headers: { Authorization: `Zoho-oauthtoken ${accessToken}` },
       });
       if (!accRes.ok) {
@@ -553,7 +553,7 @@ export function createZohoFetcher(
         searchKey,
         limit: String(Math.min(limit, 50)),
       });
-      const res = await fetch(
+      const res = await fetchWithTimeout(
         `https://mail.zoho.com/api/accounts/${accountId}/messages/search?${params}`,
         { headers: { Authorization: `Zoho-oauthtoken ${accessToken}` } },
       );
@@ -596,7 +596,7 @@ export function createJmapFetcher(
 ): MessageFetcher {
   return {
     async fetchMessages({ since, limit }) {
-      const sessionRes = await fetch("https://api.fastmail.com/jmap/session", {
+      const sessionRes = await fetchWithTimeout("https://api.fastmail.com/jmap/session", {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       if (!sessionRes.ok) {
@@ -658,7 +658,7 @@ export function createJmapFetcher(
           "1",
         ],
       ];
-      const res = await fetch(apiUrl, {
+      const res = await fetchWithTimeout(apiUrl, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -695,6 +695,32 @@ export function createJmapFetcher(
   };
 }
 
+/**
+ * fetch that can never hang: rejects after `timeoutMs` (default 20s).
+ * A black-holed socket must surface as a per-mailbox error instead of
+ * freezing the whole scan loop (R9: the 2026-09-03 18-min scan hang).
+ */
+async function fetchWithTimeout(
+  url: string,
+  init?: RequestInit,
+  timeoutMs = 20_000,
+): Promise<Response> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`request timed out after ${timeoutMs}ms`)),
+      timeoutMs,
+    );
+  });
+  try {
+    return await Promise.race([fetch(url, init), timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+/**
+ * Refresh-before-list glue: if the stored access token is expired (or within
 /**
  * Refresh-before-list glue: if the stored access token is expired (or within
  * the skew margin) and a refresh token exists, mint a fresh one at the
