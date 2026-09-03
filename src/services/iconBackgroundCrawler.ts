@@ -1230,6 +1230,31 @@ export async function findIconUrls(iconKey: string): Promise<number> {
   return providerFailures;
 }
 
+// R4: hosts that ship non-brand imagery (wallpaper/photo farms, template
+// defaults, wiki assets). These failed brand inspection in the 2026-08-13
+// characterization (docs/crawler-baseline.md F1) and must never be downloaded
+// as icon candidates.
+const JUNK_ICON_HOST_PATTERNS: RegExp[] = [
+  /(^|\.)wikipedia\.org$/i,
+  /(^|\.)wikimedia\.org$/i,
+  /(^|\.)wsimg\.com$/i,
+  /(^|\.)superlander\.com$/i,
+  /fitliferegime\.com$/i,
+  /(^|\.)apps\.microsoft\.com$/i,
+  /(^|\.)netplus\.com$/i,
+  /(^|\.)cicgroup\.com$/i,
+  /(wallpaper|wallpapers|pexels|pixabay|unsplash|freepik|pngkey|pngwing|cleanpng|stickpng)\./i,
+];
+
+function isJunkIconHost(url: string): boolean {
+  try {
+    const host = new URL(url).hostname;
+    return JUNK_ICON_HOST_PATTERNS.some((re) => re.test(host));
+  } catch {
+    return true;
+  }
+}
+
 // Background fetch worker — processes queued downloads
 export async function processIconQueue(): Promise<void> {
   console.log(`[QUEUE] processIconQueue starting`);
@@ -1257,6 +1282,15 @@ export async function processIconQueue(): Promise<void> {
             .filter((r) => !r.imageData) // No image data means not yet downloaded
             .map((r) => r.originalUrl)
             .filter((u): u is string => Boolean(u));
+          const preFilterCount = unfetchedUrls.length;
+          const admittedUrls = unfetchedUrls.filter(
+            (u) => !isJunkIconHost(u),
+          );
+          if (admittedUrls.length < preFilterCount) {
+            console.log(
+              `[R4] Filtered ${preFilterCount - admittedUrls.length} junk-host URLs for ${item.icon_key}`,
+            );
+          }
 
           console.log(
             `[QUEUE] Found ${unfetchedUrls.length} URLs to fetch for ${item.icon_key}`,
@@ -1264,7 +1298,7 @@ export async function processIconQueue(): Promise<void> {
 
           // Prefer high-quality candidates; skip domains still in cooldown
           const candidates = sortUrlsByQuality(
-            unfetchedUrls
+            admittedUrls
               .map((url) => {
                 const crawlResult = crawlResults.find(
                   (r) => r.originalUrl === url,
