@@ -492,7 +492,6 @@ describe("isSelfMail — provider-hosted mailboxes keep vendor mail", () => {
 describe("resolveMerchant — generic single-word guard (R7)", () => {
   it("drops a generic Bot sender instead of importing it", () => {
     const r = resolveMerchant({
-      id: "m3",
       messageId: "m3",
       mailboxId: "workspace:david@bohbotweb.com",
       from: "Bot <bot@bot.com>",
@@ -505,7 +504,6 @@ describe("resolveMerchant — generic single-word guard (R7)", () => {
 
   it("keeps a real merchant sender", () => {
     const r = resolveMerchant({
-      id: "m4",
       messageId: "m4",
       mailboxId: "workspace:david@bohbotweb.com",
       from: "Linode <no-reply@linode.com>",
