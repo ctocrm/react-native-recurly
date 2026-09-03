@@ -1,4 +1,5 @@
 import {
+  resolveMerchant,
   classifyMessage,
   classifySubject,
   isSelfMail,
@@ -485,5 +486,33 @@ describe("isSelfMail — provider-hosted mailboxes keep vendor mail", () => {
         from: "Tuta <welcome@tutamail.com>",
       }),
     ).toBe(false);
+  });
+});
+
+describe("resolveMerchant — generic single-word guard (R7)", () => {
+  it("drops a generic Bot sender instead of importing it", () => {
+    const r = resolveMerchant({
+      id: "m3",
+      messageId: "m3",
+      mailboxId: "workspace:david@bohbotweb.com",
+      from: "Bot <bot@bot.com>",
+      subject: "Your weekly summary",
+      date: "2026-09-01T00:00:00Z",
+    });
+    expect(r.drop).toBe(true);
+    expect(r.evidence).toContain("drop:generic-name:bot");
+  });
+
+  it("keeps a real merchant sender", () => {
+    const r = resolveMerchant({
+      id: "m4",
+      messageId: "m4",
+      mailboxId: "workspace:david@bohbotweb.com",
+      from: "Linode <no-reply@linode.com>",
+      subject: "Your invoice is available",
+      date: "2026-09-01T00:00:00Z",
+    });
+    expect(r.drop).toBe(false);
+    expect(r.merchantName.toLowerCase()).toContain("linode");
   });
 });

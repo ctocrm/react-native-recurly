@@ -211,6 +211,28 @@ export function merchantFromAddress(from: string): {
   return { merchantKey: key, merchantName };
 }
 
+const GENERIC_MERCHANT_KEYS = new Set([
+  "bot",
+  "bots",
+  "no-reply",
+  "noreply",
+  "donotreply",
+  "do-not-reply",
+  "admin",
+  "administrator",
+  "notifications",
+  "notification",
+  "newsletter",
+  "newsletters",
+  "mailer",
+  "mailer-daemon",
+  "postmaster",
+  "bounce",
+  "bounces",
+  "webmaster",
+  "system",
+]);
+
 const SELF_DOMAIN_MAILBOX_KINDS = new Set([
   "gmail",
   "workspace",
@@ -342,6 +364,17 @@ export function resolveMerchant(message: NormalizedMessage): {
   }
   const fromMerchant = merchantFromAddress(message.from);
   const fromDomain = officialDomainFromAddress(message.from);
+  // R7: generic single-word senders ("Bot", "no-reply", "admin", …) are
+  // infrastructure, not merchants — never import them as subscription rows.
+  if (GENERIC_MERCHANT_KEYS.has(fromMerchant.merchantKey)) {
+    return {
+      merchantKey: fromMerchant.merchantKey,
+      merchantName: fromMerchant.merchantName,
+      officialDomain: fromDomain,
+      evidence: [`drop:generic-name:${fromMerchant.merchantKey}`],
+      drop: true,
+    };
+  }
   if (!isPaymentProcessor(fromMerchant.merchantKey)) {
     return {
       ...fromMerchant,

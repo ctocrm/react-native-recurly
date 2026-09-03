@@ -238,7 +238,7 @@ async function loadLocalIconAsBase64(iconKey: string): Promise<string | null> {
 
 // Download image and save to DB (rate-limit aware, short transient retries)
 const FETCH_TIMEOUT_MS = 15_000;
-const FETCH_MAX_ATTEMPTS = 3;
+const FETCH_MAX_ATTEMPTS = 2;
 
 function parseRetryAfterMs(header: string | null): number | undefined {
   if (!header) return undefined;
