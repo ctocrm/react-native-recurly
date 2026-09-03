@@ -132,7 +132,9 @@ const App = () => {
       });
       await refreshSubscriptions();
       await refreshMailboxCount();
-      if (imported === 0 && errors.length) {
+      if (errors.length) {
+        // Parity with EmailScanSection: surface per-mailbox errors even when
+        // some rows imported (R2 — errors were hidden whenever imported > 0).
         Alert.alert("Scan", errors.join("\n"));
       } else if (imported === 0) {
         Alert.alert("Scan", "No new subscriptions.");
