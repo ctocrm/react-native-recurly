@@ -146,4 +146,18 @@ describe("refreshAccessToken", () => {
       }),
     ).rejects.not.toBeInstanceOf(TokenRefreshRejectedError);
   });
+
+  it("times out a black-holed refresh instead of hanging the scan", async () => {
+    const never = (async () =>
+      new Promise<Response>(() => {})) as unknown as typeof fetch;
+    await expect(
+      refreshAccessToken({
+        tokenEndpoint: endpoint,
+        clientId: "c",
+        refreshToken: "rtk",
+        timeoutMs: 25,
+        fetchImpl: never,
+      }),
+    ).rejects.toThrow(/timed out/);
+  });
 });

@@ -709,10 +709,14 @@ async function ensureFreshOAuthTokens(
   tokens: TokenBlob,
 ): Promise<TokenBlob> {
   if (!tokenNeedsRefresh(tokens) || !tokens.refreshToken) {
+    console.log(
+      `[MailScan] ${providerId} ${mailboxId} token ${tokenNeedsRefresh(tokens) ? "expired but no refresh token" : "fresh"} — using as-is`,
+    );
     return tokens;
   }
   const clientId = oauthClientId(providerId);
   if (!clientId) return tokens;
+  console.log(`[MailScan] ${providerId} ${mailboxId} token expired — refreshing`);
   try {
     const refreshed = await refreshAccessToken({
       tokenEndpoint: oauthSpec(providerId).tokenEndpoint,
@@ -827,6 +831,7 @@ async function fetcherFor(
   if (!tokens?.accessToken) {
     throw new MailConnectError("Not connected");
   }
+  console.log(`[MailScan] fetcherFor ${providerId} ${mailboxId}`);
   // Refresh-before-list: OAuth access tokens expire long before a typical
   // re-scan; without this every scan after ~1h failed with a provider 401.
   const fresh = await ensureFreshOAuthTokens(providerId, mailboxId, tokens);

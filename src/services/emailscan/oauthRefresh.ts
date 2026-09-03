@@ -67,49 +67,76 @@ export interface RefreshedTokens {
 
 /** Exchange a refresh token for a fresh access token at `tokenEndpoint`
  * (RFC 6749 §6). Resolves with the new tokens; throws
- * `TokenRefreshRejectedError` when the provider rejects the grant. Other
- * errors (network, 5xx) propagate to the caller, which should fall back to
- * the stored token. `fetchImpl` is injectable for tests. */
+ * `TokenRefreshRejectedError` when the provider rejects the grant. Aborts
+ * with a transient failure after `timeoutMs` (default 15s) so a black-holed
+ * request can never stall the scan loop. `fetchImpl` is injectable for
+ * tests. */
 export async function refreshAccessToken(opts: {
   tokenEndpoint: string;
   clientId: string;
   refreshToken: string;
+  timeoutMs?: number;
   fetchImpl?: typeof fetch;
 }): Promise<RefreshedTokens> {
   const doFetch = opts.fetchImpl ?? fetch;
-  const body = new URLSearchParams({
-    grant_type: "refresh_token",
-    refresh_token: opts.refreshToken,
-    client_id: opts.clientId,
+  const timeoutMs = opts.timeoutMs ?? 15_000;
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  // Race the request against a hard timer: a fetch implementation that
+  // ignores the abort signal must not be able to stall the scan loop.
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`Token refresh timed out after ${timeoutMs}ms`)),
+      timeoutMs,
+    );
   });
-  const res = await doFetch(opts.tokenEndpoint, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: body.toString(),
-  });
-  const json = (await res
-    .json()
-    .catch(() => null)) as {
-    access_token?: string;
-    expires_in?: number | string;
-    refresh_token?: string;
-    error?: string;
-  } | null;
-  if (!res.ok || !json?.access_token) {
-    if (classifyTokenRefreshFailure(res.status, json) === "reconnect") {
-      throw new TokenRefreshRejectedError(
-        `Token refresh rejected (${res.status}${json?.error ? ` ${json.error}` : ""})`,
+  try {
+    const res = await Promise.race([
+      doFetch(opts.tokenEndpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          grant_type: "refresh_token",
+          refresh_token: opts.refreshToken,
+          client_id: opts.clientId,
+        }).toString(),
+        signal: controller.signal,
+      } as RequestInit),
+      timeout,
+    ]);
+    const json = (await res
+      .json()
+      .catch(() => null)) as {
+      access_token?: string;
+      expires_in?: number | string;
+      refresh_token?: string;
+      error?: string;
+    } | null;
+    if (!isRefreshOk(res.status, json)) {
+      if (classifyTokenRefreshFailure(res.status, json) === "reconnect") {
+        throw new TokenRefreshRejectedError(
+          `Token refresh rejected (${res.status}${json?.error ? ` ${json.error}` : ""})`,
+        );
+      }
+      throw new Error(
+        `Token refresh failed (${res.status}${json?.error ? ` ${json.error}` : ""})`,
       );
     }
-    throw new Error(
-      `Token refresh failed (${res.status}${json?.error ? ` ${json.error}` : ""})`,
-    );
+    return {
+      accessToken: json!.access_token!,
+      refreshToken: json!.refresh_token || opts.refreshToken,
+      expiresAt: json!.expires_in
+        ? Date.now() + Number(json!.expires_in) * 1000
+        : undefined,
+    };
+  } finally {
+    if (timer) clearTimeout(timer);
   }
-  return {
-    accessToken: json.access_token,
-    refreshToken: json.refresh_token || opts.refreshToken,
-    expiresAt: json.expires_in
-      ? Date.now() + Number(json.expires_in) * 1000
-      : undefined,
-  };
+}
+
+function isRefreshOk(
+  status: number,
+  json: { access_token?: string } | null,
+): boolean {
+  return status >= 200 && status < 300 && !!json?.access_token;
 }
