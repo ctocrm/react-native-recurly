@@ -17,6 +17,32 @@ const BCPG_DEP = 'implementation("org.bouncycastle:bcpg-jdk18on:1.78.1")';
 const OSGI_META_EXCLUDE =
   '            "META-INF/versions/9/OSGI-INF/MANIFEST.MF",';
 
+// R10 follow-up: Android Conscrypt has a platform race where a failed TLS
+// handshake can NPE inside ConscryptEngineSocket.drainOutgoingQueue while
+// OkHttp's closeQuietly runs on the shared Dispatcher thread, killing the
+// whole process mid-scan. Inject a default uncaught-exception guard that
+// suppresses only that known NPE; everything else still crashes normally.
+const CONSCRYPT_GUARD_FN = [
+  "  /**",
+  "   * Suppresses the Conscrypt close NPE (see git blame / R10). Every other",
+  "   * throwable still goes to the previous uncaught-exception handler.",
+  "   */",
+  "  private fun installConscryptCloseGuard() {",
+  "    val previous = Thread.getDefaultUncaughtExceptionHandler()",
+  "    Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->",
+  "      val isConscryptCloseNpe = throwable is NullPointerException &&",
+  "          thread.name.startsWith(\"OkHttp\") &&",
+  "          throwable.stackTrace.any { it.className.contains(\"ConscryptEngineSocket\") }",
+  "      if (isConscryptCloseNpe) {",
+  "        Log.w(\"ConscryptCloseGuard\", \"Suppressed Conscrypt close NPE on \" + thread.name, throwable)",
+  "        return@setDefaultUncaughtExceptionHandler",
+  "      }",
+  "      previous?.uncaughtException(thread, throwable)",
+  "    }",
+  "  }",
+  "",
+].join("\n");
+
 function withMailImap(config) {
   config = withDangerousMod(config, [
     "android",
@@ -42,6 +68,22 @@ function withMailImap(config) {
 
   config = withMainApplication(config, (cfg) => {
     let contents = cfg.modResults.contents;
+    if (!contents.includes("import android.util.Log")) {
+      contents = contents.replace(
+        /import android\.app\.Application/,
+        "import android.app.Application\nimport android.util.Log",
+      );
+    }
+    if (!contents.includes("installConscryptCloseGuard()")) {
+      contents = contents.replace(
+        /super\.onCreate\(\)\n/,
+        "super.onCreate()\n    installConscryptCloseGuard()\n",
+      );
+      contents = contents.replace(
+        /  override fun onConfigurationChanged\(/,
+        CONSCRYPT_GUARD_FN + "  override fun onConfigurationChanged(",
+      );
+    }
     if (!contents.includes("app.picksandshovels.cadence.imap.ImapPackage")) {
       contents = contents.replace(
         /import expo\.modules\.ReactNativeHostWrapper/,
