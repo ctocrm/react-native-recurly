@@ -8,6 +8,7 @@
 import * as AuthSession from "expo-auth-session";
 import * as SecureStore from "expo-secure-store";
 import { runPersistedScan } from "./persist";
+import { classifySubject } from "./classifier";
 import {
   refreshAccessToken,
   TokenRefreshRejectedError,
@@ -406,55 +407,87 @@ export function createGmailFetcher(
 ): MessageFetcher {
   return {
     async fetchMessages({ since, limit }) {
+      const pageLimit = Math.min(limit, 100);
       const qParts = [SUBJECT_QUERY];
       if (since?.date) {
         const day = since.date.slice(0, 10).replace(/-/g, "/");
         qParts.push(`after:${day}`);
       }
-      const params = new URLSearchParams({
-        q: qParts.join(" "),
-        maxResults: String(Math.min(limit, 100)),
-      });
-      const listRes = await fetchWithTimeout(
-        `https://gmail.googleapis.com/gmail/v1/users/me/messages?${params}`,
-        { headers: { Authorization: `Bearer ${accessToken}` } },
-      );
-      if (!listRes.ok) {
-        const reason = await providerErrorReason(listRes);
-        throw new MailScanUnverifiedError(
-          `Gmail list failed (${listRes.status})${reason ? `: ${reason}` : ""}`,
-        );
-      }
-      const listJson = (await listRes.json()) as {
-        messages?: { id: string }[];
-      };
-      const ids = (listJson.messages || []).map((m) => m.id);
-      const messages: NormalizedMessage[] = [];
-      for (const id of ids) {
-        const getRes = await fetchWithTimeout(
-          `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=full`,
+      const out: NormalizedMessage[] = [];
+      let pageToken: string | undefined;
+      let pages = 0;
+      let listed = 0;
+      let bodies = 0;
+      // Proton/Tuta staging: list ids paged, screen on cheap metadata, and
+      // pull full bodies only for subjects the classifier will actually use
+      // (recurring/sparse need bodies; drop/account/security never do).
+      do {
+        const params = new URLSearchParams({
+          q: qParts.join(" "),
+          maxResults: String(pageLimit),
+        });
+        if (pageToken) params.set("pageToken", pageToken);
+        const listRes = await fetchWithTimeout(
+          `https://gmail.googleapis.com/gmail/v1/users/me/messages?${params}`,
           { headers: { Authorization: `Bearer ${accessToken}` } },
         );
-        if (!getRes.ok) continue;
-        const raw = await getRes.json();
-        const headers = raw.payload?.headers as
-          { name: string; value: string }[] | undefined;
-        const body = gmailBody(raw.payload);
-        const internal = raw.internalDate
-          ? new Date(Number(raw.internalDate)).toISOString()
-          : new Date().toISOString();
-        messages.push({
-          mailboxId,
-          messageId: raw.id,
-          from: headerOf(headers, "From"),
-          subject: headerOf(headers, "Subject"),
-          date: internal,
-          text: body.text,
-          html: body.html,
-          attachments: gmailAttachments(raw.payload),
-        });
-      }
-      return messages;
+        if (!listRes.ok) {
+          const reason = await providerErrorReason(listRes);
+          throw new MailScanUnverifiedError(
+            `Gmail list failed (${listRes.status})${reason ? `: ${reason}` : ""}`,
+          );
+        }
+        const listJson = (await listRes.json()) as {
+          messages?: { id: string }[];
+          nextPageToken?: string;
+        };
+        pageToken = listJson.nextPageToken;
+        pages += 1;
+        const ids = (listJson.messages || []).map((m) => m.id);
+        listed += ids.length;
+
+        for (const id of ids) {
+          const metaRes = await fetchWithTimeout(
+            `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date`,
+            { headers: { Authorization: `Bearer ${accessToken}` } },
+          );
+          if (!metaRes.ok) continue;
+          const meta = (await metaRes.json()) as {
+            id?: string;
+            payload?: { headers?: { name: string; value: string }[] };
+          };
+          const headers = meta.payload?.headers ?? [];
+          const subject = headerOf(headers, "Subject");
+          const cls = classifySubject(subject);
+          if (cls !== "recurring" && cls !== "sparse") continue;
+
+          const fullRes = await fetchWithTimeout(
+            `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=full`,
+            { headers: { Authorization: `Bearer ${accessToken}` } },
+          );
+          if (!fullRes.ok) continue;
+          const raw = await fullRes.json();
+          const body = gmailBody(raw.payload);
+          const parsed = new Date(headerOf(headers, "Date"));
+          out.push({
+            mailboxId,
+            messageId: meta.id || id,
+            from: headerOf(headers, "From"),
+            subject,
+            date: Number.isNaN(parsed.getTime())
+              ? new Date().toISOString()
+              : parsed.toISOString(),
+            text: body.text,
+            html: body.html,
+            attachments: gmailAttachments(raw.payload),
+          });
+          bodies += 1;
+        }
+      } while (pageToken);
+      console.log(
+        `[MailGmail] listed ${listed} pages=${pages} bodies=${bodies} of ${listed}`,
+      );
+      return out;
     },
   };
 }
@@ -465,62 +498,91 @@ export function createGraphFetcher(
 ): MessageFetcher {
   return {
     async fetchMessages({ since, limit }) {
-      const filters = [
-        "contains(subject,'welcome')",
-        "contains(subject,'subscription')",
-        "contains(subject,'renewal')",
-        "contains(subject,'invoice')",
-        "contains(subject,'receipt')",
-        "contains(subject,'password')",
-        "contains(subject,'order')",
-      ];
-      const params = new URLSearchParams({
-        $top: String(Math.min(limit, 50)),
-        $select: "id,subject,from,receivedDateTime,body,hasAttachments",
-        $filter: since?.date
-          ? `receivedDateTime gt ${since.date}`
-          : `(${filters.join(" or ")})`,
-      });
-      const res = await fetchWithTimeout(
-        `https://graph.microsoft.com/v1.0/me/messages?${params}`,
-        { headers: { Authorization: `Bearer ${accessToken}` } },
-      );
-      if (!res.ok) {
-        const reason = await providerErrorReason(res);
-        throw new MailScanUnverifiedError(
-          `Graph list failed (${res.status})${reason ? `: ${reason}` : ""}`,
-        );
-      }
-      const json = (await res.json()) as {
-        value?: {
-          id: string;
-          subject?: string;
-          from?: { emailAddress?: { address?: string; name?: string } };
-          receivedDateTime?: string;
-          body?: { contentType?: string; content?: string };
-        }[];
-      };
-      return (json.value || []).map((m) => {
-        const addr = m.from?.emailAddress?.address || "";
-        const name = m.from?.emailAddress?.name;
-        const html =
-          m.body?.contentType?.toLowerCase() === "html"
-            ? m.body.content
-            : undefined;
-        const text =
-          m.body?.contentType?.toLowerCase() === "text"
-            ? m.body.content
-            : undefined;
-        return {
-          mailboxId,
-          messageId: m.id,
-          from: name ? `${name} <${addr}>` : addr,
-          subject: m.subject || "",
-          date: m.receivedDateTime || new Date().toISOString(),
-          text,
-          html,
+      const out: NormalizedMessage[] = [];
+      let pages = 0;
+      let listed = 0;
+      let bodies = 0;
+      // Proton/Tuta staging: Graph's list returns screening fields directly
+      // ($select — no separate metadata pass), pages are followed via
+      // @odata.nextLink, and bodies ($select=body) load only for subjects the
+      // classifier will actually use.
+      let url: string | null =
+        (() => {
+          const params = new URLSearchParams({
+            $top: String(Math.min(limit, 100)),
+            $select: "id,subject,from,receivedDateTime",
+          });
+          if (since?.date) {
+            params.set("$filter", `receivedDateTime gt ${since.date}`);
+          }
+          return `https://graph.microsoft.com/v1.0/me/messages?${params}`;
+        })();
+      while (url) {
+        const res = await fetchWithTimeout(url, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        if (!res.ok) {
+          const reason = await providerErrorReason(res);
+          throw new MailScanUnverifiedError(
+            `Graph list failed (${res.status})${reason ? `: ${reason}` : ""}`,
+          );
+        }
+        const json = (await res.json()) as {
+          value?: {
+            id: string;
+            subject?: string;
+            from?: { emailAddress?: { address?: string; name?: string } };
+            receivedDateTime?: string;
+          }[];
+          "@odata.nextLink"?: string;
         };
-      });
+        url = json["@odata.nextLink"] ?? null;
+        pages += 1;
+        const items = json.value || [];
+        listed += items.length;
+
+        for (const m of items) {
+          const addr = m.from?.emailAddress?.address || "";
+          const name = m.from?.emailAddress?.name;
+          const from = name ? `${name} <${addr}>` : addr;
+          const subject = m.subject || "";
+          const cls = classifySubject(subject);
+          if (cls !== "recurring" && cls !== "sparse") continue;
+
+          const bodyRes = await fetchWithTimeout(
+            `https://graph.microsoft.com/v1.0/me/messages/${encodeURIComponent(
+              m.id,
+            )}?$select=body`,
+            { headers: { Authorization: `Bearer ${accessToken}` } },
+          );
+          if (!bodyRes.ok) continue;
+          const bj = (await bodyRes.json()) as {
+            body?: { contentType?: string; content?: string };
+          };
+          const html =
+            bj.body?.contentType?.toLowerCase() === "html"
+              ? bj.body.content
+              : undefined;
+          const text =
+            bj.body?.contentType?.toLowerCase() === "text"
+              ? bj.body.content
+              : undefined;
+          out.push({
+            mailboxId,
+            messageId: m.id,
+            from,
+            subject,
+            date: m.receivedDateTime || new Date().toISOString(),
+            text,
+            html,
+          });
+          bodies += 1;
+        }
+      }
+      console.log(
+        `[MailGraph] listed ${listed} pages=${pages} bodies=${bodies} of ${listed}`,
+      );
+      return out;
     },
   };
 }
