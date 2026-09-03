@@ -211,6 +211,16 @@ export function merchantFromAddress(from: string): {
   return { merchantKey: key, merchantName };
 }
 
+const SELF_DOMAIN_MAILBOX_KINDS = new Set([
+  "gmail",
+  "workspace",
+  "outlook",
+  "office365",
+  "fastmail",
+  "zoho",
+  "imap",
+]);
+
 export function ownerAddressFromMailbox(mailboxId: string): string | null {
   const colon = mailboxId.indexOf(":");
   if (colon < 0) return null;
@@ -238,6 +248,23 @@ export function isSelfMail(message: NormalizedMessage): boolean {
   const fromEmail = extractEmailAddress(message.from);
   const owner = ownerAddressFromMailbox(message.mailboxId);
   if (owner && fromEmail === owner) return true;
+  // R3: on custom-domain mailboxes any sender on the owner's own domain is
+  // the user's own company (no-reply@bohbotweb.com for david@bohbotweb.com)
+  // — never a merchant. Provider-hosted mailboxes (tuta:, proton:) are
+  // excluded: their domain belongs to the vendor, and vendor receipts
+  // (Tuta/Proton plans) are genuine subscriptions.
+  const colon = message.mailboxId.indexOf(":");
+  const kind = colon > 0 ? message.mailboxId.slice(0, colon).toLowerCase() : "";
+  if (
+    owner &&
+    fromEmail.includes("@") &&
+    owner.includes("@") &&
+    SELF_DOMAIN_MAILBOX_KINDS.has(kind)
+  ) {
+    const ownerDomain = owner.slice(owner.indexOf("@") + 1);
+    const fromDomain = fromEmail.slice(fromEmail.indexOf("@") + 1);
+    if (ownerDomain && fromDomain === ownerDomain) return true;
+  }
   const display = displayNameFrom(message.from);
   if (SELF_DISPLAY_NAMES.has(display)) {
     if (!owner) return true;

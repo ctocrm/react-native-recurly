@@ -1,6 +1,7 @@
 import {
   classifyMessage,
   classifySubject,
+  isSelfMail,
   merchantFromAddress,
 } from "../classifier";
 import {
@@ -416,5 +417,71 @@ describe("emailscan subject amounts + no fake $0", () => {
     });
     expect(sub.name).toBe("xAI");
     expect(sub.icon_key).toBe("xai");
+  });
+});
+
+describe("isSelfMail — owner-domain drop (R3)", () => {
+  const base = {
+    id: "m1",
+    subject: "Invoice",
+    date: "2026-09-01T00:00:00Z",
+  };
+
+  it("drops same-domain senders as self-mail", () => {
+    expect(
+      isSelfMail({
+        ...base,
+        mailboxId: "workspace:david@bohbotweb.com",
+        from: "Bohbot Web <no-reply@bohbotweb.com>",
+      }),
+    ).toBe(true);
+  });
+
+  it("keeps other-domain senders", () => {
+    expect(
+      isSelfMail({
+        ...base,
+        mailboxId: "workspace:david@bohbotweb.com",
+        from: "Linode <no-reply@linode.com>",
+      }),
+    ).toBe(false);
+  });
+
+  it("keeps lookalike domains that merely contain the owner domain", () => {
+    expect(
+      isSelfMail({
+        ...base,
+        mailboxId: "workspace:david@bohbotweb.com",
+        from: "Scam <billing@notbohbotweb.com>",
+      }),
+    ).toBe(false);
+  });
+
+  it("still drops the exact owner address", () => {
+    expect(
+      isSelfMail({
+        ...base,
+        mailboxId: "workspace:david@bohbotweb.com",
+        from: "David <david@bohbotweb.com>",
+      }),
+    ).toBe(true);
+  });
+});
+
+describe("isSelfMail — provider-hosted mailboxes keep vendor mail", () => {
+  const base = {
+    id: "m2",
+    subject: "Welcome to Tuta",
+    date: "2026-09-01T00:00:00Z",
+  };
+
+  it("does not drop same-domain mail on provider-hosted mailboxes", () => {
+    expect(
+      isSelfMail({
+        ...base,
+        mailboxId: "tuta:picksandshovels@tutamail.com",
+        from: "Tuta <welcome@tutamail.com>",
+      }),
+    ).toBe(false);
   });
 });
