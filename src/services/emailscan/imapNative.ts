@@ -181,21 +181,48 @@ export function createProtonFetcher(
         session = await protonLogin(native, creds);
         await persistSession(session);
       }
-      const listed = await native.listWithSession(
-        session.uid,
-        session.accessToken,
-        since?.date ?? null,
-        limit,
-        creds.password,
+      // Proton/Tuta staging with a bounded bridge payload: decrypt+return the
+      // mailbox in chunks so no single native->JS response is whole-mailbox
+      // sized (R10: a 443-message one-shot payload exhausted the Java heap).
+      const CHUNK = 75;
+      const MAX_BATCHES = 40;
+      const out: NormalizedMessage[] = [];
+      const seen = new Set<string>();
+      let cursorIso: string | null = since?.date ?? null;
+      for (let batch = 0; batch < MAX_BATCHES; batch += 1) {
+        const listed = await native.listWithSession(
+          session.uid,
+          session.accessToken,
+          cursorIso,
+          CHUNK,
+          creds.password,
+        );
+        const fresh = (listed.messages || [])
+          .map((m): NormalizedMessage => ({
+            mailboxId,
+            messageId: m.messageId,
+            from: m.from,
+            subject: m.subject,
+            date: m.date,
+            text: m.text,
+          }))
+          .filter((m) => !seen.has(m.messageId));
+        if (fresh.length === 0) break;
+        for (const m of fresh) {
+          seen.add(m.messageId);
+          out.push(m);
+        }
+        const dates = fresh
+          .map((m) => m.date)
+          .filter(Boolean)
+          .sort();
+        if (fresh.length < CHUNK || dates.length === 0) break;
+        cursorIso = dates[dates.length - 1];
+      }
+      console.log(
+        `[MailProton-js] batches staged, messages=${out.length} (chunk=${CHUNK})`,
       );
-      return (listed.messages || []).map((m): NormalizedMessage => ({
-        mailboxId,
-        messageId: m.messageId,
-        from: m.from,
-        subject: m.subject,
-        date: m.date,
-        text: m.text,
-      }));
+      return out;
     },
   };
 }
