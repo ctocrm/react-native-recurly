@@ -117,7 +117,7 @@ const GENERIC_FILE_TOKENS = new Set([
   "small",
 ]);
 
-function isPartnerOrUnrelatedMark(brand: string, url: string): boolean {
+export function isPartnerOrUnrelatedMark(brand: string, url: string): boolean {
   const compact = brand.toLowerCase().replace(/[^a-z0-9]+/g, "");
   let path = "";
   try {

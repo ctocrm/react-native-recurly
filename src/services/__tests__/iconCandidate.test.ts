@@ -3,6 +3,7 @@ import {
   classifyTrustedCandidate,
   hasLogoSignal,
   isGenericSocialImage,
+  isPartnerOrUnrelatedMark,
   isPickerPublishableCandidate,
   isPublishableExtractedIcon,
   isUiChromeImage,
@@ -172,6 +173,41 @@ describe("iconCandidate (hop 3 gates)", () => {
         hosts,
         "https://acehardware.com/on/demandware.static/scotts-logo.png",
         "spider:img_logo",
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("isPartnerOrUnrelatedMark (I1)", () => {
+  it("flags the tuta.com EU-SME-alliance partner badge", () => {
+    expect(
+      isPartnerOrUnrelatedMark(
+        "tuta",
+        "https://tuta.com/assets/european_digital_sme_alliance_logo.DVqbPoKQ.png",
+      ),
+    ).toBe(true);
+  });
+
+  it("flags Forbes logo hosted on porkbun.com", () => {
+    expect(
+      isPartnerOrUnrelatedMark(
+        "porkbun",
+        "https://porkbun.com/images/Forbes_logo.png",
+      ),
+    ).toBe(true);
+  });
+
+  it("keeps the brand's own favicon and wordmark assets", () => {
+    expect(
+      isPartnerOrUnrelatedMark(
+        "tuta",
+        "https://tuta.com/favicon/logo-favicon-192.png",
+      ),
+    ).toBe(false);
+    expect(
+      isPartnerOrUnrelatedMark(
+        "porkbun",
+        "https://porkbun.com/images/porkbun-logo-1200x1200.png",
       ),
     ).toBe(false);
   });

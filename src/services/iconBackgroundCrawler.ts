@@ -26,6 +26,7 @@ import {
 } from "@/services/domain/officialDomain";
 import {
   classifyTrustedCandidate,
+  isPartnerOrUnrelatedMark,
   isPickerPublishableCandidate,
   isPublishableExtractedIcon,
   isUiChromeImage,
@@ -894,6 +895,10 @@ export async function findIconUrls(iconKey: string): Promise<number> {
           for (const icon of extracted) {
             if (added >= MAX_OFFICIAL_SITE_IMGS) break;
             if (!isPublishableExtractedIcon(icon.url, icon.source)) continue;
+            // I1: partner/sponsor marks hosted on the official site (Scotts on
+            // Ace, tuta.com's EU-SME-alliance badge, porkbun's Forbes logo)
+            // must never become candidates.
+            if (isPartnerOrUnrelatedMark(iconKey, icon.url)) continue;
             if (existingUrls.has(icon.url)) continue;
             const source =
               icon.source === "favicon" || icon.source === "common_path"
@@ -1344,9 +1349,22 @@ export async function processIconQueue(): Promise<void> {
           const userChosen =
             cached?.chosen === true || isUserChosenCacheSource(cached?.source);
           if (canAutoAssignCache(!!cached?.imageData, cachedValid, userChosen)) {
-            const all = await getCrawlResults(item.icon_key);
+            const [all, reports] = await Promise.all([
+              getCrawlResults(item.icon_key),
+              getReportsForIcon(item.icon_key),
+            ]);
+            const activeReportedHashes = new Set(
+              reports.filter((r) => !r.rejected).map((r) => r.imageData),
+            );
             const withData = all.filter(
-              (r) => r.imageData && isPaintableCardIcon(r.imageData, r.format),
+              (r) =>
+                r.imageData &&
+                isPaintableCardIcon(r.imageData, r.format) &&
+                !activeReportedHashes.has(r.imageData) &&
+                !(
+                  r.originalUrl &&
+                  isPartnerOrUnrelatedMark(item.icon_key, r.originalUrl)
+                ),
             );
             if (withData.length > 0) {
               const session = await getIconCrawlSession(item.icon_key);
@@ -1460,10 +1478,22 @@ export async function promoteFirstIconToCache(iconKey: string): Promise<void> {
       return;
     }
 
-    const all = await getCrawlResults(iconKey);
-    // Never auto-assign empty / fully-transparent / unpaintable SVG to the card.
+    const [all, reports] = await Promise.all([
+      getCrawlResults(iconKey),
+      getReportsForIcon(iconKey),
+    ]);
+    const activeReportedHashes = new Set(
+      reports.filter((r) => !r.rejected).map((r) => r.imageData),
+    );
+    // Never auto-assign empty / fully-transparent / unpaintable SVG to the
+    // card; never auto-assign partner marks or user-reported-wrong icons
+    // (I1/I3).
     const withData = all.filter(
-      (r) => r.imageData && isPaintableCardIcon(r.imageData, r.format),
+      (r) =>
+        r.imageData &&
+        isPaintableCardIcon(r.imageData, r.format) &&
+        !activeReportedHashes.has(r.imageData) &&
+        !(r.originalUrl && isPartnerOrUnrelatedMark(iconKey, r.originalUrl)),
     );
     if (withData.length === 0) {
       console.log(

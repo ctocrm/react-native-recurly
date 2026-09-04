@@ -11,6 +11,7 @@ import {
 import {
   isFirstPartyIconSource,
   isGenericSocialImage,
+  isSocialOrGenericImageSource,
   provenanceRank,
 } from "@/services/iconCandidate";
 
@@ -65,6 +66,10 @@ export function scoreIconQuality(icon: IconQualityInput): number {
 
   // Provenance first: official/library/brand-token beat visual quality.
   score += provenanceRank(provenanceFor(icon)) * 2000;
+
+  // I2: og/twitter/jsonld_image are social-share art, never icon-shaped
+  // marks — rank them below the whole favicon family regardless of size.
+  if (isSocialOrGenericImageSource(src)) score -= 1500;
 
   // Social/share photos are not logos even on a first-party host.
   if (isGenericSocialImage(url, src) && !src.includes("logo")) {

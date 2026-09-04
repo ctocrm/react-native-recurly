@@ -261,3 +261,52 @@ describe("iconQuality (pure functions)", () => {
     });
   });
 });
+
+describe("og/twitter demotion (I2)", () => {
+  const brand = "porkbun";
+  const officialHost = "porkbun.com";
+
+  it("never lets an og:image wordmark outrank the favicon family", () => {
+    const og = scoreIconQuality({
+      source: "official_og_image",
+      format: "png",
+      originalUrl: "https://porkbun.com/images/porkbun-logo-1200x1200.png",
+      originalWidth: 1200,
+      originalHeight: 1200,
+      brand,
+      officialHost,
+    });
+    const apple = scoreIconQuality({
+      source: "official_apple_touch",
+      format: "png",
+      originalUrl: "https://porkbun.com/images/favicons/apple-icon-180x180.png",
+      originalWidth: 180,
+      originalHeight: 180,
+      brand,
+      officialHost,
+    });
+    expect(apple).toBeGreaterThan(og);
+  });
+
+  it("demotes og/twitter sources below same-class favicon-family sources", () => {
+    const og = scoreIconQuality({
+      source: "official_og_image",
+      format: "png",
+      originalUrl: "https://brand.test/images/logo-share.png",
+      originalWidth: 512,
+      originalHeight: 512,
+      brand: "brand",
+      officialHost: "brand.test",
+    });
+    const pwa = scoreIconQuality({
+      source: "official_pwa",
+      format: "png",
+      originalUrl: "https://brand.test/android-chrome-192x192.png",
+      originalWidth: 192,
+      originalHeight: 192,
+      brand: "brand",
+      officialHost: "brand.test",
+    });
+    expect(pwa).toBeGreaterThan(og);
+  });
+});
