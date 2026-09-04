@@ -1,6 +1,6 @@
 # Product plan — icons, crawl, DB, sync (no training)
 
-**Last updated:** 2026-09-02
+**Last updated:** 2026-09-04
 
 **Status:** Phases **1–5.5 complete**. **MAJOR FIX (Tranches A–F) landed**. **Icon hops 1–5 proven on device** (`466cde7`, `71a3840`, `6d54b0d`+`6c47871`, `2d0ba23`+`32521cb`, `5dc46ed`). **xAI compound-label hop proven** (`029c509`). **UI Improvements Phase 0–3 complete** (`ba66478`, `e4e383e`, `77a83bb`, `913b08f`). **Home/Insights hops A–E proven on device** (`ff3f3b9`, `ed16b0f`, `30de520`, `a6e6774`, `b510a35`). **UI Phase 4 is still not complete.** **Cadence identity hop proven** (`f005865` + `ff6ecd2` + `5ac6f97`). **Mail OAuth reply URI code hop:** `providers.ts` sends **`cadence://auth`**. **Wave 1 #1 Outlook Graph PROVEN live 2026-09-02** (`e5bde4c` PKCE code-exchange fix; redirect → exchange → Graph `/me` → Scan imported 9 real rows). **Wave 1 remaining:** #2 Google Workspace (`david@bohbotweb.com` — user must add it as Google Auth Platform test user first) → #3 IMAP last-row on the Outlook mailbox. Zoho client secret pasted in chat must be regenerated. Fastmail skipped. Proton/Tuta already imported live rows. Phase 5 graph is not started. Phase 6 remains later ship polish. Training frozen.
 
@@ -36,6 +36,84 @@ This is the living execution plan for app-side quality and reliability **without
 | **6**   | Ship polish                                            | **After UI Improvements**             | full smoke + doc pass               |
 
 ---
+
+
+## Completion roadmap — executor phases (locked 2026-09-04)
+
+Remaining work split into independently verifiable phases, each with a unit gate AND an emulator/vision gate. Written for step-by-step executor runs (glm-5.3-flash): **one phase per session, never mix phases.** UI Phase 5 (Insights graph) and Phase 6 ship polish are explicitly **DEFERRED** (user, 2026-09-04). Correction vs the 2026-09-03 audit row: R2, R3, R6, R7 are **already landed in code** (index.tsx R2 parity comment; classifier.ts:269 owner-domain guard; app/auth.tsx R6 no-op; classifier.ts:367 single-word guard + tests) — they need verification gates only (Phase A). Implementation work remaining: R5, P3, P4, I3-live, R4, UI-4 close-out, optional R13.
+
+### Standing rules (read before every phase)
+
+1. Loop per phase: Analyse → Edit → Unit gate (tsc + jest) → Commit → Build → Emulator+Vision gate → Docs row → Commit. The emulator/vision gate — never unit tests alone — is the definition of done.
+2. Commands >28s MUST run under systemd-run (the 30s tool timeout kills process trees):
+   `systemd-run --user --unit=<name> --working-directory=<repo> /bin/bash -c '<cmd> > /tmp/<name>.log 2>&1'`
+   then poll: `sleep 25; systemctl --user is-active <name>; tail -3 /tmp/<name>.log`
+3. Emulator: `systemd-run --user --unit=emu5554 /home/d/Android/Sdk/emulator/emulator -avd pixel_6a_API34 -no-snapshot-load -no-audio -no-window -no-boot-anim -port 5554`; ready when `adb shell getprop sys.boot_completed` = `1` (≈90s).
+4. NEVER hardcode tap coordinates. Derive, then tap bounds center:
+   `adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; adb shell cat /sdcard/ui.xml | perl -ne 'while (/text="([^"]{1,60})"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/g) { print "$1: ($2,$3)-($4,$5)\n" }'`
+   Tab bar ≈ y2116, x-centers ≈ 174/419/663/906 (re-derive every session). y ≥ 2274 is the gesture zone — do not tap there.
+5. Vision evidence: `adb exec-out screencap -p > /tmp/scr_<name>.png` then VIEW the image; if image viewing is unavailable, fall back to the text dump (rule 4).
+6. ANR dialog → tap **Wait** (≈540,1335), ≤3×, then `adb shell am force-stop com.android.systemui` (auto-restarts clean).
+7. Package missing after emulator recycle → `adb install -r android/app/build/outputs/apk/release/app-release.apk`.
+8. 3-strike rule: same fix hypothesis failing 3× → STOP, docs row, ask the user.
+9. `adb root` only when a phase says so (it restarts adbd and kills log captures). Both ProtonModule.kt copies must stay identical: edit `plugins/mail-imap/android/ProtonModule.kt`, then `cp` over `android/app/src/main/java/app/picksandshovels/cadence/imap/ProtonModule.kt`; `diff` must be empty.
+
+### Phase A — audit verification day (R2/R3/R6/R7 — verify only, no feature code)
+
+- A1 unit: `tsc --noEmit` + full jest under a systemd unit. PASS = all green, tsc silent.
+- A2 live R2/R3/R7: start logcat capture → launch app → run one scan. PASS = all 4 legs logged (`MailProton listed`, `Tuta listed`, `fetcherFor workspace`, `fetcherFor outlook`) and the subscriptions list contains NO "Bohbotweb" row and NO bare "Bot" row (if one exists, delete it via card ••• → Delete and note it in the docs row).
+- A3 live R6: mailbox Edit → Reconnect → complete MS sign-in → screenshot immediately after the redirect. PASS (vision) = Subscriptions screen, NOT an "Unmatched route" page. Save `/tmp/scr_r6.png`.
+- A4 docs: changelog row with evidence + refresh the stale Status line at the top of this file. Commit.
+
+### Phase B — R5: decouple scan-complete alert from icon-queue drain; dead-host retries ≤2
+
+- B1 analyse (no edits yet): `grep -n "startIconCrawl\|iconQueue\|await" src/services/emailscan/scanConnected.ts | head -30` and `sed -n '1,60p' src/services/iconBackgroundCrawler.ts`. Find (a) the await that blocks the scan on crawl work, (b) the retry counter. Write down both line numbers before editing.
+- B2 edit: crawl kick-off becomes fire-and-forget (the scan path never awaits the queue); `MAX_RETRIES = 2` per host/URL. Smallest possible diffs.
+- B3 unit: jest green (add a test for the retry cap if the logic is a pure function), tsc clean. Commit `fix(emailscan): R5 - scan alert decoupled from icon queue; dead-host retries capped at 2`.
+- B4 build (systemd unit `pb`); verify the APK is on the live emulator.
+- B5 gate: Settings → Clear Email Scan Cache → run a scan. PASS = the Scan alert appears ≤90s after the tap AND logcat shows `startIconCrawl` lines AFTER the alert timestamp with FETCH successes still growing afterwards (decoupling proven). Vision: alert screenshot. Docs row + commit.
+
+
+### Phase C — P3: Proton locked-scope unlock once per scan
+
+- C1 analyse: `grep -n "unlock\|locked" plugins/mail-imap/android/ProtonModule.kt | head -20` (helper ≈ :567-597). Cache "unlocked for this session" so a second `listWithSession` on the same uid+token skips the SRP unlock; invalidate on token refresh (P2 reactive path). Edit BOTH copies (cp + diff per rule 9).
+- C2 unit: jest + tsc green (native change has no jest coverage — say so honestly in the docs row). Commit `fix(proton): P3 - locked-scope unlock runs once per scan, not per batch`.
+- C3 build (systemd unit `pc`).
+- C4 gate: clear Email Scan Cache → scan. PASS = `grep -c "locked-scope unlock ok"` == **1** (was 7 post-R11), batches still `listed 75`×6 + `listed 7`, every body `fail=0`, `batches staged, messages=451`, Home Monthly Spend still `$291.45`. FAIL → diagnose; 3-strike rule applies.
+
+### Phase D — P4: official Proton client fingerprints
+
+- D1 analyse: `grep -n "x-pm-appversion\|User-Agent" plugins/mail-imap/android/ProtonModule.kt` (today: `"Other"` / `jsmastery/1.0` at :795-796). Take replacement values ONLY from `docs/research-2026-09-03-proton-reauth-icon-ranking.md` §D5/D6 (official web appversion/UA). Do not invent values.
+- D2 edit both copies; one constants block citing the research doc. Commit `fix(proton): P4 - official client fingerprints (appversion/UA)`.
+- D3 build (unit `pd`). Gate: one normal scan → PASS = listed/unlock/staged lines normal, ZERO `PROTON_ABUSE` / `2028` / `429` / CAPTCHA lines, no reconnect prompt, subscriptions intact. **If 9001/2028/429 appears → `git revert HEAD` immediately, rebuild, re-verify a clean scan, log the outcome, ask the user.** Official-server tolerance is empirical.
+
+### Phase E — I3 report-stick live exercise (behavioral proof, no code)
+
+- E1 locate: `grep -rn "reportHash\|icon_reports\|activeReport" src/ --include=*.ts | head -20`; find the picker report gesture.
+- E2 unit: full jest green (report tests included).
+- E3 gate: screenshot A (a real brand icon visible, e.g. Tuta) → file a report via the icon picker's report action → trigger the re-crawl/scan that would promote → screenshot B. PASS (vision) = B identical to A AND the log shows the report-hash skip line (or no promote line for that subscription). If the report UI does not exist on-device → docs row "I3 live test blocked: report UI unreachable" and stop; do not fake the proof.
+- E4 docs row (two screenshots + log line) + docs-only commit.
+
+### Phase F — UI Phase 4 close-out (catalog/copy honesty)
+
+- F1 analyse: `grep -rln "Connect\|mailbox" app/\(tabs\)/subscriptions* src/components/ --include=*.tsx | head`; list every user-visible string that misstates a provider (Proton/Tuta are client REST + on-device decrypt, NOT IMAP).
+- F2 edit: copy fixes only, no logic. Unit: tsc + jest green (update snapshot strings only for intended copy changes, and say so).
+- F3 build (unit `pf`). Gate: screenshots of every connect/scan surface. PASS (vision) = no "IMAP" wording on Proton/Tuta; 4 provider kinds accurate (Outlook Graph / Workspace Gmail API / Proton REST / Tuta REST). Save `/tmp/scr_f_*.png`.
+- F4 docs: changelog row + flip the Phase board UI row to "Phases 0–4 done" + status line. Commit `docs(plan)+ui: Phase 4 closed — catalog/copy honest, gated visually`.
+
+### Phase G — R4 crawler precision (largest; three sessions)
+
+- G0 baseline (no code): clear all three caches → scan → harvest `grep -E 'TIER|FETCH|SUCCESS|404' /tmp/<log> | sort | uniq -c | sort -rn | head -40` → docs row quantifying junk rate (stock-photo farm hostnames: pngimg / clipart / vecteezy / …).
+- G1 admission filters (data-driven from G0): stock-photo/wallpaper hostname blocklist; per-host caps (≤N); icon-ish URL signal (`icon|logo|favicon|apple-touch`). Unit tests per filter (pure functions). Gate: tsc + jest, build, then the 5-brand test — wipe icon cache → scan → Tuta / Porkbun / Microsoft / Google / Linode icons brand-correct (vision vs known-correct: Tuta dark-red, Porkbun pink pig, Microsoft 4-color squares, Google multicolor G, Linode blue). ANY brand regression = revert.
+- G2 picker spot-check: long-press ≥5 card icons → picker shows the brand tile first-or-second; per-brand pass/fail table in the docs row.
+
+### Phase H — R13 (optional, user decides after G): per-leg pacing
+
+Scan-wide budget + per-leg progress lines (`[MailScan] outlook 210/314 …` every 30s). Unit-test the pacing pure function; gate = one healthy-link scan with ≥1 progress line per leg, total <5 min.
+
+### Order & dependencies
+
+A → B → C → D → E → F → G0 → G1 → G2 → (H optional). A is trivial on purpose (verification only — calibrates the workflow). After F the app is one Phase-6 session from ship; G is the only multi-session phase.
 
 
 ## Cadence identity (blocker before Phase 4 OAuth) — Clerk-out + package+scheme proven ✅
@@ -1641,3 +1719,4 @@ Parked until a documented API exists. Do not implement as Connect-without-scan.
 | 2026-09-04 | **Retest: OAuth list timeout is NOT a transient blip — the scan WEDGES; the JS-side race wrapper is ineffective for this failure class; native OkHttp timeout needed (R12 candidate).** Clean re-scan (02:51): Tuta 0 new, Proton 0 new (cursor incremental OK; batch-1 `pages=6` no-op lap re-confirms R11), workspace `token expired — refreshing` → refreshed 02:51:49 — then the **Gmail list request black-holed**: SIGQUIT thread dump (`kill -3`, adb root, /data/anr/trace_00) shows `OkHttp https://gmail.googleapis.com/...` parked in `Http2Stream.takeHeaders` waiting for response headers and the pooled `OkHttp gmail.googleapis.com` thread in `SocketInputStream.socketRead0` inside the Conscrypt TLS read — connected, request sent, zero response bytes. The 20s `fetchWithTimeout` race **never rejected**: 11+ min with zero ReactNativeJS lines, mqt_v_js + mqt_v_native both idle in looper poll (timer dispatch starved or never armed post-bridge — mechanism unresolved), orchestrator never reached the outlook breadcrumb, UI scan button never completed. App itself never ANR'd; the 03:04 "System UI isn't responding" was emulator-host degradation (wlan0 beacon-loss 02:53, systemui GC storms; network back 03:05, ping OK with 180–480ms jitter). Correlation with the 01:19 run: the wrapper's error text surfaced only very late under icon-crawl JS congestion ⇒ race wrapper fires late or never — it does not bound the stall it was built for. **Fix direction (R12):** enforce the timeout NATIVELY — `OkHttpClient.callTimeout(~25s)` (or per-call `withCallTimeout`) via the RN network interceptor already present (`NetworkingModule$sendRequestInternal…addNetworkInterceptor` in the dump) — connection teardown is native-side and error delivery wakes the looper, so the JS race alone is not a guarantee. Re-scan verdict: G1/G3 refresh path re-proven (0 new rows imported, correctly), G6(1) upgraded from "transient?" to **reproducible wedge, wrapper ineffective**. |
 | 2026-09-04 | **R12 LANDED + GATED LIVE — scan can no longer wedge on a black-holed provider fetch.** `fb03e05`: `withMailImap.js` injects `installFetchCallTimeout()` into MainApplication (idempotent, before `loadReactNative`) — `OkHttpClientProvider.setOkHttpClientFactory` forces **HTTP/1.1** + connect 15s / read 25s / write 25s / call 30s on the RN fetch client (h1.1 is the crux: live thread dumps `/data/anr/trace_02`+`_03` proved that on a pooled h2 connection a silent peer wedges the call thread in `Object.wait` on headers while the h2 reader blocks in `socketRead0`, and NEITHER callTimeout nor readTimeout fires — attempt 1 `callTimeout`-only build wedged identically at 10:50). **Gates (emulator-5554, release APK 11:08):** G1 normal scan — all 4 legs complete on h1.1 (Proton 0, Tuta 0, Gmail leg silent-success, `MailGraph listed 314 pages=4 bodies=46`), imports + crawl ran, no regression. G2 forced black-hole — `iptables` DROP 172.217.112.0/21:443 → workspace leg failed bounded with the JS wrapper's `request timed out after 20000ms`, outlook leg ran (`listed 23 pages=1`), scan completed with the per-mailbox error dialog instead of a wedge. Recovery scan (rule removed, host wifi flaked again ~460ms RTT): BOTH OAuth legs bounded-failed at 20s, scan completed with a combined two-line error dialog — three runs, zero wedges, zero crashes. Honest notes: (a) the JS 20s wrapper now fires reliably because h1.1 frees the runtime to service timers; native timeouts remain the backstop for the earlier starved-timer state; (b) leg order is Proton→Tuta→{outlook,workspace} and a bounded Gmail failure costs ~20s + per-mailbox error, not the scan. Root-causes closed: R9's original 18-min hang class (JS wrapper ineffective under h2 starvation) is now covered by BOTH layers. |
 | 2026-09-04 | **R11 LANDED + GATED LIVE — Proton staging now pages the FULL mailbox; deep-history rows recovered.** `b178b98`: `listWithSession`/`listMessages` gain a second bound `untilIso` (non-strict newer bound, both ProtonModule.kt copies + legacy fetcher passes null); JS `stage()` keeps `sinceIso` fixed as the incremental lower bound and steps `untilIso` backward to each batch's OLDEST date (`dates[0]`), terminating on raw count `< CHUNK` with the `seen` set deduping the re-returned boundary message — the old code advanced a single cursor to the batch's NEWEST date so batches 2+ always returned 0 (only the newest 75 of 450 ever screened; >75 new messages between scans would silently truncate). 152/152 jest green (updated 3 call-shape expectations + rewrote the paging test to assert backward `untilIso` stepping and boundary dedup), tsc clean. **Live gate (fresh APK, Email Scan Cache cleared → cursor null):** 7 batches — `listed 75` ×6 then `listed 7`, every body decrypted `fail=0`, **`batches staged, messages=451` (full mailbox vs 75 before)**; raw counts reconcile exactly (457 fetched − 6 re-returned boundary messages = 451 unique). Payoff on-device: the wipe-and-rescan had silently LOST subscriptions living beyond the newest 75 — the R11 scan recovered **Proton $29.98 recurring** (Monthly Spend $261.47 → **$291.45**) plus **Openai** and **Linkedin** free rows from deep history. Scan completed all 4 legs; pid stable, crash buffer 0. Note: the outlook leg took ~19 min on the degraded host link (364 sequential h1.1 requests, each R12-bounded) before succeeding — total-time pacing of a leg (vs per-request) is future work if it bothers anyone. |
+| 2026-09-04 | **Completion roadmap locked (phases A–H) — executor-ready gates; UI Phase 5 + Phase 6 DEFERRED by user.** Re-survey of HEAD corrected the audit's open-item list: R2 (Home alert parity, `index.tsx` R2 comment), R3 (`classifier.ts:269` owner-domain guard), R6 (`app/auth.tsx` absorbs `cadence://auth`) and R7 (`classifier.ts:367` single-word guard + tests) are **already landed** — verification gates only (Phase A). Real implementation remaining: R5 (scan alert decoupled from icon-queue drain; dead-host retries ≤2), P3 (Proton unlock once per scan — post-R11 a full scan performs 7 locked-scope unlocks), P4 (official fingerprints — `x-pm-appversion: "Other"` / `User-Agent: jsmastery/1.0` at ProtonModule.kt:795-796), I3 report-stick live exercise, R4 crawler precision (baseline-first), optional R13 per-leg pacing. UI Phase 4 is substantively proven live (4/4 mailboxes, repeated) — remains catalog/copy honesty + phase-board closure. Full phased executor plan with per-phase unit + emulator/vision gates now lives in "Completion roadmap — executor phases" above (30s systemd-run pattern, coordinate derivation, ANR handling, revert rules — flash-ready). |
