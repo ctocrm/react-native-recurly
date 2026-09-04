@@ -43,6 +43,35 @@ const CONSCRYPT_GUARD_FN = [
   "",
 ].join("\n");
 
+// R12: RN's fetch client (OkHttpClientProvider) ships with connect/read/write
+// timeouts of 0 (infinite). A black-holed socket wedges the fetch forever and
+// the JS-side Promise.race timeout cannot rescue the scan because its timer
+// never gets serviced while the fetch hangs (proven live 2026-09-04). Live
+// proof also showed that on a POOLED HTTP/2 connection neither callTimeout
+// nor readTimeout fires (OkHttp clears the socket read timeout on h2
+// upgrade; the h2 reader has no deadline), so we force HTTP/1.1 where every
+// call owns its connection and readTimeout is a hard SO_TIMEOUT on the call
+// thread. 25s sits above the 20s JS wrapper (providers.ts
+// fetchWithTimeout) — native is the backstop.
+const FETCH_CALL_TIMEOUT_FN = [
+  "  /**",
+  "   * R12 backstop: bounds every RN fetch natively (see plugin source / plan).",
+  "   */",
+  "  private fun installFetchCallTimeout() {",
+  "    val appContext = applicationContext",
+  "    OkHttpClientProvider.setOkHttpClientFactory {",
+  "      OkHttpClientProvider.createClientBuilder(appContext)",
+  "          .protocols(listOf(okhttp3.Protocol.HTTP_1_1))",
+  "          .connectTimeout(15, TimeUnit.SECONDS)",
+  "          .readTimeout(25, TimeUnit.SECONDS)",
+  "          .writeTimeout(25, TimeUnit.SECONDS)",
+  "          .callTimeout(30, TimeUnit.SECONDS)",
+  "          .build()",
+  "    }",
+  "  }",
+  "",
+].join("\n");
+
 function withMailImap(config) {
   config = withDangerousMod(config, [
     "android",
@@ -94,6 +123,20 @@ function withMailImap(config) {
       contents = contents.replace(
         /PackageList\(this\)\.packages\.apply \{/,
         "PackageList(this).packages.apply {\n              add(ImapPackage())",
+      );
+    }
+    if (!contents.includes("installFetchCallTimeout()")) {
+      contents = contents.replace(
+        /import com\.facebook\.react\.common\.ReleaseLevel/,
+        "import com.facebook.react.common.ReleaseLevel\nimport com.facebook.react.modules.network.OkHttpClientProvider\n\nimport java.util.concurrent.TimeUnit",
+      );
+      contents = contents.replace(
+        /installConscryptCloseGuard\(\)\n/,
+        "installConscryptCloseGuard()\n    installFetchCallTimeout()\n",
+      );
+      contents = contents.replace(
+        /  override fun onConfigurationChanged\(/,
+        FETCH_CALL_TIMEOUT_FN + "  override fun onConfigurationChanged(",
       );
     }
     cfg.modResults.contents = contents;
