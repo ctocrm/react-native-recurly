@@ -901,7 +901,7 @@ async function fetcherFor(
       throw new MailConnectError("tuta is not connected");
     }
     const { createPasswordMailFetcher } = await import("./imapNative");
-    const inner = createPasswordMailFetcher("tuta", creds, mailboxId);
+    const inner = createPasswordMailFetcher(creds, mailboxId);
     return {
       async fetchMessages(opts) {
         try {

@@ -152,6 +152,13 @@ async function protonLogin(
   }
 }
 
+function codeOf(error: unknown): string | undefined {
+  return (error as { code?: string } | null | undefined)?.code;
+}
+
+const PROTON_RECONNECT_MESSAGE =
+  "Proton session expired — reconnect the mailbox (Edit → Reconnect) to scan it.";
+
 export function createProtonFetcher(
   creds: { username: string; password: string; totp?: string },
   mailboxId: string,
@@ -164,77 +171,94 @@ export function createProtonFetcher(
       if (!native || Platform.OS !== "android") {
         throw new Error("proton fetch needs the native MailProton module.");
       }
-      let session = stored;
-      if (session?.uid && session.refreshToken) {
-        try {
-          session = await native.refreshSession(
-            session.uid,
-            session.refreshToken,
-            session.accessToken,
-          );
-          await persistSession(session);
-        } catch {
-          session = null;
-        }
-      }
-      if (!session?.uid || !session.accessToken) {
-        session = await protonLogin(native, creds);
-        await persistSession(session);
-      }
+
       // Proton/Tuta staging with a bounded bridge payload: decrypt+return the
       // mailbox in chunks so no single native->JS response is whole-mailbox
       // sized (R10: a 443-message one-shot payload exhausted the Java heap).
       const CHUNK = 75;
       const MAX_BATCHES = 40;
-      const out: NormalizedMessage[] = [];
-      const seen = new Set<string>();
-      let cursorIso: string | null = since?.date ?? null;
-      for (let batch = 0; batch < MAX_BATCHES; batch += 1) {
-        const listed = await native.listWithSession(
-          session.uid,
-          session.accessToken,
-          cursorIso,
-          CHUNK,
-          creds.password,
-        );
-        const fresh = (listed.messages || [])
-          .map((m): NormalizedMessage => ({
-            mailboxId,
-            messageId: m.messageId,
-            from: m.from,
-            subject: m.subject,
-            date: m.date,
-            text: m.text,
-          }))
-          .filter((m) => !seen.has(m.messageId));
-        if (fresh.length === 0) break;
-        for (const m of fresh) {
-          seen.add(m.messageId);
-          out.push(m);
+      const stage = async (
+        session: ProtonNativeSession,
+      ): Promise<NormalizedMessage[]> => {
+        const out: NormalizedMessage[] = [];
+        const seen = new Set<string>();
+        let cursorIso: string | null = since?.date ?? null;
+        for (let batch = 0; batch < MAX_BATCHES; batch += 1) {
+          const listed = await native.listWithSession(
+            session.uid,
+            session.accessToken,
+            cursorIso,
+            CHUNK,
+            creds.password,
+          );
+          const fresh = (listed.messages || [])
+            .map((m): NormalizedMessage => ({
+              mailboxId,
+              messageId: m.messageId,
+              from: m.from,
+              subject: m.subject,
+              date: m.date,
+              text: m.text,
+            }))
+            .filter((m) => !seen.has(m.messageId));
+          if (fresh.length === 0) break;
+          for (const m of fresh) {
+            seen.add(m.messageId);
+            out.push(m);
+          }
+          const dates = fresh
+            .map((m) => m.date)
+            .filter(Boolean)
+            .sort();
+          if (fresh.length < CHUNK || dates.length === 0) break;
+          cursorIso = dates[dates.length - 1];
         }
-        const dates = fresh
-          .map((m) => m.date)
-          .filter(Boolean)
-          .sort();
-        if (fresh.length < CHUNK || dates.length === 0) break;
-        cursorIso = dates[dates.length - 1];
+        console.log(
+          `[MailProton-js] batches staged, messages=${out.length} (chunk=${CHUNK})`,
+        );
+        return out;
+      };
+
+      let session = stored?.uid && stored.accessToken ? stored : null;
+
+      // P2: the refresh token is single-use — spend it only when the server
+      // actually rejects the access token, then retry the staged fetch once.
+      // Never silently replay the password after a dead session (P1).
+      if (session) {
+        try {
+          return await stage(session);
+        } catch (error) {
+          if (codeOf(error) !== "PROTON_SESSION_DEAD") throw error;
+          if (!session.refreshToken) throw new Error(PROTON_RECONNECT_MESSAGE);
+          console.log("[MailProton-js] access token rejected — refreshing session");
+          try {
+            session = await native.refreshSession(
+              session.uid,
+              session.refreshToken,
+              session.accessToken,
+            );
+          } catch (refreshError) {
+            if (codeOf(refreshError) === "PROTON_ABUSE") throw refreshError;
+            throw new Error(PROTON_RECONNECT_MESSAGE);
+          }
+          await persistSession(session);
+          console.log("[MailProton-js] access token refreshed");
+          return await stage(session);
+        }
       }
-      console.log(
-        `[MailProton-js] batches staged, messages=${out.length} (chunk=${CHUNK})`,
-      );
-      return out;
+
+      // No stored session (first scan after connect): login with credentials.
+      session = await protonLogin(native, creds);
+      await persistSession(session);
+      return await stage(session);
     },
   };
 }
 
 export function createPasswordMailFetcher(
-  kind: "proton" | "tuta",
   creds: { username: string; password: string; totp?: string },
   mailboxId: string,
 ): MessageFetcher {
-  if (kind === "proton") {
-    return createProtonFetcher(creds, mailboxId, null, async () => undefined);
-  }
   return {
     async fetchMessages({ since, limit }) {
       const native = nativeNamed("MailTuta");

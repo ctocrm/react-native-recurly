@@ -74,6 +74,15 @@ class ProtonModule(reactContext: ReactApplicationContext) :
         promise.resolve(protonSessionToMap(session))
       } catch (e: ProtonHvRequired) {
         promise.reject("PROTON_HV", e.message, e.toMap())
+      } catch (e: ProtonApiError) {
+        Log.e(TAG, "Proton login failed (${e.httpCode}/${e.apiCode})")
+        when {
+          e.apiCode == 2028 || e.httpCode == 429 ->
+            promise.reject("PROTON_ABUSE", e.message, e)
+          e.httpCode == 401 || e.httpCode == 422 || e.apiCode == 8002 ->
+            promise.reject("PROTON_CREDENTIALS", e.message, e)
+          else -> promise.reject("PROTON_ERROR", e.message, e)
+        }
       } catch (e: Exception) {
         Log.e(TAG, "Proton login failed", e)
         promise.reject("PROTON_ERROR", e.message ?: "Proton login failed", e)
@@ -92,6 +101,17 @@ class ProtonModule(reactContext: ReactApplicationContext) :
       try {
         val session = ProtonClient().refresh(uid, refreshToken, accessToken.orEmpty())
         promise.resolve(protonSessionToMap(session))
+      } catch (e: ProtonApiError) {
+        Log.e(TAG, "Proton refresh failed (${e.httpCode}/${e.apiCode})")
+        if (e.apiCode == 2028 || e.httpCode == 429) {
+          promise.reject("PROTON_ABUSE", e.message, e)
+        } else {
+          promise.reject(
+            "PROTON_SESSION_DEAD",
+            "Proton session expired — reconnect the mailbox (Edit → Reconnect) to scan it.",
+            e,
+          )
+        }
       } catch (e: Exception) {
         Log.e(TAG, "Proton refresh failed", e)
         promise.reject("PROTON_ERROR", e.message ?: "Proton refresh failed", e)
@@ -117,6 +137,15 @@ class ProtonModule(reactContext: ReactApplicationContext) :
           password,
         )
         promise.resolve(protonMessagesToMap(messages))
+      } catch (e: ProtonApiError) {
+        Log.e(TAG, "Proton list failed (${e.httpCode}/${e.apiCode})")
+        when {
+          e.httpCode == 401 || e.apiCode == 12087 ->
+            promise.reject("PROTON_SESSION_DEAD", "Proton access token expired.", e)
+          e.apiCode == 2028 || e.httpCode == 429 ->
+            promise.reject("PROTON_ABUSE", e.message, e)
+          else -> promise.reject("PROTON_ERROR", e.message, e)
+        }
       } catch (e: Exception) {
         Log.e(TAG, "Proton list failed", e)
         promise.reject("PROTON_ERROR", e.message ?: "Proton list failed", e)
@@ -141,6 +170,15 @@ class ProtonModule(reactContext: ReactApplicationContext) :
         promise.resolve(protonMessagesToMap(messages))
       } catch (e: ProtonHvRequired) {
         promise.reject("PROTON_HV", e.message, e.toMap())
+      } catch (e: ProtonApiError) {
+        Log.e(TAG, "Proton fetch failed (${e.httpCode}/${e.apiCode})")
+        when {
+          e.apiCode == 2028 || e.httpCode == 429 ->
+            promise.reject("PROTON_ABUSE", e.message, e)
+          e.httpCode == 401 || e.httpCode == 422 || e.apiCode == 8002 ->
+            promise.reject("PROTON_CREDENTIALS", e.message, e)
+          else -> promise.reject("PROTON_ERROR", e.message, e)
+        }
       } catch (e: Exception) {
         Log.e(TAG, "Proton fetch failed", e)
         promise.reject("PROTON_ERROR", e.message ?: "Proton failed", e)
@@ -192,6 +230,16 @@ internal class ProtonHvRequired(
     return map
   }
 }
+
+/**
+ * Typed API error carrying the HTTP status and Proton `Code` so callers can
+ * distinguish session-dead / anti-abuse / wrong-credentials (P1).
+ */
+internal class ProtonApiError(
+  val httpCode: Int,
+  val apiCode: Int,
+  message: String,
+) : IllegalStateException(message)
 
 internal data class ProtonSession(
   val uid: String,
@@ -816,12 +864,15 @@ private class ProtonClient {
         }
         throw ProtonHvRequired(webUrl, hvToken, methods)
       }
-      if (conn.responseCode == 401 || conn.responseCode == 422) {
-        throw IllegalStateException(
-          "Proton rejected the password or 2FA code (HTTP ${conn.responseCode}).",
-        )
+      val message = when {
+        apiCode == 8002 ->
+          "Proton rejected the username, password or 2FA code."
+        apiCode == 2028 ->
+          "Proton temporarily blocked this client (anti-abuse). Wait a while, then retry."
+        else ->
+          "Proton HTTP ${conn.responseCode} Code $apiCode: ${apiError.ifEmpty { text.take(200) }}"
       }
-      throw IllegalStateException("Proton HTTP ${conn.responseCode}: $text")
+      throw ProtonApiError(conn.responseCode, apiCode, message)
     }
     return JSONObject(text)
   }
