@@ -69,6 +69,7 @@ describe("createProtonFetcher session orchestration (P2)", () => {
       "uid-1",
       "acc-old",
       null,
+      null,
       75,
       "p",
     );
@@ -110,6 +111,7 @@ describe("createProtonFetcher session orchestration (P2)", () => {
     expect(native.listWithSession).toHaveBeenLastCalledWith(
       "uid-1",
       "acc-new",
+      null,
       null,
       75,
       "p",
@@ -189,21 +191,31 @@ describe("createProtonFetcher session orchestration (P2)", () => {
       "uid-2",
       "acc-2",
       null,
+      null,
       75,
       "p",
     );
   });
 
-  it("still pages in bounded chunks (R10 staging intact)", async () => {
+  it("pages backward through history in bounded chunks (R10 staging + R11 cursor fix)", async () => {
     const native = makeNative();
+    // Page 1: the 75 newest messages, one per minute (oldest = 00:00).
     const firstPage = Array.from({ length: 75 }, (_, i) =>
       message(`m${i}`, new Date(Date.UTC(2026, 7, 1, 0, i)).toISOString()),
     );
+    // Page 2: the next-older chunk (July 31, 23:59..23:30) plus a re-return
+    // of page 1's boundary message (same messageId) — the native upper bound
+    // is non-strict so same-second neighbours are never skipped; the JS
+    // `seen` set dedupes the re-return.
+    const secondPage = [
+      ...Array.from({ length: 30 }, (_, i) =>
+        message(`n${i}`, new Date(Date.UTC(2026, 7, 0, 23, 59 - i)).toISOString()),
+      ),
+      message("m0", "2026-08-01T00:00:00.000Z"),
+    ];
     native.listWithSession
       .mockResolvedValueOnce({ messages: firstPage })
-      .mockResolvedValueOnce({
-        messages: [message("tail", "2026-09-20T00:00:00.000Z")],
-      });
+      .mockResolvedValueOnce({ messages: secondPage });
     const fetcher = createProtonFetcher(
       { username: "u", password: "p" },
       "proton:u",
@@ -214,10 +226,14 @@ describe("createProtonFetcher session orchestration (P2)", () => {
     const out = await fetcher.fetchMessages({ mailboxId: "proton:u", since: null, limit: 500 });
 
     expect(native.listWithSession).toHaveBeenCalledTimes(2);
-    const secondCall = native.listWithSession.mock.calls[1] as unknown[];
-    expect(secondCall[2]).toBe(
-      firstPage.map((m) => m.date).sort()[firstPage.length - 1],
-    );
-    expect(out).toHaveLength(76);
+    const [firstCall, secondCall] = native.listWithSession.mock.calls as unknown[][];
+    // sinceIso stays fixed at the scan cursor (null here); untilIso starts
+    // null and then steps to the batch's OLDEST date (not its newest).
+    expect(firstCall[2]).toBeNull();
+    expect(firstCall[3]).toBeNull();
+    expect(secondCall[2]).toBeNull();
+    expect(secondCall[3]).toBe(firstPage.map((m) => m.date).sort()[0]);
+    // 75 + 30 unique messages — the boundary duplicate is deduped.
+    expect(out).toHaveLength(105);
   });
 });

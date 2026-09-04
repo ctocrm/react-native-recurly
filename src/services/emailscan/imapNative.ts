@@ -78,6 +78,7 @@ interface NativeProton {
     uid: string,
     accessToken: string,
     sinceIso: string | null,
+    untilIso: string | null,
     limit: number,
     password: string,
   ): Promise<{
@@ -182,16 +183,24 @@ export function createProtonFetcher(
       ): Promise<NormalizedMessage[]> => {
         const out: NormalizedMessage[] = [];
         const seen = new Set<string>();
-        let cursorIso: string | null = since?.date ?? null;
+        // R11: sinceIso stays FIXED as the incremental lower bound (scan
+        // cursor); untilIso is the exclusive newer bound that steps the
+        // cursor BACKWARD through history one chunk at a time. The old code
+        // advanced a single cursor to the batch's NEWEST date, so batch 2+
+        // always returned 0 and only the newest CHUNK (75) was ever staged.
+        const sinceIso: string | null = since?.date ?? null;
+        let untilIso: string | null = null;
         for (let batch = 0; batch < MAX_BATCHES; batch += 1) {
           const listed = await native.listWithSession(
             session.uid,
             session.accessToken,
-            cursorIso,
+            sinceIso,
+            untilIso,
             CHUNK,
             creds.password,
           );
-          const fresh = (listed.messages || [])
+          const raw = listed.messages || [];
+          const fresh = raw
             .map((m): NormalizedMessage => ({
               mailboxId,
               messageId: m.messageId,
@@ -206,12 +215,15 @@ export function createProtonFetcher(
             seen.add(m.messageId);
             out.push(m);
           }
-          const dates = fresh
-            .map((m) => m.date)
-            .filter(Boolean)
-            .sort();
-          if (fresh.length < CHUNK || dates.length === 0) break;
-          cursorIso = dates[dates.length - 1];
+          // Terminate on the RAW count: untilIso is a non-strict upper bound,
+          // so the boundary message itself is re-returned next batch (and
+          // deduped above) — raw stays at CHUNK while the window has more.
+          if (raw.length < CHUNK) break;
+          const dates = raw.map((m) => m.date).filter(Boolean).sort();
+          if (dates.length === 0) break;
+          const nextUntil = dates[0]; // oldest date of this batch
+          if (nextUntil === untilIso) break;
+          untilIso = nextUntil;
         }
         console.log(
           `[MailProton-js] batches staged, messages=${out.length} (chunk=${CHUNK})`,

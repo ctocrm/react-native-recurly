@@ -124,6 +124,7 @@ class ProtonModule(reactContext: ReactApplicationContext) :
     uid: String,
     accessToken: String,
     sinceIso: String?,
+    untilIso: String?,
     limit: Int,
     password: String?,
     promise: Promise,
@@ -133,6 +134,7 @@ class ProtonModule(reactContext: ReactApplicationContext) :
         val messages = ProtonClient().listMessages(
           ProtonSession(uid, accessToken, ""),
           sinceIso,
+          untilIso,
           limit.coerceIn(1, 500),
           password,
         )
@@ -166,7 +168,7 @@ class ProtonModule(reactContext: ReactApplicationContext) :
       try {
         val client = ProtonClient()
         val session = client.login(username.trim(), password, totp, null, null)
-        val messages = client.listMessages(session, sinceIso, limit.coerceIn(1, 500), password)
+        val messages = client.listMessages(session, sinceIso, null, limit.coerceIn(1, 500), password)
         promise.resolve(protonMessagesToMap(messages))
       } catch (e: ProtonHvRequired) {
         promise.reject("PROTON_HV", e.message, e.toMap())
@@ -360,6 +362,7 @@ private class ProtonClient {
   fun listMessages(
     session: ProtonSession,
     sinceIso: String?,
+    untilIso: String?,
     limit: Int,
     password: String?,
   ): List<ProtonMsg> {
@@ -369,6 +372,11 @@ private class ProtonClient {
     val labelId = "15"
     val out = mutableListOf<ProtonMsg>()
     val sinceMs = sinceIso?.let { parseIsoMs(it) }
+    // R11: exclusive NEWER bound — keep only messages at or older than
+    // untilMs so the JS staging loop can page backward through history in
+    // bounded chunks. Non-strict on purpose: same-second neighbours at the
+    // boundary are re-returned and deduped JS-side instead of being skipped.
+    val untilMs = untilIso?.let { parseIsoMs(it) }
     var page = 0
     var total = -1
     var pages = 0
@@ -392,6 +400,7 @@ private class ProtonClient {
         val m = arr.getJSONObject(i)
         val time = m.optLong("Time") * 1000
         if (sinceMs != null && time <= sinceMs) continue
+        if (untilMs != null && time > untilMs) continue
         val sender = m.optJSONObject("Sender")
         val from = sender?.optString("Address") ?: sender?.optString("Name") ?: ""
         out.add(
