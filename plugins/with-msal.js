@@ -60,7 +60,9 @@ function msalConfigJson(clientId) {
           default: true,
         },
       ],
-      logging: { pii_enabled: false, log_level: "WARNING", logcat_enabled: true },
+      // INFO (not WARNING) so MSAL emits init/browser-launch diagnostics to
+      // logcat tag "MSAL" during the assisted reconnect validation.
+      logging: { pii_enabled: false, log_level: "INFO", logcat_enabled: true },
     },
     null,
     2,
