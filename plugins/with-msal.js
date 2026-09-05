@@ -23,7 +23,6 @@ const {
 const fs = require("fs");
 const path = require("path");
 
-const SRC_DIR = path.join(__dirname, "android");
 const MSAL_DEPENDENCY = 'implementation("com.microsoft.identity.client:msal:4.9.+")';
 const MSAL_MAVEN_REPO =
   "maven { url 'https://pkgs.dev.azure.com/MicrosoftDeviceSDK/DuoSDK-Public/_packaging/Duo-SDK-Feed/maven/v1' }";
@@ -67,9 +66,19 @@ function withMsal(config) {
         cfg.modRequest.platformProjectRoot,
         "app/src/main/java/app/picksandshovels/cadence/msal",
       );
+      // Anchor to projectRoot, NOT __dirname: "./plugins/with-msal" is
+      // ambiguous in Node resolution (file with-msal.js + directory
+      // with-msal/ are siblings), and prebuild has been observed evaluating
+      // the plugin with a __dirname one level up (ENOENT into plugins/android).
+      const srcDir = path.join(
+        cfg.modRequest.projectRoot,
+        "plugins",
+        "with-msal",
+        "android",
+      );
       fs.mkdirSync(javaDir, { recursive: true });
       for (const file of ["MsalModule.kt", "MsalPackage.kt"]) {
-        fs.copyFileSync(path.join(SRC_DIR, file), path.join(javaDir, file));
+        fs.copyFileSync(path.join(srcDir, file), path.join(javaDir, file));
       }
       const rawDir = path.join(
         cfg.modRequest.platformProjectRoot,
