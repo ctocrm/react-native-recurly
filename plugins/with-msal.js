@@ -206,7 +206,14 @@ function withMsal(config) {
                 $: {
                   "android:scheme": "msauth",
                   "android:host": PACKAGE_NAME,
-                  "android:path": `/${SIGNATURE_B64_URL}`,
+                  // Intent-filter literal paths match the DECODED Uri path, so
+                  // the manifest must carry the raw '=' form — the %3D form
+                  // never resolves, and MSAL 4.9.2's init-time
+                  // checkIntentFilterAddedToAppManifestForBrokerFlow() then
+                  // throws APP_MANIFEST_VALIDATION_ERROR (surfaces as
+                  // MSAL_INIT_FAILED). %3D stays only in redirect_uri above
+                  // and in the Entra portal registration.
+                  "android:path": `/${decodeURIComponent(SIGNATURE_B64_URL)}`,
                 },
               },
             ],
