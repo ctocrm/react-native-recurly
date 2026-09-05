@@ -44,6 +44,11 @@ function msalConfigJson(clientId) {
     {
       client_id: clientId,
       authorization_user_agent: "DEFAULT",
+      // MSAL 4.9.2 validateAccountModeConfiguration: createMultipleAccount-
+      // PublicClientApplication throws
+      // "AccountMode in configuration is not set to multiple" unless the JSON
+      // declares account_mode explicitly (default is SINGLE).
+      account_mode: "MULTIPLE",
       redirect_uri: `msauth://${PACKAGE_NAME}/${SIGNATURE_B64_URL}`,
       // Keep QA deterministic: no Authenticator-broker attempt (the emulator
       // has none). Flip to true for real devices to enable broker SSO.
