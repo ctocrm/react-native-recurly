@@ -23,7 +23,17 @@ const {
 const fs = require("fs");
 const path = require("path");
 
-const MSAL_DEPENDENCY = 'implementation("com.microsoft.identity.client:msal:4.9.+")';
+const MSAL_DEPENDENCY = [
+  // Official Microsoft MSAL Android SDK (R6). The io.opentelemetry exclusion
+  // works around MSAL #1864 (opentelemetry-bom is exposed as a plain library
+  // edge -> gradle variant mismatch); MSAL only needs api+context, pulled
+  // explicitly below from mavenCentral.
+  'implementation("com.microsoft.identity.client:msal:4.9.+") {',
+  '    exclude group: "io.opentelemetry"',
+  "}",
+  'implementation("io.opentelemetry:opentelemetry-api:1.18.0")',
+  'implementation("io.opentelemetry:opentelemetry-context:1.18.0")',
+].join("\n    ");
 const MSAL_MAVEN_REPO =
   "maven { url 'https://pkgs.dev.azure.com/MicrosoftDeviceSDK/DuoSDK-Public/_packaging/Duo-SDK-Feed/maven/v1' }";
 const SIGNATURE_B64_URL = "Xo8WBi6jzSxKDVR4drqm84yr9iU%3D";
