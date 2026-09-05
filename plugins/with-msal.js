@@ -183,13 +183,19 @@ function withMsal(config) {
   config = withAndroidManifest(config, (cfg) => {
     const application = cfg.modResults.manifest.application[0];
     application.activity = application.activity || [];
-    const exists = application.activity.some(
+    // Prebuild normally runs incrementally (no --clean), so an older
+    // BrowserTabActivity entry can already be present in android/. REMOVE it
+    // and re-add the canonical entry below; an exists->skip guard let a stale
+    // %3D path survive into build 8.
+    application.activity = application.activity.filter(
       (a) =>
-        a.$ &&
-        a.$["android:name"] === "com.microsoft.identity.client.BrowserTabActivity",
+        !(
+          a &&
+          a.$ &&
+          a.$["android:name"] === "com.microsoft.identity.client.BrowserTabActivity"
+        ),
     );
-    if (!exists) {
-      application.activity.push({
+    application.activity.push({
         $: {
           "android:name": "com.microsoft.identity.client.BrowserTabActivity",
           "android:exported": "true",
@@ -220,7 +226,6 @@ function withMsal(config) {
           },
         ],
       });
-    }
     return cfg;
   });
 
