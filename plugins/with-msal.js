@@ -152,7 +152,19 @@ function withMsal(config) {
     if (cfg.modResults.language !== "groovy") {
       return cfg;
     }
-    if (!cfg.modResults.contents.includes("com.microsoft.identity.client:msal")) {
+    // Idempotent AND self-updating: strip any stale block injected by an
+    // earlier version of this plugin, then insert the current dependency
+    // block. A bare includes() guard would keep a stale (e.g. exclusion-less)
+    // msal line forever across prebuilds.
+    if (
+      !cfg.modResults.contents.includes(
+        "io.opentelemetry:opentelemetry-context",
+      )
+    ) {
+      cfg.modResults.contents = cfg.modResults.contents.replace(
+        /\n    \/\/ Official Microsoft MSAL Android SDK \(R6\)\n    implementation\("com\.microsoft\.identity\.client:msal:4\.9\.\+"\)\n?/g,
+        "",
+      );
       cfg.modResults.contents = cfg.modResults.contents.replace(
         /dependencies \{/,
         `dependencies {\n    // Official Microsoft MSAL Android SDK (R6)\n    ${MSAL_DEPENDENCY}`,
