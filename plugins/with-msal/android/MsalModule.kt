@@ -15,6 +15,7 @@ import com.microsoft.identity.client.AuthenticationCallback
 import com.microsoft.identity.client.IAccount
 import com.microsoft.identity.client.IAuthenticationResult
 import com.microsoft.identity.client.IMultipleAccountPublicClientApplication
+import com.microsoft.identity.client.IPublicClientApplication
 import com.microsoft.identity.client.PublicClientApplication
 import com.microsoft.identity.client.exception.MsalClientException
 import com.microsoft.identity.client.exception.MsalException
@@ -36,7 +37,7 @@ import com.microsoft.identity.client.exception.MsalUiRequiredException
  * cancelled attempt is never retried automatically — repeated incomplete
  * MSA attempts make Microsoft challenge harder (2026-09-04 bombardment).
  */
-class MsalModule(reactContext: ReactApplicationContext) :
+class MsalModule(private val reactContext: ReactApplicationContext) :
   ReactContextBaseJavaModule(reactContext) {
 
   private var pca: IMultipleAccountPublicClientApplication? = null
@@ -60,7 +61,7 @@ class MsalModule(reactContext: ReactApplicationContext) :
       PublicClientApplication.createMultipleAccountPublicClientApplication(
         context,
         resId,
-        object : PublicClientApplication.IMultipleAccountApplicationCreatedListener {
+        object : IPublicClientApplication.IMultipleAccountApplicationCreatedListener {
           override fun onCreated(application: IMultipleAccountPublicClientApplication) {
             pca = application
             promise.resolve(true)
@@ -79,12 +80,12 @@ class MsalModule(reactContext: ReactApplicationContext) :
   @ReactMethod
   fun acquireTokenInteractive(scopes: ReadableArray, promise: Promise) {
     val app = pca ?: return rejectNotInitialized(promise)
-    val activity: Activity = currentActivity ?: run {
+    val activity: Activity = reactContext.currentActivity ?: run {
       promise.reject("MSAL_NO_ACTIVITY", "No foreground activity for interactive sign-in", null)
       return
     }
     val params = AcquireTokenParameters.Builder()
-      .startAuthorizationViaActivity(activity)
+      .startAuthorizationFromActivity(activity)
       .withScopes(scopes.toArrayList().map { it.toString() })
       .withCallback(authCallback(promise))
       .build()
@@ -109,7 +110,7 @@ class MsalModule(reactContext: ReactApplicationContext) :
     }
     val params = AcquireTokenSilentParameters.Builder()
       .forAccount(account)
-      .fromAuthority(app.configuration.defaultAuthority.authorityURL.toString())
+      .fromAuthority("https://login.microsoftonline.com/common")
       .withScopes(scopes.toArrayList().map { it.toString() })
       .forceRefresh(forceRefresh)
       .withCallback(authCallback(promise))
@@ -139,8 +140,8 @@ class MsalModule(reactContext: ReactApplicationContext) :
     app.removeAccount(
       account,
       object : IMultipleAccountPublicClientApplication.RemoveAccountCallback {
-        override fun onRemoved(removed: Boolean) {
-          promise.resolve(removed)
+        override fun onRemoved() {
+          promise.resolve(true)
         }
 
         override fun onError(exception: MsalException) {
@@ -175,7 +176,9 @@ class MsalModule(reactContext: ReactApplicationContext) :
     is MsalUiRequiredException -> "MSAL_INTERACTION_REQUIRED"
     is MsalServiceException -> "MSAL_SERVICE"
     is MsalClientException ->
-      if (exception.errorCode == MsalClientException.USER_CANCELLED) "MSAL_USER_CANCELLED"
+      // MsalClientException has no USER_CANCELLED constant in msal 4.9.x;
+      // cancellation surfaces either via onCancel() or this string code.
+      if (exception.errorCode == "user_cancelled") "MSAL_USER_CANCELLED"
       else "MSAL_CLIENT"
     else -> "MSAL_CLIENT"
   }
