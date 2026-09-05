@@ -14,6 +14,12 @@ import {
   TokenRefreshRejectedError,
   tokenNeedsRefresh,
 } from "./oauthRefresh";
+import {
+  acquireTokenInteractively,
+  acquireTokenSilently,
+  buildMsalFailureMessage,
+  classifyMsalError,
+} from "./msalAuth";
 import type {
   IncrementalScanResult,
   MailProvider,
@@ -50,6 +56,10 @@ interface TokenBlob {
   expiresAt?: number;
   accountHint?: string;
   uid?: string;
+  /** MSAL account id (Microsoft accounts only, M2). Present → silent token
+   * acquisition goes through MSAL's encrypted cache; the provider refresh
+   * token is NOT stored for these accounts (it lives inside MSAL). */
+  msalAccountId?: string;
 }
 
 /** SecureStore keys may only use A-Z a-z 0-9 . - _ */
@@ -210,6 +220,28 @@ function googleRedirectUri(clientId: string): string {
   return `com.googleusercontent.apps.${bare}:/oauthredirect`;
 }
 
+/**
+ * Microsoft accounts authenticate through the official MSAL SDK (M2): the
+ * full MSA journey — including any emailed verification-code challenge —
+ * runs inside MSAL's managed auth surface. No provider refresh token is
+ * stored: the refresh token lives in MSAL's encrypted cache and is consumed
+ * via acquireTokenSilent (token reuse when valid). A failed/cancelled
+ * attempt is never retried automatically (MSA challenge bombardment,
+ * 2026-09-04).
+ */
+async function msalTokenBlob(): Promise<TokenBlob> {
+  try {
+    const result = await acquireTokenInteractively();
+    return {
+      accessToken: result.accessToken,
+      expiresAt: result.expiresAt,
+      msalAccountId: result.accountId,
+    };
+  } catch (error) {
+    throw new MailConnectError(buildMsalFailureMessage(error, "Microsoft"));
+  }
+}
+
 export async function promptOAuth(
   providerId: MailProviderId,
   userId: string,
@@ -219,6 +251,12 @@ export async function promptOAuth(
     throw new MailConnectError(
       `${providerId} OAuth is not configured (missing public client id).`,
     );
+  }
+  // Microsoft accounts go through the official MSAL SDK (M2): the full MSA
+  // journey — including any emailed verification-code challenge — runs in
+  // MSAL's managed surface. See msalTokenBlob above.
+  if (providerId === "outlook" || providerId === "office365") {
+    return msalTokenBlob();
   }
   const spec = oauthSpec(providerId);
   // Google requires the reverse-client-ID redirect (secure-response-handling
@@ -796,6 +834,37 @@ async function ensureFreshOAuthTokens(
   mailboxId: string,
   tokens: TokenBlob,
 ): Promise<TokenBlob> {
+  // MSAL accounts (M2): token reuse when valid — acquireTokenSilent serves
+  // MSAL's encrypted cache and refreshes internally; interaction-required
+  // maps to the same honest reconnect error as a rejected refresh token.
+  // No auto-retries (see msalAuth.ts).
+  if (
+    (providerId === "outlook" || providerId === "office365") &&
+    tokens.msalAccountId
+  ) {
+    try {
+      const result = await acquireTokenSilently(tokens.msalAccountId);
+      const next: TokenBlob = {
+        ...tokens,
+        accessToken: result.accessToken,
+        expiresAt: result.expiresAt ?? tokens.expiresAt,
+      };
+      await saveTokens(mailboxId, next);
+      console.log(`[MailOAuth] ${providerId} MSAL silent token ok (${mailboxId})`);
+      return next;
+    } catch (error) {
+      const kind = classifyMsalError(error);
+      if (kind === "reconnect") {
+        throw new MailScanUnverifiedError(
+          `${providerId} sign-in expired — reconnect the mailbox (Edit → Reconnect) to scan it.`,
+        );
+      }
+      console.log(
+        `[MailOAuth] ${providerId} MSAL silent acquisition failed (${kind}); using stored token`,
+      );
+      return tokens;
+    }
+  }
   if (!tokenNeedsRefresh(tokens) || !tokens.refreshToken) {
     console.log(
       `[MailScan] ${providerId} ${mailboxId} token ${tokenNeedsRefresh(tokens) ? "expired but no refresh token" : "fresh"} — using as-is`,

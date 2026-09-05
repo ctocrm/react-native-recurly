@@ -19,6 +19,7 @@ module.exports = {
       ...(appJson.expo.plugins || []),
       "react-native-fast-tflite",
       "./plugins/mail-imap/withMailImap",
+      "./plugins/with-msal",
     ],
   },
 };

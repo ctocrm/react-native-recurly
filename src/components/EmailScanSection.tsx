@@ -148,6 +148,27 @@ export default function EmailScanSection({
       );
       return;
     }
+    if (id === "outlook" || id === "office365") {
+      // MSA can interject a verification challenge (e.g. a code emailed to
+      // the recovery address) at any sign-in. Set the expectation up front;
+      // the challenge itself is completed inside Microsoft's own auth
+      // surface (MSAL). A cancelled or failed attempt is never auto-retried.
+      const proceed = await new Promise<boolean>((resolve) => {
+        Alert.alert(
+          "Microsoft sign-in",
+          "Microsoft may verify it's you before finishing sign-in — usually a code emailed to the account's recovery address. Have that inbox handy and enter the code in Microsoft's sign-in window when it asks.",
+          [
+            {
+              text: "Cancel",
+              style: "cancel" as const,
+              onPress: () => resolve(false),
+            },
+            { text: "Continue", onPress: () => resolve(true) },
+          ],
+        );
+      });
+      if (!proceed) return;
+    }
     setBusy(true);
     setStatus(null);
     try {
