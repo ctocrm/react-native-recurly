@@ -443,7 +443,12 @@ async function providerErrorReason(res: Response): Promise<string> {
 export function createGmailFetcher(
   accessToken: string,
   mailboxId: string,
+  /** R16 mid-leg 401 hook: force one token refresh, return the new token. */
+  refreshToken?: () => Promise<string | null>,
 ): MessageFetcher {
+  // Mutable token box: a mid-leg 401 swaps it so every later call in this
+  // leg (list, metadata, full body) uses the refreshed value.
+  let token = accessToken;
   // Gmail API quota (2026-09-05: the Workspace leg died with a 403 "Total
   // Query Cost / Units per minute per user" because list + per-message
   // metadata GETs + body GETs fired back-to-back). Pace every Gmail call to
@@ -460,13 +465,30 @@ export function createGmailFetcher(
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
   async function gmailApi(url: string): Promise<Response> {
+    let refreshed = false;
     for (let attempt = 1; attempt <= 2; attempt += 1) {
       const wait = nextSlot - Date.now();
       if (wait > 0) await sleep(wait);
       nextSlot = Date.now() + MIN_INTERVAL_MS;
       const res = await fetchWithTimeout(url, {
-        headers: { Authorization: `Bearer ${accessToken}` },
+        headers: { Authorization: `Bearer ${token}` },
       });
+      // R16 mid-leg 401: the access token can expire while a long leg runs
+      // (2026-09-06: page-21 list 401'd 34s after a "fresh"-at-leg-start
+      // token's expiresAt). Force ONE refresh and replay this request; the
+      // refreshed flag bounds it so a dead session still fails boundedly.
+      if (res.status === 401 && refreshToken && !refreshed) {
+        refreshed = true;
+        console.log(
+          "[MailGmail] 401 — access token rejected; refreshing and retrying once",
+        );
+        const next = await refreshToken();
+        if (next && next !== token) {
+          token = next;
+          attempt -= 1; // replay the same attempt; quota budget untouched
+          continue;
+        }
+      }
       if (res.ok) return res;
       const reason = await providerErrorReason(res);
       const quotaLimited =
@@ -592,7 +614,10 @@ export function createGmailFetcher(
 export function createGraphFetcher(
   accessToken: string,
   mailboxId: string,
+  /** R16 mid-leg 401 hook: force one token refresh, return the new token. */
+  refreshToken?: () => Promise<string | null>,
 ): MessageFetcher {
+  let token = accessToken;
   return {
     async fetchMessages({ since, limit }) {
       const out: NormalizedMessage[] = [];
@@ -614,10 +639,23 @@ export function createGraphFetcher(
           }
           return `https://graph.microsoft.com/v1.0/me/messages?${params}`;
         })();
+      let refreshed = false;
       while (url) {
         const res = await fetchWithTimeout(url, {
-          headers: { Authorization: `Bearer ${accessToken}` },
+          headers: { Authorization: `Bearer ${token}` },
         });
+        // R16 mid-leg 401: force ONE refresh and replay the same page.
+        if (res.status === 401 && refreshToken && !refreshed) {
+          refreshed = true;
+          console.log(
+            "[MailGraph] 401 — access token rejected; refreshing and retrying once",
+          );
+          const next = await refreshToken();
+          if (next && next !== token) {
+            token = next;
+            continue;
+          }
+        }
         if (!res.ok) {
           const reason = await providerErrorReason(res);
           throw new MailScanUnverifiedError(
@@ -650,7 +688,7 @@ export function createGraphFetcher(
             `https://graph.microsoft.com/v1.0/me/messages/${encodeURIComponent(
               m.id,
             )}?$select=body`,
-            { headers: { Authorization: `Bearer ${accessToken}` } },
+            { headers: { Authorization: `Bearer ${token}` } },
           );
           if (!bodyRes.ok) continue;
           const bj = (await bodyRes.json()) as {
@@ -912,8 +950,13 @@ async function fetchWithTimeout(
   }
 }
 
-/**
- * Refresh-before-list glue: if the stored access token is expired (or within
+// A Google/Microsoft access token lives ~3600s. R1 refreshes when already
+// expired, but a long scan leg outlives a token that is merely "not yet
+// expired" at leg start (2026-09-06: a ~35min Gmail leg 401'd 34s after a
+// token with 34min of remaining life). Legs therefore demand a larger
+// remaining-lifetime margin: refresh unless at least this much is left.
+const OAUTH_LEG_MIN_LIFETIME_MS = 40 * 60_000;
+
 /**
  * Refresh-before-list glue: if the stored access token is expired (or within
  * the skew margin) and a refresh token exists, mint a fresh one at the
@@ -926,6 +969,7 @@ async function ensureFreshOAuthTokens(
   providerId: MailProviderId,
   mailboxId: string,
   tokens: TokenBlob,
+  opts?: { force?: boolean; minRemainingMs?: number },
 ): Promise<TokenBlob> {
   // MSAL accounts (M2): token reuse when valid — acquireTokenSilent serves
   // MSAL's encrypted cache and refreshes internally; interaction-required
@@ -958,15 +1002,26 @@ async function ensureFreshOAuthTokens(
       return tokens;
     }
   }
-  if (!tokenNeedsRefresh(tokens) || !tokens.refreshToken) {
+  const stale = tokenNeedsRefresh(tokens, Date.now(), opts?.minRemainingMs);
+  if (!tokens.refreshToken) {
     console.log(
-      `[MailScan] ${providerId} ${mailboxId} token ${tokenNeedsRefresh(tokens) ? "expired but no refresh token" : "fresh"} — using as-is`,
+      `[MailScan] ${providerId} ${mailboxId} token ${stale ? "expired but no refresh token" : "fresh"} — using as-is`,
     );
+    return tokens;
+  }
+  if (!stale && !opts?.force) {
+    console.log(`[MailScan] ${providerId} ${mailboxId} token fresh — using as-is`);
     return tokens;
   }
   const clientId = oauthClientId(providerId);
   if (!clientId) return tokens;
-  console.log(`[MailScan] ${providerId} ${mailboxId} token expired — refreshing`);
+  console.log(
+    `[MailScan] ${providerId} ${mailboxId} token ${
+      opts?.force
+        ? "rejected mid-leg — force refresh"
+        : "expired or below leg lifetime margin"
+    } — refreshing`,
+  );
   try {
     const refreshed = await refreshAccessToken({
       tokenEndpoint: oauthSpec(providerId).tokenEndpoint,
@@ -1084,12 +1139,27 @@ async function fetcherFor(
   console.log(`[MailScan] fetcherFor ${providerId} ${mailboxId}`);
   // Refresh-before-list: OAuth access tokens expire long before a typical
   // re-scan; without this every scan after ~1h failed with a provider 401.
-  const fresh = await ensureFreshOAuthTokens(providerId, mailboxId, tokens);
+  // The leg-lifetime margin additionally refreshes a token whose REMAINING
+  // life is shorter than a typical long leg, not just one already expired.
+  const fresh = await ensureFreshOAuthTokens(providerId, mailboxId, tokens, {
+    minRemainingMs: OAUTH_LEG_MIN_LIFETIME_MS,
+  });
+  // R16 mid-leg 401 hook: force ONE refresh from the LATEST stored blob
+  // (loadTokens picks up refresh-token rotation saved by the leg-start
+  // refresh) and hand the fetchers a swap callback. A rejected refresh
+  // token throws the explicit reconnect error mid-leg - honest and bounded.
+  const refreshMidLeg = async (): Promise<string | null> => {
+    const latest = (await loadTokens(mailboxId)) ?? tokens;
+    const next = await ensureFreshOAuthTokens(providerId, mailboxId, latest, {
+      force: true,
+    });
+    return next.accessToken || null;
+  };
   if (providerId === "gmail" || providerId === "workspace") {
-    return createGmailFetcher(fresh.accessToken, mailboxId);
+    return createGmailFetcher(fresh.accessToken, mailboxId, refreshMidLeg);
   }
   if (providerId === "outlook" || providerId === "office365") {
-    return createGraphFetcher(fresh.accessToken, mailboxId);
+    return createGraphFetcher(fresh.accessToken, mailboxId, refreshMidLeg);
   }
   if (providerId === "fastmail") {
     return createJmapFetcher(fresh.accessToken, mailboxId);

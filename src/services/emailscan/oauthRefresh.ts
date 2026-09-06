@@ -18,15 +18,21 @@ export interface RefreshableTokenBlob {
 }
 
 /** True when the stored access token is expired or within the skew margin
- * of expiring. Missing `expiresAt` is treated as usable — the list call
- * itself will surface an auth error if it is stale. */
+ * of expiring. Scan legs pass a larger `minRemainingMs`: a leg can run longer
+ * than the token's remaining life even when the token is not yet expired
+ * (2026-09-06: a ~35min Gmail leg 401'd 34s after a "fresh"-at-leg-start
+ * token's expiresAt). Missing `expiresAt` is treated as usable — the list
+ * call itself will surface an auth error if it is stale. */
 export function tokenNeedsRefresh(
   tokens: RefreshableTokenBlob,
   now: number = Date.now(),
+  minRemainingMs: number = TOKEN_EXPIRY_SKEW_MS,
 ): boolean {
   if (!tokens.accessToken) return false;
   if (!tokens.expiresAt) return false;
-  return now + TOKEN_EXPIRY_SKEW_MS >= tokens.expiresAt;
+  return (
+    now + Math.max(TOKEN_EXPIRY_SKEW_MS, minRemainingMs) >= tokens.expiresAt
+  );
 }
 
 /** The provider's verdict on our refresh token. Only a rejection means the

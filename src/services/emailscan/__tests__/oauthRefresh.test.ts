@@ -32,6 +32,26 @@ describe("tokenNeedsRefresh", () => {
     ).toBe(false);
   });
 
+  it("flags a token whose remaining life is below the leg margin", () => {
+    expect(
+      tokenNeedsRefresh(
+        { ...base, expiresAt: NOW + 34 * 60_000 },
+        NOW,
+        40 * 60_000,
+      ),
+    ).toBe(true);
+  });
+
+  it("keeps a token whose remaining life exceeds the leg margin", () => {
+    expect(
+      tokenNeedsRefresh(
+        { ...base, expiresAt: NOW + 41 * 60_000 },
+        NOW,
+        40 * 60_000,
+      ),
+    ).toBe(false);
+  });
+
   it("keeps a token with unknown expiry (the list call will report)", () => {
     expect(tokenNeedsRefresh(base, NOW)).toBe(false);
   });
