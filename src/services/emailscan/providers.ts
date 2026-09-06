@@ -16,6 +16,11 @@ import {
   tokenNeedsRefresh,
 } from "./oauthRefresh";
 import {
+  createTokenSession,
+  LiveToken,
+  type TokenSession,
+} from "./oauthSession";
+import {
   acquireTokenInteractively,
   acquireTokenSilently,
   buildMsalFailureMessage,
@@ -440,15 +445,44 @@ async function providerErrorReason(res: Response): Promise<string> {
   return "";
 }
 
+/**
+ * R17: the ONE authed-request path for the OAuth JSON fetchers (Graph, Zoho,
+ * JMAP — Gmail keeps its own quota-paced loop but uses the same session).
+ * Proactive: `session.valid()` refreshes BEFORE the request when remaining
+ * token life is under the request margin, so an expiring token can never
+ * reach the provider (the 2026-09-06 Gmail mid-leg 401 class). Reactive
+ * backstop: a 401 still forces one refresh and one replay, bounded per
+ * request, for early server-side revocation.
+ */
+async function fetchWithSession(
+  session: TokenSession,
+  url: string,
+  init: RequestInit | undefined,
+  scheme: (token: string) => string,
+  label: string,
+): Promise<Response> {
+  const token = await session.valid();
+  const res = await fetchWithTimeout(url, {
+    ...init,
+    headers: { ...init?.headers, Authorization: scheme(token) },
+  });
+  if (res.status !== 401) return res;
+  console.log(
+    `[${label}] 401 — access token rejected; refreshing and retrying once`,
+  );
+  const next = await session.force();
+  if (!next || next === token) return res;
+  return fetchWithTimeout(url, {
+    ...init,
+    headers: { ...init?.headers, Authorization: scheme(next) },
+  });
+}
+
 export function createGmailFetcher(
-  accessToken: string,
+  /** R17: expiry-aware session — proactive refresh + 401 backstop. */
+  session: TokenSession,
   mailboxId: string,
-  /** R16 mid-leg 401 hook: force one token refresh, return the new token. */
-  refreshToken?: () => Promise<string | null>,
 ): MessageFetcher {
-  // Mutable token box: a mid-leg 401 swaps it so every later call in this
-  // leg (list, metadata, full body) uses the refreshed value.
-  let token = accessToken;
   // Gmail API quota (2026-09-05: the Workspace leg died with a 403 "Total
   // Query Cost / Units per minute per user" because list + per-message
   // metadata GETs + body GETs fired back-to-back). Pace every Gmail call to
@@ -467,24 +501,25 @@ export function createGmailFetcher(
   async function gmailApi(url: string): Promise<Response> {
     let refreshed = false;
     for (let attempt = 1; attempt <= 2; attempt += 1) {
+      // R17: proactive — a token within the request margin of expiry is
+      // refreshed BEFORE the request fires, so the provider never has to
+      // 401 us (the 2026-09-06 page-21 mid-leg 401 class).
+      const token = await session.valid();
       const wait = nextSlot - Date.now();
       if (wait > 0) await sleep(wait);
       nextSlot = Date.now() + MIN_INTERVAL_MS;
       const res = await fetchWithTimeout(url, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      // R16 mid-leg 401: the access token can expire while a long leg runs
-      // (2026-09-06: page-21 list 401'd 34s after a "fresh"-at-leg-start
-      // token's expiresAt). Force ONE refresh and replay this request; the
-      // refreshed flag bounds it so a dead session still fails boundedly.
-      if (res.status === 401 && refreshToken && !refreshed) {
+      // Backstop only: early server-side revocation. Bounded once per
+      // request so a dead session still fails boundedly.
+      if (res.status === 401 && !refreshed) {
         refreshed = true;
         console.log(
           "[MailGmail] 401 — access token rejected; refreshing and retrying once",
         );
-        const next = await refreshToken();
+        const next = await session.force();
         if (next && next !== token) {
-          token = next;
           attempt -= 1; // replay the same attempt; quota budget untouched
           continue;
         }
@@ -612,12 +647,10 @@ export function createGmailFetcher(
 }
 
 export function createGraphFetcher(
-  accessToken: string,
+  /** R17: expiry-aware session — proactive refresh + 401 backstop. */
+  session: TokenSession,
   mailboxId: string,
-  /** R16 mid-leg 401 hook: force one token refresh, return the new token. */
-  refreshToken?: () => Promise<string | null>,
 ): MessageFetcher {
-  let token = accessToken;
   return {
     async fetchMessages({ since, limit }) {
       const out: NormalizedMessage[] = [];
@@ -639,23 +672,14 @@ export function createGraphFetcher(
           }
           return `https://graph.microsoft.com/v1.0/me/messages?${params}`;
         })();
-      let refreshed = false;
       while (url) {
-        const res = await fetchWithTimeout(url, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        // R16 mid-leg 401: force ONE refresh and replay the same page.
-        if (res.status === 401 && refreshToken && !refreshed) {
-          refreshed = true;
-          console.log(
-            "[MailGraph] 401 — access token rejected; refreshing and retrying once",
-          );
-          const next = await refreshToken();
-          if (next && next !== token) {
-            token = next;
-            continue;
-          }
-        }
+        const res = await fetchWithSession(
+          session,
+          url,
+          undefined,
+          (t) => `Bearer ${t}`,
+          "MailGraph",
+        );
         if (!res.ok) {
           const reason = await providerErrorReason(res);
           throw new MailScanUnverifiedError(
@@ -684,11 +708,14 @@ export function createGraphFetcher(
           const cls = classifySubject(subject);
           if (cls !== "recurring" && cls !== "sparse") continue;
 
-          const bodyRes = await fetchWithTimeout(
+          const bodyRes = await fetchWithSession(
+            session,
             `https://graph.microsoft.com/v1.0/me/messages/${encodeURIComponent(
               m.id,
             )}?$select=body`,
-            { headers: { Authorization: `Bearer ${token}` } },
+            undefined,
+            (t) => `Bearer ${t}`,
+            "MailGraph",
           );
           if (!bodyRes.ok) continue;
           const bj = (await bodyRes.json()) as {
@@ -723,14 +750,21 @@ export function createGraphFetcher(
 }
 
 export function createZohoFetcher(
-  accessToken: string,
+  /** R17: expiry-aware session — Zoho tokens expire in 1h; this fetcher
+   * previously had NO refresh path at all (the next live 401 waiting to
+   * happen). */
+  session: TokenSession,
   mailboxId: string,
 ): MessageFetcher {
   return {
     async fetchMessages({ since, limit }) {
-      const accRes = await fetchWithTimeout("https://mail.zoho.com/api/accounts", {
-        headers: { Authorization: `Zoho-oauthtoken ${accessToken}` },
-      });
+      const accRes = await fetchWithSession(
+        session,
+        "https://mail.zoho.com/api/accounts",
+        undefined,
+        (t) => `Zoho-oauthtoken ${t}`,
+        "MailZoho",
+      );
       if (!accRes.ok) {
         throw new MailScanUnverifiedError(
           `Zoho accounts failed (${accRes.status})`,
@@ -750,9 +784,12 @@ export function createZohoFetcher(
         searchKey,
         limit: String(Math.min(limit, 50)),
       });
-      const res = await fetchWithTimeout(
+      const res = await fetchWithSession(
+        session,
         `https://mail.zoho.com/api/accounts/${accountId}/messages/search?${params}`,
-        { headers: { Authorization: `Zoho-oauthtoken ${accessToken}` } },
+        undefined,
+        (t) => `Zoho-oauthtoken ${t}`,
+        "MailZoho",
       );
       if (!res.ok) {
         throw new MailScanUnverifiedError(`Zoho search failed (${res.status})`);
@@ -788,22 +825,28 @@ export function createZohoFetcher(
 }
 
 export function createJmapFetcher(
-  accessToken: string,
+  /** R17: expiry-aware session (passthrough for Fastmail's long-lived
+   * tokens — no expiresAt means `valid()` never refreshes). */
+  session: TokenSession,
   mailboxId: string,
 ): MessageFetcher {
   return {
     async fetchMessages({ since, limit }) {
-      const sessionRes = await fetchWithTimeout("https://api.fastmail.com/jmap/session", {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
+      const sessionRes = await fetchWithSession(
+        session,
+        "https://api.fastmail.com/jmap/session",
+        undefined,
+        (t) => `Bearer ${t}`,
+        "MailJmap",
+      );
       if (!sessionRes.ok) {
         throw new MailScanUnverifiedError(
           `Fastmail session failed (${sessionRes.status})`,
         );
       }
-      const session = await sessionRes.json();
-      const apiUrl = session.apiUrl as string;
-      const accountId = Object.keys(session.accounts || {})[0];
+      const jmapSession = await sessionRes.json();
+      const apiUrl = jmapSession.apiUrl as string;
+      const accountId = Object.keys(jmapSession.accounts || {})[0];
       if (!apiUrl || !accountId) {
         throw new MailScanUnverifiedError("Fastmail session missing account");
       }
@@ -855,17 +898,20 @@ export function createJmapFetcher(
           "1",
         ],
       ];
-      const res = await fetchWithTimeout(apiUrl, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
+      const res = await fetchWithSession(
+        session,
+        apiUrl,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            using: ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+            methodCalls: query,
+          }),
         },
-        body: JSON.stringify({
-          using: ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
-          methodCalls: query,
-        }),
-      });
+        (t) => `Bearer ${t}`,
+        "MailJmap",
+      );
       if (!res.ok) {
         throw new MailScanUnverifiedError(`JMAP get failed (${res.status})`);
       }
@@ -1144,28 +1190,37 @@ async function fetcherFor(
   const fresh = await ensureFreshOAuthTokens(providerId, mailboxId, tokens, {
     minRemainingMs: OAUTH_LEG_MIN_LIFETIME_MS,
   });
-  // R16 mid-leg 401 hook: force ONE refresh from the LATEST stored blob
-  // (loadTokens picks up refresh-token rotation saved by the leg-start
-  // refresh) and hand the fetchers a swap callback. A rejected refresh
-  // token throws the explicit reconnect error mid-leg - honest and bounded.
-  const refreshMidLeg = async (): Promise<string | null> => {
+  // R17: every OAuth fetcher runs on an expiry-aware token session. A token
+  // within REQUEST_LIFETIME_MARGIN_MS of expiry is refreshed BEFORE the next
+  // request fires (single-flight; the refresh persists via
+  // ensureFreshOAuthTokens so loadTokens picks up rotation), so the provider
+  // never has to 401 us. The 401 backstop inside the fetchers remains for
+  // early server-side revocation; a rejected refresh token still surfaces
+  // the explicit reconnect error mid-leg - honest and bounded.
+  const refreshMidLeg = async (): Promise<LiveToken | null> => {
     const latest = (await loadTokens(mailboxId)) ?? tokens;
     const next = await ensureFreshOAuthTokens(providerId, mailboxId, latest, {
       force: true,
     });
-    return next.accessToken || null;
+    return next.accessToken
+      ? { accessToken: next.accessToken, expiresAt: next.expiresAt }
+      : null;
   };
+  const session = createTokenSession(
+    { accessToken: fresh.accessToken, expiresAt: fresh.expiresAt },
+    refreshMidLeg,
+  );
   if (providerId === "gmail" || providerId === "workspace") {
-    return createGmailFetcher(fresh.accessToken, mailboxId, refreshMidLeg);
+    return createGmailFetcher(session, mailboxId);
   }
   if (providerId === "outlook" || providerId === "office365") {
-    return createGraphFetcher(fresh.accessToken, mailboxId, refreshMidLeg);
+    return createGraphFetcher(session, mailboxId);
   }
   if (providerId === "fastmail") {
-    return createJmapFetcher(fresh.accessToken, mailboxId);
+    return createJmapFetcher(session, mailboxId);
   }
   if (providerId === "zoho") {
-    return createZohoFetcher(fresh.accessToken, mailboxId);
+    return createZohoFetcher(session, mailboxId);
   }
   return {
     async fetchMessages() {

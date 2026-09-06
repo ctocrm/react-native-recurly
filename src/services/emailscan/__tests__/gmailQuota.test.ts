@@ -11,6 +11,7 @@
  */
 
 import { createGmailFetcher, MailScanUnverifiedError } from "../providers";
+import { createTokenSession } from "../oauthSession";
 
 // providers.ts pulls in native modules its Gmail fetcher never touches.
 // Mock them so the suite runs in plain node (the Gmail path only needs fetch).
@@ -118,7 +119,7 @@ describe("createGmailFetcher quota handling", () => {
       return jsonResponse(404, {});
     });
 
-    const fetcher = createGmailFetcher("token-1", "workspace-1");
+    const fetcher = createGmailFetcher(createTokenSession({ accessToken: "token-1" }), "workspace-1");
     const promise = fetcher.fetchMessages({
       mailboxId: "workspace-1",
       since: null,
@@ -147,7 +148,7 @@ describe("createGmailFetcher quota handling", () => {
       }),
     );
 
-    const fetcher = createGmailFetcher("token-1", "workspace-1");
+    const fetcher = createGmailFetcher(createTokenSession({ accessToken: "token-1" }), "workspace-1");
     const promise = fetcher.fetchMessages({
       mailboxId: "workspace-1",
       since: null,
@@ -174,7 +175,7 @@ describe("createGmailFetcher quota handling", () => {
       jsonResponse(403, { error: { message: "Invalid Credentials" } }),
     );
 
-    const fetcher = createGmailFetcher("token-1", "workspace-1");
+    const fetcher = createGmailFetcher(createTokenSession({ accessToken: "token-1" }), "workspace-1");
     const promise = fetcher.fetchMessages({
       mailboxId: "workspace-1",
       since: null,
