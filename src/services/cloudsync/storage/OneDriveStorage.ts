@@ -1,15 +1,51 @@
 import * as FileSystem from "expo-file-system/legacy";
 import * as SecureStore from "expo-secure-store";
 import { CloudStorageProvider } from "@/services/cloudsync/types";
+import {
+  authedRequest,
+  type CloudTokenBlob,
+  createCloudSession,
+  makeOAuthTokenRefresher,
+} from "@/services/cloudsync/authedRequest";
+import type { TokenSession } from "@/services/emailscan/oauthSession";
 
 const ONEDRIVE_API_BASE = "https://graph.microsoft.com/v1.0";
 
 export class OneDriveStorage implements CloudStorageProvider {
   private tokens: any = null;
   private userId: string = "";
+  private session: TokenSession | null = null;
 
   constructor(userId: string) {
     this.userId = userId;
+  }
+
+  /** R17: expiry-aware session — OneDrive access tokens live 1h; refresh
+   * BEFORE each request (persisted) + one 401 backstop retry. */
+  private ensureSession(): TokenSession {
+    if (!this.session) {
+      const tokens = (this.tokens ?? { accessToken: "" }) as CloudTokenBlob;
+      this.session = createCloudSession({
+        tokens,
+        storageKey: `onedrive_tokens_${this.userId}`,
+        refresher:
+          tokens.refreshToken && process.env.EXPO_PUBLIC_ONEDRIVE_CLIENT_ID
+            ? makeOAuthTokenRefresher({
+                tokenEndpoint:
+                  "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+                clientId: process.env.EXPO_PUBLIC_ONEDRIVE_CLIENT_ID,
+              })
+            : null,
+      });
+    }
+    return this.session;
+  }
+
+  private req(url: string, init?: RequestInit): Promise<Response> {
+    if (!this.tokens?.accessToken) {
+      throw new Error("Not authenticated");
+    }
+    return authedRequest(this.ensureSession(), url, init, "OneDrive");
   }
 
   async authenticate(): Promise<void> {
@@ -45,7 +81,7 @@ export class OneDriveStorage implements CloudStorageProvider {
     try {
       // Create the folder under Documents - OneDrive will create it if it doesn't exist
       // If it exists, OneDrive returns 409 which we can ignore
-      await fetch(
+      await this.req(
         `${ONEDRIVE_API_BASE}/me/drive/root:/Documents/SubTracker:/content`,
         {
           method: "PUT",
@@ -92,7 +128,7 @@ export class OneDriveStorage implements CloudStorageProvider {
       bytes[i] = binaryString.charCodeAt(i);
     }
 
-    const response = await fetch(
+    const response = await this.req(
       `${ONEDRIVE_API_BASE}/me/drive/root:${onedrivePath}:/content`,
       {
         method: "PUT",
@@ -129,7 +165,7 @@ export class OneDriveStorage implements CloudStorageProvider {
       throw new Error("Not authenticated");
     }
 
-    const response = await fetch(
+    const response = await this.req(
       `${ONEDRIVE_API_BASE}/me/drive/items/${fileId}/content`,
       {
         headers: {
@@ -169,7 +205,7 @@ export class OneDriveStorage implements CloudStorageProvider {
       throw new Error("Not authenticated");
     }
 
-    const response = await fetch(
+    const response = await this.req(
       `${ONEDRIVE_API_BASE}/me/drive/items/${fileId}`,
       {
         method: "DELETE",
@@ -195,7 +231,7 @@ export class OneDriveStorage implements CloudStorageProvider {
     }
 
     try {
-      const response = await fetch(
+      const response = await this.req(
         `${ONEDRIVE_API_BASE}/me/drive/items/${fileId}?select=id,lastModifiedDateTime,size`,
         {
           headers: {
@@ -237,7 +273,7 @@ export class OneDriveStorage implements CloudStorageProvider {
     const onedrivePath = `/Documents/SubTracker/${fileName}`;
 
     try {
-      const response = await fetch(
+      const response = await this.req(
         `${ONEDRIVE_API_BASE}/me/drive/root:/Documents/SubTracker:/children?select=id,lastModifiedDateTime,size,name`,
         {
           headers: {
