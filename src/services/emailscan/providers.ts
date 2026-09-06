@@ -448,7 +448,10 @@ export function createGmailFetcher(
   // metadata GETs + body GETs fired back-to-back). Pace every Gmail call to
   // MIN_INTERVAL_MS between request starts, and treat a quota 403/429 as
   // retryable after a ~60s backoff (once) instead of failing the whole leg.
-  const MIN_INTERVAL_MS = 250;
+  // Live evidence for 500ms: at 250ms the leg clipped the per-minute ceiling
+  // every ~2min (four backoff-recoveries in 9min); 500ms stays under it —
+  // slightly slower calls, but no 60s stalls.
+  const MIN_INTERVAL_MS = 500;
   const QUOTA_BACKOFF_MS = 60_000;
   const MAX_BACKOFF_MS = 120_000;
   let nextSlot = 0;
