@@ -6,6 +6,7 @@ const {
   withDangerousMod,
   withMainApplication,
   withAppBuildGradle,
+  withAndroidManifest,
 } = require("@expo/config-plugins");
 const fs = require("fs");
 const path = require("path");
@@ -86,6 +87,7 @@ function withMailImap(config) {
         "ImapPackage.kt",
         "ProtonModule.kt",
         "TutaModule.kt",
+        "WatchdogModule.kt",
       ]) {
         const src = path.join(SRC_DIR, file);
         const dest = path.join(destDir, file);
@@ -94,6 +96,23 @@ function withMailImap(config) {
       return cfg;
     },
   ]);
+
+  // R15 offline gate: ConnectivityManager queries + registerDefaultNetworkCallback
+  // both require ACCESS_NETWORK_STATE, which a default Expo manifest does not
+  // declare. Idempotent.
+  config = withAndroidManifest(config, (cfg) => {
+    const manifest = cfg.modResults.manifest;
+    manifest["uses-permission"] = manifest["uses-permission"] || [];
+    const has = manifest["uses-permission"].some(
+      (p) => p && p.$ && p.$["android:name"] === "android.permission.ACCESS_NETWORK_STATE",
+    );
+    if (!has) {
+      manifest["uses-permission"].push({
+        $: { "android:name": "android.permission.ACCESS_NETWORK_STATE" },
+      });
+    }
+    return cfg;
+  });
 
   config = withMainApplication(config, (cfg) => {
     let contents = cfg.modResults.contents;

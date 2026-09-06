@@ -9,7 +9,7 @@ import * as AuthSession from "expo-auth-session";
 import * as SecureStore from "expo-secure-store";
 import { runPersistedScan } from "./persist";
 import { classifySubject } from "./classifier";
-import { feedScanWatchdog } from "./scanWatchdog";
+import { ensureOnline, feedScanWatchdog } from "./scanWatchdog";
 import {
   refreshAccessToken,
   TokenRefreshRejectedError,
@@ -862,10 +862,10 @@ export function createJmapFetcher(
  * hang). Every settled call — ok or not — also feeds the R14 scan watchdog:
  * a delivered response is scan progress and restarts the no-progress clock.
  */
-async function fetchWithTimeout(
+async function fetchOnce(
   url: string,
-  init?: RequestInit,
-  timeoutMs = 20_000,
+  init: RequestInit | undefined,
+  timeoutMs: number,
 ): Promise<Response> {
   const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -884,6 +884,31 @@ async function fetchWithTimeout(
     return res;
   } finally {
     if (timer) clearTimeout(timer);
+  }
+}
+
+/**
+ * fetchWithTimeout (R9/R12/R14) + the R15 offline gate: never fetch into a
+ * dead network. Offline -> pause on the native reconnect event (user sees a
+ * Toast; the leg resumes where it stopped). If the network dies MID-request,
+ * wait for reconnection and retry the same request once. Only a pause that
+ * outlasts ONLINE_WAIT_MS fails the leg - boundedly, like every other path.
+ */
+async function fetchWithTimeout(
+  url: string,
+  init?: RequestInit,
+  timeoutMs = 20_000,
+): Promise<Response> {
+  if (!(await ensureOnline())) {
+    throw new Error(
+      "network offline - scan paused too long; try again when you are back online",
+    );
+  }
+  try {
+    return await fetchOnce(url, init, timeoutMs);
+  } catch (error) {
+    if (!(await ensureOnline())) throw error;
+    return await fetchOnce(url, init, timeoutMs);
   }
 }
 

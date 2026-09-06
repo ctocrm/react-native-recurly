@@ -1,8 +1,13 @@
 package app.picksandshovels.cadence.imap
 
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
 import android.os.Handler
 import android.os.HandlerThread
 import android.util.Log
+import android.widget.Toast
+import java.util.concurrent.atomic.AtomicBoolean
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
@@ -84,6 +89,103 @@ class WatchdogModule(reactContext: ReactApplicationContext) :
     val p = pending
     pending = null
     p?.resolve(null)
+  }
+
+
+  /**
+   * R15 offline gate: is there a network with internet capability right now?
+   * Cheap synchronous check used before every provider HTTP call.
+   */
+  @ReactMethod
+  fun isOnline(promise: Promise) {
+    val cm = reactApplicationContext.getSystemService(ConnectivityManager::class.java)
+    val caps = cm?.activeNetwork?.let { cm.getNetworkCapabilities(it) }
+    val online = caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
+    promise.resolve(online)
+  }
+
+  /**
+   * R15 offline gate: park on the NATIVE reconnect event. Resolves true when a
+   * network with internet comes back, false after timeoutMs. Deliberately
+   * event-driven (NetworkCallback) with zero JS timers, so the wait survives
+   * the main-thread stall class that freezes RN timer dispatch (2026-09-06
+   * gate evidence). While waiting: feeds the watchdog natively every 30s so a
+   * legitimate offline pause can never be stall-killed, and shows a Toast so
+   * the user knows the scan paused and will resume on its own.
+   */
+  @ReactMethod
+  fun waitForOnline(timeoutMs: Double, promise: Promise) {
+    val cm = reactApplicationContext.getSystemService(ConnectivityManager::class.java)
+    if (cm == null) {
+      promise.resolve(true)
+      return
+    }
+    OnlineWait(cm, promise, timeoutMs.toLong().coerceAtLeast(1_000L)).start()
+  }
+
+  private inner class OnlineWait(
+    private val cm: ConnectivityManager,
+    private val promise: Promise,
+    private val timeoutMs: Long,
+  ) {
+    private val done = AtomicBoolean(false)
+
+    // Keep the no-progress watchdog fed while legitimately paused offline.
+    private val feed = object : Runnable {
+      override fun run() {
+        if (done.get()) return
+        if (pending != null) {
+          handler.removeCallbacks(expire)
+          handler.postDelayed(expire, budgetMs)
+        }
+        handler.postDelayed(this, 30_000L)
+      }
+    }
+
+    private val timeout = Runnable { finish(false) }
+
+    private val callback = object : ConnectivityManager.NetworkCallback() {
+      override fun onAvailable(network: Network) {
+        finish(true)
+      }
+    }
+
+    fun finish(ok: Boolean) {
+      if (!done.compareAndSet(false, true)) return
+      handler.removeCallbacks(feed)
+      handler.removeCallbacks(timeout)
+      try {
+        cm.unregisterNetworkCallback(callback)
+      } catch (_: Exception) {
+        // Already unregistered / never registered - nothing to do.
+      }
+      promise.resolve(ok)
+    }
+
+    fun start() {
+      // Fast path: back online before the wait even starts.
+      val caps = cm.activeNetwork?.let { cm.getNetworkCapabilities(it) }
+      if (caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true) {
+        promise.resolve(true)
+        return
+      }
+      handler.post {
+        Toast.makeText(
+          reactApplicationContext,
+          "Offline - scan paused; it will resume when the network is back",
+          Toast.LENGTH_LONG,
+        ).show()
+      }
+      try {
+        cm.registerDefaultNetworkCallback(callback)
+      } catch (e: Exception) {
+        Log.w(TAG, "registerDefaultNetworkCallback failed; assuming online", e)
+        promise.resolve(true)
+        return
+      }
+      handler.postDelayed(feed, 30_000L)
+      handler.postDelayed(timeout, timeoutMs)
+    }
   }
 
   companion object {

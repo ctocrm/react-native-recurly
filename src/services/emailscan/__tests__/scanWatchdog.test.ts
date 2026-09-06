@@ -5,6 +5,7 @@
  * per-mailbox failure.
  */
 import {
+  ensureOnline,
   feedScanWatchdog,
   waitForScanStall,
   type ScanStallHandle,
@@ -44,6 +45,8 @@ describe("waitForScanStall", () => {
       },
       feed() {},
       cancel() {},
+      isOnline: async () => true,
+      waitForOnline: async () => true,
     };
     const handle = waitForScanStall(1234, fake);
     expect(armCalls).toEqual([1234]);
@@ -64,6 +67,8 @@ describe("waitForScanStall", () => {
       cancel() {
         cancelCalled = true;
       },
+      isOnline: async () => true,
+      waitForOnline: async () => true,
     };
     const handle = waitForScanStall(500, fake);
     handle.cancel();
@@ -75,6 +80,52 @@ describe("waitForScanStall", () => {
     arm.reject?.(new Error("late rejection"));
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(rejected).toBe(false);
+  });
+});
+
+describe("ensureOnline (R15 offline gate)", () => {
+  it("returns true immediately when online", async () => {
+    const mod: WatchdogNative = {
+      arm: () => Promise.resolve(null),
+      feed: () => {},
+      cancel: () => {},
+      isOnline: async () => true,
+      waitForOnline: async () => {
+        throw new Error("must not be called when online");
+      },
+    };
+    await expect(ensureOnline(5_000, mod)).resolves.toBe(true);
+  });
+
+  it("pauses on the native reconnect event and resumes", async () => {
+    const waits: number[] = [];
+    const mod: WatchdogNative = {
+      arm: () => Promise.resolve(null),
+      feed: () => {},
+      cancel: () => {},
+      isOnline: async () => false,
+      waitForOnline: async (ms: number) => {
+        waits.push(ms);
+        return true;
+      },
+    };
+    await expect(ensureOnline(123_456, mod)).resolves.toBe(true);
+    expect(waits).toEqual([123_456]);
+  });
+
+  it("reports false when offline longer than the budget", async () => {
+    const mod: WatchdogNative = {
+      arm: () => Promise.resolve(null),
+      feed: () => {},
+      cancel: () => {},
+      isOnline: async () => false,
+      waitForOnline: async () => false,
+    };
+    await expect(ensureOnline(1_000, mod)).resolves.toBe(false);
+  });
+
+  it("never blocks when the native module is absent", async () => {
+    await expect(ensureOnline(1_000, null)).resolves.toBe(true);
   });
 });
 

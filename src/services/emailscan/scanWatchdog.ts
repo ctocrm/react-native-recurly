@@ -26,6 +26,8 @@ export type WatchdogNative = {
   arm(budgetMs: number): Promise<unknown>;
   feed(): void;
   cancel(): void;
+  isOnline(): Promise<boolean>;
+  waitForOnline(timeoutMs: number): Promise<boolean>;
 };
 
 function native(): WatchdogNative | null {
@@ -92,5 +94,47 @@ export function feedScanWatchdog(): void {
     native()?.feed();
   } catch {
     // Best-effort — never let diagnostics kill a scan.
+  }
+}
+
+/** How long a paused leg waits for the network before failing boundedly. */
+export const ONLINE_WAIT_MS = 10 * 60_000;
+
+/** Native connectivity check (true when the module is absent). */
+export async function isOnline(
+  mod: WatchdogNative | null = native(),
+): Promise<boolean> {
+  if (!mod) return true;
+  try {
+    return await mod.isOnline();
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * R15 offline gate: if the network is down, tell the user (native Toast from
+ * the module) and park on the NATIVE reconnect event - zero JS timers, so the
+ * wait survives the main-thread stall class that froze RN timer dispatch
+ * (2026-09-06 gate evidence). Returns true when back online in time, false
+ * when offline longer than timeoutMs (caller fails the leg boundedly).
+ */
+export async function ensureOnline(
+  timeoutMs: number = ONLINE_WAIT_MS,
+  mod: WatchdogNative | null = native(),
+): Promise<boolean> {
+  if (!mod) return true;
+  let online = false;
+  try {
+    online = await mod.isOnline();
+  } catch {
+    return true;
+  }
+  if (online) return true;
+  console.log("[MailScan] offline - scan paused, waiting for the network");
+  try {
+    return await mod.waitForOnline(timeoutMs);
+  } catch {
+    return true;
   }
 }
