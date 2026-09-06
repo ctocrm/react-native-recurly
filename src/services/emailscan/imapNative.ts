@@ -2,6 +2,7 @@
  * JS bridge to the Android MailImap native module (SSL IMAPS).
  * Public hosts only. Not Proton. Not Tuta.
  */
+import { feedScanWatchdog } from "./scanWatchdog";
 import { NativeModules, Platform } from "react-native";
 import { requestProtonCaptcha } from "./protonCaptcha";
 import type { MessageFetcher, NormalizedMessage } from "./types";
@@ -191,6 +192,7 @@ export function createProtonFetcher(
         const sinceIso: string | null = since?.date ?? null;
         let untilIso: string | null = null;
         for (let batch = 0; batch < MAX_BATCHES; batch += 1) {
+          feedScanWatchdog();
           const listed = await native.listWithSession(
             session.uid,
             session.accessToken,

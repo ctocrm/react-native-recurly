@@ -4,6 +4,11 @@
  * only on a parser-version bump. Toggle does not call this.
  */
 import { classifyMessage } from "./classifier";
+import {
+    feedScanWatchdog,
+    waitForScanStall,
+    type ScanStallHandle,
+} from "./scanWatchdog";
 import { buildCandidateMap } from "./rollup";
 import {
     INITIAL_SCAN_LIMIT,
@@ -109,13 +114,33 @@ function reparseStale(state: MailboxScanState): {
   return { state: next, reparsed };
 }
 
+/**
+ * R14 no-progress watchdog. Injectable so tests can drive the stall path;
+ * defaults to the native-backed module (no-op off Android). feed() is called
+ * by the fetchers themselves (providers fetchWithTimeout, imapNative chunks)
+ * — every completed HTTP call or native chunk restarts the countdown.
+ */
+export type ScanWatchdogControl = {
+  stall(budgetMs?: number): ScanStallHandle;
+  feed(): void;
+  cancel(handle: ScanStallHandle): void;
+};
+
+const defaultWatchdog: ScanWatchdogControl = {
+  stall: waitForScanStall,
+  feed: feedScanWatchdog,
+  cancel: (handle) => handle.cancel(),
+};
+
 export async function runIncrementalScan(opts: {
   mailboxId: string;
   providerId: MailProviderId;
   fetcher: MessageFetcher;
   store: ScanCacheStore;
   limit?: number;
+  watchdog?: ScanWatchdogControl;
 }): Promise<IncrementalScanResult> {
+  const watchdog = opts.watchdog ?? defaultWatchdog;
   const limit = opts.limit ?? INITIAL_SCAN_LIMIT;
   const existing =
     opts.store.getMailbox(opts.mailboxId) ??
@@ -131,11 +156,24 @@ export async function runIncrementalScan(opts: {
         }
       : null;
 
-  const fetched = await opts.fetcher.fetchMessages({
-    mailboxId: opts.mailboxId,
-    since,
-    limit,
-  });
+  // R14: race the whole leg against the native no-progress watchdog so a
+  // mid-leg wedge (dead JS timers with no in-flight socket to time out —
+  // the 2026-09-05 run-2 class) surfaces as a per-mailbox error instead of
+  // parking the scan forever.
+  const stall = watchdog.stall();
+  let fetched: NormalizedMessage[];
+  try {
+    fetched = await Promise.race([
+      opts.fetcher.fetchMessages({
+        mailboxId: opts.mailboxId,
+        since,
+        limit,
+      }),
+      stall.promise,
+    ]);
+  } finally {
+    watchdog.cancel(stall);
+  }
 
   const next: MailboxScanState = {
     ...primed,

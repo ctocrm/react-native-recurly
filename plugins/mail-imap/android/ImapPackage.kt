@@ -11,6 +11,7 @@ class ImapPackage : ReactPackage {
       ImapModule(reactContext),
       ProtonModule(reactContext),
       TutaModule(reactContext),
+      WatchdogModule(reactContext),
     )
   }
 

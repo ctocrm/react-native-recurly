@@ -9,6 +9,7 @@ import * as AuthSession from "expo-auth-session";
 import * as SecureStore from "expo-secure-store";
 import { runPersistedScan } from "./persist";
 import { classifySubject } from "./classifier";
+import { feedScanWatchdog } from "./scanWatchdog";
 import {
   refreshAccessToken,
   TokenRefreshRejectedError,
@@ -535,8 +536,16 @@ export function createGmailFetcher(
         pages += 1;
         const ids = (listJson.messages || []).map((m) => m.id);
         listed += ids.length;
+        // R14 breadcrumbs: any future stall's last log line pinpoints the
+        // park point (which page, how deep into the screening loop).
+        console.log(`[MailGmail] page ${pages}: +${ids.length} ids (total ${listed})`);
 
+        let screened = 0;
         for (const id of ids) {
+          screened += 1;
+          if (screened % 25 === 0) {
+            console.log(`[MailGmail] screening ${screened}/${ids.length} on page ${pages}`);
+          }
           const metaRes = await gmailApi(
             `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date`,
           );
@@ -846,24 +855,33 @@ export function createJmapFetcher(
 }
 
 /**
- * fetch that can never hang: rejects after `timeoutMs` (default 20s).
- * A black-holed socket must surface as a per-mailbox error instead of
- * freezing the whole scan loop (R9: the 2026-09-03 18-min scan hang).
+ * fetch that can never hang: rejects after `timeoutMs` (default 20s) AND
+ * aborts the underlying request natively so a timed-out call cannot leak
+ * its socket. A black-holed socket must surface as a per-mailbox error
+ * instead of freezing the whole scan loop (R9: the 2026-09-03 18-min scan
+ * hang). Every settled call — ok or not — also feeds the R14 scan watchdog:
+ * a delivered response is scan progress and restarts the no-progress clock.
  */
 async function fetchWithTimeout(
   url: string,
   init?: RequestInit,
   timeoutMs = 20_000,
 ): Promise<Response> {
+  const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(
-      () => reject(new Error(`request timed out after ${timeoutMs}ms`)),
-      timeoutMs,
-    );
+    timer = setTimeout(() => {
+      controller.abort();
+      reject(new Error(`request timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
   });
   try {
-    return await Promise.race([fetch(url, init), timeout]);
+    const res = await Promise.race([
+      fetch(url, { ...init, signal: controller.signal }),
+      timeout,
+    ]);
+    feedScanWatchdog();
+    return res;
   } finally {
     if (timer) clearTimeout(timer);
   }
