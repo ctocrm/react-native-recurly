@@ -7,6 +7,30 @@ import {
   MailScanUnverifiedError,
 } from "./providers";
 
+// OOM guard (2026-09-05 crash, FATAL mqt_v_native at 192MB): the import used
+// to fire startIconCrawl for EVERY new/updated subscription at once — eight
+// concurrent discovery flows (search + scrape) running on top of the shared
+// icon queue exhausted the Java heap mid-scan. Icon discovery is background
+// work, so chain the scan-fired crawls: at most one discovery flow runs at a
+// time while downloads inside the crawler stay bounded by DOWNLOAD_CONCURRENCY.
+let scanCrawlChain: Promise<void> = Promise.resolve();
+function enqueueScanIconCrawl(
+  iconKey: string,
+  subscriptionId: string | undefined,
+  officialDomain: string | null | undefined,
+): Promise<void> {
+  scanCrawlChain = scanCrawlChain
+    .then(() =>
+      startIconCrawl(iconKey, subscriptionId, {
+        officialDomain: officialDomain ?? undefined,
+      }),
+    )
+    .catch((error) => {
+      console.warn(`[MailScan] icon crawl failed for ${iconKey}:`, error);
+    });
+  return scanCrawlChain;
+}
+
 export async function importFromConnectedMailboxes(opts: {
   userId: string;
   existing: Subscription[];
@@ -65,9 +89,11 @@ export async function importFromConnectedMailboxes(opts: {
                   icon_key: crawlKey,
                 });
               }
-              void startIconCrawl(crawlKey, already.id, {
-                officialDomain: candidate.officialDomain,
-              });
+              enqueueScanIconCrawl(
+                crawlKey,
+                already.id,
+                candidate.officialDomain,
+              );
             }
           }
           continue;
@@ -76,9 +102,7 @@ export async function importFromConnectedMailboxes(opts: {
         existingByKey.set(key, next);
         imported += 1;
         if (next.icon_key && next.icon_key !== "plus") {
-          void startIconCrawl(next.icon_key, next.id, {
-            officialDomain: candidate.officialDomain,
-          });
+          enqueueScanIconCrawl(next.icon_key, next.id, candidate.officialDomain);
         }
       }
     } catch (error) {
