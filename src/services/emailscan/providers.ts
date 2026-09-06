@@ -443,6 +443,56 @@ export function createGmailFetcher(
   accessToken: string,
   mailboxId: string,
 ): MessageFetcher {
+  // Gmail API quota (2026-09-05: the Workspace leg died with a 403 "Total
+  // Query Cost / Units per minute per user" because list + per-message
+  // metadata GETs + body GETs fired back-to-back). Pace every Gmail call to
+  // MIN_INTERVAL_MS between request starts, and treat a quota 403/429 as
+  // retryable after a ~60s backoff (once) instead of failing the whole leg.
+  const MIN_INTERVAL_MS = 250;
+  const QUOTA_BACKOFF_MS = 60_000;
+  const MAX_BACKOFF_MS = 120_000;
+  let nextSlot = 0;
+
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+  async function gmailApi(url: string): Promise<Response> {
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      const wait = nextSlot - Date.now();
+      if (wait > 0) await sleep(wait);
+      nextSlot = Date.now() + MIN_INTERVAL_MS;
+      const res = await fetchWithTimeout(url, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (res.ok) return res;
+      const reason = await providerErrorReason(res);
+      const quotaLimited =
+        res.status === 429 ||
+        (res.status === 403 &&
+          /quota|rate ?limit|rate ?exceeded|userRateLimitExceeded/i.test(
+            reason,
+          ));
+      if (!quotaLimited) return res;
+      if (attempt === 2) {
+        throw new MailScanUnverifiedError(
+          "Gmail API quota exceeded — Google is rate limiting this app for your account. Try the scan again in a few minutes.",
+        );
+      }
+      const retryAfter = Number(res.headers?.get?.("retry-after"));
+      const backoffMs =
+        Number.isFinite(retryAfter) && retryAfter > 0
+          ? Math.min(retryAfter * 1000, MAX_BACKOFF_MS)
+          : QUOTA_BACKOFF_MS;
+      console.log(
+        `[MailGmail] quota limited (${res.status}) — backing off ${Math.round(
+          backoffMs / 1000,
+        )}s, then one retry`,
+      );
+      await sleep(backoffMs);
+    }
+    // Unreachable: the loop either returns or throws.
+    throw new MailScanUnverifiedError("Gmail API request failed");
+  }
+
   return {
     async fetchMessages({ since, limit }) {
       const pageLimit = Math.min(limit, 100);
@@ -465,9 +515,8 @@ export function createGmailFetcher(
           maxResults: String(pageLimit),
         });
         if (pageToken) params.set("pageToken", pageToken);
-        const listRes = await fetchWithTimeout(
+        const listRes = await gmailApi(
           `https://gmail.googleapis.com/gmail/v1/users/me/messages?${params}`,
-          { headers: { Authorization: `Bearer ${accessToken}` } },
         );
         if (!listRes.ok) {
           const reason = await providerErrorReason(listRes);
@@ -485,9 +534,8 @@ export function createGmailFetcher(
         listed += ids.length;
 
         for (const id of ids) {
-          const metaRes = await fetchWithTimeout(
+          const metaRes = await gmailApi(
             `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date`,
-            { headers: { Authorization: `Bearer ${accessToken}` } },
           );
           if (!metaRes.ok) continue;
           const meta = (await metaRes.json()) as {
@@ -499,9 +547,8 @@ export function createGmailFetcher(
           const cls = classifySubject(subject);
           if (cls !== "recurring" && cls !== "sparse") continue;
 
-          const fullRes = await fetchWithTimeout(
+          const fullRes = await gmailApi(
             `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=full`,
-            { headers: { Authorization: `Bearer ${accessToken}` } },
           );
           if (!fullRes.ok) continue;
           const raw = await fullRes.json();
