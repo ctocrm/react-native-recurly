@@ -168,7 +168,7 @@ export function createProtonFetcher(
   persistSession: (session: ProtonNativeSession) => Promise<void>,
 ): MessageFetcher {
   return {
-    async fetchMessages({ since, limit }) {
+    async fetchMessages({ since, limit }, onChunk) {
       const native = nativeProton();
       if (!native || Platform.OS !== "android") {
         throw new Error("proton fetch needs the native MailProton module.");
@@ -181,9 +181,9 @@ export function createProtonFetcher(
       const MAX_BATCHES = 40;
       const stage = async (
         session: ProtonNativeSession,
-      ): Promise<NormalizedMessage[]> => {
-        const out: NormalizedMessage[] = [];
+      ): Promise<void> => {
         const seen = new Set<string>();
+        let staged = 0;
         // R11: sinceIso stays FIXED as the incremental lower bound (scan
         // cursor); untilIso is the exclusive newer bound that steps the
         // cursor BACKWARD through history one chunk at a time. The old code
@@ -215,8 +215,11 @@ export function createProtonFetcher(
           if (fresh.length === 0) break;
           for (const m of fresh) {
             seen.add(m.messageId);
-            out.push(m);
           }
+          // R19-OOM: flush per native chunk — the bridge payload is already
+          // chunked; the JS side must not re-accumulate the whole mailbox.
+          await onChunk(fresh);
+          staged += fresh.length;
           // Terminate on the RAW count: untilIso is a non-strict upper bound,
           // so the boundary message itself is re-returned next batch (and
           // deduped above) — raw stays at CHUNK while the window has more.
@@ -228,9 +231,8 @@ export function createProtonFetcher(
           untilIso = nextUntil;
         }
         console.log(
-          `[MailProton-js] batches staged, messages=${out.length} (chunk=${CHUNK})`,
+          `[MailProton-js] batches staged, messages=${staged} (chunk=${CHUNK})`,
         );
-        return out;
       };
 
       let session = stored?.uid && stored.accessToken ? stored : null;
@@ -274,7 +276,7 @@ export function createPasswordMailFetcher(
   mailboxId: string,
 ): MessageFetcher {
   return {
-    async fetchMessages({ since, limit }) {
+    async fetchMessages({ since, limit }, onChunk) {
       const native = nativeNamed("MailTuta");
       if (!native || Platform.OS !== "android") {
         throw new Error("tuta fetch needs the native MailTuta module.");
@@ -286,14 +288,17 @@ export function createPasswordMailFetcher(
         since?.date ?? null,
         limit,
       );
-      return (result.messages || []).map((m): NormalizedMessage => ({
-        mailboxId,
-        messageId: m.messageId,
-        from: m.from,
-        subject: m.subject,
-        date: m.date,
-        text: m.text,
-      }));
+      // R19-OOM: single native batch streamed straight to the scan.
+      await onChunk(
+        (result.messages || []).map((m): NormalizedMessage => ({
+          mailboxId,
+          messageId: m.messageId,
+          from: m.from,
+          subject: m.subject,
+          date: m.date,
+          text: m.text,
+        })),
+      );
     },
   };
 }
@@ -303,7 +308,7 @@ export function createImapFetcher(
   mailboxId: string,
 ): MessageFetcher {
   return {
-    async fetchMessages({ since, limit }) {
+    async fetchMessages({ since, limit }, onChunk) {
       const native = nativeImap();
       if (!native || Platform.OS !== "android") {
         throw new Error(
@@ -318,14 +323,17 @@ export function createImapFetcher(
         since?.date ?? null,
         limit,
       );
-      return (result.messages || []).map((m): NormalizedMessage => ({
-        mailboxId,
-        messageId: m.messageId,
-        from: m.from,
-        subject: m.subject,
-        date: m.date,
-        text: m.text,
-      }));
+      // R19-OOM: single native batch streamed straight to the scan.
+      await onChunk(
+        (result.messages || []).map((m): NormalizedMessage => ({
+          mailboxId,
+          messageId: m.messageId,
+          from: m.from,
+          subject: m.subject,
+          date: m.date,
+          text: m.text,
+        })),
+      );
     },
   };
 }

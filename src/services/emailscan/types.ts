@@ -139,11 +139,24 @@ export interface FetchSince {
 }
 
 export interface MessageFetcher {
-  fetchMessages(opts: {
-    mailboxId: string;
-    since: FetchSince | null;
-    limit: number;
-  }): Promise<NormalizedMessage[]>;
+  /**
+   * R19-OOM streaming contract: fetchers MUST deliver messages per page or
+   * native batch via `onChunk` and MUST NOT retain the whole leg's messages
+   * in memory until the leg ends. Body-bearing messages are the peak-memory
+   * hazard: a Workspace leg listing 500 messages while pulling full HTML
+   * bodies exhausted the 192MB Java heap MID-LEG (2026-09-07 fresh
+   * reproduction: 17MB -> 213MB Java in ~35s, FATAL OutOfMemoryError). The
+   * scan classifies each chunk as it arrives and stores body-stripped
+   * copies, so a body only lives for the duration of one chunk.
+   */
+  fetchMessages(
+    opts: {
+      mailboxId: string;
+      since: FetchSince | null;
+      limit: number;
+    },
+    onChunk: (chunk: NormalizedMessage[]) => void | Promise<void>,
+  ): Promise<void>;
 }
 
 export interface ScanCacheStore {

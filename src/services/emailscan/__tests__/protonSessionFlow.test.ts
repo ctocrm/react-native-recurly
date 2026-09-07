@@ -6,6 +6,7 @@
 import { NativeModules } from "react-native";
 
 import { createProtonFetcher, ProtonNativeSession } from "../imapNative";
+import type { NormalizedMessage } from "../types";
 
 jest.mock("react-native", () => ({
   NativeModules: {} as Record<string, unknown>,
@@ -61,7 +62,13 @@ describe("createProtonFetcher session orchestration (P2)", () => {
       persist,
     );
 
-    const out = await fetcher.fetchMessages({ mailboxId: "proton:u", since: null, limit: 200 });
+    const out: NormalizedMessage[] = [];
+    await fetcher.fetchMessages(
+      { mailboxId: "proton:u", since: null, limit: 200 },
+      async (chunk) => {
+        out.push(...chunk);
+      },
+    );
 
     expect(out).toHaveLength(1);
     expect(native.listWithSession).toHaveBeenCalledTimes(1);
@@ -98,7 +105,13 @@ describe("createProtonFetcher session orchestration (P2)", () => {
       persist,
     );
 
-    const out = await fetcher.fetchMessages({ mailboxId: "proton:u", since: null, limit: 200 });
+    const out: NormalizedMessage[] = [];
+    await fetcher.fetchMessages(
+      { mailboxId: "proton:u", since: null, limit: 200 },
+      async (chunk) => {
+        out.push(...chunk);
+      },
+    );
 
     expect(out).toHaveLength(1);
     expect(native.refreshSession).toHaveBeenCalledTimes(1);
@@ -135,7 +148,10 @@ describe("createProtonFetcher session orchestration (P2)", () => {
     );
 
     await expect(
-      fetcher.fetchMessages({ mailboxId: "proton:u", since: null, limit: 200 }),
+      fetcher.fetchMessages(
+        { mailboxId: "proton:u", since: null, limit: 200 },
+        async () => {},
+      ),
     ).rejects.toThrow(/reconnect/i);
 
     expect(native.refreshSession).toHaveBeenCalledTimes(1);
@@ -156,7 +172,10 @@ describe("createProtonFetcher session orchestration (P2)", () => {
     );
 
     await expect(
-      fetcher.fetchMessages({ mailboxId: "proton:u", since: null, limit: 200 }),
+      fetcher.fetchMessages(
+        { mailboxId: "proton:u", since: null, limit: 200 },
+        async () => {},
+      ),
     ).rejects.toMatchObject({ code: "PROTON_ABUSE" });
 
     expect(native.login).not.toHaveBeenCalled();
@@ -178,7 +197,10 @@ describe("createProtonFetcher session orchestration (P2)", () => {
       persist,
     );
 
-    await fetcher.fetchMessages({ mailboxId: "proton:u", since: null, limit: 200 });
+    await fetcher.fetchMessages(
+      { mailboxId: "proton:u", since: null, limit: 200 },
+      async () => {},
+    );
 
     expect(native.login).toHaveBeenCalledTimes(1);
     expect(native.refreshSession).not.toHaveBeenCalled();
@@ -223,7 +245,13 @@ describe("createProtonFetcher session orchestration (P2)", () => {
       jest.fn().mockResolvedValue(undefined),
     );
 
-    const out = await fetcher.fetchMessages({ mailboxId: "proton:u", since: null, limit: 500 });
+    const out: NormalizedMessage[] = [];
+    await fetcher.fetchMessages(
+      { mailboxId: "proton:u", since: null, limit: 500 },
+      async (chunk) => {
+        out.push(...chunk);
+      },
+    );
 
     expect(native.listWithSession).toHaveBeenCalledTimes(2);
     const [firstCall, secondCall] = native.listWithSession.mock.calls as unknown[][];

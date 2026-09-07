@@ -555,14 +555,13 @@ export function createGmailFetcher(
   }
 
   return {
-    async fetchMessages({ since, limit }) {
+    async fetchMessages({ since, limit }, onChunk) {
       const pageLimit = Math.min(limit, 100);
       const qParts = [SUBJECT_QUERY];
       if (since?.date) {
         const day = since.date.slice(0, 10).replace(/-/g, "/");
         qParts.push(`after:${day}`);
       }
-      const out: NormalizedMessage[] = [];
       let pageToken: string | undefined;
       let pages = 0;
       let listed = 0;
@@ -597,6 +596,9 @@ export function createGmailFetcher(
         // park point (which page, how deep into the screening loop).
         console.log(`[MailGmail] page ${pages}: +${ids.length} ids (total ${listed})`);
 
+        // R19-OOM: bodies accumulate for ONE page only, then flush to the
+        // scan before the next page is listed.
+        const pageMsgs: NormalizedMessage[] = [];
         let screened = 0;
         for (const id of ids) {
           screened += 1;
@@ -623,7 +625,7 @@ export function createGmailFetcher(
           const raw = await fullRes.json();
           const body = gmailBody(raw.payload);
           const parsed = new Date(headerOf(headers, "Date"));
-          out.push({
+          pageMsgs.push({
             mailboxId,
             messageId: meta.id || id,
             from: headerOf(headers, "From"),
@@ -637,11 +639,11 @@ export function createGmailFetcher(
           });
           bodies += 1;
         }
+        await onChunk(pageMsgs);
       } while (pageToken);
       console.log(
         `[MailGmail] listed ${listed} pages=${pages} bodies=${bodies} of ${listed}`,
       );
-      return out;
     },
   };
 }
@@ -652,8 +654,7 @@ export function createGraphFetcher(
   mailboxId: string,
 ): MessageFetcher {
   return {
-    async fetchMessages({ since, limit }) {
-      const out: NormalizedMessage[] = [];
+    async fetchMessages({ since, limit }, onChunk) {
       let pages = 0;
       let listed = 0;
       let bodies = 0;
@@ -700,6 +701,11 @@ export function createGraphFetcher(
         const items = json.value || [];
         listed += items.length;
 
+        // R19-OOM: bodies accumulate for ONE page only, then flush to the
+        // scan (which classifies and stores stripped copies immediately).
+        // Never hold the whole leg's bodies — that is what exhausted the
+        // Java heap mid-leg on 2026-09-07.
+        const pageMsgs: NormalizedMessage[] = [];
         for (const m of items) {
           const addr = m.from?.emailAddress?.address || "";
           const name = m.from?.emailAddress?.name;
@@ -729,7 +735,7 @@ export function createGraphFetcher(
             bj.body?.contentType?.toLowerCase() === "text"
               ? bj.body.content
               : undefined;
-          out.push({
+          pageMsgs.push({
             mailboxId,
             messageId: m.id,
             from,
@@ -740,11 +746,11 @@ export function createGraphFetcher(
           });
           bodies += 1;
         }
+        await onChunk(pageMsgs);
       }
       console.log(
         `[MailGraph] listed ${listed} pages=${pages} bodies=${bodies} of ${listed}`,
       );
-      return out;
     },
   };
 }
@@ -757,7 +763,7 @@ export function createZohoFetcher(
   mailboxId: string,
 ): MessageFetcher {
   return {
-    async fetchMessages({ since, limit }) {
+    async fetchMessages({ since, limit }, onChunk) {
       const accRes = await fetchWithSession(
         session,
         "https://mail.zoho.com/api/accounts",
@@ -804,22 +810,25 @@ export function createZohoFetcher(
           summary?: string;
         }[];
       };
-      return (json.data || []).map((m) => {
-        const received =
-          typeof m.receivedTime === "number"
-            ? new Date(m.receivedTime).toISOString()
-            : m.receivedTime || new Date().toISOString();
-        return {
-          mailboxId,
-          messageId: String(m.messageId || ""),
-          from: m.sender
-            ? `${m.sender} <${m.fromAddress || ""}>`
-            : m.fromAddress || "",
-          subject: m.subject || "",
-          date: received,
-          text: m.summary,
-        };
-      });
+      // R19-OOM: stream the single search batch; bounded by the search limit.
+      await onChunk(
+        (json.data || []).map((m) => {
+          const received =
+            typeof m.receivedTime === "number"
+              ? new Date(m.receivedTime).toISOString()
+              : m.receivedTime || new Date().toISOString();
+          return {
+            mailboxId,
+            messageId: String(m.messageId || ""),
+            from: m.sender
+              ? `${m.sender} <${m.fromAddress || ""}>`
+              : m.fromAddress || "",
+            subject: m.subject || "",
+            date: received,
+            text: m.summary,
+          };
+        }),
+      );
     },
   };
 }
@@ -831,7 +840,7 @@ export function createJmapFetcher(
   mailboxId: string,
 ): MessageFetcher {
   return {
-    async fetchMessages({ since, limit }) {
+    async fetchMessages({ since, limit }, onChunk) {
       const sessionRes = await fetchWithSession(
         session,
         "https://api.fastmail.com/jmap/session",
@@ -920,20 +929,23 @@ export function createJmapFetcher(
         (c: unknown[]) => c[0] === "Email/get",
       );
       const list = getCall?.[1]?.list || [];
-      return list.map((m: any) => {
-        const fromObj = m.from?.[0];
-        const from = fromObj
-          ? `${fromObj.name || ""} <${fromObj.email || ""}>`.trim()
-          : "";
-        return {
-          mailboxId,
-          messageId: m.id,
-          from,
-          subject: m.subject || "",
-          date: m.receivedAt || new Date().toISOString(),
-          text: m.preview,
-        };
-      });
+      // R19-OOM: stream the single Email/get batch; bounded by the query limit.
+      await onChunk(
+        list.map((m: any) => {
+          const fromObj = m.from?.[0];
+          const from = fromObj
+            ? `${fromObj.name || ""} <${fromObj.email || ""}>`.trim()
+            : "";
+          return {
+            mailboxId,
+            messageId: m.id,
+            from,
+            subject: m.subject || "",
+            date: m.receivedAt || new Date().toISOString(),
+            text: m.preview,
+          };
+        }),
+      );
     },
   };
 }
@@ -1109,9 +1121,9 @@ async function fetcherFor(
     const { createImapFetcher } = await import("./imapNative");
     const inner = createImapFetcher(creds, mailboxId);
     return {
-      async fetchMessages(opts) {
+      async fetchMessages(opts, onChunk) {
         try {
-          return await inner.fetchMessages(opts);
+          return await inner.fetchMessages(opts, onChunk);
         } catch (error) {
           const message =
             error instanceof Error ? error.message : "IMAP fetch failed";
@@ -1147,9 +1159,9 @@ async function fetcherFor(
       },
     );
     return {
-      async fetchMessages(opts) {
+      async fetchMessages(opts, onChunk) {
         try {
-          return await inner.fetchMessages(opts);
+          return await inner.fetchMessages(opts, onChunk);
         } catch (error) {
           const message =
             error instanceof Error ? error.message : "proton fetch failed";
@@ -1166,9 +1178,9 @@ async function fetcherFor(
     const { createPasswordMailFetcher } = await import("./imapNative");
     const inner = createPasswordMailFetcher(creds, mailboxId);
     return {
-      async fetchMessages(opts) {
+      async fetchMessages(opts, onChunk) {
         try {
-          return await inner.fetchMessages(opts);
+          return await inner.fetchMessages(opts, onChunk);
         } catch (error) {
           const message =
             error instanceof Error ? error.message : "tuta fetch failed";

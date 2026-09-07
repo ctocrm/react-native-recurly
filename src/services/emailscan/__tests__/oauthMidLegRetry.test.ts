@@ -21,6 +21,7 @@ import {
   createGraphFetcher,
   MailScanUnverifiedError,
 } from "../providers";
+import type { NormalizedMessage } from "../types";
 import { createTokenSession } from "../oauthSession";
 
 // providers.ts pulls in native modules its Gmail/Graph fetchers never touch.
@@ -151,15 +152,22 @@ describe("mid-leg OAuth 401 (R16)", () => {
       ),
       "workspace-1",
     );
-    const promise = fetcher.fetchMessages({
-      mailboxId: "workspace-1",
-      since: null,
-      limit: 100,
-    });
+    const collected: NormalizedMessage[] = [];
+    const promise = fetcher.fetchMessages(
+      {
+        mailboxId: "workspace-1",
+        since: null,
+        limit: 100,
+      },
+      async (chunk) => {
+        collected.push(...chunk);
+      },
+    );
     for (let i = 0; i < 12; i += 1) {
       await jest.advanceTimersByTimeAsync(10_000);
     }
-    const result = await promise;
+    await promise;
+    const result = collected;
 
     expect(refresh).toHaveBeenCalledTimes(1);
     // list(401 with token-1) -> replay(list with token-2) -> meta -> full
@@ -187,11 +195,17 @@ describe("mid-leg OAuth 401 (R16)", () => {
       ),
       "workspace-1",
     );
-    const promise = fetcher.fetchMessages({
-      mailboxId: "workspace-1",
-      since: null,
-      limit: 100,
-    });
+    const collected: NormalizedMessage[] = [];
+    const promise = fetcher.fetchMessages(
+      {
+        mailboxId: "workspace-1",
+        since: null,
+        limit: 100,
+      },
+      async (chunk) => {
+        collected.push(...chunk);
+      },
+    );
     const outcome = promise.then(
       () => "resolved",
       (error: unknown) => error,
@@ -218,11 +232,17 @@ describe("mid-leg OAuth 401 (R16)", () => {
       createTokenSession({ accessToken: "token-1" }),
       "workspace-1",
     );
-    const promise = fetcher.fetchMessages({
-      mailboxId: "workspace-1",
-      since: null,
-      limit: 100,
-    });
+    const collected: NormalizedMessage[] = [];
+    const promise = fetcher.fetchMessages(
+      {
+        mailboxId: "workspace-1",
+        since: null,
+        limit: 100,
+      },
+      async (chunk) => {
+        collected.push(...chunk);
+      },
+    );
     const outcome = promise.then(
       () => "resolved",
       (error: unknown) => error,
@@ -265,11 +285,19 @@ describe("mid-leg OAuth 401 (R16)", () => {
       ),
       "outlook-1",
     );
-    const result = await fetcher.fetchMessages({
-      mailboxId: "outlook-1",
-      since: null,
-      limit: 100,
-    });
+    const collected: NormalizedMessage[] = [];
+    const result = await fetcher
+      .fetchMessages(
+        {
+          mailboxId: "outlook-1",
+          since: null,
+          limit: 100,
+        },
+        async (chunk) => {
+          collected.push(...chunk);
+        },
+      )
+      .then(() => collected);
 
     expect(refresh).toHaveBeenCalledTimes(1);
     expect(calls).toHaveLength(3); // list 401 -> replay -> body
@@ -308,15 +336,22 @@ describe("mid-leg OAuth 401 (R16)", () => {
       { marginMs: 60_000 },
     );
     const fetcher = createGmailFetcher(session, "workspace-1");
-    const promise = fetcher.fetchMessages({
-      mailboxId: "workspace-1",
-      since: null,
-      limit: 100,
-    });
+    const collected: NormalizedMessage[] = [];
+    const promise = fetcher.fetchMessages(
+      {
+        mailboxId: "workspace-1",
+        since: null,
+        limit: 100,
+      },
+      async (chunk) => {
+        collected.push(...chunk);
+      },
+    );
     for (let i = 0; i < 300; i += 1) {
       await jest.advanceTimersByTimeAsync(1_000);
     }
-    const result = await promise;
+    await promise;
+    const result = collected;
 
     expect(refresh).toHaveBeenCalledTimes(1);
     // THE gate: refresh fired before expiry — no request was ever doomed.

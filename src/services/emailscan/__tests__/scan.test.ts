@@ -25,11 +25,11 @@ function fetcherOf(
   let i = 0;
   return {
     calls,
-    async fetchMessages({ since, limit }) {
+    async fetchMessages({ since, limit }, onChunk) {
       calls.push({ since, limit });
       const batch = batches[i] ?? [];
       i += 1;
-      return batch;
+      await onChunk(batch);
     },
   };
 }

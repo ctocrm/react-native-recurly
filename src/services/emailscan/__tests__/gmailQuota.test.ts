@@ -10,6 +10,7 @@
  * - a non-quota 403 fails immediately (no pointless backoff)
  */
 
+import type { NormalizedMessage } from "../types";
 import { createGmailFetcher, MailScanUnverifiedError } from "../providers";
 import { createTokenSession } from "../oauthSession";
 
@@ -120,16 +121,23 @@ describe("createGmailFetcher quota handling", () => {
     });
 
     const fetcher = createGmailFetcher(createTokenSession({ accessToken: "token-1" }), "workspace-1");
-    const promise = fetcher.fetchMessages({
-      mailboxId: "workspace-1",
-      since: null,
-      limit: 100,
-    });
+    const collected: NormalizedMessage[] = [];
+    const promise = fetcher.fetchMessages(
+      {
+        mailboxId: "workspace-1",
+        since: null,
+        limit: 100,
+      },
+      async (chunk) => {
+        collected.push(...chunk);
+      },
+    );
     // Drive through pacing slots (250ms each) and the 60s quota backoff.
     for (let i = 0; i < 12; i += 1) {
       await jest.advanceTimersByTimeAsync(10_000);
     }
-    const result = await promise;
+    await promise;
+    const result = collected;
 
     // list(403) -> list ok -> metadata -> full body
     expect(calls).toHaveLength(4);
@@ -149,11 +157,17 @@ describe("createGmailFetcher quota handling", () => {
     );
 
     const fetcher = createGmailFetcher(createTokenSession({ accessToken: "token-1" }), "workspace-1");
-    const promise = fetcher.fetchMessages({
-      mailboxId: "workspace-1",
-      since: null,
-      limit: 100,
-    });
+    const collected: NormalizedMessage[] = [];
+    const promise = fetcher.fetchMessages(
+      {
+        mailboxId: "workspace-1",
+        since: null,
+        limit: 100,
+      },
+      async (chunk) => {
+        collected.push(...chunk);
+      },
+    );
     const outcome = promise.then(
       () => "resolved",
       (error: unknown) => error,
@@ -176,11 +190,17 @@ describe("createGmailFetcher quota handling", () => {
     );
 
     const fetcher = createGmailFetcher(createTokenSession({ accessToken: "token-1" }), "workspace-1");
-    const promise = fetcher.fetchMessages({
-      mailboxId: "workspace-1",
-      since: null,
-      limit: 100,
-    });
+    const collected: NormalizedMessage[] = [];
+    const promise = fetcher.fetchMessages(
+      {
+        mailboxId: "workspace-1",
+        since: null,
+        limit: 100,
+      },
+      async (chunk) => {
+        collected.push(...chunk);
+      },
+    );
     const outcome = promise.then(
       () => "resolved",
       (error: unknown) => error,

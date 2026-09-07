@@ -175,16 +175,18 @@ describe("runIncrementalScan watchdog race (R14)", () => {
       cancel: (handle) => handle.cancel(),
     };
     const fetcher: MessageFetcher = {
-      fetchMessages: async () => [
-        {
-          mailboxId: "workspace:example@test",
-          messageId: "m1",
-          from: "billing@example.com",
-          subject: "Your receipt",
-          date: "2026-09-05T00:00:00.000Z",
-          text: "receipt",
-        },
-      ],
+      fetchMessages: async (_opts, onChunk) => {
+        await onChunk([
+          {
+            mailboxId: "workspace:example@test",
+            messageId: "m1",
+            from: "billing@example.com",
+            subject: "Your receipt",
+            date: "2026-09-05T00:00:00.000Z",
+            text: "receipt",
+          },
+        ]);
+      },
     };
 
     const result = await runIncrementalScan({

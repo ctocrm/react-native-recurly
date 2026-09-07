@@ -93,6 +93,10 @@ function reparseStale(state: MailboxScanState): {
   state: MailboxScanState;
   reparsed: number;
 } {
+  // R19-OOM note: stored messages are body-stripped (stripBodyForStore), so a
+  // parser-version bump reclassifies the subject/header-derived fields only.
+  // Body-derived fields (billNumber, body amounts) refresh when the message
+  // is re-fetched live, exactly like any newer mail.
   if (state.cursor.parserVersion === PARSER_VERSION) {
     return { state, reparsed: 0 };
   }
@@ -112,6 +116,26 @@ function reparseStale(state: MailboxScanState): {
     reparsed += 1;
   }
   return { state: next, reparsed };
+}
+
+/**
+ * R19-OOM: bodies are extraction inputs, not storage. Stored state keeps a
+ * short text snippet for debugging and drops html entirely — retaining full
+ * bodies inside state.messages (embedded AGAIN inside each ClassifiedMessage)
+ * blew the heap mid-leg and bloated every persist row and candidate map built
+ * afterwards.
+ */
+const SNIPPET_CHARS = 500;
+function stripBodyForStore(message: NormalizedMessage): NormalizedMessage {
+  return {
+    ...message,
+    text: message.text?.slice(0, SNIPPET_CHARS),
+    html: undefined,
+    attachments: message.attachments?.map((att) => ({
+      ...att,
+      text: att.text?.slice(0, SNIPPET_CHARS),
+    })),
+  };
 }
 
 /**
@@ -161,20 +185,9 @@ export async function runIncrementalScan(opts: {
   // the 2026-09-05 run-2 class) surfaces as a per-mailbox error instead of
   // parking the scan forever.
   const stall = watchdog.stall();
-  let fetched: NormalizedMessage[];
-  try {
-    fetched = await Promise.race([
-      opts.fetcher.fetchMessages({
-        mailboxId: opts.mailboxId,
-        since,
-        limit,
-      }),
-      stall.promise,
-    ]);
-  } finally {
-    watchdog.cancel(stall);
-  }
-
+  // R19-OOM: the merge state exists BEFORE the leg starts so streamed chunks
+  // are classified and folded in as they arrive — a body is alive only for
+  // the duration of one chunk, never for the whole leg.
   const next: MailboxScanState = {
     ...primed,
     providerId: opts.providerId,
@@ -182,25 +195,41 @@ export async function runIncrementalScan(opts: {
   };
 
   let accepted = 0;
-  for (const message of fetched) {
-    if (
-      !isNewerThanCursor(message, primed.cursor) &&
-      next.messages[message.messageId]
-    ) {
-      continue;
-    }
-    if (next.messages[message.messageId]?.parserVersion === PARSER_VERSION) {
-      continue;
-    }
-    next.messages[message.messageId] = {
-      message,
-      classified: classifyMessage(message),
-      parserVersion: PARSER_VERSION,
-    };
-    accepted += 1;
+  try {
+    await Promise.race([
+      opts.fetcher.fetchMessages(
+        { mailboxId: opts.mailboxId, since, limit },
+        (chunk) => {
+          for (const raw of chunk) {
+            if (
+              !isNewerThanCursor(raw, primed.cursor) &&
+              next.messages[raw.messageId]
+            ) {
+              continue;
+            }
+            if (
+              next.messages[raw.messageId]?.parserVersion === PARSER_VERSION
+            ) {
+              continue;
+            }
+            next.messages[raw.messageId] = {
+              // classifyMessage consumes the FULL body (billNumber, amount,
+              // processor merchant extraction); the stored copy is stripped.
+              message: stripBodyForStore(raw),
+              classified: classifyMessage(raw),
+              parserVersion: PARSER_VERSION,
+            };
+            accepted += 1;
+          }
+          next.cursor = advanceCursor(next.cursor, chunk);
+        },
+      ),
+      stall.promise,
+    ]);
+  } finally {
+    watchdog.cancel(stall);
   }
 
-  next.cursor = advanceCursor(primed.cursor, fetched);
   opts.store.saveMailbox(next);
 
   return {
