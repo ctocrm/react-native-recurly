@@ -45,7 +45,8 @@ const Subscriptions = () => {
     getUpcomingSubscriptions,
     refreshSubscriptions,
   } = useSubscriptions();
-  const { displayFor, cyclePeriod } = useChargeDisplay(subscriptions);
+  const { displayFor, sparseLineFor, cyclePeriod } =
+    useChargeDisplay(subscriptions);
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedSubscriptionId, setExpandedSubscriptionId] = useState<
     string | null
@@ -257,6 +258,7 @@ const Subscriptions = () => {
             displayUnknown={displayFor(item).unknown}
             displayPeriodLabel={displayFor(item).label}
             onCyclePeriod={() => cyclePeriod(item)}
+            sparseLine={sparseLineFor(item)}
             onPress={() => {
               const isExpanding = expandedSubscriptionId !== item.id;
               setExpandedSubscriptionId((currentId) =>

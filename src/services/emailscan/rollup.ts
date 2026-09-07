@@ -10,6 +10,7 @@ import type {
   ScanCandidate,
 } from "./types";
 import { DEFAULT_DISPLAY_FILTERS } from "./types";
+import { inferCadenceFromPayments } from "./classifier";
 
 function kindRank(kind: CandidateKind): number {
   if (kind === "recurring") return 2;
@@ -29,6 +30,7 @@ function rollupKey(hit: ClassifiedMessage): string {
 
 export function rollupCandidates(hits: ClassifiedMessage[]): ScanCandidate[] {
   const map = new Map<string, ScanCandidate>();
+  const datesByKey = new Map<string, string[]>();
 
   for (const hit of hits) {
     if (!hit.kind) continue;
@@ -54,12 +56,14 @@ export function rollupCandidates(hits: ClassifiedMessage[]): ScanCandidate[] {
         messageIds: [messageId],
         confidence: hit.confidence,
       });
+      datesByKey.set(key, [hit.message.date]);
       continue;
     }
 
     if (!existing.messageIds.includes(messageId)) {
       existing.messageIds.push(messageId);
     }
+    datesByKey.set(key, [...(datesByKey.get(key) ?? []), hit.message.date]);
     existing.evidence = [...existing.evidence, ...evidence];
 
     if (hit.amount !== undefined) {
@@ -81,6 +85,25 @@ export function rollupCandidates(hits: ClassifiedMessage[]): ScanCandidate[] {
     }
     if (!existing.officialDomain && hit.officialDomain) {
       existing.officialDomain = hit.officialDomain;
+    }
+  }
+
+  // R18: clockwork inference — a RECURRING candidate whose emails never name
+  // a cadence still gets one when the charge spacing is clockwork-regular.
+  // Regex always wins (applied above); sparse is never inferred/promoted.
+  for (const [key, candidate] of map) {
+    if (
+      candidate.kind === "recurring" &&
+      (!candidate.cadence || candidate.cadence === "unknown")
+    ) {
+      const inferred = inferCadenceFromPayments(datesByKey.get(key) ?? []);
+      if (inferred) {
+        candidate.cadence = inferred;
+        candidate.evidence = [
+          ...candidate.evidence,
+          `cadence:clockwork-${inferred}`,
+        ];
+      }
     }
   }
 

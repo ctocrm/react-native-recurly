@@ -10,9 +10,11 @@ export function candidateToSubscription(
   const cadence =
     candidate.cadence === "yearly"
       ? "Yearly"
-      : candidate.cadence === "monthly"
-        ? "Monthly"
-        : "Monthly";
+      : candidate.cadence === "weekly"
+        ? "Weekly"
+        : candidate.cadence === "monthly"
+          ? "Monthly"
+          : "Monthly";
   const known = candidate.amount !== undefined;
   const priceUnknown = !known && candidate.kind !== "free";
   const iconKey = nameToSlug(candidate.merchant) || "plus";

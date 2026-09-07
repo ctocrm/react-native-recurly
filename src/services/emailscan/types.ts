@@ -22,7 +22,7 @@ export type SubjectClass =
 
 export type CandidateKind = "recurring" | "sparse" | "free";
 
-export type Cadence = "monthly" | "yearly" | "unknown";
+export type Cadence = "weekly" | "monthly" | "yearly" | "unknown";
 
 export interface MailAttachment {
   filename: string;

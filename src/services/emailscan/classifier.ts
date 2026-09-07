@@ -476,6 +476,38 @@ function inferCadence(text: string): Cadence | undefined {
   return undefined;
 }
 
+/** R18: clockwork payment-spacing inference. When the same merchant charges
+ * like clockwork — EVERY gap between consecutive charges sits inside one
+ * cadence band (weekly ≈7d, monthly ≈30d, yearly ≈365d) — that cadence is
+ * safe to assume even when the email text never names it. Conservative by
+ * design: fewer than 3 charges (2 gaps) or one irregular gap → unknown.
+ * Never used to promote sparse merchants to recurring (A-decision). */
+export function inferCadenceFromPayments(
+  dates: string[],
+): "weekly" | "monthly" | "yearly" | undefined {
+  const DAY = 86_400_000;
+  const times = dates
+    .map((d) => new Date(d).getTime())
+    .filter((t) => !Number.isNaN(t))
+    .sort((a, b) => a - b);
+  if (times.length < 3) return undefined;
+  const intervals: number[] = [];
+  for (let i = 1; i < times.length; i += 1) {
+    intervals.push((times[i] - times[i - 1]) / DAY);
+  }
+  const bands: { cadence: "weekly" | "monthly" | "yearly"; min: number; max: number }[] = [
+    { cadence: "weekly", min: 5, max: 9 },
+    { cadence: "monthly", min: 26, max: 34 },
+    { cadence: "yearly", min: 355, max: 375 },
+  ];
+  for (const band of bands) {
+    if (intervals.every((iv) => iv >= band.min && iv <= band.max)) {
+      return band.cadence;
+    }
+  }
+  return undefined;
+}
+
 function isInvoiceAttachment(att: MailAttachment): boolean {
   const name = att.filename || "";
   if (IMAGE_NAME_RE.test(name)) return false;

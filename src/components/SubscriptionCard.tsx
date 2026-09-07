@@ -37,6 +37,7 @@ interface SubscriptionCardProps {
   displayPrice?: number;
   displayUnknown?: boolean;
   displayPeriodLabel?: string;
+  sparseLine?: { amount: number; label: string } | null;
   onCyclePeriod?: () => void;
 }
 
@@ -68,6 +69,7 @@ const SubscriptionCard = ({
   displayPrice,
   displayUnknown,
   displayPeriodLabel,
+  sparseLine,
   onCyclePeriod,
 }: SubscriptionCardProps) => {
   const [menuVisible, setMenuVisible] = useState(false);
@@ -151,6 +153,14 @@ const SubscriptionCard = ({
             <Text className="sub-billing">
               {displayPeriodLabel ?? billing}
             </Text>
+            {/* R18: stacked second line — this month's sparse purchases for
+                this merchant; hidden entirely when there is none. */}
+            {sparseLine ? (
+              <Text className="sub-billing">
+                +{formatCurrency(sparseLine.amount, currency, false)}{" "}
+                {sparseLine.label}
+              </Text>
+            ) : null}
           </Pressable>
         </View>
 

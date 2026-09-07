@@ -3,6 +3,7 @@ import {
   displayedAmount,
   monthlySpendContribution,
   nextDisplayPeriod,
+  sparseSecondaryLine,
   type DisplayPeriod,
 } from "@/services/emailscan";
 import { listClassifiedMessagesAsync } from "@/services/emailscan/persist";
@@ -68,6 +69,13 @@ export function useChargeDisplay(subscriptions: Subscription[]) {
     [messages, periods],
   );
 
+  // R18: stacked second card line — this month's sparse purchases for the
+  // card's own merchant (null when the merchant has no sparse activity).
+  const sparseLineFor = useCallback(
+    (sub: Subscription) => sparseSecondaryLine(sub, messages),
+    [messages],
+  );
+
   const monthlySpend = useMemo(
     () =>
       subscriptions.reduce(
@@ -77,5 +85,5 @@ export function useChargeDisplay(subscriptions: Subscription[]) {
     [messages, subscriptions],
   );
 
-  return { messages, displayFor, cyclePeriod, monthlySpend };
+  return { messages, displayFor, sparseLineFor, cyclePeriod, monthlySpend };
 }

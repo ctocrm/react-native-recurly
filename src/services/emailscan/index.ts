@@ -75,6 +75,7 @@ export {
     displayedAmount,
     monthlySpendContribution,
     nextDisplayPeriod,
+    sparseSecondaryLine,
     thisMonthInsights,
     monthlyChartFromMail,
 } from "./chargeDisplay";

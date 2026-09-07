@@ -5,7 +5,7 @@
 import { nameToSlug } from "@/services/iconScraper";
 import type { ClassifiedMessage } from "./types";
 
-export type RecurringDisplayPeriod = "monthly" | "yearly";
+export type RecurringDisplayPeriod = "weekly" | "monthly" | "yearly";
 export type SparseDisplayPeriod = "week" | "month" | "year";
 export type DisplayPeriod = RecurringDisplayPeriod | SparseDisplayPeriod;
 
@@ -13,9 +13,26 @@ export function isSparseSubscription(sub: Subscription): boolean {
   return sub.category === "sparse";
 }
 
+/** "Yearly" | "Monthly" | "Weekly" when the row carries an explicit cadence
+ * (scan-detected or user-set); null when unknown/missing. */
+function explicitCadenceLabel(sub: Subscription): string | null {
+  const allowed = new Set(["Yearly", "Monthly", "Weekly"]);
+  if (sub.billing && allowed.has(sub.billing)) return sub.billing;
+  if (sub.frequency && allowed.has(sub.frequency)) return sub.frequency;
+  return null;
+}
+
+/** R18: the card defaults to the subscription's OWN cadence. A sparse row
+ * with an explicit cadence (Porkbun: Yearly) is shown as-billed instead of
+ * being forced into a this-month actuals window. */
 export function defaultDisplayPeriod(sub: Subscription): DisplayPeriod {
+  const explicit = explicitCadenceLabel(sub);
+  if (explicit === "Yearly") return isSparseSubscription(sub) ? "year" : "yearly";
+  if (explicit === "Weekly") return isSparseSubscription(sub) ? "week" : "weekly";
+  if (explicit === "Monthly") {
+    return isSparseSubscription(sub) ? "month" : "monthly";
+  }
   if (isSparseSubscription(sub)) return "month";
-  if (sub.billing === "Yearly" || sub.frequency === "Yearly") return "yearly";
   return "monthly";
 }
 
@@ -28,7 +45,9 @@ export function nextDisplayPeriod(
     if (current === "month") return "year";
     return "week";
   }
-  return current === "yearly" ? "monthly" : "yearly";
+  if (current === "monthly") return "yearly";
+  if (current === "yearly") return "weekly";
+  return "monthly";
 }
 
 export function displayPeriodLabel(period: DisplayPeriod): string {
@@ -36,6 +55,7 @@ export function displayPeriodLabel(period: DisplayPeriod): string {
   if (period === "month") return "This month";
   if (period === "year") return "This year";
   if (period === "yearly") return "Yearly";
+  if (period === "weekly") return "Weekly";
   return "Monthly";
 }
 
@@ -45,14 +65,19 @@ export function convertStoredPrice(
   target: RecurringDisplayPeriod,
 ): number {
   if (stored === target) return price;
-  if (stored === "monthly" && target === "yearly") return price * 12;
-  return price / 12;
+  // Pivot through a monthly rate; weekly↔monthly uses 52/12 weeks per month.
+  const WPM = 52 / 12;
+  const monthlyRate =
+    stored === "weekly" ? price * WPM : stored === "yearly" ? price / 12 : price;
+  if (target === "weekly") return monthlyRate / WPM;
+  if (target === "yearly") return monthlyRate * 12;
+  return monthlyRate;
 }
 
 export function storedCadence(sub: Subscription): RecurringDisplayPeriod {
-  return sub.billing === "Yearly" || sub.frequency === "Yearly"
-    ? "yearly"
-    : "monthly";
+  if (sub.billing === "Yearly" || sub.frequency === "Yearly") return "yearly";
+  if (sub.billing === "Weekly" || sub.frequency === "Weekly") return "weekly";
+  return "monthly";
 }
 
 function startOfWeek(now: Date): Date {
@@ -87,6 +112,11 @@ export function matchesSubscription(
 ): boolean {
   if (hit.kind !== "recurring" && hit.kind !== "sparse") return false;
   if (hit.amount === undefined) return false;
+  // R18: a row only ever matches hits of its OWN stream — a sparse row's
+  // actuals must not swallow the merchant's subscription charges, and a
+  // recurring row must not count the merchant's one-off purchases.
+  if (isSparseSubscription(sub) && hit.kind !== "sparse") return false;
+  if (!isSparseSubscription(sub) && hit.kind !== "recurring") return false;
   const mailbox = sub.paymentMethod;
   if (mailbox && hit.message.mailboxId !== mailbox) return false;
   const key = nameToSlug(sub.name);
@@ -123,6 +153,41 @@ export function sparseActuals(
   return sumChargesInWindow(sub, messages, start, end);
 }
 
+/** R18: the stacked second card line — this calendar month's sparse
+ * purchases for a subscription's own merchant+mailbox. Null when the
+ * merchant has no sparse activity at all ("only show sparse if it's sparse
+ * at all"). Recurring rows only: a pure-sparse card IS the sparse line. */
+export function sparseSecondaryLine(
+  sub: Subscription,
+  messages: ClassifiedMessage[],
+  now = new Date(),
+): { amount: number; label: string } | null {
+  if (isSparseSubscription(sub) || sub.category === "free") return null;
+  const { start, end } = windowForPeriod("month", now);
+  const mailbox = sub.paymentMethod;
+  const key = nameToSlug(sub.name);
+  let total = 0;
+  let any = false;
+  for (const hit of messages) {
+    if (hit.kind !== "sparse") continue;
+    if (hit.amount === undefined) continue;
+    if (mailbox && hit.message.mailboxId !== mailbox) continue;
+    if (
+      hit.merchantKey !== key &&
+      hit.merchantName.toLowerCase() !== sub.name.toLowerCase()
+    ) {
+      continue;
+    }
+    const charged = new Date(hit.message.date);
+    if (Number.isNaN(charged.getTime())) continue;
+    if (charged < start || charged > end) continue;
+    any = true;
+    total += hit.amount ?? 0;
+  }
+  if (!any) return null;
+  return { amount: total, label: "Sparse" };
+}
+
 export function displayedAmount(
   sub: Subscription,
   period: DisplayPeriod,
@@ -133,7 +198,14 @@ export function displayedAmount(
   if (sub.category === "free") {
     return { amount: 0, unknown: false, label };
   }
-  if (isSparseSubscription(sub) && sub.paymentMethod) {
+  if (isSparseSubscription(sub)) {
+    // R18: a sparse row with an explicit cadence and a known price (Porkbun:
+    // Yearly $47.74) is shown AS BILLED — not forced into a this-month
+    // actuals window that reads $0 / "?" eleven months of the year.
+    const explicit = explicitCadenceLabel(sub);
+    if (explicit && !sub.priceUnknown) {
+      return { amount: sub.price, unknown: false, label: explicit };
+    }
     if (period !== "week" && period !== "month" && period !== "year") {
       return displayedAmount(sub, "month", messages, now);
     }
@@ -145,7 +217,11 @@ export function displayedAmount(
     return { amount: 0, unknown: true, label };
   }
   const target: RecurringDisplayPeriod =
-    period === "yearly" ? "yearly" : "monthly";
+    period === "yearly"
+      ? "yearly"
+      : period === "weekly"
+        ? "weekly"
+        : "monthly";
   return {
     amount: convertStoredPrice(sub.price, storedCadence(sub), target),
     unknown: false,

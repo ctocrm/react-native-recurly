@@ -51,7 +51,7 @@ const App = () => {
     getUpcomingSubscriptions,
     refreshSubscriptions,
   } = useSubscriptions();
-  const { displayFor, cyclePeriod, monthlySpend } =
+  const { displayFor, sparseLineFor, cyclePeriod, monthlySpend } =
     useChargeDisplay(subscriptions);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingSubscription, setEditingSubscription] =
@@ -309,6 +309,7 @@ const App = () => {
             displayUnknown={displayFor(item).unknown}
             displayPeriodLabel={displayFor(item).label}
             onCyclePeriod={() => cyclePeriod(item)}
+            sparseLine={sparseLineFor(item)}
             onPress={() => {
               const isExpanding = expandedSubscriptionId !== item.id;
               setExpandedSubscriptionId((currentId) =>

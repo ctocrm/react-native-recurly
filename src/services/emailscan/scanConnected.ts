@@ -60,20 +60,40 @@ export async function importFromConnectedMailboxes(opts: {
         const already = existingByKey.get(key);
         const next = candidateToSubscription(candidate);
         if (already) {
+          // R18: a SPARSE candidate must never repair a RECURRING row —
+          // one-off purchases (xAI tokens, domain orders) are not the
+          // subscription's price. A recurring candidate MAY repair a sparse
+          // row (e.g. Porkbun's yearly order receipt).
+          const kindCompatible =
+            next.category === "recurring" || already.category === "sparse";
+          // cadenceRepair: the candidate carries a confident cadence
+          // (Yearly/Weekly — unknown maps to "Monthly" and no-ops) that
+          // differs from the stored one. Repairs billing even when the
+          // price is unchanged, so stale wrong-cadence rows heal.
+          const cadenceRepair =
+            kindCompatible &&
+            next.billing !== "Monthly" &&
+            (already.billing !== next.billing ||
+              already.frequency !== next.frequency);
           const richer =
-            (already.priceUnknown && !next.priceUnknown) ||
-            (candidate.amount !== undefined &&
-              candidate.amount !== already.price);
-          if (richer && opts.updateSubscription) {
-            await opts.updateSubscription(already.id, {
-              price: next.price,
-              priceUnknown: next.priceUnknown,
-              currency: next.currency,
+            kindCompatible &&
+            ((already.priceUnknown && !next.priceUnknown) ||
+              (candidate.amount !== undefined &&
+                candidate.amount !== already.price));
+          if ((richer || cadenceRepair) && opts.updateSubscription) {
+            const patch: Partial<Subscription> = {
               billing: next.billing,
               frequency: next.frequency,
-              category: next.category,
-            });
-            existingByKey.set(key, { ...already, ...next, id: already.id });
+              // repairs never flip the row's stream; import decides it once
+              category: already.category,
+            };
+            if (richer) {
+              patch.price = next.price;
+              patch.priceUnknown = next.priceUnknown;
+              patch.currency = next.currency;
+            }
+            await opts.updateSubscription(already.id, patch);
+            existingByKey.set(key, { ...already, ...patch, id: already.id });
             imported += 1;
           }
           const existingKey = already.icon_key;
