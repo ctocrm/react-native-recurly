@@ -32,5 +32,8 @@ export function candidateToSubscription(
     billing: cadence,
     frequency: cadence,
     paymentMethod: candidate.mailboxId,
+    // R18 paper-trail: first candidate email + best-effort bill number
+    sourceMessageId: candidate.messageIds[0] ?? null,
+    billNumber: candidate.billNumber ?? null,
   };
 }

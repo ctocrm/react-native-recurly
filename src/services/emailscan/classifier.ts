@@ -508,6 +508,20 @@ export function inferCadenceFromPayments(
   return undefined;
 }
 
+/** R18: best-effort bill reference (invoice/order/receipt number). Deliberately
+ * conservative: the keyword must sit right next to the id and the id must
+ * contain a digit, so prose like "in order to confirm" never matches. Often
+ * null — the field stays user-editable. */
+const BILL_NUMBER_RE =
+  /\b(?:invoice|order|receipt)\s*(?:#|no\.?|number)?\s*[:#-]?\s*([A-Z0-9][A-Z0-9/-]{3,29})\b/i;
+
+export function extractBillNumber(text: string): string | undefined {
+  if (!text) return undefined;
+  const token = text.match(BILL_NUMBER_RE)?.[1];
+  if (!token || !/\d/.test(token)) return undefined;
+  return token;
+}
+
 function isInvoiceAttachment(att: MailAttachment): boolean {
   const name = att.filename || "";
   if (IMAGE_NAME_RE.test(name)) return false;
@@ -597,6 +611,7 @@ export function classifyMessage(message: NormalizedMessage): ClassifiedMessage {
     amount: parsed?.amount,
     currency: parsed?.currency,
     cadence: cadence ?? (kind === "recurring" ? "unknown" : undefined),
+    billNumber: extractBillNumber(`${message.subject}\n${body}`),
     amountUnknown,
     needsBody: true,
     evidence,

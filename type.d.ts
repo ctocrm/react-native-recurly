@@ -29,6 +29,10 @@ declare global {
     frequency?: string;
     renewalDate?: string;
     color?: string;
+    /** R18: paper-trail — mailbox message id of the first scan candidate. */
+    sourceMessageId?: string | null;
+    /** R18: best-effort invoice/order/receipt number; often null; editable. */
+    billNumber?: string | null;
   }
 
   interface SubscriptionCardProps extends Subscription {

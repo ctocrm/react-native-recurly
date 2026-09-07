@@ -50,6 +50,7 @@ export function rollupCandidates(hits: ClassifiedMessage[]): ScanCandidate[] {
         amount: hit.amount,
         currency: hit.currency,
         cadence: hit.cadence,
+        billNumber: hit.billNumber ?? null,
         nextDate: undefined,
         amountUnknown: hit.amountUnknown || hit.amount === undefined,
         evidence,
@@ -78,6 +79,9 @@ export function rollupCandidates(hits: ClassifiedMessage[]): ScanCandidate[] {
       existing.cadence = hit.cadence;
     } else if (!existing.cadence && hit.cadence) {
       existing.cadence = hit.cadence;
+    }
+    if (hit.billNumber) {
+      existing.billNumber = hit.billNumber;
     }
 
     if (confidenceRank(hit.confidence) > confidenceRank(existing.confidence)) {

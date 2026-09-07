@@ -69,6 +69,7 @@ const EditSubscriptionModal = ({
   const [category, setCategory] = useState<string>("Other");
   const [plan, setPlan] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("");
+  const [billNumber, setBillNumber] = useState("");
   const [renewalDate, setRenewalDate] = useState("");
   const [selectedIcon, setSelectedIcon] = useState(icons.plus);
   const [showAutocomplete, setShowAutocomplete] = useState(false);
@@ -131,6 +132,7 @@ const EditSubscriptionModal = ({
       setCategory(subscription.category || "Other");
       setPlan(subscription.plan || "");
       setPaymentMethod(subscription.paymentMethod || "");
+      setBillNumber(subscription.billNumber || "");
       setRenewalDate(
         subscription.renewalDate
           ? dayjs(subscription.renewalDate).format("YYYY-MM-DD")
@@ -211,6 +213,7 @@ const EditSubscriptionModal = ({
       renewalDate: renewalDate
         ? dayjs(renewalDate).toISOString()
         : subscription.renewalDate,
+      billNumber: billNumber.trim() || null,
       color: CATEGORY_COLORS[category] || CATEGORY_COLORS.Other,
     };
 
@@ -418,6 +421,19 @@ const EditSubscriptionModal = ({
                   placeholderTextColor="rgba(0, 0, 0, 0.4)"
                   onChangeText={setPaymentMethod}
                   autoCapitalize="sentences"
+                />
+              </View>
+
+              {/* Bill Number (R18) */}
+              <View className="auth-field">
+                <Text className="auth-label">Bill Number</Text>
+                <TextInput
+                  className="auth-input"
+                  value={billNumber}
+                  placeholder="e.g. INV-2026-000123"
+                  placeholderTextColor="rgba(0, 0, 0, 0.4)"
+                  onChangeText={setBillNumber}
+                  autoCapitalize="characters"
                 />
               </View>
 

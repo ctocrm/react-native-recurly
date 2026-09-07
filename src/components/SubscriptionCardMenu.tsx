@@ -20,6 +20,7 @@ interface SubscriptionCardMenuProps {
   onMarkCancelled: () => void;
   onDelete: () => void;
   onViewStats: () => void;
+  onDetails?: () => void;
 }
 
 const SubscriptionCardMenu = ({
@@ -32,6 +33,7 @@ const SubscriptionCardMenu = ({
   onMarkCancelled,
   onDelete,
   onViewStats,
+  onDetails,
 }: SubscriptionCardMenuProps) => {
   const handleDelete = () => {
     Alert.alert(
@@ -52,7 +54,7 @@ const SubscriptionCardMenu = ({
   };
 
   const showActionSheet = () => {
-    const options: string[] = ["View Stats", "Edit"];
+    const options: string[] = ["View Stats", "Details", "Edit"];
 
     if (status === "cancelled" || status === "paused") {
       options.push("Mark as Active");
@@ -84,6 +86,9 @@ const SubscriptionCardMenu = ({
         const selected = options[buttonIndex];
         if (selected === "View Stats") {
           onViewStats();
+          onClose();
+        } else if (selected === "Details") {
+          onDetails?.();
           onClose();
         } else if (selected === "Edit") {
           onEdit();
@@ -144,6 +149,13 @@ const SubscriptionCardMenu = ({
               onClose();
             }}
           />
+          <MenuItem
+            label="Details"
+            onPress={() => {
+              onDetails?.();
+              onClose();
+            }}
+ />
           <MenuItem
             label="Edit"
             onPress={() => {

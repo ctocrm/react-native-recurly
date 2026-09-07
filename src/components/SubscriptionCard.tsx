@@ -33,6 +33,7 @@ interface SubscriptionCardProps {
   onMarkPaused?: () => void;
   onMarkCancelled?: () => void;
   onViewStats?: () => void;
+  onViewDetails?: () => void;
   onIconLongPress?: () => void;
   displayPrice?: number;
   displayUnknown?: boolean;
@@ -65,6 +66,7 @@ const SubscriptionCard = ({
   onMarkPaused,
   onMarkCancelled,
   onViewStats,
+  onViewDetails,
   onIconLongPress,
   displayPrice,
   displayUnknown,
@@ -257,6 +259,7 @@ const SubscriptionCard = ({
         onMarkCancelled={() => onMarkCancelled?.()}
         onDelete={() => onDelete?.()}
         onViewStats={() => onViewStats?.()}
+        onDetails={() => onViewDetails?.()}
       />
     </>
   );

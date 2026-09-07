@@ -3,6 +3,7 @@ import EditSubscriptionModal from "@/components/EditSubscriptionModal";
 import EmailScanSection from "@/components/EmailScanSection";
 import ListHeading from "@/components/ListHeading";
 import SubscriptionCard from "@/components/SubscriptionCard";
+import SubscriptionDetailsModal from "@/components/SubscriptionDetailsModal";
 import SubscriptionIconPickerModal from "@/components/SubscriptionIconPickerModal";
 import SubscriptionStatsModal from "@/components/SubscriptionStatsModal";
 import { icons } from "@/constants/icons";
@@ -45,8 +46,10 @@ const Subscriptions = () => {
     getUpcomingSubscriptions,
     refreshSubscriptions,
   } = useSubscriptions();
-  const { displayFor, sparseLineFor, cyclePeriod } =
+  const { displayFor, sparseLineFor, cyclePeriod, messages } =
     useChargeDisplay(subscriptions);
+  const [detailsSubscription, setDetailsSubscription] =
+    useState<Subscription | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedSubscriptionId, setExpandedSubscriptionId] = useState<
     string | null
@@ -282,6 +285,7 @@ const Subscriptions = () => {
             onMarkPaused={() => handleStatusChange(item, "paused")}
             onMarkCancelled={() => handleStatusChange(item, "cancelled")}
             onViewStats={() => handleViewStats(item)}
+            onViewDetails={() => setDetailsSubscription(item)}
             onIconLongPress={() => handleIconLongPress(item)}
           />
         )}
@@ -328,6 +332,14 @@ const Subscriptions = () => {
         onRenew={(id) => {
           updateSubscription(id, {});
         }}
+      />
+
+      {/* Details Modal (R18) */}
+      <SubscriptionDetailsModal
+        visible={detailsSubscription !== null}
+        subscription={detailsSubscription}
+        messages={messages}
+        onClose={() => setDetailsSubscription(null)}
       />
 
       {/* Icon Picker Modal */}

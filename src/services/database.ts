@@ -61,6 +61,8 @@ function rowToSubscription(row: Record<string, any>): Subscription {
     frequency: row.frequency ?? undefined,
     renewalDate: row.renewal_date ?? undefined,
     color: row.color ?? undefined,
+    sourceMessageId: row.source_message_id ?? null,
+    billNumber: row.bill_number ?? null,
   };
 }
 
@@ -95,8 +97,8 @@ export async function addSubscription(
     iconKey = match ? match[0] : "plus";
   }
   await db.runAsync(
-    `INSERT INTO subscriptions (id, name, plan, category, payment_method, status, start_date, price, price_unknown, currency, billing, frequency, renewal_date, color, icon_key)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO subscriptions (id, name, plan, category, payment_method, status, start_date, price, price_unknown, currency, billing, frequency, renewal_date, color, icon_key, source_message_id, bill_number)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     subscription.id,
     subscription.name,
     subscription.plan ?? null,
@@ -112,6 +114,8 @@ export async function addSubscription(
     subscription.renewalDate ?? null,
     subscription.color ?? null,
     iconKey,
+    subscription.sourceMessageId ?? null,
+    subscription.billNumber ?? null,
   );
 }
 
@@ -135,6 +139,8 @@ export async function updateSubscription(
     renewalDate: "renewal_date",
     color: "color",
     icon_key: "icon_key",
+    sourceMessageId: "source_message_id",
+    billNumber: "bill_number",
   };
   const setClauses: string[] = [];
   const params: any[] = [];

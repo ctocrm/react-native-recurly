@@ -5,7 +5,7 @@
 import type { SQLiteDatabase } from "expo-sqlite";
 
 /** Bump when adding a migration. Stored in PRAGMA user_version. */
-export const SCHEMA_VERSION = 13;
+export const SCHEMA_VERSION = 14;
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS subscriptions (
@@ -24,6 +24,8 @@ CREATE TABLE IF NOT EXISTS subscriptions (
   renewal_date  TEXT,
   color         TEXT,
   icon_key      TEXT,
+  source_message_id TEXT,
+  bill_number   TEXT,
   created_at    TEXT DEFAULT (datetime('now')),
   updated_at    TEXT DEFAULT (datetime('now'))
 );
@@ -394,6 +396,21 @@ export const MIGRATIONS: ((db: SQLiteDatabase) => Promise<void>)[] = [
       `UPDATE icon_cache SET chosen = 1
        WHERE lower(IFNULL(source,'')) IN ('ai_upscale','subscription','user');`,
     );
+  },
+  // 14 (R18): subscription details paper-trail — source scan email reference
+  // and best-effort bill number.
+  async (db) => {
+    const names = await columnNames(db, "subscriptions");
+    if (!names.includes("source_message_id")) {
+      await db.execAsync(
+        `ALTER TABLE subscriptions ADD COLUMN source_message_id TEXT;`,
+      );
+    }
+    if (!names.includes("bill_number")) {
+      await db.execAsync(
+        `ALTER TABLE subscriptions ADD COLUMN bill_number TEXT;`,
+      );
+    }
   },
 ];
 

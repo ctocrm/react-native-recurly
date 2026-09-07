@@ -55,6 +55,8 @@ export interface ClassifiedMessage {
   amount?: number;
   currency?: string;
   cadence?: Cadence;
+  /** R18: best-effort invoice/order/receipt number from the body. */
+  billNumber?: string | null;
   /** Invoice-like PDF present but no parseable total. */
   amountUnknown: boolean;
   needsBody: boolean;
@@ -73,6 +75,8 @@ export interface ScanCandidate {
   currency?: string;
   cadence?: Cadence;
   nextDate?: string;
+  /** R18: best-effort bill number carried to import. */
+  billNumber?: string | null;
   amountUnknown: boolean;
   evidence: string[];
   messageIds: string[];

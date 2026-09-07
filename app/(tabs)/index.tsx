@@ -2,6 +2,7 @@ import CreateSubscriptionModal from "@/components/CreateSubscriptionModal";
 import EditSubscriptionModal from "@/components/EditSubscriptionModal";
 import ListHeading from "@/components/ListHeading";
 import SubscriptionCard from "@/components/SubscriptionCard";
+import SubscriptionDetailsModal from "@/components/SubscriptionDetailsModal";
 import SubscriptionIconPickerModal from "@/components/SubscriptionIconPickerModal";
 import SubscriptionStatsModal from "@/components/SubscriptionStatsModal";
 import UpcomingSubscriptionCard from "@/components/UpcomingSubscriptionCard";
@@ -51,8 +52,10 @@ const App = () => {
     getUpcomingSubscriptions,
     refreshSubscriptions,
   } = useSubscriptions();
-  const { displayFor, sparseLineFor, cyclePeriod, monthlySpend } =
+  const { displayFor, sparseLineFor, cyclePeriod, monthlySpend, messages } =
     useChargeDisplay(subscriptions);
+  const [detailsSubscription, setDetailsSubscription] =
+    useState<Subscription | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingSubscription, setEditingSubscription] =
     useState<Subscription | null>(null);
@@ -333,6 +336,7 @@ const App = () => {
             onMarkPaused={() => handleStatusChange(item, "paused")}
             onMarkCancelled={() => handleStatusChange(item, "cancelled")}
             onViewStats={() => handleViewStats(item)}
+            onViewDetails={() => setDetailsSubscription(item)}
             onIconLongPress={() => handleIconLongPress(item)}
           />
         )}
@@ -376,6 +380,14 @@ const App = () => {
       <UserSettingsModal
         visible={userSettingsVisible}
         onClose={() => setUserSettingsVisible(false)}
+      />
+
+      {/* Details Modal (R18) */}
+      <SubscriptionDetailsModal
+        visible={detailsSubscription !== null}
+        subscription={detailsSubscription}
+        messages={messages}
+        onClose={() => setDetailsSubscription(null)}
       />
 
       {/* Icon Picker Modal */}
