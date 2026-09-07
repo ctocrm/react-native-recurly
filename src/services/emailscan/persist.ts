@@ -138,18 +138,29 @@ export async function listClassifiedMessagesAsync(): Promise<
   ClassifiedMessage[]
 > {
   const db = getDatabase();
-  // Lean read: never fetch body_text/html. Legacy rows can carry full bodies
-  // (pre-R19 writes); retaining every body at boot OOMs the app. Display math
-  // (chargeDisplay) only reads message.mailboxId/message.date.
-  const rows = await db.getAllAsync<ClassifiedLeanRow>(
-    `SELECT mailbox_id, message_id, from_addr, subject, date,
-            classified_json, parser_version
-     FROM mail_messages`,
-  );
-  // Fire-and-forget: NULL legacy body columns so the cache stops carrying
-  // them at all. Batched, memory-bound, and never blocks this load.
+  // Lean read, paged: never SELECT * (legacy classified_json embeds the full
+  // message body) and never materialize the whole table in one getAllAsync —
+  // either one OOMs the app at boot (R19). Display math (chargeDisplay) only
+  // reads message.mailboxId/message.date.
+  const hits: ClassifiedMessage[] = [];
+  const BATCH = 200;
+  for (let offset = 0; ; offset += BATCH) {
+    const rows = await db.getAllAsync<ClassifiedLeanRow>(
+      `SELECT mailbox_id, message_id, from_addr, subject, date,
+              classified_json, parser_version
+       FROM mail_messages
+       LIMIT ? OFFSET ?`,
+      BATCH,
+      offset,
+    );
+    if (rows.length === 0) break;
+    for (const row of rows) hits.push(leanRowToClassified(row));
+    if (rows.length < BATCH) break;
+  }
+  // Fire-and-forget: rewrite legacy fat rows (NULL body columns, stub the
+  // embedded message). Batched, memory-bound, never blocks this load.
   void ensureLegacyBodiesStrippedAsync();
-  return rows.map(leanRowToClassified);
+  return hits;
 }
 
 function leanRowToClassified(row: ClassifiedLeanRow): ClassifiedMessage {
@@ -183,20 +194,24 @@ export function ensureLegacyBodiesStrippedAsync(): Promise<void> {
 async function stripLegacyBodiesAsync(): Promise<void> {
   const db = getDatabase();
   for (;;) {
-    const batch = await db.getAllAsync<{
-      mailbox_id: string;
-      message_id: string;
-    }>(
-      `SELECT mailbox_id, message_id FROM mail_messages
+    const batch = await db.getAllAsync<ClassifiedLeanRow>(
+      `SELECT mailbox_id, message_id, from_addr, subject, date,
+              classified_json, parser_version
+       FROM mail_messages
        WHERE body_text IS NOT NULL OR html IS NOT NULL
        LIMIT ?`,
       STRIP_BATCH,
     );
     if (batch.length === 0) return;
     for (const row of batch) {
+      // Stub the embedded message too: classified_json carries a full
+      // serialized NormalizedMessage (body included) in legacy rows.
+      const lean = leanRowToClassified(row);
       await db.runAsync(
-        `UPDATE mail_messages SET body_text = NULL, html = NULL
+        `UPDATE mail_messages
+         SET body_text = NULL, html = NULL, classified_json = ?
          WHERE mailbox_id = ? AND message_id = ?`,
+        JSON.stringify(lean),
         row.mailbox_id,
         row.message_id,
       );

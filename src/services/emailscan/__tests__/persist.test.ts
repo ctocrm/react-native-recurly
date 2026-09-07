@@ -22,6 +22,11 @@ jest.mock("@/services/db/connection", () => {
           .filter((r) => r.body_text !== null || r.html !== null)
           .slice(0, limit) as unknown as T[];
       }
+      if (/LIMIT \? OFFSET \?/.test(sql)) {
+        const limit = typeof params[0] === "number" ? params[0] : 200;
+        const offset = typeof params[1] === "number" ? params[1] : 0;
+        return fake.rows.slice(offset, offset + limit) as unknown as T[];
+      }
       return fake.rows as unknown as T[];
     },
     async getFirstAsync<T>(): Promise<T> {
@@ -30,11 +35,12 @@ jest.mock("@/services/db/connection", () => {
     async runAsync(sql: string, ...params: unknown[]): Promise<void> {
       fake.updates.push(sql);
       const row = fake.rows.find(
-        (r) => r.mailbox_id === params[0] && r.message_id === params[1],
+        (r) => r.mailbox_id === params[1] && r.message_id === params[2],
       );
       if (row && /body_text = NULL/.test(sql)) {
         row.body_text = null;
         row.html = null;
+        row.classified_json = params[0];
       }
     },
   };
@@ -95,6 +101,8 @@ describe("listClassifiedMessagesAsync (lean read)", () => {
     expect(loadSql).toBeDefined();
     expect(loadSql).not.toMatch(/body_text|html/);
     expect(loadSql).toMatch(/classified_json/);
+    // Paged: must never materialize the whole table in one shot.
+    expect(loadSql).toMatch(/LIMIT \? OFFSET \?/);
   });
 
   it("returns classified messages with a body-less message stub", async () => {
@@ -124,6 +132,18 @@ describe("ensureLegacyBodiesStrippedAsync", () => {
     expect(db.updates.filter((u) => /body_text = NULL/.test(u))).toHaveLength(
       2,
     );
+    // The embedded classified_json message must be stubbed too — it carried
+    // the full serialized body in legacy rows.
+    for (const r of db.rows) {
+      const json = String(r.classified_json);
+      expect(json).not.toContain("filler");
+      expect(json).not.toContain("<p>");
+      const parsed = JSON.parse(json) as {
+        message?: { text?: string; html?: string };
+      };
+      expect(parsed.message?.text).toBeUndefined();
+      expect(parsed.message?.html).toBeUndefined();
+    }
   });
 
   it("is a no-op once every row is stripped", async () => {
