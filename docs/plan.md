@@ -1676,6 +1676,27 @@ User decisions (binding):
 - Gate: completion dialog with no new errors; zero unhandled 401 lines; Porkbun card = Yearly + amount; sparse counts unchanged (nothing mispromoted); a two-stream merchant (xAI ideal) renders the stacked sparse line; Monthly Spend sane; Details populated.
 - Standard gate applies. One commit per phase; docs after gates.
 
+**C status (2026-09-07, live run on fresh APK + v14 migration, data intact):**
+- VERIFIED on-device (screenshots /tmp/r18_pork3.png, r18_details.png, r18_audi3.png):
+  - **Porkbun = "sparse / $47.74 / Yearly"** with brand icon — the R18 headline bug is dead (was "Monthly ?").
+  - Details modal renders on both tabs' cards: Account (mailbox-attributed: Porkbun→tuta:,
+    Audible→workspace:), Amount as billed ("$47.74 Yearly"), Started, Bill number, Source email;
+    honest "—" when a field is absent (pre-R18 rows have null paper-trail).
+  - ALL FOUR legs ran in one scan: Tuta 0 msgs, Outlook 25, Proton 0 new, **Workspace 2095 msgs /
+    21 pages / 1692 bodies — first-ever full workspace completion, zero 401s** (R15/R17 refresh holding).
+  - As-billed cadence across rows sane: Hover Yearly $39.99, Google Yearly $27.99, Amazon Yearly
+    $99.00, Amazonmusic Monthly $9.99, free rows $0.00 Monthly, sparse rows labeled sparse.
+- BLOCKER FOUND: **app OOM crash** at 00:00:49, AFTER all mailbox legs finished, during
+  import/icon-crawl phase (`java.lang.OutOfMemoryError`, JVM heap at 201MB growth limit, GC thrash,
+  SIGABRT on mqt_v_js). Data survived (per-import transactions); scan UI died; several new rows
+  (Audible, Amazonmusic, Buybudcanada, Cobratate…) imported but crawl of later merchants aborted
+  (spinner icons remain). Completion dialog therefore NOT reached — C gate still open on this point.
+- FOLLOW-UPS: (1) fix OOM in import/crawl phase (memory bounding); (2) Audible fresh import has
+  Source email "—" — rollup-built candidate reached import without messageIds[0]; check
+  scanConnected repair/rollup path; (3) stacked sparse line not yet observed on-device (data
+  dependent: needs a recurring merchant with THIS-month sparse purchases; unit-proven only);
+  (4) several rows show "?" price (honest no-amount display, mostly crash-interrupted imports).
+
 Harness note: adb root kills `adb logcat` capture — restart any capture AFTER rooting.
 
 ---
