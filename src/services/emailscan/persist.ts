@@ -33,6 +33,17 @@ interface MessageRow {
   parser_version: number;
 }
 
+/** Lean projection of MessageRow — never carries body_text/html. */
+interface ClassifiedLeanRow {
+  mailbox_id: string;
+  message_id: string;
+  from_addr: string;
+  subject: string;
+  date: string;
+  classified_json: string;
+  parser_version: number;
+}
+
 function rowToMessage(row: MessageRow): CachedMessage {
   const message: NormalizedMessage = {
     mailboxId: row.mailbox_id,
@@ -127,8 +138,70 @@ export async function listClassifiedMessagesAsync(): Promise<
   ClassifiedMessage[]
 > {
   const db = getDatabase();
-  const rows = await db.getAllAsync<MessageRow>("SELECT * FROM mail_messages");
-  return rows.map((row) => rowToMessage(row).classified);
+  // Lean read: never fetch body_text/html. Legacy rows can carry full bodies
+  // (pre-R19 writes); retaining every body at boot OOMs the app. Display math
+  // (chargeDisplay) only reads message.mailboxId/message.date.
+  const rows = await db.getAllAsync<ClassifiedLeanRow>(
+    `SELECT mailbox_id, message_id, from_addr, subject, date,
+            classified_json, parser_version
+     FROM mail_messages`,
+  );
+  // Fire-and-forget: NULL legacy body columns so the cache stops carrying
+  // them at all. Batched, memory-bound, and never blocks this load.
+  void ensureLegacyBodiesStrippedAsync();
+  return rows.map(leanRowToClassified);
+}
+
+function leanRowToClassified(row: ClassifiedLeanRow): ClassifiedMessage {
+  const classified = JSON.parse(row.classified_json) as ClassifiedMessage;
+  classified.message = {
+    mailboxId: row.mailbox_id,
+    messageId: row.message_id,
+    from: row.from_addr,
+    subject: row.subject,
+    date: row.date,
+  };
+  return classified;
+}
+
+const STRIP_BATCH = 100;
+let stripBodiesOnce: Promise<void> | null = null;
+
+/**
+ * One-time per session: NULL legacy body_text/html columns. Rows written
+ * before body-stripping store full bodies, which made boot-time loads OOM
+ * (R19). Batches small ID sets so memory stays bounded; a no-op once every
+ * row is stripped. Failures never wedge the caller — retried next session.
+ */
+export function ensureLegacyBodiesStrippedAsync(): Promise<void> {
+  stripBodiesOnce ??= stripLegacyBodiesAsync().catch(() => {
+    stripBodiesOnce = null;
+  });
+  return stripBodiesOnce;
+}
+
+async function stripLegacyBodiesAsync(): Promise<void> {
+  const db = getDatabase();
+  for (;;) {
+    const batch = await db.getAllAsync<{
+      mailbox_id: string;
+      message_id: string;
+    }>(
+      `SELECT mailbox_id, message_id FROM mail_messages
+       WHERE body_text IS NOT NULL OR html IS NOT NULL
+       LIMIT ?`,
+      STRIP_BATCH,
+    );
+    if (batch.length === 0) return;
+    for (const row of batch) {
+      await db.runAsync(
+        `UPDATE mail_messages SET body_text = NULL, html = NULL
+         WHERE mailbox_id = ? AND message_id = ?`,
+        row.mailbox_id,
+        row.message_id,
+      );
+    }
+  }
 }
 
 export async function listMailboxesAsync(): Promise<
