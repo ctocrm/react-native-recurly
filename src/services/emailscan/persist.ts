@@ -138,24 +138,32 @@ export async function listClassifiedMessagesAsync(): Promise<
   ClassifiedMessage[]
 > {
   const db = getDatabase();
-  // Lean read, paged: never SELECT * (legacy classified_json embeds the full
-  // message body) and never materialize the whole table in one getAllAsync —
-  // either one OOMs the app at boot (R19). Display math (chargeDisplay) only
-  // reads message.mailboxId/message.date.
+  // Lean read, paged by rowid keyset: never SELECT * (legacy classified_json
+  // embeds the full message body) and never materialize the whole table in
+  // one getAllAsync — either one OOMs the app at boot (R19). R23: keyset
+  // (`rowid > last`) replaced LIMIT/OFFSET — OFFSET makes SQLite re-walk
+  // every discarded row on each page, and over fat legacy pages the
+  // cold-boot classified load took ~60s, leaving Monthly Spend showing
+  // recurring-only ($177.08) for a full minute before sparse actuals landed.
+  // Keyset seeks straight to each page: O(N) total.
   const hits: ClassifiedMessage[] = [];
-  const BATCH = 200;
-  for (let offset = 0; ; offset += BATCH) {
-    const rows = await db.getAllAsync<ClassifiedLeanRow>(
-      `SELECT mailbox_id, message_id, from_addr, subject, date,
+  const BATCH = 1000;
+  let lastRowid = 0;
+  for (;;) {
+    const rows = await db.getAllAsync<ClassifiedLeanRow & { rid: number }>(
+      `SELECT rowid AS rid, mailbox_id, message_id, from_addr, subject, date,
               classified_json, parser_version
        FROM mail_messages
-       LIMIT ? OFFSET ?`,
+       WHERE rowid > ?
+       ORDER BY rowid
+       LIMIT ?`,
+      lastRowid,
       BATCH,
-      offset,
     );
     if (rows.length === 0) break;
     for (const row of rows) hits.push(leanRowToClassified(row));
     if (rows.length < BATCH) break;
+    lastRowid = rows[rows.length - 1].rid;
   }
   // Fire-and-forget: rewrite legacy fat rows (NULL body columns, stub the
   // embedded message). Batched, memory-bound, never blocks this load.
@@ -185,14 +193,27 @@ let stripBodiesOnce: Promise<void> | null = null;
  * row is stripped. Failures never wedge the caller — retried next session.
  */
 export function ensureLegacyBodiesStrippedAsync(): Promise<void> {
-  stripBodiesOnce ??= stripLegacyBodiesAsync().catch(() => {
-    stripBodiesOnce = null;
-  });
+  stripBodiesOnce ??= stripLegacyBodiesAsync()
+    .then((stripped) => {
+      if (stripped > 0)
+        console.log(`[MailScan] legacy body strip: ${stripped} rows stripped`);
+    })
+    .catch((err) => {
+      // R23: this catch was silent, so a strip that failed every session
+      // kept fat rows (and the slow cold-boot load they cause) forever.
+      // Log it; retried next session via the reset below.
+      console.log(
+        "[MailScan] legacy body strip FAILED",
+        err instanceof Error ? err.message : String(err),
+      );
+      stripBodiesOnce = null;
+    });
   return stripBodiesOnce;
 }
 
-async function stripLegacyBodiesAsync(): Promise<void> {
+async function stripLegacyBodiesAsync(): Promise<number> {
   const db = getDatabase();
+  let stripped = 0;
   for (;;) {
     const batch = await db.getAllAsync<ClassifiedLeanRow>(
       `SELECT mailbox_id, message_id, from_addr, subject, date,
@@ -202,7 +223,7 @@ async function stripLegacyBodiesAsync(): Promise<void> {
        LIMIT ?`,
       STRIP_BATCH,
     );
-    if (batch.length === 0) return;
+    if (batch.length === 0) return stripped;
     for (const row of batch) {
       // Stub the embedded message too: classified_json carries a full
       // serialized NormalizedMessage (body included) in legacy rows.
@@ -215,6 +236,7 @@ async function stripLegacyBodiesAsync(): Promise<void> {
         row.mailbox_id,
         row.message_id,
       );
+      stripped += 1;
     }
   }
 }

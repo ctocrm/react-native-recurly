@@ -14,6 +14,7 @@ jest.mock("@/services/db/connection", () => {
     rows: [] as Record<string, unknown>[],
     queries: [] as string[],
     updates: [] as string[],
+    failNextUpdate: false,
     async getAllAsync<T>(sql: string, ...params: unknown[]): Promise<T[]> {
       fake.queries.push(sql);
       if (/body_text IS NOT NULL/.test(sql)) {
@@ -22,10 +23,15 @@ jest.mock("@/services/db/connection", () => {
           .filter((r) => r.body_text !== null || r.html !== null)
           .slice(0, limit) as unknown as T[];
       }
-      if (/LIMIT \? OFFSET \?/.test(sql)) {
-        const limit = typeof params[0] === "number" ? params[0] : 200;
-        const offset = typeof params[1] === "number" ? params[1] : 0;
-        return fake.rows.slice(offset, offset + limit) as unknown as T[];
+      if (/rowid > \?/.test(sql)) {
+        // Keyset page (R23): rowid is the array position (1-based).
+        const last = typeof params[0] === "number" ? params[0] : 0;
+        const limit = typeof params[1] === "number" ? params[1] : 200;
+        return fake.rows
+          .map((r, i) => ({ ...r, rid: i + 1 }))
+          .filter((r) => r.rid > last)
+          .sort((a, b) => a.rid - b.rid)
+          .slice(0, limit) as unknown as T[];
       }
       return fake.rows as unknown as T[];
     },
@@ -34,6 +40,10 @@ jest.mock("@/services/db/connection", () => {
     },
     async runAsync(sql: string, ...params: unknown[]): Promise<void> {
       fake.updates.push(sql);
+      if (fake.failNextUpdate) {
+        fake.failNextUpdate = false;
+        throw new Error("injected update failure");
+      }
       const row = fake.rows.find(
         (r) => r.mailbox_id === params[1] && r.message_id === params[2],
       );
@@ -71,6 +81,7 @@ interface FakeDb {
   rows: Record<string, unknown>[];
   queries: string[];
   updates: string[];
+  failNextUpdate: boolean;
 }
 
 // Fresh module registry per call so persist.ts's once-per-session strip
@@ -102,7 +113,30 @@ describe("listClassifiedMessagesAsync (lean read)", () => {
     expect(loadSql).not.toMatch(/body_text|html/);
     expect(loadSql).toMatch(/classified_json/);
     // Paged: must never materialize the whole table in one shot.
-    expect(loadSql).toMatch(/LIMIT \? OFFSET \?/);
+    expect(loadSql).toMatch(/ORDER BY rowid\s*LIMIT \?/);
+    // R23: keyset, not OFFSET — OFFSET re-walks every discarded row per page
+    // and over fat legacy pages that cost ~60s of cold-boot load.
+    expect(loadSql).not.toMatch(/OFFSET/);
+  });
+
+  it("aggregates every row exactly once across keyset pages", async () => {
+    const { persist, db } = freshEnv();
+    // 2500 rows forces 3 pages at BATCH=1000 (1000 + 1000 + 500).
+    const pageRow = (id: string) => {
+      const row = fatRow(id) as Record<string, unknown>;
+      row.body_text = "short";
+      row.html = null;
+      return row;
+    };
+    db.rows = Array.from({ length: 2500 }, (_, i) => pageRow(`m-${i}`));
+    const hits = await persist.listClassifiedMessagesAsync();
+    expect(hits).toHaveLength(2500);
+    expect(new Set(hits.map((h) => h.message.messageId)).size).toBe(2500);
+    // 3 keyset queries + nothing else against mail_messages from the loader.
+    const pageQueries = db.queries.filter(
+      (q) => /rowid > \?/.test(q) && /FROM mail_messages/.test(q),
+    );
+    expect(pageQueries).toHaveLength(3);
   });
 
   it("returns classified messages with a body-less message stub", async () => {
@@ -153,5 +187,33 @@ describe("ensureLegacyBodiesStrippedAsync", () => {
     expect(db.updates.filter((u) => /body_text = NULL/.test(u))).toHaveLength(1);
     await persist.ensureLegacyBodiesStrippedAsync();
     expect(db.updates.filter((u) => /body_text = NULL/.test(u))).toHaveLength(1);
+  });
+
+  it("logs its strip count and its failures (R23)", async () => {
+    const logSpy = jest.spyOn(console, "log").mockImplementation(() => {});
+    try {
+      const { persist, db } = freshEnv();
+      db.rows = [fatRow("m-1"), fatRow("m-2")];
+      await persist.ensureLegacyBodiesStrippedAsync();
+      expect(
+        logSpy.mock.calls.some((c) =>
+          String(c[0]).includes("legacy body strip: 2 rows stripped"),
+        ),
+      ).toBe(true);
+
+      // A failing strip must be logged, not swallowed — a silent failure
+      // kept fat rows (and the slow cold-boot load they cause) forever.
+      const { persist: p2, db: db2 } = freshEnv();
+      db2.rows = [fatRow("m-1")];
+      db2.failNextUpdate = true;
+      await p2.ensureLegacyBodiesStrippedAsync();
+      expect(
+        logSpy.mock.calls.some((c) =>
+          String(c[0]).includes("legacy body strip FAILED"),
+        ),
+      ).toBe(true);
+    } finally {
+      logSpy.mockRestore();
+    }
   });
 });

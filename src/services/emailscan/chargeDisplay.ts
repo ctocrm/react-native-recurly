@@ -5,6 +5,20 @@
 import { nameToSlug } from "@/services/iconScraper";
 import type { ClassifiedMessage } from "./types";
 
+/** R23: nameToSlug is 5+ regex passes; matchesSubscription runs it once per
+ * (subscription, cached hit) pair — 125 subs × 2209 hits re-slugged the same
+ * names ~276k times and the post-load recompute took ~14.5s on cold boot.
+ * Merchant names are few and stable: memoize. */
+const slugCache = new Map<string, string>();
+function cachedSlug(name: string): string {
+  let slug = slugCache.get(name);
+  if (slug === undefined) {
+    slug = nameToSlug(name);
+    slugCache.set(name, slug);
+  }
+  return slug;
+}
+
 export type RecurringDisplayPeriod = "weekly" | "monthly" | "yearly";
 export type SparseDisplayPeriod = "week" | "month" | "year";
 export type DisplayPeriod = RecurringDisplayPeriod | SparseDisplayPeriod;
@@ -119,7 +133,7 @@ export function matchesSubscription(
   if (!isSparseSubscription(sub) && hit.kind !== "recurring") return false;
   const mailbox = sub.paymentMethod;
   if (mailbox && hit.message.mailboxId !== mailbox) return false;
-  const key = nameToSlug(sub.name);
+  const key = cachedSlug(sub.name);
   return (
     hit.merchantKey === key ||
     hit.merchantName.toLowerCase() === sub.name.toLowerCase()
@@ -165,7 +179,7 @@ export function sparseSecondaryLine(
   if (isSparseSubscription(sub) || sub.category === "free") return null;
   const { start, end } = windowForPeriod("month", now);
   const mailbox = sub.paymentMethod;
-  const key = nameToSlug(sub.name);
+  const key = cachedSlug(sub.name);
   let total = 0;
   let any = false;
   for (const hit of messages) {

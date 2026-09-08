@@ -7,6 +7,7 @@ import {
   type DisplayPeriod,
 } from "@/services/emailscan";
 import { listClassifiedMessagesAsync } from "@/services/emailscan/persist";
+import { isSparseSubscription } from "@/services/emailscan/chargeDisplay";
 import { getPreference, setPreference } from "@/services/database";
 import type { ClassifiedMessage } from "@/services/emailscan/types";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -36,9 +37,18 @@ export function useChargeDisplay(subscriptions: Subscription[]) {
           getPreference(PREF_KEY),
         ]);
         if (cancelled) return;
+        console.log(
+          `[MailScan] spend-audit: classified load ok, msgs=${hits.length}`,
+        );
         setMessages(hits);
         setPeriods(parsePeriods(stored));
-      } catch {
+      } catch (err) {
+        // R23: a silent catch here zeroed every sparse contribution and the
+        // boot UI never retried — log instead of swallowing (LESSONS 26).
+        console.log(
+          "[MailScan] spend-audit: classified load FAILED",
+          err instanceof Error ? err.message : String(err),
+        );
         if (!cancelled) setMessages([]);
       }
     })();
@@ -76,14 +86,34 @@ export function useChargeDisplay(subscriptions: Subscription[]) {
     [messages],
   );
 
-  const monthlySpend = useMemo(
-    () =>
-      subscriptions.reduce(
-        (sum, sub) => sum + monthlySpendContribution(sub, messages),
-        0,
-      ),
-    [messages, subscriptions],
-  );
+  const monthlySpend = useMemo(() => {
+    // R23 audit: split the total so cold-boot vs post-scan deltas name their
+    // owner (recurring amortized vs sparse actuals) in logcat.
+    let recurring = 0;
+    let sparse = 0;
+    let sparseRows = 0;
+    let sparseMissingMailbox = 0;
+    let unknownPrice = 0;
+    const sum = subscriptions.reduce((acc, sub) => {
+      const c = monthlySpendContribution(sub, messages);
+      if (isSparseSubscription(sub)) {
+        sparseRows += 1;
+        if (!sub.paymentMethod) sparseMissingMailbox += 1;
+        sparse += c;
+      } else {
+        recurring += c;
+      }
+      if (sub.priceUnknown) unknownPrice += 1;
+      return acc + c;
+    }, 0);
+    console.log(
+      `[MailScan] spend-audit: subs=${subscriptions.length} msgs=${messages.length} ` +
+        `recurring=${recurring.toFixed(2)} sparse=${sparse.toFixed(2)} ` +
+        `sparseRows=${sparseRows} noMailbox=${sparseMissingMailbox} ` +
+        `unknownPrice=${unknownPrice} total=${sum.toFixed(2)}`,
+    );
+    return sum;
+  }, [messages, subscriptions]);
 
   return { messages, displayFor, sparseLineFor, cyclePeriod, monthlySpend };
 }
