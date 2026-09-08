@@ -183,27 +183,49 @@ async function listClassifiedMessagesUncancelledAsync(): Promise<
   let page = 0;
   let dbMs = 0;
   let lastRowid = 0;
-  for (;;) {
-    const tq = Date.now();
-    const rows = await db.getAllAsync<ClassifiedLeanRow & { rid: number }>(
-      `SELECT rowid AS rid, mailbox_id, message_id, from_addr, subject, date,
-              classified_json, parser_version
-       FROM mail_messages
-       WHERE rowid > ?
-       ORDER BY rowid
-       LIMIT ?`,
-      lastRowid,
-      BATCH,
-    );
-    dbMs += Date.now() - tq;
-    page += 1;
-    console.log(
-      `[MailScan] classified page ${page}: rows=${rows.length} dbMs=${dbMs}`,
-    );
-    if (rows.length === 0) break;
-    for (const row of rows) hits.push(leanRowToClassified(row));
-    if (rows.length < BATCH) break;
-    lastRowid = rows[rows.length - 1].rid;
+  // R24: liveness ticker — if these ticks gap out, the JS thread (not the
+  // DB) owns the stall; if they keep beating while a phase hangs, the DB
+  // side owns it. Split prepare/execute/fetch so the phase names itself.
+  let lastTick = Date.now();
+  const tick = setInterval(() => {
+    const now = Date.now();
+    console.log(`[MailScan] js-tick +${now - lastTick}ms`);
+    lastTick = now;
+  }, 500);
+  try {
+    for (;;) {
+      const tq = Date.now();
+      const statement = await db.prepareAsync(
+        `SELECT rowid AS rid, mailbox_id, message_id, from_addr, subject, date,
+                classified_json, parser_version
+         FROM mail_messages
+         WHERE rowid > ?
+         ORDER BY rowid
+         LIMIT ?`,
+      );
+      const prepMs = Date.now() - tq;
+      const tex = Date.now();
+      const result = await statement.executeAsync(lastRowid, BATCH);
+      const execMs = Date.now() - tex;
+      const tfe = Date.now();
+      const rows = (await result.getAllAsync()) as (ClassifiedLeanRow & {
+        rid: number;
+      })[];
+      const fetchMs = Date.now() - tfe;
+      await statement.finalizeAsync();
+      dbMs += Date.now() - tq;
+      page += 1;
+      console.log(
+        `[MailScan] classified page ${page}: rows=${rows.length} ` +
+          `prepMs=${prepMs} execMs=${execMs} fetchMs=${fetchMs}`,
+      );
+      if (rows.length === 0) break;
+      for (const row of rows) hits.push(leanRowToClassified(row));
+      if (rows.length < BATCH) break;
+      lastRowid = rows[rows.length - 1].rid;
+    }
+  } finally {
+    clearInterval(tick);
   }
   console.log(
     `[MailScan] classified load: pages=${page} rows=${hits.length} ` +

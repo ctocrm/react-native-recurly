@@ -39,6 +39,28 @@ jest.mock("@/services/db/connection", () => {
       }
       return fake.rows as unknown as T[];
     },
+    async prepareAsync(sql: string): Promise<unknown> {
+      fake.queries.push(sql);
+      const run = async (...params: unknown[]) => {
+        if (/rowid > \?/.test(sql)) {
+          // Keyset page (R23): rowid is the array position (1-based).
+          const last = typeof params[0] === "number" ? params[0] : 0;
+          const limit = typeof params[1] === "number" ? params[1] : 200;
+          return fake.rows
+            .map((r, i) => ({ ...r, rid: i + 1 }))
+            .filter((r) => r.rid > last)
+            .sort((a, b) => a.rid - b.rid)
+            .slice(0, limit);
+        }
+        return fake.rows;
+      };
+      return {
+        executeAsync: async (...params: unknown[]) => ({
+          getAllAsync: async () => (await run(...params)) as unknown[],
+        }),
+        finalizeAsync: async () => {},
+      };
+    },
     async getFirstAsync<T>(sql: string): Promise<T> {
       if (/page_count/.test(sql) && fake.page_count !== null) {
         return { page_count: fake.page_count } as unknown as T;
