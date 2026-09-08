@@ -80,7 +80,14 @@ export async function importFromConnectedMailboxes(opts: {
             ((already.priceUnknown && !next.priceUnknown) ||
               (candidate.amount !== undefined &&
                 candidate.amount !== already.price));
-          if ((richer || cadenceRepair) && opts.updateSubscription) {
+          const paperTrailBackfill =
+            kindCompatible &&
+            ((!already.sourceMessageId && !!next.sourceMessageId) ||
+              (!already.billNumber && !!next.billNumber));
+          if (
+            (richer || cadenceRepair || paperTrailBackfill) &&
+            opts.updateSubscription
+          ) {
             const patch: Partial<Subscription> = {
               billing: next.billing,
               frequency: next.frequency,
@@ -91,6 +98,15 @@ export async function importFromConnectedMailboxes(opts: {
               patch.price = next.price;
               patch.priceUnknown = next.priceUnknown;
               patch.currency = next.currency;
+            }
+            // R22: backfill the R18 paper-trail when the stored row predates
+            // it or arrived through the rollup path that dropped messageIds
+            // (Audible showed Source email "—" forever). Never overwrites.
+            if (!already.sourceMessageId && next.sourceMessageId) {
+              patch.sourceMessageId = next.sourceMessageId;
+            }
+            if (!already.billNumber && next.billNumber) {
+              patch.billNumber = next.billNumber;
             }
             await opts.updateSubscription(already.id, patch);
             existingByKey.set(key, { ...already, ...patch, id: already.id });
