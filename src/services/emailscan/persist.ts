@@ -134,7 +134,21 @@ export async function getMailboxAsync(
   };
 }
 
-export async function listClassifiedMessagesAsync(): Promise<
+let inflightLoad: Promise<ClassifiedMessage[]> | null = null;
+
+/**
+ * Cached classified messages only, lean projection. Deduped: the boot effect
+ * re-fires when subscriptions arrive (~300ms after mount), and two concurrent
+ * paging loops contended the connection and doubled the cold load (R24).
+ */
+export function listClassifiedMessagesAsync(): Promise<ClassifiedMessage[]> {
+  inflightLoad ??= listClassifiedMessagesUncancelledAsync().finally(() => {
+    inflightLoad = null;
+  });
+  return inflightLoad;
+}
+
+async function listClassifiedMessagesUncancelledAsync(): Promise<
   ClassifiedMessage[]
 > {
   const db = getDatabase();
@@ -148,8 +162,29 @@ export async function listClassifiedMessagesAsync(): Promise<
   // Keyset seeks straight to each page: O(N) total.
   const hits: ClassifiedMessage[] = [];
   const BATCH = 1000;
+  // R24: split db-wait from JS parse so the cold-load tail names its owner.
+  const t0 = Date.now();
+  const shape = await db.getFirstAsync<{
+    page_count: number;
+    freelist_count: number;
+    journal_mode: string;
+  }>("PRAGMA page_count");
+  const freelist = await db.getFirstAsync<{ freelist_count: number }>(
+    "PRAGMA freelist_count",
+  );
+  const journal = await db.getFirstAsync<{ journal_mode: string }>(
+    "PRAGMA journal_mode",
+  );
+  console.log(
+    `[MailScan] db shape: pageCount=${shape?.page_count ?? "?"} ` +
+      `freelist=${freelist?.freelist_count ?? "?"} ` +
+      `journal=${journal?.journal_mode ?? "?"}`,
+  );
+  let page = 0;
+  let dbMs = 0;
   let lastRowid = 0;
   for (;;) {
+    const tq = Date.now();
     const rows = await db.getAllAsync<ClassifiedLeanRow & { rid: number }>(
       `SELECT rowid AS rid, mailbox_id, message_id, from_addr, subject, date,
               classified_json, parser_version
@@ -160,15 +195,79 @@ export async function listClassifiedMessagesAsync(): Promise<
       lastRowid,
       BATCH,
     );
+    dbMs += Date.now() - tq;
+    page += 1;
+    console.log(
+      `[MailScan] classified page ${page}: rows=${rows.length} dbMs=${dbMs}`,
+    );
     if (rows.length === 0) break;
     for (const row of rows) hits.push(leanRowToClassified(row));
     if (rows.length < BATCH) break;
     lastRowid = rows[rows.length - 1].rid;
   }
+  console.log(
+    `[MailScan] classified load: pages=${page} rows=${hits.length} ` +
+      `dbMs=${dbMs} totalMs=${Date.now() - t0}`,
+  );
   // Fire-and-forget: rewrite legacy fat rows (NULL body columns, stub the
-  // embedded message). Batched, memory-bound, never blocks this load.
-  void ensureLegacyBodiesStrippedAsync();
+  // embedded message), then reclaim the dead space their era left behind.
+  // Batched, memory-bound, never blocks this load.
+  void ensureLegacyBodiesStrippedAsync().then(() => {
+    void ensureDbCompactedAsync();
+  });
   return hits;
+}
+
+const VACUUM_MIN_FREE_PAGES = 1000;
+const VACUUM_FREE_RATIO = 0.2;
+let vacuumOnce: Promise<void> | null = null;
+
+/**
+ * R24: the legacy fat-body era left the DB ~86% free pages (33897 total,
+ * 29230 free ≈ 114MB dead) — every cold classified read paid for a 132MB
+ * file to serve 2209 lean rows. VACUUM once per session when dead space
+ * dominates; self-limiting, no preference flag — the freelist collapses
+ * after the first run, so the guard never fires again until a future mass
+ * delete re-fragments the file.
+ */
+export function ensureDbCompactedAsync(): Promise<void> {
+  vacuumOnce ??= compactIfFragmentedAsync().catch((err) => {
+    console.log(
+      "[MailScan] db vacuum FAILED",
+      err instanceof Error ? err.message : String(err),
+    );
+  });
+  return vacuumOnce;
+}
+
+async function compactIfFragmentedAsync(): Promise<void> {
+  const db = getDatabase();
+  const pc = await db.getFirstAsync<{ page_count: number }>(
+    "PRAGMA page_count",
+  );
+  const fl = await db.getFirstAsync<{ freelist_count: number }>(
+    "PRAGMA freelist_count",
+  );
+  const pageCount = pc?.page_count ?? 0;
+  const freePages = fl?.freelist_count ?? 0;
+  if (
+    freePages < VACUUM_MIN_FREE_PAGES ||
+    (pageCount > 0 && freePages / pageCount < VACUUM_FREE_RATIO)
+  ) {
+    console.log(
+      `[MailScan] db vacuum: skipped (pageCount=${pageCount} freelist=${freePages})`,
+    );
+    return;
+  }
+  const t0 = Date.now();
+  await db.execAsync("VACUUM");
+  const after = await db.getFirstAsync<{ page_count: number }>(
+    "PRAGMA page_count",
+  );
+  console.log(
+    `[MailScan] db vacuum: ${pageCount} -> ${after?.page_count ?? "?"} pages ` +
+      `in ${Date.now() - t0}ms`,
+  );
 }
 
 function leanRowToClassified(row: ClassifiedLeanRow): ClassifiedMessage {

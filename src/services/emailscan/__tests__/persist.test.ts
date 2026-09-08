@@ -14,7 +14,11 @@ jest.mock("@/services/db/connection", () => {
     rows: [] as Record<string, unknown>[],
     queries: [] as string[],
     updates: [] as string[],
+    page_count: null as number | null,
+    freelist_count: null as number | null,
+    execed: [] as string[],
     failNextUpdate: false,
+    failNextExec: false,
     async getAllAsync<T>(sql: string, ...params: unknown[]): Promise<T[]> {
       fake.queries.push(sql);
       if (/body_text IS NOT NULL/.test(sql)) {
@@ -35,8 +39,34 @@ jest.mock("@/services/db/connection", () => {
       }
       return fake.rows as unknown as T[];
     },
-    async getFirstAsync<T>(): Promise<T> {
+    async getFirstAsync<T>(sql: string): Promise<T> {
+      if (/page_count/.test(sql) && fake.page_count !== null) {
+        return { page_count: fake.page_count } as unknown as T;
+      }
+      if (/freelist_count/.test(sql) && fake.freelist_count !== null) {
+        return { freelist_count: fake.freelist_count } as unknown as T;
+      }
+      if (/journal_mode/.test(sql)) {
+        return { journal_mode: "delete" } as unknown as T;
+      }
       return null as unknown as T;
+    },
+    async execAsync(sql: string): Promise<void> {
+      fake.execed.push(sql);
+      if (fake.failNextExec) {
+        fake.failNextExec = false;
+        throw new Error("injected exec failure");
+      }
+      // VACUUM rebuilds the file: dead pages vanish. Mirrors real behavior.
+      if (/VACUUM/.test(sql)) {
+        if (fake.page_count !== null) {
+          fake.page_count = Math.max(
+            0,
+            fake.page_count - (fake.freelist_count ?? 0),
+          );
+        }
+        fake.freelist_count = 0;
+      }
     },
     async runAsync(sql: string, ...params: unknown[]): Promise<void> {
       fake.updates.push(sql);
@@ -58,6 +88,14 @@ jest.mock("@/services/db/connection", () => {
 });
 
 const FAT_HTML = `<html><body>${"<p>x</p>".repeat(4000)}</body></html>`;
+
+/** Slim row for paging/vacuum volume tests — no FAT_HTML construction. */
+function pageRow(id: string): Record<string, unknown> {
+  const row = fatRow(id) as Record<string, unknown>;
+  row.body_text = "short";
+  row.html = null;
+  return row;
+}
 
 function fatRow(id: string) {
   return {
@@ -81,7 +119,11 @@ interface FakeDb {
   rows: Record<string, unknown>[];
   queries: string[];
   updates: string[];
+  page_count: number | null;
+  freelist_count: number | null;
+  execed: string[];
   failNextUpdate: boolean;
+  failNextExec: boolean;
 }
 
 // Fresh module registry per call so persist.ts's once-per-session strip
@@ -122,12 +164,6 @@ describe("listClassifiedMessagesAsync (lean read)", () => {
   it("aggregates every row exactly once across keyset pages", async () => {
     const { persist, db } = freshEnv();
     // 2500 rows forces 3 pages at BATCH=1000 (1000 + 1000 + 500).
-    const pageRow = (id: string) => {
-      const row = fatRow(id) as Record<string, unknown>;
-      row.body_text = "short";
-      row.html = null;
-      return row;
-    };
     db.rows = Array.from({ length: 2500 }, (_, i) => pageRow(`m-${i}`));
     const hits = await persist.listClassifiedMessagesAsync();
     expect(hits).toHaveLength(2500);
@@ -137,6 +173,19 @@ describe("listClassifiedMessagesAsync (lean read)", () => {
       (q) => /rowid > \?/.test(q) && /FROM mail_messages/.test(q),
     );
     expect(pageQueries).toHaveLength(3);
+  });
+
+  it("shares one in-flight load across concurrent callers (R24)", async () => {
+    const { persist, db } = freshEnv();
+    db.rows = Array.from({ length: 2500 }, (_, i) => pageRow(`m-${i}`));
+    // Boot fires the loader on mount AND again when subscriptions arrive;
+    // the second caller must ride the first load, not re-page the table.
+    const [a, b] = await Promise.all([
+      persist.listClassifiedMessagesAsync(),
+      persist.listClassifiedMessagesAsync(),
+    ]);
+    expect(a).toBe(b);
+    expect(db.queries.filter((q) => /rowid > \?/.test(q))).toHaveLength(3);
   });
 
   it("returns classified messages with a body-less message stub", async () => {
@@ -210,6 +259,64 @@ describe("ensureLegacyBodiesStrippedAsync", () => {
       expect(
         logSpy.mock.calls.some((c) =>
           String(c[0]).includes("legacy body strip FAILED"),
+        ),
+      ).toBe(true);
+    } finally {
+      logSpy.mockRestore();
+    }
+  });
+});
+
+describe("ensureDbCompactedAsync (R24)", () => {
+  it("vacuums when free pages dominate, then self-limits", async () => {
+    const logSpy = jest.spyOn(console, "log").mockImplementation(() => {});
+    try {
+      const { persist, db } = freshEnv();
+      db.rows = [pageRow("m-1")];
+      // The measured R24 shape: 86% of pages dead.
+      db.page_count = 33897;
+      db.freelist_count = 29230;
+      await persist.ensureDbCompactedAsync();
+      expect(db.execed.filter((s) => /VACUUM/.test(s))).toHaveLength(1);
+      // Fake mirrors real VACUUM: freelist collapses into the file.
+      expect(db.page_count).toBe(4667);
+      expect(db.freelist_count).toBe(0);
+
+      // Fresh session against the now-compact file: guard skips, no vacuum.
+      const { persist: p2, db: db2 } = freshEnv();
+      db2.page_count = 4667;
+      db2.freelist_count = 0;
+      await p2.ensureDbCompactedAsync();
+      expect(db2.execed.some((s) => /VACUUM/.test(s))).toBe(false);
+      expect(
+        logSpy.mock.calls.some((c) => String(c[0]).includes("db vacuum: skipped")),
+      ).toBe(true);
+    } finally {
+      logSpy.mockRestore();
+    }
+  });
+
+  it("does not vacuum a healthy file", async () => {
+    const { persist, db } = freshEnv();
+    db.rows = [pageRow("m-1")];
+    db.page_count = 3000;
+    db.freelist_count = 50;
+    await persist.ensureDbCompactedAsync();
+    expect(db.execed.some((s) => /VACUUM/.test(s))).toBe(false);
+  });
+
+  it("logs vacuum failures instead of swallowing them (R23 class)", async () => {
+    const logSpy = jest.spyOn(console, "log").mockImplementation(() => {});
+    try {
+      const { persist, db } = freshEnv();
+      db.rows = [pageRow("m-1")];
+      db.page_count = 33897;
+      db.freelist_count = 29230;
+      db.failNextExec = true;
+      await persist.ensureDbCompactedAsync();
+      expect(
+        logSpy.mock.calls.some((c) =>
+          String(c[0]).includes("db vacuum FAILED"),
         ),
       ).toBe(true);
     } finally {
