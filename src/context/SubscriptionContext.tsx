@@ -148,6 +148,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
       // Process any queued icons on startup (first time only)
       if (!hasProcessedOnStartup.current) {
         hasProcessedOnStartup.current = true;
+        console.log("[BOOT] calling processIconQueue");
         processIconQueue().catch(console.error);
       }
     }

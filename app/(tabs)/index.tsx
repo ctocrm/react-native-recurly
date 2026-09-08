@@ -85,6 +85,12 @@ const App = () => {
     refreshMailboxCount().catch(() => undefined);
   }, [refreshMailboxCount, subscriptions.length]);
 
+  useEffect(() => {
+    console.log("[BOOT] home mounted");
+  }, []);
+
+  console.log(`[BOOT] home render subs=${subscriptions.length}`);
+
   const displayName =
     user?.firstName ||
     user?.fullName ||

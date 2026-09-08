@@ -60,6 +60,7 @@ const TabLayout = () => {
     return <Redirect href={"/(auth)/signIn"} />;
   }
 
+  console.log("[BOOT] tabs layout rendering");
   return (
     <DatabaseProvider>
       <SubscriptionProvider>

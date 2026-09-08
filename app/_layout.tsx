@@ -38,7 +38,10 @@ const RootLayout = () => {
   });
 
   useEffect(() => {
-    if (fontsLoaded) SplashScreen.hideAsync();
+    if (fontsLoaded) {
+      console.log("[BOOT] root fonts loaded");
+      SplashScreen.hideAsync();
+    }
   }, [fontsLoaded]);
 
   if (!fontsLoaded) return null;

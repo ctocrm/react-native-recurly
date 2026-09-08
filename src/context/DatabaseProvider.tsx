@@ -64,6 +64,7 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
       const openPromise = (async () => {
         try {
           const database = await openDatabase(currentUserId);
+          console.log("[BOOT] db opened");
           if (!cancelled) {
             setDb(database);
             setDbError(null);
