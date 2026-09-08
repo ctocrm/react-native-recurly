@@ -133,6 +133,13 @@ export async function importFromConnectedMailboxes(opts: {
           : error instanceof Error
             ? error.message
             : "scan failed";
+      // LESSONS 26 (R20 gate): this catch used to swallow the error silently —
+      // the workspace leg logged `fetcherFor` then vanished from the 66-min
+      // log (no summary, no error). The leg failure must reach logcat.
+      console.warn(
+        `[MailScan] leg failed ${box.providerId} ${box.mailboxId}: ${message}`,
+        error,
+      );
       errors.push(`${box.mailboxId}: ${message}`);
     }
   }
