@@ -81,6 +81,44 @@ export function createSqliteScanStore(): ScanCacheStore {
   };
 }
 
+let rebuildRunning = false;
+let rebuildDirty = false;
+
+/**
+ * R26b: schedule the full projection rebuild OFF the write path.
+ *
+ * `rebuildProjectionAsync` re-folds every mail_messages row (~1000 bucket
+ * INSERTs on a real mailbox). Awaited at leg end (fbad4ed) it convoyed behind
+ * the scan-fired icon crawl's SQLite queue for 70+ minutes on 2026-09-09 and
+ * stalled the 4-leg scan's completion — the exact blocking class R14–R20
+ * removed. The projection is a deterministic, rebuildable cache over the
+ * mail_messages SSOT, so coalescing is safe: at most one rebuild runs at a
+ * time, writes landing mid-rebuild set a dirty flag, and a single trailing
+ * rebuild folds them. Write paths must call this fire-and-forget, never
+ * await it.
+ */
+export function scheduleProjectionRebuild(reason: string): void {
+  if (rebuildRunning) {
+    rebuildDirty = true;
+    return;
+  }
+  rebuildRunning = true;
+  void rebuildProjectionAsync()
+    .catch((err) => {
+      console.log(
+        `[MailScan] projection rebuild FAILED (${reason})`,
+        err instanceof Error ? err.message : String(err),
+      );
+    })
+    .finally(() => {
+      rebuildRunning = false;
+      if (rebuildDirty) {
+        rebuildDirty = false;
+        scheduleProjectionRebuild(`${reason}:trailing`);
+      }
+    });
+}
+
 export async function getMailboxAsync(
   mailboxId: string,
 ): Promise<MailboxScanState | undefined> {
@@ -103,12 +141,7 @@ export async function getMailboxAsync(
       mailboxId,
     );
     // R26: removed rows change the actuals; rebuild off the critical path.
-    void rebuildProjectionAsync().catch((err) => {
-      console.log(
-        "[MailScan] projection rebuild FAILED (parser bump)",
-        err instanceof Error ? err.message : String(err),
-      );
-    });
+    scheduleProjectionRebuild("parser bump");
     return {
       mailboxId: box.id,
       providerId: box.provider_id as MailProviderId,
@@ -458,8 +491,9 @@ export async function saveMailboxAsync(state: MailboxScanState): Promise<void> {
     );
   }
 
-  // R26: keep the actuals projection consistent after message upserts.
-  await rebuildProjectionAsync();
+  // R26b: keep the actuals projection consistent after message upserts —
+  // scheduled, never awaited (see scheduleProjectionRebuild).
+  scheduleProjectionRebuild("mailbox save");
 }
 
 export async function clearMailboxAsync(mailboxId: string): Promise<void> {
@@ -470,7 +504,7 @@ export async function clearMailboxAsync(mailboxId: string): Promise<void> {
   );
   await db.runAsync("DELETE FROM mail_mailboxes WHERE id = ?", mailboxId);
   // R26: keep the actuals projection consistent after message removal.
-  await rebuildProjectionAsync();
+  scheduleProjectionRebuild("mailbox clear");
 }
 
 /** Cached classified messages only. Does not drop mailbox rows or SecureStore. */
