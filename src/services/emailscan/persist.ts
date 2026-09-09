@@ -2,6 +2,7 @@
  * SQLite scan cache. Local-only (not cloud-synced).
  */
 import { getDatabase } from "@/services/db/connection";
+import { rebuildProjectionAsync } from "./projection";
 import type {
   CachedMessage,
   ClassifiedMessage,
@@ -101,6 +102,13 @@ export async function getMailboxAsync(
       PARSER_VERSION,
       mailboxId,
     );
+    // R26: removed rows change the actuals; rebuild off the critical path.
+    void rebuildProjectionAsync().catch((err) => {
+      console.log(
+        "[MailScan] projection rebuild FAILED (parser bump)",
+        err instanceof Error ? err.message : String(err),
+      );
+    });
     return {
       mailboxId: box.id,
       providerId: box.provider_id as MailProviderId,
@@ -421,6 +429,9 @@ export async function saveMailboxAsync(state: MailboxScanState): Promise<void> {
       cached.parserVersion,
     );
   }
+
+  // R26: keep the actuals projection consistent after message upserts.
+  await rebuildProjectionAsync();
 }
 
 export async function clearMailboxAsync(mailboxId: string): Promise<void> {
@@ -430,6 +441,8 @@ export async function clearMailboxAsync(mailboxId: string): Promise<void> {
     mailboxId,
   );
   await db.runAsync("DELETE FROM mail_mailboxes WHERE id = ?", mailboxId);
+  // R26: keep the actuals projection consistent after message removal.
+  await rebuildProjectionAsync();
 }
 
 /** Cached classified messages only. Does not drop mailbox rows or SecureStore. */

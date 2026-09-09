@@ -5,7 +5,7 @@
 import type { SQLiteDatabase } from "expo-sqlite";
 
 /** Bump when adding a migration. Stored in PRAGMA user_version. */
-export const SCHEMA_VERSION = 14;
+export const SCHEMA_VERSION = 15;
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS subscriptions (
@@ -137,6 +137,18 @@ CREATE TABLE IF NOT EXISTS mail_messages (
   PRIMARY KEY (mailbox_id, message_id)
 );
 CREATE INDEX IF NOT EXISTS idx_mail_messages_mailbox ON mail_messages(mailbox_id);
+
+CREATE TABLE IF NOT EXISTS merchant_day_actuals (
+  bucket_type TEXT NOT NULL,
+  bucket_key  TEXT NOT NULL,
+  mailbox_id  TEXT NOT NULL,
+  kind        TEXT NOT NULL,
+  day         TEXT NOT NULL,
+  total       REAL NOT NULL DEFAULT 0,
+  count       INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (bucket_type, bucket_key, mailbox_id, kind, day)
+);
+CREATE INDEX IF NOT EXISTS idx_merchant_day_actuals_key ON merchant_day_actuals(bucket_type, bucket_key);
 
 CREATE TABLE IF NOT EXISTS sync_metadata (
   id                     INTEGER PRIMARY KEY CHECK (id = 1),
@@ -410,6 +422,26 @@ export const MIGRATIONS: ((db: SQLiteDatabase) => Promise<void>)[] = [
       await db.execAsync(
         `ALTER TABLE subscriptions ADD COLUMN bill_number TEXT;`,
       );
+    }
+  },
+
+  // 15: R26/DEC-001 merchant actuals projection (rebuildable cache over
+  // mail_messages; see src/services/emailscan/projection.ts).
+  async (db) => {
+    if (!(await tableExists(db, "merchant_day_actuals"))) {
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS merchant_day_actuals (
+          bucket_type TEXT NOT NULL,
+          bucket_key  TEXT NOT NULL,
+          mailbox_id  TEXT NOT NULL,
+          kind        TEXT NOT NULL,
+          day         TEXT NOT NULL,
+          total       REAL NOT NULL DEFAULT 0,
+          count       INTEGER NOT NULL DEFAULT 0,
+          PRIMARY KEY (bucket_type, bucket_key, mailbox_id, kind, day)
+        );
+        CREATE INDEX IF NOT EXISTS idx_merchant_day_actuals_key ON merchant_day_actuals(bucket_type, bucket_key);
+      `);
     }
   },
 ];
