@@ -7,12 +7,27 @@ import {
   type DisplayPeriod,
 } from "@/services/emailscan";
 import { listClassifiedMessagesAsync } from "@/services/emailscan/persist";
-import { isSparseSubscription } from "@/services/emailscan/chargeDisplay";
+import {
+  isSparseSubscription,
+} from "@/services/emailscan/chargeDisplay";
+import {
+  projectionDisplayedAmount,
+  projectionMonthlySpendContribution,
+  projectionSparseSecondaryLine,
+} from "@/services/emailscan/projectionDisplay";
+import {
+  loadActualsAsync,
+  type MerchantDayActual,
+} from "@/services/emailscan/projection";
 import { getPreference, setPreference } from "@/services/database";
 import type { ClassifiedMessage } from "@/services/emailscan/types";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 const PREF_KEY = "display_periods";
+
+/** R26/DEC-001 kill-switch: pref "off" restores the legacy full-load path.
+ * Default ON — boot reads small actuals rows instead of every message. */
+const PROJECTION_PREF_KEY = "use_projection_actuals";
 
 function parsePeriods(raw: string | null): Record<string, DisplayPeriod> {
   if (!raw) return {};
@@ -26,36 +41,93 @@ function parsePeriods(raw: string | null): Record<string, DisplayPeriod> {
 
 export function useChargeDisplay(subscriptions: Subscription[]) {
   const [messages, setMessages] = useState<ClassifiedMessage[]>([]);
+  const [actuals, setActuals] = useState<MerchantDayActual[]>([]);
+  const [usingProjection, setUsingProjection] = useState(true);
   const [periods, setPeriods] = useState<Record<string, DisplayPeriod>>({});
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       try {
-        const [hits, stored] = await Promise.all([
-          listClassifiedMessagesAsync(),
+        const [projectionPref, stored] = await Promise.all([
+          getPreference(PROJECTION_PREF_KEY),
           getPreference(PREF_KEY),
         ]);
+        const useProjection = projectionPref !== "off";
+        if (cancelled) return;
+        setUsingProjection(useProjection);
+        setPeriods(parsePeriods(stored));
+        if (useProjection) {
+          const buckets = await loadActualsAsync();
+          if (cancelled) return;
+          console.log(
+            `[MailScan] spend-audit: projection load ok, buckets=${buckets.length}`,
+          );
+          setActuals(buckets);
+          return;
+        }
+        const hits = await listClassifiedMessagesAsync();
         if (cancelled) return;
         console.log(
           `[MailScan] spend-audit: classified load ok, msgs=${hits.length}`,
         );
         setMessages(hits);
-        setPeriods(parsePeriods(stored));
       } catch (err) {
         // R23: a silent catch here zeroed every sparse contribution and the
         // boot UI never retried — log instead of swallowing (LESSONS 26).
         console.log(
-          "[MailScan] spend-audit: classified load FAILED",
+          "[MailScan] spend-audit: load FAILED",
           err instanceof Error ? err.message : String(err),
         );
-        if (!cancelled) setMessages([]);
+        if (!cancelled) {
+          setMessages([]);
+          setActuals([]);
+        }
       }
     })();
     return () => {
       cancelled = true;
     };
   }, [subscriptions.length]);
+
+  // R26/DEC-001 verification: once per boot, after the projection UI has
+  // settled, run the legacy full-scan total in the background and log it
+  // beside the projection total. Removed in Phase 5 once proven.
+  useEffect(() => {
+    if (!usingProjection) return;
+    let cancelled = false;
+    const t = setTimeout(() => {
+      void (async () => {
+        try {
+          const msgs = await listClassifiedMessagesAsync();
+          if (cancelled) return;
+          const legacy = subscriptions.reduce(
+            (acc, s) => acc + monthlySpendContribution(s, msgs),
+            0,
+          );
+          const projected = subscriptions.reduce(
+            (acc, s) => acc + projectionMonthlySpendContribution(s, actuals),
+            0,
+          );
+          const delta = Math.abs(projected - legacy);
+          console.log(
+            `[MailScan] spend-projection-audit: projection=${projected.toFixed(2)} ` +
+              `legacy=${legacy.toFixed(2)} delta=${delta.toFixed(2)} ` +
+              `match=${delta < 0.005 ? "yes" : "NO"}`,
+          );
+        } catch (err) {
+          console.log(
+            "[MailScan] spend-projection-audit FAILED",
+            err instanceof Error ? err.message : String(err),
+          );
+        }
+      })();
+    }, 5000);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [usingProjection, subscriptions, actuals]);
 
   const persist = useCallback(async (next: Record<string, DisplayPeriod>) => {
     setPeriods(next);
@@ -74,16 +146,24 @@ export function useChargeDisplay(subscriptions: Subscription[]) {
   const displayFor = useCallback(
     (sub: Subscription) => {
       const period = periods[sub.id] ?? defaultDisplayPeriod(sub);
+      if (usingProjection) {
+        return projectionDisplayedAmount(sub, period, actuals);
+      }
       return displayedAmount(sub, period, messages);
     },
-    [messages, periods],
+    [messages, actuals, periods, usingProjection],
   );
 
   // R18: stacked second card line — this month's sparse purchases for the
   // card's own merchant (null when the merchant has no sparse activity).
   const sparseLineFor = useCallback(
-    (sub: Subscription) => sparseSecondaryLine(sub, messages),
-    [messages],
+    (sub: Subscription) => {
+      if (usingProjection) {
+        return projectionSparseSecondaryLine(sub, actuals);
+      }
+      return sparseSecondaryLine(sub, messages);
+    },
+    [messages, actuals, usingProjection],
   );
 
   const monthlySpend = useMemo(() => {
@@ -95,7 +175,9 @@ export function useChargeDisplay(subscriptions: Subscription[]) {
     let sparseMissingMailbox = 0;
     let unknownPrice = 0;
     const sum = subscriptions.reduce((acc, sub) => {
-      const c = monthlySpendContribution(sub, messages);
+      const c = usingProjection
+        ? projectionMonthlySpendContribution(sub, actuals)
+        : monthlySpendContribution(sub, messages);
       if (isSparseSubscription(sub)) {
         sparseRows += 1;
         if (!sub.paymentMethod) sparseMissingMailbox += 1;
@@ -107,13 +189,22 @@ export function useChargeDisplay(subscriptions: Subscription[]) {
       return acc + c;
     }, 0);
     console.log(
-      `[MailScan] spend-audit: subs=${subscriptions.length} msgs=${messages.length} ` +
+      `[MailScan] spend-audit: subs=${subscriptions.length} ` +
+        `${usingProjection ? `buckets=${actuals.length}` : `msgs=${messages.length}`} ` +
         `recurring=${recurring.toFixed(2)} sparse=${sparse.toFixed(2)} ` +
         `sparseRows=${sparseRows} noMailbox=${sparseMissingMailbox} ` +
         `unknownPrice=${unknownPrice} total=${sum.toFixed(2)}`,
     );
     return sum;
-  }, [messages, subscriptions]);
+  }, [messages, actuals, subscriptions, usingProjection]);
 
-  return { messages, displayFor, sparseLineFor, cyclePeriod, monthlySpend };
+  return {
+    messages,
+    actuals,
+    usingProjection,
+    displayFor,
+    sparseLineFor,
+    cyclePeriod,
+    monthlySpend,
+  };
 }

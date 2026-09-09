@@ -4,6 +4,10 @@ import { useBottomClearance } from "@/hooks/useBottomClearance";
 import { useChargeDisplay } from "@/hooks/useChargeDisplay";
 import { formatCurrency } from "@/lib/utils";
 import { thisMonthInsights, monthlyChartFromMail } from "@/services/emailscan";
+import {
+  projectionMonthlyChartFromMail,
+  projectionThisMonthInsights,
+} from "@/services/emailscan/projectionDisplay";
 import { styled } from "nativewind";
 import { usePostHog } from "posthog-react-native";
 import React, { useEffect, useMemo, useState } from "react";
@@ -48,7 +52,7 @@ const Insights = () => {
   const { tabListPadding, pagePadding } = useBottomClearance();
   const posthog = usePostHog();
   const { subscriptions } = useSubscriptions();
-  const { messages } = useChargeDisplay(subscriptions);
+  const { messages, actuals, usingProjection } = useChargeDisplay(subscriptions);
   const [selectedPeriod, setSelectedPeriod] = useState<Period>("This Month");
 
   useEffect(() => {
@@ -58,7 +62,9 @@ const Insights = () => {
   // Calculate total monthly spend and category breakdown
   const { totalMonthlySpend, categoryBreakdown, monthlyChartData, merchants } =
     useMemo(() => {
-      const insights = thisMonthInsights(subscriptions, messages);
+      const insights = usingProjection
+        ? projectionThisMonthInsights(subscriptions, actuals)
+        : thisMonthInsights(subscriptions, messages);
       const categoryTotals = [
         { name: "recurring", total: insights.kinds.recurring },
         { name: "sparse", total: insights.kinds.sparse },
@@ -74,11 +80,9 @@ const Insights = () => {
               ? 6
               : 12;
 
-      const chartData = monthlyChartFromMail(
-        subscriptions,
-        messages,
-        monthsToShow,
-      );
+      const chartData = usingProjection
+        ? projectionMonthlyChartFromMail(subscriptions, actuals, monthsToShow)
+        : monthlyChartFromMail(subscriptions, messages, monthsToShow);
 
       return {
         totalMonthlySpend: insights.total,
@@ -86,7 +90,7 @@ const Insights = () => {
         monthlyChartData: chartData,
         merchants: insights.merchants,
       };
-    }, [messages, selectedPeriod, subscriptions]);
+    }, [messages, actuals, usingProjection, selectedPeriod, subscriptions]);
 
   const maxCategorySpend =
     categoryBreakdown.length > 0

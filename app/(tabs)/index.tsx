@@ -52,7 +52,7 @@ const App = () => {
     getUpcomingSubscriptions,
     refreshSubscriptions,
   } = useSubscriptions();
-  const { displayFor, sparseLineFor, cyclePeriod, monthlySpend, messages } =
+  const { displayFor, sparseLineFor, cyclePeriod, monthlySpend } =
     useChargeDisplay(subscriptions);
   const [detailsSubscription, setDetailsSubscription] =
     useState<Subscription | null>(null);
@@ -392,7 +392,6 @@ const App = () => {
       <SubscriptionDetailsModal
         visible={detailsSubscription !== null}
         subscription={detailsSubscription}
-        messages={messages}
         onClose={() => setDetailsSubscription(null)}
       />
 

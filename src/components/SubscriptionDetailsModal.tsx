@@ -4,15 +4,15 @@ import {
   formatCurrency,
   formatSubscriptionDateTime,
 } from "@/lib/utils";
+import { getCachedMessageByIdAsync } from "@/services/emailscan/persist";
 import type { ClassifiedMessage } from "@/services/emailscan/types";
 import clsx from "clsx";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Modal, Pressable, Text, View } from "react-native";
 
 interface SubscriptionDetailsModalProps {
   visible: boolean;
   subscription: Subscription | null;
-  messages: ClassifiedMessage[];
   onClose: () => void;
 }
 
@@ -32,17 +32,29 @@ function Row({ label, value }: { label: string; value: string }) {
 const SubscriptionDetailsModal = ({
   visible,
   subscription,
-  messages,
   onClose,
 }: SubscriptionDetailsModalProps) => {
+  // R26: the source email is fetched by id straight from the DB — the boot
+  // path no longer carries the whole in-memory message list for this .find.
+  const [source, setSource] = useState<ClassifiedMessage | null>(null);
+
+  useEffect(() => {
+    if (!visible || !subscription?.sourceMessageId) {
+      setSource(null);
+      return;
+    }
+    let active = true;
+    void getCachedMessageByIdAsync(subscription.sourceMessageId).then((m) => {
+      if (active) setSource(m);
+    });
+    return () => {
+      active = false;
+    };
+  }, [visible, subscription?.sourceMessageId]);
+
   if (!subscription) return null;
 
   const cadenceLabel = subscription.billing || subscription.frequency || "—";
-  const source = subscription.sourceMessageId
-    ? messages.find(
-        (m) => m.message.messageId === subscription.sourceMessageId,
-      )
-    : undefined;
 
   return (
     <Modal

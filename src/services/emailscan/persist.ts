@@ -312,6 +312,34 @@ function leanRowToClassified(row: ClassifiedLeanRow): ClassifiedMessage {
   return classified;
 }
 
+/**
+ * R26: single classified row by message id (details modal "Source email"
+ * line). Replaces the modal's full-array .find so boot no longer needs the
+ * whole in-memory message list. Lean read — never body_text/html.
+ */
+export async function getCachedMessageByIdAsync(
+  messageId: string,
+): Promise<ClassifiedMessage | null> {
+  const db = getDatabase();
+  try {
+    const row = await db.getFirstAsync<ClassifiedLeanRow>(
+      `SELECT mailbox_id, message_id, from_addr, subject, date,
+              classified_json, parser_version
+       FROM mail_messages
+       WHERE message_id = ?
+       LIMIT 1`,
+      messageId,
+    );
+    return row ? leanRowToClassified(row) : null;
+  } catch (err) {
+    console.log(
+      "[MailScan] source-message lookup FAILED",
+      err instanceof Error ? err.message : String(err),
+    );
+    return null;
+  }
+}
+
 const STRIP_BATCH = 100;
 let stripBodiesOnce: Promise<void> | null = null;
 
