@@ -83,6 +83,15 @@ export async function upscaleIconIfSmall(
   // Vector icons scale natively — nothing to do.
   if (format === "svg") return { base64, format };
 
+  // R25: with crawl-time upscaling disabled and no explicit force, the
+  // caller only ever gets these bytes back — the old path still paid a
+  // full Image.getSize(data-URI) image decode per card first (~9.6s on the
+  // first cold-boot call, ~0.4s each after) and threw the measurement
+  // away. Return before measuring.
+  if (!CRAWL_TIME_UPSCALE_ENABLED && !force) {
+    return { base64, format };
+  }
+
   // Temp files are declared outside the try so cleanup always runs.
   const tmpUri = `${cacheDirectory}icon_upscale_${Date.now()}.${format}`;
   let resultUri: string | undefined;
@@ -102,13 +111,6 @@ export async function upscaleIconIfSmall(
     );
 
     const maxDim = Math.max(size.width, size.height);
-
-    // Crawl-time upscaling is disabled - only upscale when explicitly forced
-    // (user taps "Upscale (AI)" button). This preserves original resolution
-    // for better AI upscaling quality.
-    if (!CRAWL_TIME_UPSCALE_ENABLED && !force) {
-      return { base64, format };
-    }
 
     if (maxDim >= TARGET_SIZE_PX && !force) {
       // Already at or above target size — no upscaling needed.

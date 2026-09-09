@@ -257,6 +257,86 @@ function detectFormatFromBase64(base64: string, source: string): string {
   return "png";
 }
 
+// R25: when a list mounts, every visible card fires its own icon-blob
+// SELECT. Those N encrypted-blob reads serialize on the single connection
+// (~300-500ms each on device) and saturated mqt_v_js for ~8-10s at boot.
+// Lookups requested within the same 50ms window now share one IN(...) query.
+type PendingIconLookup = {
+  key: string;
+  resolve: (row: CachedIconData | null) => void;
+};
+let pendingIconLookups: PendingIconLookup[] = [];
+let iconLookupFlushTimer: ReturnType<typeof setTimeout> | null = null;
+
+async function flushIconLookups(): Promise<void> {
+  iconLookupFlushTimer = null;
+  const batch = pendingIconLookups;
+  pendingIconLookups = [];
+  if (batch.length === 0) return;
+  const db = getDatabase();
+  const uniqueKeys = [...new Set(batch.map((l) => l.key))];
+  let rows: {
+    icon_key: string;
+    image_data: string;
+    source: string;
+    format: string;
+    original_url: string | null;
+    fallback_tier: number;
+    original_width: number | null;
+    original_height: number | null;
+    chosen: number | null;
+  }[] = [];
+  try {
+    rows = await db.getAllAsync<{
+      icon_key: string;
+      image_data: string;
+      source: string;
+      format: string;
+      original_url: string | null;
+      fallback_tier: number;
+      original_width: number | null;
+      original_height: number | null;
+      chosen: number | null;
+    }>(
+      `SELECT icon_key, image_data, source, format, original_url, fallback_tier, original_width, original_height, chosen FROM icon_cache WHERE icon_key IN (${uniqueKeys.map(() => "?").join(", ")})`,
+      ...uniqueKeys,
+    );
+  } catch {
+    // Same failure semantics as getCachedIcon: lookups resolve null.
+  }
+  const byKey = new Map(rows.map((r) => [r.icon_key, r]));
+  for (const { key, resolve } of batch) {
+    const row = byKey.get(key);
+    if (row) {
+      resolve({
+        imageData: row.image_data,
+        source: row.source,
+        format: row.format,
+        originalUrl: row.original_url ?? null,
+        fallbackTier: row.fallback_tier,
+        originalWidth: row.original_width ?? undefined,
+        originalHeight: row.original_height ?? undefined,
+        chosen: row.chosen === 1,
+      });
+    } else {
+      resolve(null);
+    }
+  }
+}
+
+export function getCachedIconBatched(
+  iconKey: string,
+): Promise<CachedIconData | null> {
+  return new Promise<CachedIconData | null>((resolve) => {
+    pendingIconLookups.push({ key: iconKey, resolve });
+    if (iconLookupFlushTimer === null) {
+      iconLookupFlushTimer = setTimeout(() => {
+        void flushIconLookups();
+      }, 50);
+    }
+  });
+}
+
 export async function getCachedIcon(
   iconKey: string,
 ): Promise<CachedIconData | null> {

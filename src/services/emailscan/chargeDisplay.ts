@@ -19,6 +19,80 @@ function cachedSlug(name: string): string {
   return slug;
 }
 
+/**
+ * R25: every display computation (monthly spend, per-card sparse lines,
+ * insights, the 6-month chart) used to scan ALL messages per subscription —
+ * 125 × 2209 pair checks (6× that for the chart) ≈ millions of
+ * matchesSubscription calls, ~8.5s of JS-thread freeze when messages land
+ * at boot. Merchant names are few and stable: index messages by
+ * (merchantKey, kind) + lowercase name once per messages array (WeakMap on
+ * identity — the loader replaces the array rather than mutating it), so
+ * each subscription only visits its own merchant's hits.
+ */
+interface MerchantBuckets {
+  recurring: ClassifiedMessage[];
+  sparse: ClassifiedMessage[];
+}
+interface MerchantIndex {
+  bySlug: Map<string, MerchantBuckets>;
+  byLowerName: Map<string, MerchantBuckets>;
+}
+const merchantIndexCache = new WeakMap<ClassifiedMessage[], MerchantIndex>();
+
+function merchantIndex(messages: ClassifiedMessage[]): MerchantIndex {
+  const existing = merchantIndexCache.get(messages);
+  if (existing) return existing;
+  const index: MerchantIndex = {
+    bySlug: new Map(),
+    byLowerName: new Map(),
+  };
+  for (const hit of messages) {
+    if (hit.kind !== "recurring" && hit.kind !== "sparse") continue;
+    if (hit.amount === undefined) continue;
+    let slugBuckets = index.bySlug.get(hit.merchantKey);
+    if (!slugBuckets) {
+      slugBuckets = { recurring: [], sparse: [] };
+      index.bySlug.set(hit.merchantKey, slugBuckets);
+    }
+    slugBuckets[hit.kind].push(hit);
+    const lowerName = hit.merchantName.toLowerCase();
+    if (lowerName !== hit.merchantKey) {
+      let nameBuckets = index.byLowerName.get(lowerName);
+      if (!nameBuckets) {
+        nameBuckets = { recurring: [], sparse: [] };
+        index.byLowerName.set(lowerName, nameBuckets);
+      }
+      nameBuckets[hit.kind].push(hit);
+    }
+  }
+  merchantIndexCache.set(messages, index);
+  return index;
+}
+
+/** The only hits that could possibly match `sub` (its merchant's messages
+ * of `wantKind` — default: the stream kind the row consumes), in stable
+ * order. Callers still run the full per-hit checks — this only removes the
+ * other ~2190 misses. */
+function matchCandidates(
+  sub: Subscription,
+  messages: ClassifiedMessage[],
+  wantKind?: "recurring" | "sparse",
+): ClassifiedMessage[] {
+  const kind = wantKind ?? (isSparseSubscription(sub) ? "sparse" : "recurring");
+  const index = merchantIndex(messages);
+  const key = cachedSlug(sub.name);
+  const primary = index.bySlug.get(key)?.[kind] ?? [];
+  const lowerName = sub.name.toLowerCase();
+  const secondary =
+    lowerName === key
+      ? []
+      : (index.byLowerName.get(lowerName)?.[kind] ?? []);
+  if (secondary.length === 0) return primary;
+  if (primary.length === 0) return secondary;
+  const seen = new Set(primary);
+  return [...primary, ...secondary.filter((hit) => !seen.has(hit))];
+}
+
 export type RecurringDisplayPeriod = "weekly" | "monthly" | "yearly";
 export type SparseDisplayPeriod = "week" | "month" | "year";
 export type DisplayPeriod = RecurringDisplayPeriod | SparseDisplayPeriod;
@@ -147,7 +221,7 @@ export function sumChargesInWindow(
   end: Date,
 ): number {
   let total = 0;
-  for (const hit of messages) {
+  for (const hit of matchCandidates(sub, messages)) {
     if (!matchesSubscription(hit, sub)) continue;
     const charged = new Date(hit.message.date);
     if (Number.isNaN(charged.getTime())) continue;
@@ -182,7 +256,7 @@ export function sparseSecondaryLine(
   const key = cachedSlug(sub.name);
   let total = 0;
   let any = false;
-  for (const hit of messages) {
+  for (const hit of matchCandidates(sub, messages, "sparse")) {
     if (hit.kind !== "sparse") continue;
     if (hit.amount === undefined) continue;
     if (mailbox && hit.message.mailboxId !== mailbox) continue;
