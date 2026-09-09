@@ -19,6 +19,7 @@ jest.mock("@/services/db/connection", () => {
     execed: [] as string[],
     failNextUpdate: false,
     failNextExec: false,
+    vacuumFailuresRemaining: 0,
     async getAllAsync<T>(sql: string, ...params: unknown[]): Promise<T[]> {
       fake.queries.push(sql);
       if (/body_text IS NOT NULL/.test(sql)) {
@@ -78,6 +79,12 @@ jest.mock("@/services/db/connection", () => {
       if (fake.failNextExec) {
         fake.failNextExec = false;
         throw new Error("injected exec failure");
+      }
+      if (/VACUUM/.test(sql) && fake.vacuumFailuresRemaining > 0) {
+        // The live R26 failure: another task's txn is open on the shared
+        // connection when the VACUUM statement fires.
+        fake.vacuumFailuresRemaining -= 1;
+        throw new Error("cannot VACUUM from within a transaction");
       }
       // VACUUM rebuilds the file: dead pages vanish. Mirrors real behavior.
       if (/VACUUM/.test(sql)) {
@@ -187,6 +194,7 @@ interface FakeDb {
   execed: string[];
   failNextUpdate: boolean;
   failNextExec: boolean;
+  vacuumFailuresRemaining: number;
 }
 
 // Fresh module registry per call so persist.ts's once-per-session strip
@@ -383,6 +391,57 @@ describe("ensureDbCompactedAsync (R24)", () => {
         ),
       ).toBe(true);
     } finally {
+      logSpy.mockRestore();
+    }
+  });
+
+  it("retries VACUUM deferred by an open transaction, then compacts (R26)", async () => {
+    jest.useFakeTimers();
+    try {
+      const { persist, db } = freshEnv();
+      db.rows = [pageRow("m-1")];
+      db.page_count = 33897;
+      db.freelist_count = 29230;
+      // Two interleaved-transaction refusals, then the txn closes.
+      db.vacuumFailuresRemaining = 2;
+      const pending = persist.ensureDbCompactedAsync();
+      await jest.advanceTimersByTimeAsync(3_000);
+      await jest.advanceTimersByTimeAsync(6_000);
+      await pending;
+      expect(db.execed.filter((s) => /VACUUM/.test(s))).toHaveLength(3);
+      expect(db.page_count).toBe(4667);
+      expect(db.freelist_count).toBe(0);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("defers through the whole backoff window, then logs the failure (R26)", async () => {
+    const logSpy = jest.spyOn(console, "log").mockImplementation(() => {});
+    jest.useFakeTimers();
+    try {
+      const { persist, db } = freshEnv();
+      db.rows = [pageRow("m-1")];
+      db.page_count = 33897;
+      db.freelist_count = 29230;
+      // Transaction never closes inside the window: 1 attempt + 5 retries.
+      db.vacuumFailuresRemaining = Number.POSITIVE_INFINITY;
+      const pending = persist.ensureDbCompactedAsync();
+      await jest.advanceTimersByTimeAsync(93_000);
+      await pending;
+      expect(db.execed.filter((s) => /VACUUM/.test(s))).toHaveLength(6);
+      expect(
+        logSpy.mock.calls.filter((c) =>
+          String(c[0]).includes("db vacuum deferred"),
+        ),
+      ).toHaveLength(5);
+      expect(
+        logSpy.mock.calls.some((c) =>
+          String(c[0]).includes("db vacuum FAILED"),
+        ),
+      ).toBe(true);
+    } finally {
+      jest.useRealTimers();
       logSpy.mockRestore();
     }
   });

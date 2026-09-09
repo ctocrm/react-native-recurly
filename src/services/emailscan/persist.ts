@@ -286,6 +286,45 @@ const VACUUM_FREE_RATIO = 0.2;
 let vacuumOnce: Promise<void> | null = null;
 
 /**
+ * SQLite refuses VACUUM inside any open transaction, and on the shared
+ * expo-sqlite connection another task's async transaction (scan save,
+ * projection rebuild, body-strip batch) can interleave with this statement —
+ * the live "cannot VACUUM from within a transaction" seen at scan-end since
+ * R26. Those transactions are always transient, so defer with backoff
+ * (~93s total window) instead of failing the compaction for the session.
+ */
+const VACUUM_RETRY_DELAYS_MS = [3_000, 6_000, 12_000, 24_000, 48_000];
+
+function sleepAsync(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function execVacuumAsync(
+  db: ReturnType<typeof getDatabase>,
+): Promise<void> {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      await db.execAsync("VACUUM");
+      return;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (
+        attempt < VACUUM_RETRY_DELAYS_MS.length &&
+        /cannot VACUUM/i.test(msg)
+      ) {
+        console.log(
+          `[MailScan] db vacuum deferred (txn open, attempt ${attempt + 1}); ` +
+            `retrying in ${VACUUM_RETRY_DELAYS_MS[attempt]}ms`,
+        );
+        await sleepAsync(VACUUM_RETRY_DELAYS_MS[attempt]);
+        continue;
+      }
+      throw err;
+    }
+  }
+}
+
+/**
  * R24: the legacy fat-body era left the DB ~86% free pages (33897 total,
  * 29230 free ≈ 114MB dead) — every cold classified read paid for a 132MB
  * file to serve 2209 lean rows. VACUUM once per session when dead space
@@ -323,7 +362,7 @@ async function compactIfFragmentedAsync(): Promise<void> {
     return;
   }
   const t0 = Date.now();
-  await db.execAsync("VACUUM");
+  await execVacuumAsync(db);
   const after = await db.getFirstAsync<{ page_count: number }>(
     "PRAGMA page_count",
   );
