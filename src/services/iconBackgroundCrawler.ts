@@ -25,7 +25,11 @@ import {
   sanitizeOfficialHost,
 } from "@/services/domain/officialDomain";
 import {
+  admitsWithHostCap,
+  canCandidateBeatCached,
   classifyTrustedCandidate,
+  hasDiscoveryUrlSignal,
+  isJunkIconFarmHost,
   isPartnerOrUnrelatedMark,
   isPickerPublishableCandidate,
   isPublishableExtractedIcon,
@@ -1029,9 +1033,22 @@ export async function findIconUrls(iconKey: string): Promise<number> {
 
   let directAdded = 0;
   let untrustedRejected = 0;
+  // G1: per-host admission cap state (official/library hosts exempt inside
+  // admitsWithHostCap). Shared with queueDirectFromLink below.
+  const hostAdmission = new Map<string, number>();
+  let farmRejected = 0;
+  let signalRejected = 0;
+  let hostCapped = 0;
   for (const result of searchResults.slice(0, MAX_WEB_SEARCH_RESULTS)) {
     if (existingUrls.has(result.url)) continue;
     if (isSearchEngineHost(result.url)) continue;
+
+    // G1: junk PNG farms never enter discovery, even with a brand token
+    // in the path ("Gmail-Logo-PNG.png" on pngmart.com in the G0 window).
+    if (isJunkIconFarmHost(result.url)) {
+      farmRejected++;
+      continue;
+    }
 
     const classified = classifyTrustedCandidate(
       iconKey,
@@ -1040,6 +1057,22 @@ export async function findIconUrls(iconKey: string): Promise<number> {
     );
     if (!classified.trusted) {
       untrustedRejected++;
+      continue;
+    }
+
+    // G1: a brand-token match on an unknown host is only credible when the
+    // URL itself looks like a logo asset (reclaimthenet.org/.../tuta.jpg
+    // was auto-assigned in G0 — a news photo, not a logo).
+    if (
+      classified.prov === "brand-token" &&
+      !hasDiscoveryUrlSignal(result.url)
+    ) {
+      signalRejected++;
+      continue;
+    }
+
+    if (!admitsWithHostCap(result.url, officialHosts, hostAdmission)) {
+      hostCapped++;
       continue;
     }
 
@@ -1054,12 +1087,17 @@ export async function findIconUrls(iconKey: string): Promise<number> {
     }
   }
   console.log(
-    `[SEARCH] TIER 3: Queued ${directAdded} direct image URLs; rejected ${untrustedRejected} untrusted-provenance URLs`,
+    `[SEARCH] TIER 3: Queued ${directAdded} direct image URLs; rejected ${untrustedRejected} untrusted-provenance, ${farmRejected} junk-farm, ${signalRejected} brand-token-no-signal, ${hostCapped} over-host-cap URLs`,
   );
 
   const linkUrls: string[] = [];
   const queueDirectFromLink = async (linkUrl: string) => {
     if (existingUrls.has(linkUrl)) return;
+    // G1: same admission gates as the direct-image loop above.
+    if (isJunkIconFarmHost(linkUrl)) {
+      farmRejected++;
+      return;
+    }
     const classified = classifyTrustedCandidate(
       iconKey,
       officialHosts,
@@ -1067,6 +1105,17 @@ export async function findIconUrls(iconKey: string): Promise<number> {
     );
     if (!classified.trusted) {
       untrustedRejected++;
+      return;
+    }
+    if (
+      classified.prov === "brand-token" &&
+      !hasDiscoveryUrlSignal(linkUrl)
+    ) {
+      signalRejected++;
+      return;
+    }
+    if (!admitsWithHostCap(linkUrl, officialHosts, hostAdmission)) {
+      hostCapped++;
       return;
     }
     const fmt = detectUrlFormat(linkUrl);
@@ -1289,7 +1338,7 @@ export async function processIconQueue(): Promise<void> {
             .filter((u): u is string => Boolean(u));
           const preFilterCount = unfetchedUrls.length;
           const admittedUrls = unfetchedUrls.filter(
-            (u) => !isJunkIconHost(u),
+            (u) => !isJunkIconHost(u) && !isJunkIconFarmHost(u),
           );
           if (admittedUrls.length < preFilterCount) {
             console.log(
@@ -1322,9 +1371,32 @@ export async function processIconQueue(): Promise<void> {
             item.icon_key,
           );
 
+          // G1: one cached-icon snapshot before the fetch loop so candidates
+          // that cannot outrank the cache skip the network entirely. G0
+          // measured 22+ full downloads spent learning "bing_images not
+          // better than bing_images". The post-loop promotion below still
+          // re-reads the (possibly updated) cache.
+          const preLoopCached = await getCachedIcon(item.icon_key);
+          const preLoopCachedValid =
+            !!preLoopCached?.imageData &&
+            isBase64IconValid(preLoopCached.imageData, preLoopCached.format);
+          const preLoopUserChosen =
+            preLoopCached?.chosen === true ||
+            isUserChosenCacheSource(preLoopCached?.source);
+
           for (const c of candidates) {
             if (await isDomainRateLimited(c.url)) {
               console.log(`[QUEUE] Skip rate-limited ${c.url}`);
+              continue;
+            }
+            if (
+              preLoopCachedValid &&
+              !preLoopUserChosen &&
+              !canCandidateBeatCached(c.source, preLoopCached?.source)
+            ) {
+              console.log(
+                `[QUEUE] Skip pre-fetch downgrade for ${item.icon_key} (${c.source} cannot beat cached ${preLoopCached?.source ?? "unknown"})`,
+              );
               continue;
             }
             const success = await downloadImageAsBase64(

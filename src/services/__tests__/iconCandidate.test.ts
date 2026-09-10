@@ -1,8 +1,12 @@
 import { officialHostsForBrand } from "../domain/provenance";
 import {
+  admitsWithHostCap,
+  canCandidateBeatCached,
   classifyTrustedCandidate,
+  hasDiscoveryUrlSignal,
   hasLogoSignal,
   isGenericSocialImage,
+  isJunkIconFarmHost,
   isPartnerOrUnrelatedMark,
   isPickerPublishableCandidate,
   isPublishableExtractedIcon,
@@ -175,6 +179,105 @@ describe("iconCandidate (hop 3 gates)", () => {
         "spider:img_logo",
       ),
     ).toBe(false);
+  });
+});
+
+describe("iconCandidate (G1 admission filters, data-driven from G0)", () => {
+  it("rejects the junk PNG farms observed fetching brand-named files in G0", () => {
+    for (const url of [
+      "https://www.pngmart.com/files/23/Gmail-Logo-PNG.png",
+      "https://logodownload.org/wp-content/uploads/2021/04/coinbase-logo.png",
+      "https://logos-world.net/wp-content/uploads/2023/02/Coinbase-Logo.png",
+      "https://www.pngimg.com/uploads/uber/uber_PNG15.png",
+      "https://www.pngall.com/wp-content/uploads/4/LinkedIn-Logo.png",
+      "https://www.freeiconspng.com/uploads/linkedin-logo-3.png",
+      "https://latestlogo.com/wp-content/uploads/2023/02/x-logo.png",
+      "https://cdn.creazilla.com/icons/3433780/airbnb-icon-md.png",
+      "https://cdn.freebiesupply.com/images/large/2x/airbnb-logo.png",
+      "https://www.stickpng.com/assets/icons/uber",
+    ]) {
+      expect(isJunkIconFarmHost(url)).toBe(true);
+    }
+  });
+
+  it("keeps official, library, and ordinary-brand hosts", () => {
+    expect(isJunkIconFarmHost("https://github.com/apple-touch-icon.png")).toBe(
+      false,
+    );
+    expect(isJunkIconFarmHost("https://i.dell.com/assets/logo.png")).toBe(false);
+    expect(
+      isJunkIconFarmHost("https://img.icons8.com/color/512/github.png"),
+    ).toBe(false);
+    expect(
+      isJunkIconFarmHost("https://www.thestreet.com/.image/t_share/some.png"),
+    ).toBe(false);
+  });
+
+  it("requires a URL logo signal for brand-token discovery candidates", () => {
+    // G0: a news photo matched the brand token and was auto-assigned.
+    expect(
+      hasDiscoveryUrlSignal("https://media.reclaimthenet.org/2023/11/tuta.jpg"),
+    ).toBe(false);
+    expect(hasDiscoveryUrlSignal("https://www.porkbun.design/logo.svg")).toBe(
+      true,
+    );
+    expect(
+      hasDiscoveryUrlSignal("https://cdn.example/tuta/apple-touch-icon.png"),
+    ).toBe(true);
+  });
+
+  it("caps non-official hosts at 3 admits per crawl (official exempt)", () => {
+    const officialHosts = new Set(["example.com"]);
+    const counts = new Map<string, number>();
+    expect(admitsWithHostCap("https://a.io/1.png", officialHosts, counts)).toBe(
+      true,
+    );
+    expect(admitsWithHostCap("https://a.io/2.png", officialHosts, counts)).toBe(
+      true,
+    );
+    expect(admitsWithHostCap("https://a.io/3.png", officialHosts, counts)).toBe(
+      true,
+    );
+    expect(admitsWithHostCap("https://a.io/4.png", officialHosts, counts)).toBe(
+      false,
+    );
+    // www variants count toward the same host
+    expect(
+      admitsWithHostCap("https://www.a.io/5.png", officialHosts, counts),
+    ).toBe(false);
+    // official host is exempt from the cap
+    expect(
+      admitsWithHostCap("https://example.com/a.png", officialHosts, counts),
+    ).toBe(true);
+    expect(
+      admitsWithHostCap("https://www.example.com/b.png", officialHosts, counts),
+    ).toBe(true);
+    // unparseable URLs are not admitted
+    expect(admitsWithHostCap("not-a-url", officialHosts, counts)).toBe(false);
+  });
+
+  it("never re-fetches a candidate whose source cannot beat the cache", () => {
+    // The G0 pathology: bing_images refetched to compare against bing_images.
+    expect(canCandidateBeatCached("bing_images", "bing_images")).toBe(false);
+    expect(canCandidateBeatCached("web_search", "bing_images")).toBe(false);
+    expect(canCandidateBeatCached("bing_images", null)).toBe(true);
+    expect(canCandidateBeatCached("web_search", "")).toBe(true);
+    // library / official sources outrank generic discovery
+    expect(canCandidateBeatCached("icons8", "bing_images")).toBe(true);
+    expect(canCandidateBeatCached("official_domain", "bing_images")).toBe(true);
+    expect(canCandidateBeatCached("bing_images", "official_favicon")).toBe(
+      false,
+    );
+    expect(canCandidateBeatCached("favicon", "icons8")).toBe(false);
+    // first-party spider extracts outrank generic discovery
+    expect(canCandidateBeatCached("spider:web_manifest", "bing_images")).toBe(
+      true,
+    );
+    expect(
+      canCandidateBeatCached("spider:favicon", "spider:web_manifest"),
+    ).toBe(false);
+    // an unknown source cannot beat anything with a rank
+    expect(canCandidateBeatCached("", "favicon")).toBe(false);
   });
 });
 
