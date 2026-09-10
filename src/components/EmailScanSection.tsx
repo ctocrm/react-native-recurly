@@ -486,6 +486,11 @@ export default function EmailScanSection({
                 <Text className="text-sm font-sans-medium text-primary">
                   {row.label}
                 </Text>
+                {row.note ? (
+                  <Text className="mt-0.5 text-xs font-sans-medium text-muted-foreground">
+                    {row.note}
+                  </Text>
+                ) : null}
               </Pressable>
             ))}
             <Pressable
@@ -520,6 +525,9 @@ export default function EmailScanSection({
             >
               <Text className="text-xl font-sans-bold text-primary mb-2">
                 {editingMailboxId ? "Edit IMAP / IMAPS" : "IMAP / IMAPS"}
+              </Text>
+              <Text className="mb-3 text-xs font-sans-medium text-muted-foreground">
+                {MAIL_PROVIDER_CATALOG.find((r) => r.id === "imap")?.note}
               </Text>
               <TextInput
                 className="rounded-xl border border-border bg-card p-3 mb-2 text-primary"
@@ -606,6 +614,9 @@ export default function EmailScanSection({
               <Text className="text-xl font-sans-bold text-primary mb-2">
                 {editingMailboxId ? "Edit " : ""}
                 {passwordKind === "proton" ? "Proton Mail" : "Tuta"}
+              </Text>
+              <Text className="mb-3 text-xs font-sans-medium text-muted-foreground">
+                {MAIL_PROVIDER_CATALOG.find((r) => r.id === passwordKind)?.note}
               </Text>
               <TextInput
                 className="rounded-xl border border-border bg-card p-3 mb-2 text-primary"
