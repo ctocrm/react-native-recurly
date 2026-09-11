@@ -18,6 +18,7 @@ jest.mock("@/services/database", () => ({
 
 jest.mock("@/services/iconBackgroundCrawler", () => ({
   startIconCrawl: jest.fn(),
+  awaitCrawlCompletion: jest.fn().mockResolvedValue(undefined),
 }));
 
 const mockMissing = listIconKeysMissingCache as jest.Mock;

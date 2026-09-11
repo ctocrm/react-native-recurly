@@ -79,6 +79,20 @@ let isProcessingQueue = false;
 let queueRerunRequested = false;
 /** In-flight crawls so double-tap Search does not stack workers for same key. */
 const activeCrawls = new Set<string>();
+/**
+ * Each key's live crawl-worker promise (discovery + first batch + promote).
+ * startIconCrawl resolves at setup — background passes that must NOT stack
+ * discovery flows (iconSelfHeal's OOM-guard chain) await this instead.
+ */
+const crawlWorkers = new Map<string, Promise<void>>();
+
+/**
+ * Resolves when the key's current crawl worker truly finishes. Resolves
+ * immediately when nothing is running for the key.
+ */
+export function awaitCrawlCompletion(iconKey: string): Promise<void> {
+  return crawlWorkers.get(iconKey) ?? Promise.resolve();
+}
 
 /**
  * Explicit mobile-safe deep-discovery policy. These caps are deliberately
@@ -1707,7 +1721,9 @@ export async function startIconCrawl(
   setIconLoading(iconKey, true);
 
   // Fire-and-forget background worker. Not awaited by any caller/modal.
-  void (async () => {
+  // The promise IS recorded (crawlWorkers) so background passes can await a
+  // key's true completion; startIconCrawl itself still resolves at setup.
+  const worker: Promise<void> = (async () => {
     try {
       // findIconUrls runs discovery and a small immediate fetch, then enqueues
       // remaining URLs on the shared worker without awaiting that worker.
@@ -1756,8 +1772,10 @@ export async function startIconCrawl(
       // via notifyCacheUpdate. Do not wait on other keys' leftover URLs.
       setIconLoading(iconKey, false);
       activeCrawls.delete(iconKey);
+      crawlWorkers.delete(iconKey);
     }
   })();
+  crawlWorkers.set(iconKey, worker);
 }
 
 // Backwards-compatible alias kept so existing call sites keep working.

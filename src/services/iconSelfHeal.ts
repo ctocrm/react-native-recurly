@@ -17,7 +17,10 @@ import {
   getQueuedIcons,
   listIconKeysMissingCache,
 } from "@/services/database";
-import { startIconCrawl } from "@/services/iconBackgroundCrawler";
+import {
+  awaitCrawlCompletion,
+  startIconCrawl,
+} from "@/services/iconBackgroundCrawler";
 import { waitIfScanActive } from "@/services/scanState";
 
 let isSelfHealing = false;
@@ -51,6 +54,11 @@ export async function selfHealMissingIcons(): Promise<number> {
           console.log(`[HEAL] re-crawling ${key}`);
           return startIconCrawl(key);
         })
+        // True serialization (OOM guard intent): startIconCrawl resolves at
+        // setup — its discovery+fetch worker runs detached. Without this, a
+        // ~100-key pass would stack ~100 discovery flows (the 2026-09-05
+        // FATAL-at-192MB class the scan chain was written to prevent).
+        .then(() => awaitCrawlCompletion(key))
         .catch((error) => {
           console.warn(`[HEAL] crawl failed for ${key}:`, error);
         });
