@@ -92,6 +92,9 @@ const SubscriptionIconPickerModal = ({
   const [availableIcons, setAvailableIcons] = useState<PickerIcon[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [crawlDetail, setCrawlDetail] = useState<string | null>(null);
+  // True while the collection for a freshly-changed key is still loading —
+  // the cleared gap shows a spinner instead of the "no icons" empty state.
+  const [isLoadingCollection, setIsLoadingCollection] = useState(false);
   const [rateLimitedDomains, setRateLimitedDomains] = useState<string[]>([]);
   // Toggle to reveal reported ("incorrect") icons.
   const [showIncorrect, setShowIncorrect] = useState(false);
@@ -119,11 +122,30 @@ const SubscriptionIconPickerModal = ({
   );
   const isMounted = useRef(true);
   const latestKeyRef = useRef(iconKey);
+  /** Key whose collection is currently on screen (set when a load resolves). */
+  const loadedKeyRef = useRef<string | null>(null);
   /** True while white-bg / AI upscale runs — skip cache-driven reloads that race the list. */
   const processingRef = useRef(false);
 
   useEffect(() => {
     latestKeyRef.current = iconKey;
+  }, [iconKey]);
+
+  // Shared-instance reset: this modal stays mounted across opens, so per-key
+  // state would otherwise keep showing the PREVIOUS subscription's tiles,
+  // crawl detail, or report form until the new key's async load resolves
+  // (the stale-tiles flash). Transient in-sheet state resets on every close
+  // or switch; the tile list itself is only cleared when the key actually
+  // differs from what is on screen, so a same-key reopen stays instant.
+  useEffect(() => {
+    setCrawlDetail(null);
+    setReportState({ icon: null, type: null, comment: "" });
+    setProcessing(null);
+    processingRef.current = false;
+    if (loadedKeyRef.current !== iconKey) {
+      setAvailableIcons([]);
+      setIsLoadingCollection(iconKey !== null);
+    }
   }, [iconKey]);
 
   const refreshCrawlDetail = useCallback(async () => {
@@ -305,9 +327,13 @@ const SubscriptionIconPickerModal = ({
           console.log(
             `[PICKER] Skip empty collection reload while processing for ${iconKey}`,
           );
+          loadedKeyRef.current = requestKey;
+          setIsLoadingCollection(false);
           return;
         }
 
+        loadedKeyRef.current = requestKey;
+        setIsLoadingCollection(false);
         setAvailableIcons(visible);
         console.log(
           `[PICKER] Loaded ${visible.length} icons for ${iconKey} (${mapped.length} total, reports hidden by default)`,
@@ -319,6 +345,7 @@ const SubscriptionIconPickerModal = ({
     } catch (error) {
       console.error("[PICKER] Failed to load icons:", error);
       // Do not setAvailableIcons([]) — keep current list on failure.
+      setIsLoadingCollection(false);
     }
   }, [iconKey, showIncorrect, showBroken, detectIcons]);
 
@@ -881,12 +908,23 @@ const SubscriptionIconPickerModal = ({
 
           {availableIcons.length === 0 && (
             <View className="items-center py-8">
-              <Text className="text-sm text-muted-foreground">
-                No alternative icons found
-              </Text>
-              <Text className="mt-1 text-xs text-muted-foreground">
-                Tap the button below to find icons for {subscriptionName}
-              </Text>
+              {isLoadingCollection ? (
+                <>
+                  <ActivityIndicator size="small" color="#8b5cf6" />
+                  <Text className="mt-2 text-sm text-muted-foreground">
+                    Loading icons for {subscriptionName}...
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <Text className="text-sm text-muted-foreground">
+                    No alternative icons found
+                  </Text>
+                  <Text className="mt-1 text-xs text-muted-foreground">
+                    Tap the button below to find icons for {subscriptionName}
+                  </Text>
+                </>
+              )}
             </View>
           )}
 
