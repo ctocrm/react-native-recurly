@@ -1,4 +1,9 @@
-import { startIconCrawl } from "@/services/iconBackgroundCrawler";
+import { processIconQueue, startIconCrawl } from "@/services/iconBackgroundCrawler";
+import {
+  beginScan,
+  endScan,
+  waitIfScanActive,
+} from "@/services/scanState";
 import { candidateToSubscription } from "./importCandidate";
 import { listMailboxesAsync } from "./persist";
 import {
@@ -13,6 +18,9 @@ import {
 // icon queue exhausted the Java heap mid-scan. Icon discovery is background
 // work, so chain the scan-fired crawls: at most one discovery flow runs at a
 // time while downloads inside the crawler stay bounded by DOWNLOAD_CONCURRENCY.
+// Gate A (2026-09-11): each chained step additionally PARKS on waitIfScanActive
+// so no crawl network competes with the mail legs; the chain stays serialized
+// and the parked steps all resume, in enqueue order, when the scan ends.
 let scanCrawlChain: Promise<void> = Promise.resolve();
 function enqueueScanIconCrawl(
   iconKey: string,
@@ -20,6 +28,7 @@ function enqueueScanIconCrawl(
   officialDomain: string | null | undefined,
 ): Promise<void> {
   scanCrawlChain = scanCrawlChain
+    .then(() => waitIfScanActive())
     .then(() =>
       startIconCrawl(iconKey, subscriptionId, {
         officialDomain: officialDomain ?? undefined,
@@ -32,6 +41,27 @@ function enqueueScanIconCrawl(
 }
 
 export async function importFromConnectedMailboxes(opts: {
+  userId: string;
+  existing: Subscription[];
+  addSubscription: (subscription: Subscription) => Promise<void>;
+  updateSubscription?: (
+    id: string,
+    data: Partial<Subscription>,
+  ) => Promise<void>;
+}): Promise<{ imported: number; errors: string[] }> {
+  beginScan();
+  try {
+    return await runScan(opts);
+  } finally {
+    // Unpark the scan-fired crawls (still serialized by scanCrawlChain) and
+    // resume the shared queue drain that Gate A paused mid-scan. Fired before
+    // this function's own return-value continuation so the drain starts ASAP.
+    endScan();
+    void processIconQueue().catch(console.error);
+  }
+}
+
+async function runScan(opts: {
   userId: string;
   existing: Subscription[];
   addSubscription: (subscription: Subscription) => Promise<void>;

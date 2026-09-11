@@ -18,6 +18,7 @@ import {
   setCachedIcon,
   updateIconCrawlSession,
 } from "@/services/database";
+import { isScanActive } from "@/services/scanState";
 import { rankOfficialDomainCandidates } from "@/services/domain/domainDiscovery";
 import {
   officialHostFromCompoundSlug,
@@ -1327,6 +1328,17 @@ export async function processIconQueue(): Promise<void> {
       console.log(`[QUEUE] Found ${queued.length} items in queue`);
 
       for (const item of queued) {
+        // Gate A (agreed 2026-09-11): no crawl network while an email scan
+        // runs — pause BETWEEN items; untouched items stay queued (dequeue
+        // only happens after an item is processed) and the drain resumes
+        // when importFromConnectedMailboxes' finally re-fires this after
+        // endScan().
+        if (isScanActive()) {
+          console.log(
+            `[QUEUE] Email scan active — pausing drain (${item.icon_key} and the rest stay queued)`,
+          );
+          break;
+        }
         console.log(`[QUEUE] Fetching icons for ${item.icon_key}`);
 
         try {

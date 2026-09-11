@@ -11,6 +11,7 @@ import { importFromConnectedMailboxes } from "../scanConnected";
 
 jest.mock("@/services/iconBackgroundCrawler", () => ({
   startIconCrawl: jest.fn().mockResolvedValue(undefined),
+  processIconQueue: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock("../persist", () => ({
