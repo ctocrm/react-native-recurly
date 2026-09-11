@@ -124,6 +124,8 @@ const SubscriptionIconPickerModal = ({
   const latestKeyRef = useRef(iconKey);
   /** Key whose collection is currently on screen (set when a load resolves). */
   const loadedKeyRef = useRef<string | null>(null);
+  /** Tiles the current loadedKeyRef list is showing (0 = nothing kept). */
+  const loadedCountRef = useRef(0);
   /** True while white-bg / AI upscale runs — skip cache-driven reloads that race the list. */
   const processingRef = useRef(false);
 
@@ -142,9 +144,18 @@ const SubscriptionIconPickerModal = ({
     setReportState({ icon: null, type: null, comment: "" });
     setProcessing(null);
     processingRef.current = false;
+    if (iconKey === null) {
+      // Close: KEEP the loaded tiles (and loadedKeyRef) so the next same-key
+      // reopen renders instantly; only drop transient load state.
+      setIsLoadingCollection(false);
+      return;
+    }
     if (loadedKeyRef.current !== iconKey) {
+      // Different subscription: drop the previous tiles BEFORE the first
+      // paint of the new key so they can never flash (the stale-tiles bug).
       setAvailableIcons([]);
-      setIsLoadingCollection(iconKey !== null);
+      loadedCountRef.current = 0;
+      setIsLoadingCollection(true);
     }
   }, [iconKey]);
 
@@ -280,8 +291,20 @@ const SubscriptionIconPickerModal = ({
     [],
   );
 
-  const loadIcons = useCallback(async () => {
+  const loadIcons = useCallback(async (force = false) => {
     if (!iconKey) return;
+    // Same-key reopen with tiles already on screen: skip the refetch so the
+    // sheet renders instantly. Empty collections always refetch — they are
+    // cheap and may have gained icons from a crawl that finished while the
+    // sheet was closed.
+    if (
+      !force &&
+      loadedKeyRef.current === iconKey &&
+      loadedCountRef.current > 0
+    ) {
+      console.log(`[PICKER] Same-key reopen — keep tiles for ${iconKey}`);
+      return;
+    }
     const requestKey = iconKey;
     try {
       const collection = await getIconCollection(iconKey);
@@ -333,6 +356,7 @@ const SubscriptionIconPickerModal = ({
         }
 
         loadedKeyRef.current = requestKey;
+        loadedCountRef.current = visible.length;
         setIsLoadingCollection(false);
         setAvailableIcons(visible);
         console.log(
@@ -378,7 +402,7 @@ const SubscriptionIconPickerModal = ({
         console.log("[PICKER] Skip cache reload while processing");
         return;
       }
-      loadIcons();
+      loadIcons(true);
     });
     return unsubscribeCache;
   }, [iconKey, visible, loadIcons]);
@@ -823,7 +847,7 @@ const SubscriptionIconPickerModal = ({
                 value={showIncorrect}
                 onValueChange={(v) => {
                   setShowIncorrect(v);
-                  loadIcons();
+                  loadIcons(true);
                 }}
               />
               <Text className="text-xs text-muted-foreground">
@@ -835,7 +859,7 @@ const SubscriptionIconPickerModal = ({
                 value={showBroken}
                 onValueChange={(v) => {
                   setShowBroken(v);
-                  loadIcons();
+                  loadIcons(true);
                 }}
               />
               <Text className="text-xs text-muted-foreground">Show broken</Text>
