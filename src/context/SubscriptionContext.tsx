@@ -11,6 +11,7 @@ import {
   setPreference,
   updateCrawledUrlAttempt,
 } from "@/services/database";
+import { selfHealMissingIcons } from "@/services/iconSelfHeal";
 import { processIconQueue } from "@/services/iconBackgroundCrawler";
 import dayjs from "dayjs";
 import React, {
@@ -64,6 +65,10 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
     const handleAppStateChange = (state: string) => {
       if (state === "active") {
         processIconQueue().catch(console.error);
+        // Self-heal (2026-09-11): re-crawl subscriptions whose icon_cache row
+        // vanished (e.g. a cache wipe) — single-flighted, scan-aware, and a
+        // cheap SQL no-op when nothing is missing.
+        selfHealMissingIcons().catch(console.error);
       }
     };
 
@@ -148,6 +153,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
       // transition already ran it: single-flight + no-op when empty.
       console.log("[BOOT] calling processIconQueue");
       processIconQueue().catch(console.error);
+      selfHealMissingIcons().catch(console.error);
     }
   }, [isReady, db]);
 

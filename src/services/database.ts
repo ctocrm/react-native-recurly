@@ -849,6 +849,24 @@ export async function getQueuedIcons(): Promise<QueuedIcon[]> {
   );
 }
 
+/**
+ * Icon keys referenced by subscriptions that have NO icon_cache row at all.
+ * (Invalid/SVG rows are hop-2 heal territory — this query targets the wipe/
+ * flood case: any cache clear strands every existing subscription, so the
+ * self-heal pass re-crawls whatever this returns.)
+ */
+export async function listIconKeysMissingCache(): Promise<string[]> {
+  const db = getDatabase();
+  const rows = await db.getAllAsync<{ icon_key: string }>(
+    `SELECT DISTINCT s.icon_key AS icon_key
+     FROM subscriptions s
+     LEFT JOIN icon_cache c ON c.icon_key = s.icon_key
+     WHERE s.icon_key IS NOT NULL AND s.icon_key != 'plus' AND c.icon_key IS NULL
+     ORDER BY s.icon_key`,
+  );
+  return rows.map((row) => row.icon_key);
+}
+
 export async function dequeueIcon(iconKey: string): Promise<void> {
   const db = getDatabase();
   await db.runAsync("DELETE FROM icon_crawl_queue WHERE icon_key = ?", iconKey);
