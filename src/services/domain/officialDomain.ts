@@ -121,6 +121,7 @@ export function officialHostFromCompoundSlug(slug: string): string | null {
  */
 const KNOWN_OFFICIAL_DOMAINS: Record<string, string> = {
   wert: "wert.io",
+  cline: "cline.bot",
 };
 
 export function knownOfficialDomainForBrand(brand: string): string | null {

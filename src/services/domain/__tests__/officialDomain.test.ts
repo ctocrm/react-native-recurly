@@ -43,6 +43,7 @@ describe("officialDomain (Hop 1 scan seed)", () => {
   it("serves curated known official domains (oddball TLDs)", () => {
     expect(knownOfficialDomainForBrand("wert")).toBe("wert.io");
     expect(knownOfficialDomainForBrand("Wert")).toBe("wert.io");
+    expect(knownOfficialDomainForBrand("cline")).toBe("cline.bot");
     expect(knownOfficialDomainForBrand("proton")).toBeNull();
     expect(knownOfficialDomainForBrand("unknownbrand")).toBeNull();
   });
