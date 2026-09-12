@@ -1,4 +1,5 @@
 import {
+  knownOfficialDomainForBrand,
   officialDomainFromAddress,
   officialHostFromCompoundSlug,
   sanitizeOfficialHost,
@@ -37,5 +38,12 @@ describe("officialDomain (Hop 1 scan seed)", () => {
     expect(officialHostFromCompoundSlug("home")).toBeNull();
     expect(officialHostFromCompoundSlug("figma")).toBeNull();
     expect(officialHostFromCompoundSlug("netflix")).toBeNull();
+  });
+
+  it("serves curated known official domains (oddball TLDs)", () => {
+    expect(knownOfficialDomainForBrand("wert")).toBe("wert.io");
+    expect(knownOfficialDomainForBrand("Wert")).toBe("wert.io");
+    expect(knownOfficialDomainForBrand("proton")).toBeNull();
+    expect(knownOfficialDomainForBrand("unknownbrand")).toBeNull();
   });
 });

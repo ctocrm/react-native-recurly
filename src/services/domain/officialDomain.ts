@@ -112,6 +112,24 @@ export function officialHostFromCompoundSlug(slug: string): string | null {
   return host;
 }
 
+/**
+ * Curated official domains for brands whose real site is not reachable by
+ * slug reconstruction. Every entry MUST be the brand's genuine official host —
+ * verify it live and brand-owned before adding (wert.io: Wert's official NFT
+ * checkout / fiat onramp site, operated by SHA2 Solutions Inc. — confirmed
+ * live 2026-09-12). Pure lookup; the crawler persists it as the TIER 0 seed.
+ */
+const KNOWN_OFFICIAL_DOMAINS: Record<string, string> = {
+  wert: "wert.io",
+};
+
+export function knownOfficialDomainForBrand(brand: string): string | null {
+  const key = brand.toLowerCase().trim().replace(/[^a-z0-9]/g, "");
+  const host = KNOWN_OFFICIAL_DOMAINS[key];
+  if (!host) return null;
+  return sanitizeOfficialHost(host);
+}
+
 export function officialDomainFromAddress(from: string): string | null {
   const angled = from.match(/<([^>]+)>/);
   const raw = (angled ? angled[1] : from).trim().toLowerCase();

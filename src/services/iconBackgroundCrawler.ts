@@ -21,6 +21,7 @@ import {
 import { isScanActive } from "@/services/scanState";
 import { rankOfficialDomainCandidates } from "@/services/domain/domainDiscovery";
 import {
+  knownOfficialDomainForBrand,
   officialHostFromCompoundSlug,
   officialSiteUrlForHost,
   sanitizeOfficialHost,
@@ -805,6 +806,7 @@ export async function findIconUrls(
     ? sanitizeOfficialHost(sessionHint.officialDomain)
     : null;
   const reconstructedHost = officialHostFromCompoundSlug(iconKey);
+  const knownHost = knownOfficialDomainForBrand(iconKey);
   if (seededHost) {
     officialSiteUrl = officialSiteUrlForHost(seededHost);
     officialHosts = officialHostsForBrand(iconKey, seededHost);
@@ -817,6 +819,15 @@ export async function findIconUrls(
     });
     console.log(
       `[SEARCH] TIER 0: Reconstructed compound-label site: ${officialSiteUrl}`,
+    );
+  } else if (knownHost) {
+    officialSiteUrl = officialSiteUrlForHost(knownHost);
+    officialHosts = officialHostsForBrand(iconKey, knownHost);
+    await updateIconCrawlSession(iconKey, {
+      officialDomain: knownHost,
+    });
+    console.log(
+      `[SEARCH] TIER 0: Using known official domain for ${iconKey}: ${officialSiteUrl}`,
     );
   } else {
     try {
