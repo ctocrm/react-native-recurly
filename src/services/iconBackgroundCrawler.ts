@@ -25,6 +25,7 @@ import {
   officialSiteUrlForHost,
   sanitizeOfficialHost,
 } from "@/services/domain/officialDomain";
+import { rdapCorroborateBrand } from "@/services/domain/rdap";
 import {
   admitsWithHostCap,
   canCandidateBeatCached,
@@ -887,6 +888,18 @@ export async function findIconUrls(
       } else {
         console.log(`[SEARCH] TIER 0: Timeout finding official site`);
       }
+    }
+  }
+
+  // PHASE D: RDAP corroboration of the discovered official domain. Evidence +
+  // log only — never changes ranks or replaces an icon by itself
+  // (plan.md "D — RDAP resolver").
+  if (officialSiteUrl) {
+    try {
+      const rdapOfficialHost = new URL(officialSiteUrl).hostname;
+      await rdapCorroborateBrand(iconKey, rdapOfficialHost, seededHost);
+    } catch {
+      // Evidence-only: RDAP failures must never fail the crawl.
     }
   }
 
