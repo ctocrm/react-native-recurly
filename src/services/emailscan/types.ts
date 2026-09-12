@@ -50,6 +50,13 @@ export interface ClassifiedMessage {
   merchantName: string;
   /** Sanitized From-host for icon crawl. Null for processor/ESP mail. */
   officialDomain?: string | null;
+  /**
+   * Phase C: brand-sent icon URLs extracted from the email HTML at classify
+   * time (body is stripped right after, so this is the only chance). Ordered
+   * best-first (logo-ish first-party, logo-ish, signature). cid refs are only
+   * ever evidence — no provider supplies a fetchable ref yet.
+   */
+  emailIconUrls?: string[];
   /** Null when subjectClass is drop. */
   kind: CandidateKind | null;
   amount?: number;
@@ -77,6 +84,8 @@ export interface ScanCandidate {
   nextDate?: string;
   /** R18: best-effort bill number carried to import. */
   billNumber?: string | null;
+  /** Phase C: brand-sent icon seeds for the scan-fired crawl (best-first). */
+  emailIconUrls?: string[];
   amountUnknown: boolean;
   evidence: string[];
   messageIds: string[];

@@ -739,7 +739,10 @@ const crawlGens = new CrawlGenerationRegistry();
 // This is called when user types or taps search - spinner stops after this returns.
 // Returns the number of provider failures so the caller can report a truthful
 // terminal status (a provider outage must not read as a clean "complete").
-export async function findIconUrls(iconKey: string): Promise<number> {
+export async function findIconUrls(
+  iconKey: string,
+  emailSeeds?: string[],
+): Promise<number> {
   console.log(`[SEARCH] ===== STARTING SEARCH for ${iconKey} =====`);
   let providerFailures = 0;
   const counts: CrawlCounts = {
@@ -764,6 +767,33 @@ export async function findIconUrls(iconKey: string): Promise<number> {
 
   // Track URLs we need to fetch immediately
   const urlsToFetch: CrawlCandidate[] = [];
+
+  // EMAIL SEEDS (Phase C): icon URLs extracted from the brand's own email at
+  // scan/classify time. Queued before every network tier — the brand sent the
+  // mail, so these outrank bing_images/web discovery (`email_*` provenance = 5)
+  // while a cached official-site icon (6) still wins. Seeds are best-effort:
+  // junk farms / social art / UI chrome were already filtered by the extractor.
+  if (emailSeeds && emailSeeds.length > 0) {
+    let seeded = 0;
+    for (const url of emailSeeds) {
+      if (existingUrls.has(url)) continue;
+      const source = /(?:^|[/?#_.=-])(?:signature|sig)(?:$|[/?#_.=-])/i.test(
+        url,
+      )
+        ? "email_signature"
+        : "email_logo";
+      const formatMatch = url.match(/\.(svg|png|jpe?g|webp|ico)(?:[?#]|$)/i);
+      const format = (formatMatch?.[1] ?? "png").toLowerCase();
+      await saveCrawlResult(iconKey, "", source, format, url);
+      urlsToFetch.push({ url, source, format });
+      existingUrls.add(url);
+      seeded += 1;
+      counts.discovered += 1;
+    }
+    console.log(
+      `[SEARCH] EMAIL-SEEDS: queued ${seeded} of ${emailSeeds.length} brand-sent URL(s) for ${iconKey}`,
+    );
+  }
 
   // TIER 0: Discover official website. Scan seeds skip search.
   console.log(`[SEARCH] TIER 0: Discovering official website`);
@@ -1679,6 +1709,13 @@ export async function promoteFirstIconToCache(iconKey: string): Promise<void> {
 // - Runs discovery as a detached promise never awaited by any UI.
 export type IconCrawlOptions = {
   officialDomain?: string | null;
+  /**
+   * Phase C: brand-sent icon URLs extracted from the merchant's own email at
+   * classify time. One-shot per crawl (not persisted) — fetched first with
+   * `email_*` provenance, which outranks all web discovery but never a cached
+   * official-site icon.
+   */
+  seedUrls?: string[];
 };
 
 export async function startIconCrawl(
@@ -1704,6 +1741,14 @@ export async function startIconCrawl(
     if (seeded) {
       await updateIconCrawlSession(iconKey, { officialDomain: seeded });
     }
+    if (options?.seedUrls?.length) {
+      // Honest drop: a crawl is already mid-flight for this key and seeds are
+      // one-shot discovery inputs, not persisted state. The next scan-fired
+      // (or picker-fired) crawl re-seeds.
+      console.log(
+        `[EMAIL-SEEDS] ${iconKey}: ${options.seedUrls.length} seed(s) dropped — crawl already active`,
+      );
+    }
     return;
   }
   activeCrawls.add(iconKey);
@@ -1727,7 +1772,7 @@ export async function startIconCrawl(
     try {
       // findIconUrls runs discovery and a small immediate fetch, then enqueues
       // remaining URLs on the shared worker without awaiting that worker.
-      const providerFailures = await findIconUrls(iconKey);
+      const providerFailures = await findIconUrls(iconKey, options?.seedUrls);
       // Stale-cancellation: a newer crawl for this key owns publication now.
       if (!crawlGens.isCurrent(iconKey, gen)) return;
       await promoteFirstIconToCache(iconKey);

@@ -54,6 +54,7 @@ export function hasLogoSignal(url: string, source = ""): boolean {
   if (blob.includes("jsonld_logo")) return true;
   if (blob.includes("apple_touch") || blob.includes("apple-touch")) return true;
   if (blob.includes("android-chrome") || blob.includes("mask-icon")) return true;
+  if (blob.startsWith("email_")) return true;
   if (
     /(?:^|:)(favicon|img_logo|official_favicon|official_apple|official_pwa)/.test(
       blob,
@@ -141,6 +142,8 @@ export function isPartnerOrUnrelatedMark(brand: string, url: string): boolean {
 export function isFirstPartyIconSource(source: string): boolean {
   const src = source.toLowerCase();
   if (src.startsWith("official")) return true;
+  // Phase C: seeds extracted from the brand's own email are brand-sent.
+  if (src.startsWith("email_")) return true;
   if (!src.startsWith("spider:")) return false;
   return /web_manifest|apple|favicon|img_logo|jsonld_logo|pwa|mask/.test(src);
 }
@@ -213,6 +216,10 @@ export function discoverySourceRank(source: string | null | undefined): number {
   if (!src) return 0;
   if (src.startsWith("official") || src === "subscription" || src === "ai_upscale")
     return 6;
+  // Phase C: brand-sent mail assets. The brand itself sent the image, so they
+  // outrank all web discovery (bing_images/web_search = 1) but never beat a
+  // cached official-site extract (6) — the site is the canonical mark source.
+  if (src.startsWith("email_")) return 5;
   if (src === "favicon" || src === "official_favicon") return 5;
   if (
     src === "icons8" ||

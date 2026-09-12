@@ -26,12 +26,14 @@ function enqueueScanIconCrawl(
   iconKey: string,
   subscriptionId: string | undefined,
   officialDomain: string | null | undefined,
+  emailIconUrls?: string[],
 ): Promise<void> {
   scanCrawlChain = scanCrawlChain
     .then(() => waitIfScanActive())
     .then(() =>
       startIconCrawl(iconKey, subscriptionId, {
         officialDomain: officialDomain ?? undefined,
+        seedUrls: emailIconUrls,
       }),
     )
     .catch((error) => {
@@ -159,6 +161,7 @@ async function runScan(opts: {
                 crawlKey,
                 already.id,
                 candidate.officialDomain,
+                candidate.emailIconUrls,
               );
             }
           }
@@ -168,7 +171,12 @@ async function runScan(opts: {
         existingByKey.set(key, next);
         imported += 1;
         if (next.icon_key && next.icon_key !== "plus") {
-          enqueueScanIconCrawl(next.icon_key, next.id, candidate.officialDomain);
+          enqueueScanIconCrawl(
+            next.icon_key,
+            next.id,
+            candidate.officialDomain,
+            candidate.emailIconUrls,
+          );
         }
       }
     } catch (error) {

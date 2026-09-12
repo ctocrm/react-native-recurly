@@ -3,6 +3,12 @@
  * for money classes (recurring / sparse). No LLM.
  */
 import { officialDomainFromAddress } from "@/services/domain/officialDomain";
+import {
+  hasDiscoveryUrlSignal,
+  isGenericSocialImage,
+  isJunkIconFarmHost,
+  isUiChromeImage,
+} from "@/services/iconCandidate";
 import type {
   Cadence,
   ClassifiedMessage,
@@ -522,6 +528,114 @@ export function extractBillNumber(text: string): string | undefined {
   return token;
 }
 
+// ---------------------------------------------------------------------------
+// Phase C: icon-from-email. Brand-sent mail regularly carries the merchant's
+// own logo (header <img>, cid inline image, signature mark). Extraction runs
+// at classify time because stripBodyForStore drops the html right after; only
+// fetchable https URLs survive into emailIconUrls — cid refs are recorded as
+// evidence and skipped honestly until a provider supplies fetchable refs.
+// ---------------------------------------------------------------------------
+
+const MAX_EMAIL_ICON_URLS = 5;
+const EMAIL_IMG_TAG_RE = /<img\b[^>]*>/gi;
+const EMAIL_SRC_RE = /\bsrc\s*=\s*["']([^"']+)["']/i;
+const EMAIL_ALT_RE = /\balt\s*=\s*["']([^"']*)["']/i;
+const EMAIL_WIDTH_RE = /\bwidth\s*=\s*["']?(\d{1,4})/i;
+const EMAIL_HEIGHT_RE = /\bheight\s*=\s*["']?(\d{1,4})/i;
+const EMAIL_TRACKING_RE =
+  /(?:pixel|tracking|open(?:\.aspx|\bstat)|\/o[._]gif|dblclk|beacon|analytics)/i;
+const EMAIL_SIGNATURE_TOKEN_RE =
+  /(?:^|[/?#_.=-])(?:signature|sig)(?:$|[/?#_.=-])/i;
+// Anything under 8px is a tracking/beacon image, never a logo.
+const EMAIL_MIN_DIMENSION = 8;
+
+export function extractEmailIconUrls(
+  message: NormalizedMessage,
+  officialDomain?: string | null,
+): { urls: string[]; cidSkipped: string[] } {
+  const urls: string[] = [];
+  const cidSkipped: string[] = [];
+  const html = message.html;
+  if (!html || !html.trim()) return { urls, cidSkipped };
+
+  const firstPartyHost = officialDomain
+    ? officialDomain.replace(/^www\./i, "").toLowerCase()
+    : null;
+
+  const seen = new Set<string>();
+  const firstParty: string[] = [];
+  const logoish: string[] = [];
+  const signatures: string[] = [];
+
+  for (const tag of html.match(EMAIL_IMG_TAG_RE) ?? []) {
+    const src = tag.match(EMAIL_SRC_RE)?.[1]?.trim();
+    if (!src) continue;
+    if (/^cid:/i.test(src)) {
+      // Inline attachment refs are the STRONGEST provenance, but no provider
+      // supplies a fetchable ref today — record and skip, never fake a URL.
+      cidSkipped.push(src.slice(4).split("?")[0]);
+      continue;
+    }
+    if (/^data:/i.test(src)) continue;
+    // Email CDNs commonly serve http://; the crawl fetches https cleanly and
+    // an https-only candidate list keeps every seed on an upgraded origin.
+    let url = src.replace(/^http:\/\//i, "https://");
+    let host = "";
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol !== "https:") continue;
+      url = parsed.href;
+      host = parsed.hostname.replace(/^www\./i, "").toLowerCase();
+    } catch {
+      continue;
+    }
+    const alt = tag.match(EMAIL_ALT_RE)?.[1] ?? "";
+    const width = Number.parseInt(tag.match(EMAIL_WIDTH_RE)?.[1] ?? "0", 10);
+    const height = Number.parseInt(tag.match(EMAIL_HEIGHT_RE)?.[1] ?? "0", 10);
+    if (
+      (width > 0 && width < EMAIL_MIN_DIMENSION) ||
+      (height > 0 && height < EMAIL_MIN_DIMENSION) ||
+      EMAIL_TRACKING_RE.test(url.toLowerCase())
+    ) {
+      continue;
+    }
+    // Junk PNG farms / social-share art / UI chrome stay out regardless of
+    // who sent the mail — the brand forwarded them, it did not make them.
+    if (
+      isJunkIconFarmHost(url) ||
+      isGenericSocialImage(url, "") ||
+      isUiChromeImage(url, "")
+    ) {
+      continue;
+    }
+
+    const logoToken =
+      hasDiscoveryUrlSignal(url) || hasDiscoveryUrlSignal(alt.toLowerCase());
+    const signatureToken = EMAIL_SIGNATURE_TOKEN_RE.test(url.toLowerCase());
+    // Explicit logo-sized dimensions (24–256px) also mark a header image.
+    const sizedLogo =
+      !signatureToken && width >= 24 && width <= 256 && height >= 24 && height <= 256;
+    if (!logoToken && !signatureToken && !sizedLogo) continue;
+
+    if (seen.has(url)) continue;
+    seen.add(url);
+    const firstPartyMatch =
+      firstPartyHost !== null &&
+      (host === firstPartyHost || host.endsWith(`.${firstPartyHost}`));
+    if (signatureToken) signatures.push(url);
+    else if (firstPartyMatch) firstParty.push(url);
+    else logoish.push(url);
+  }
+
+  return {
+    urls: [...firstParty, ...logoish, ...signatures].slice(
+      0,
+      MAX_EMAIL_ICON_URLS,
+    ),
+    cidSkipped,
+  };
+}
+
 function isInvoiceAttachment(att: MailAttachment): boolean {
   const name = att.filename || "";
   if (IMAGE_NAME_RE.test(name)) return false;
@@ -576,6 +690,7 @@ export function classifyMessage(message: NormalizedMessage): ClassifiedMessage {
       merchantKey,
       merchantName,
       officialDomain,
+      ...emailIconFields(message, officialDomain, evidence),
       kind: "free",
       amountUnknown: false,
       needsBody: false,
@@ -607,6 +722,7 @@ export function classifyMessage(message: NormalizedMessage): ClassifiedMessage {
     merchantKey,
     merchantName,
     officialDomain,
+    ...emailIconFields(message, officialDomain, evidence),
     kind,
     amount: parsed?.amount,
     currency: parsed?.currency,
@@ -617,4 +733,27 @@ export function classifyMessage(message: NormalizedMessage): ClassifiedMessage {
     evidence,
     confidence: parsed ? "high" : amountUnknown ? "medium" : "medium",
   };
+}
+
+/** Phase C: attach extracted brand-sent icon seeds + compact evidence lines.
+ *  Spread into every non-drop ClassifiedMessage. Drops carry no seeds. */
+function emailIconFields(
+  message: NormalizedMessage,
+  officialDomain: string | null | undefined,
+  evidence: string[],
+): { emailIconUrls?: string[] } {
+  const extracted = extractEmailIconUrls(message, officialDomain);
+  if (extracted.urls.length > 0) {
+    evidence.push(`icon:email:${extracted.urls.length} url(s)`);
+  }
+  if (extracted.cidSkipped.length > 0) {
+    // Honest record: inline images were seen but are not fetchable yet.
+    evidence.push(
+      `icon:cid-skip:${extracted.cidSkipped.slice(0, 3).join(",")}` +
+        (extracted.cidSkipped.length > 3
+          ? ` +${extracted.cidSkipped.length - 3}`
+          : ""),
+    );
+  }
+  return extracted.urls.length > 0 ? { emailIconUrls: extracted.urls } : {};
 }

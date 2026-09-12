@@ -56,6 +56,9 @@ export function rollupCandidates(hits: ClassifiedMessage[]): ScanCandidate[] {
         evidence,
         messageIds: [messageId],
         confidence: hit.confidence,
+        ...(hit.emailIconUrls?.length
+          ? { emailIconUrls: [...hit.emailIconUrls] }
+          : {}),
       });
       datesByKey.set(key, [hit.message.date]);
       continue;
@@ -82,6 +85,16 @@ export function rollupCandidates(hits: ClassifiedMessage[]): ScanCandidate[] {
     }
     if (hit.billNumber) {
       existing.billNumber = hit.billNumber;
+    }
+
+    // Phase C: merge brand-sent icon seeds best-first; later emails only add
+    // URLs the earlier ones missed. Capped like the extractor (5).
+    if (hit.emailIconUrls?.length) {
+      const merged = existing.emailIconUrls ?? [];
+      for (const url of hit.emailIconUrls) {
+        if (!merged.includes(url)) merged.push(url);
+      }
+      existing.emailIconUrls = merged.slice(0, 5);
     }
 
     if (confidenceRank(hit.confidence) > confidenceRank(existing.confidence)) {
