@@ -44,6 +44,7 @@ describe("officialDomain (Hop 1 scan seed)", () => {
     expect(knownOfficialDomainForBrand("wert")).toBe("wert.io");
     expect(knownOfficialDomainForBrand("Wert")).toBe("wert.io");
     expect(knownOfficialDomainForBrand("cline")).toBe("cline.bot");
+    expect(knownOfficialDomainForBrand("cline-bot-inc")).toBe("cline.bot");
     expect(knownOfficialDomainForBrand("proton")).toBeNull();
     expect(knownOfficialDomainForBrand("unknownbrand")).toBeNull();
   });
