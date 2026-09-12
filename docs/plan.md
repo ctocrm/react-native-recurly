@@ -1730,6 +1730,30 @@ Harness note: adb root kills `adb logcat` capture — restart any capture AFTER 
 
 ---
 
+## Icon-flood follow-up hops C/D/E (opened 2026-09-11, after A+B closed `4766007`)
+
+One phase per session. Order: C → D → E (E is smallest; may pull forward only if a session has spare gate budget — never mix two implementations in one tranche).
+
+### C — icon-from-email (scan-time extraction, seeds into the crawl)
+
+Constraint that shapes everything: `stripBodyForStore` (`scan.ts:129`) drops `html` and truncates attachment text at store time, and `classifyMessage` is the only code that ever sees full HTML (`classifier.ts:537`). So extraction MUST run at classification time and persist URLs only (OOM-safe by construction — regex-on-string in the chunk, no body retention).
+
+- C1 `ClassifiedMessage.emailIconUrls?: string[]` (types.ts) — extracted in `classifyMessage`, ranked: (1) `cid:` refs — record only when the provider supplied a fetchable ref, otherwise record-and-skip honestly (provider plumbing is a later tranche); (2) logo-ish header `<img>` with absolute https URL (logo-ish filename/path or width/height attrs, first-party host preferred); (3) signature images (path says sig/signature); (4) favicon of `officialDomain` (already flows to the crawl as arg 3 — dedupe, don't double-seed).
+- C2 carry through `rollup.ts` → `ScanCandidate.emailIconUrls` → `scanConnected.ts:171` passes them to `enqueueScanIconCrawl` as seeds (signature change) → crawl fetches seeds FIRST. G1 admission filters still apply; email-sourced URLs are brand-sent, so give them TIER-1-like provenance in `discoverySourceRank` (they outrank bing_images but never outrank a cached official icon without beating it on rank).
+- C3 unit: extractor tests on fixture HTML (cid/logo/signature/noise split, absolute-URL only, cap count ≤5). Full jest green.
+- C4 gate: build + one scan (or picker "Search for Icon Online" on a fresh 0-icon sub if scan won't fire crawls — G0 premise) showing the seed fetch in the log and ≥1 brand-correct apply sourced from the email. Docs row + commit.
+
+### D — RDAP resolver (domain→org evidence for brand-correctness)
+
+RDAP over HTTPS (no key): bootstrapped from `officialDomain` → RDAP server via IANA bootstrap (`https://data.iana.org/rdap/dns.json`, cacheable) → registrant org field. Use as CORROBORATION only: registrant-org token overlap with merchant name + email-domain corroboration (From-host vs registered domain). Never auto-replace an icon on RDAP alone; it feeds the existing rank/report logic (and the C/D zohoaccounts blue-mark spot-check). Unit tests with canned RDAP JSON (mock fetch). Gate: a real lookup log line for 3+ domains incl. one .io/.co oddball.
+
+### E — picker reveal-toggle fix (known bug, spec at changelog 2026-09-11 Phase E row)
+
+`SubscriptionIconPickerModal.tsx:848-851/:860-863` — "Show incorrect"/"Show broken" toggles call `loadIcons(true)` synchronously inside `onValueChange` with a stale closure; the :341-346 filter re-hides. Fix via refs read inside `loadIcons` or `useEffect(() => loadIcons(true), [showIncorrect, showBroken])` (refs approach preferred — kills the whole stale-closure class there). Gate: on-device — file a report, toggle Show incorrect, the reported tile MUST appear and "Mark as good" must be reachable; jest for the ref/effect wiring; tsc/eslint green.
+
+---
+
+
 
 
 ## Changelog (plan)
