@@ -277,11 +277,13 @@ private data class UnlockedProtonKeys(
 private val unlockedScopes = java.util.concurrent.ConcurrentHashMap<String, String>()
 
 // P4: client fingerprints per docs/research-2026-09-03-proton-reauth-icon-ranking.md
-// §1.6 P4 ("x-pm-appversion: cadence@<version> + stable UA") and §1.2 format note
-// (appversion must be name@version — 5003 APP_VERSION_BAD). Honest, stable product
-// identity on every call; the doc records no official-web strings and spoofing them
-// is out of scope. Version mirrors app.json ("version": "1.0.0").
-private const val P4_APP_VERSION = "cadence@1.0.0"
+// §1.6 P4 ("cadence@<version> + stable UA") — amended by SERVER EVIDENCE 2026-09-13:
+// Proton rejected `cadence@1.0.0` with HTTP 400 Code 2064 "Application platform and
+// product must be separated by a dash ('-')" — the real appversion format is
+// platform-product@version (official convention: web-mail@, ios-mail@, android-mail@).
+// android-cadence@1.0.0 = factual platform + product + version (app.json), honest
+// identity, no spoofing. UA is stable per §1.6 P4 ("stable UA").
+private const val P4_APP_VERSION = "android-cadence@1.0.0"
 private const val P4_USER_AGENT = "Cadence/1.0.0"
 
 private class ProtonClient {
