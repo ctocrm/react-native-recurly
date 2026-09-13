@@ -276,6 +276,14 @@ private data class UnlockedProtonKeys(
 // longer matches, and the next batch re-runs the SRP unlock (self-invalidation).
 private val unlockedScopes = java.util.concurrent.ConcurrentHashMap<String, String>()
 
+// P4: client fingerprints per docs/research-2026-09-03-proton-reauth-icon-ranking.md
+// §1.6 P4 ("x-pm-appversion: cadence@<version> + stable UA") and §1.2 format note
+// (appversion must be name@version — 5003 APP_VERSION_BAD). Honest, stable product
+// identity on every call; the doc records no official-web strings and spoofing them
+// is out of scope. Version mirrors app.json ("version": "1.0.0").
+private const val P4_APP_VERSION = "cadence@1.0.0"
+private const val P4_USER_AGENT = "Cadence/1.0.0"
+
 private class ProtonClient {
   private val api = "https://mail.proton.me/api"
 
@@ -807,8 +815,8 @@ private class ProtonClient {
     conn.connectTimeout = 20_000
     conn.readTimeout = 25_000
     conn.setRequestProperty("Content-Type", "application/json")
-    conn.setRequestProperty("x-pm-appversion", "Other")
-    conn.setRequestProperty("User-Agent", "jsmastery/1.0")
+    conn.setRequestProperty("x-pm-appversion", P4_APP_VERSION)
+    conn.setRequestProperty("User-Agent", P4_USER_AGENT)
     if (session != null) {
       conn.setRequestProperty("Authorization", "Bearer ${session.accessToken}")
       conn.setRequestProperty("x-pm-uid", session.uid)
@@ -830,8 +838,8 @@ private class ProtonClient {
     conn.setRequestProperty("Content-Type", "application/json")
     conn.setRequestProperty("Authorization", "Bearer ${session.accessToken}")
     conn.setRequestProperty("x-pm-uid", session.uid)
-    conn.setRequestProperty("x-pm-appversion", "Other")
-    conn.setRequestProperty("User-Agent", "jsmastery/1.0")
+    conn.setRequestProperty("x-pm-appversion", P4_APP_VERSION)
+    conn.setRequestProperty("User-Agent", P4_USER_AGENT)
     conn.doOutput = true
     OutputStreamWriter(conn.outputStream, StandardCharsets.UTF_8).use { it.write(body) }
     return read(conn)
@@ -844,8 +852,8 @@ private class ProtonClient {
     conn.readTimeout = 25_000
     conn.setRequestProperty("Authorization", "Bearer ${session.accessToken}")
     conn.setRequestProperty("x-pm-uid", session.uid)
-    conn.setRequestProperty("x-pm-appversion", "Other")
-    conn.setRequestProperty("User-Agent", "jsmastery/1.0")
+    conn.setRequestProperty("x-pm-appversion", P4_APP_VERSION)
+    conn.setRequestProperty("User-Agent", P4_USER_AGENT)
     return read(conn)
   }
 
