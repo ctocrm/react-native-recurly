@@ -35,7 +35,13 @@ import {
 } from "@/services/rateLimitTracker";
 import { detectWhiteBg, removeWhiteBg } from "@/services/whiteBgRemoval";
 import { usePostHog } from "posthog-react-native";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -337,16 +343,12 @@ const SubscriptionIconPickerModal = ({
           };
         });
 
-        // Default: hide reported icons. Toggles reveal them.
-        const visible = mapped.filter((i) => {
-          if (!i.reportedType) return true;
-          if (i.reportedType === "wrong") return showIncorrect;
-          if (i.reportedType === "broken") return showBroken;
-          return true;
-        });
+        // Store the FULL mapped list; reveal-toggles filter at render time
+        // (visibleIcons useMemo) so flipping a toggle never depends on a
+        // callback closure — the stale-closure that killed the toggles before.
 
         // Never clobber a non-empty in-progress list with empty mid-upscale.
-        if (processingRef.current && visible.length === 0) {
+        if (processingRef.current && mapped.length === 0) {
           console.log(
             `[PICKER] Skip empty collection reload while processing for ${iconKey}`,
           );
@@ -356,11 +358,11 @@ const SubscriptionIconPickerModal = ({
         }
 
         loadedKeyRef.current = requestKey;
-        loadedCountRef.current = visible.length;
+        loadedCountRef.current = mapped.length;
         setIsLoadingCollection(false);
-        setAvailableIcons(visible);
+        setAvailableIcons(mapped);
         console.log(
-          `[PICKER] Loaded ${visible.length} icons for ${iconKey} (${mapped.length} total, reports hidden by default)`,
+          `[PICKER] Loaded ${mapped.length} icons for ${iconKey} (reports hidden by default via visibleIcons)`,
         );
 
         // Run per-icon white-bg / low-res detection for the corrective chips.
@@ -371,7 +373,21 @@ const SubscriptionIconPickerModal = ({
       // Do not setAvailableIcons([]) — keep current list on failure.
       setIsLoadingCollection(false);
     }
-  }, [iconKey, showIncorrect, showBroken, detectIcons]);
+  }, [iconKey, detectIcons]);
+
+  // Reveal-toggles are DERIVED, not load-time: reported icons reappear the
+  // moment a toggle flips, with no reload and no closure-capture of the old
+  // flag (the stale closure that made the toggles + "✓ Good" unreachable).
+  const visibleIcons = useMemo(
+    () =>
+      availableIcons.filter((i) => {
+        if (!i.reportedType) return true;
+        if (i.reportedType === "wrong") return showIncorrect;
+        if (i.reportedType === "broken") return showBroken;
+        return true;
+      }),
+    [availableIcons, showIncorrect, showBroken],
+  );
 
   useEffect(() => {
     isMounted.current = true;
@@ -701,8 +717,12 @@ const SubscriptionIconPickerModal = ({
   const handleMarkAsGood = async (icon: PickerIcon) => {
     if (!iconKey) return;
     await rejectReportedIcon(iconKey, icon.imageData);
+    // Flip the tile back to a normal candidate in place (chips become
+    // Wrong/Broken again) — matches the alert text without a reload.
     setAvailableIcons((prev) =>
-      prev.filter((i) => i.imageData !== icon.imageData),
+      prev.map((i) =>
+        i.imageData === icon.imageData ? { ...i, reportedType: null } : i,
+      ),
     );
     Alert.alert("Restored", "This icon will no longer be hidden.");
   };
@@ -845,10 +865,7 @@ const SubscriptionIconPickerModal = ({
             <View className="flex-row items-center gap-2">
               <Switch
                 value={showIncorrect}
-                onValueChange={(v) => {
-                  setShowIncorrect(v);
-                  loadIcons(true);
-                }}
+                onValueChange={setShowIncorrect}
               />
               <Text className="text-xs text-muted-foreground">
                 Show incorrect
@@ -857,10 +874,7 @@ const SubscriptionIconPickerModal = ({
             <View className="flex-row items-center gap-2">
               <Switch
                 value={showBroken}
-                onValueChange={(v) => {
-                  setShowBroken(v);
-                  loadIcons(true);
-                }}
+                onValueChange={setShowBroken}
               />
               <Text className="text-xs text-muted-foreground">Show broken</Text>
             </View>
@@ -913,14 +927,14 @@ const SubscriptionIconPickerModal = ({
             </View>
           </View>
 
-          {availableIcons.length > 0 && (
+          {visibleIcons.length > 0 && (
             <>
               <Text className="mb-2 text-xs text-muted-foreground">
-                {availableIcons.length} icon
-                {availableIcons.length !== 1 ? "s" : ""} available
+                {visibleIcons.length} icon
+                {visibleIcons.length !== 1 ? "s" : ""} available
               </Text>
               <FlatList
-                data={availableIcons}
+                data={visibleIcons}
                 keyExtractor={(item) => item.id}
                 renderItem={renderIconItem}
                 horizontal
@@ -930,7 +944,7 @@ const SubscriptionIconPickerModal = ({
             </>
           )}
 
-          {availableIcons.length === 0 && (
+          {visibleIcons.length === 0 && (
             <View className="items-center py-8">
               {isLoadingCollection ? (
                 <>
