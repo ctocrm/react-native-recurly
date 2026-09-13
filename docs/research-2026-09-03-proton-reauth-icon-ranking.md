@@ -76,6 +76,18 @@ Repo code (both `ProtonModule.kt` copies confirmed **identical** — `plugins/ma
 - **P4 — Fingerprint hardening.** `x-pm-appversion: cadence@<version>` + stable UA (optionally OkHttp/HTTP2 later). *Shrinks D5.*
 - **Gates:** two consecutive scans with ≤1 refresh/unlock in logs, no reauth prompt, chunk ≤75 intact, cold login (fresh TOTP entry) still works, Proton rows import.
 
+### 1.7 Addendum 2026-09-13 — appversion product allowlist (empirical; amends §1.2 and P4)
+
+On-device evidence certified the full rule that §1.2's format note and P4's prescription were missing:
+
+- `x-pm-appversion` must be `platform-product@version` **and** the product must be on Proton's allowlist of official clients (`web-mail@…`, `ios-mail@…`, `android-mail@…`). Third-party product names cannot be registered.
+- Unknown/third-party clients may only send `x-pm-appversion: Other` — the value every successful scan has used.
+- Empirical provenance (ProtonModule.kt constants block, commit `0e32c45`; capture `/tmp/p4_gate.log`):
+  - `cadence@1.0.0` → HTTP 400 Code 2064 `Application platform and product must be separated by a dash ('-') (in `cadence`)`
+  - `android-cadence@1.0.0` → HTTP 400 Code 2064 `Product `cadence` is not valid (in `android-cadence@1.0.0`)`
+- Consequence: P4's `cadence@<version>` is unsatisfiable. Honest fingerprint landing: `Other` + stable `User-Agent: Cadence/1.0.0` (UA is not allowlist-validated). Full arc in plan.md Phase D (P4) CLOSED row; spoofing official client strings rejected as out of scope without an explicit user order.
+- This document is the SSOT for Proton protocol findings; no earlier artifact recording this rule exists in the repo (verified 2026-09-13 by corpus + git-history search).
+
 ---
 
 ## Part 2 — Tuta icon quirk: partner badge on the official site outranks the real mark
