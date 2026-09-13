@@ -698,9 +698,13 @@ const SubscriptionIconPickerModal = ({
     setReportState({ icon: null, type: null, comment: "" });
 
     if (saved) {
-      // Drop it from the visible list immediately (it will stay hidden on reopen).
+      // Mark it in place; the derived visibleIcons filter hides it while the
+      // reveal-toggles are off — and flipping a toggle brings it back without
+      // any reload (removing it from the list would make the toggles dead).
       setAvailableIcons((prev) =>
-        prev.filter((i) => i.imageData !== icon.imageData),
+        prev.map((i) =>
+          i.imageData === icon.imageData ? { ...i, reportedType: type } : i,
+        ),
       );
       Alert.alert(
         "Icon Reported",
