@@ -269,6 +269,13 @@ private data class UnlockedProtonKeys(
   val privateKeys: List<PGPPrivateKey>,
 )
 
+// P3: uid -> accessToken whose locked scope was already SRP-unlocked in this
+// process. ProtonClient is re-instantiated per listWithSession call, so the
+// cache lives at file scope to persist across batches. Keyed by the CURRENT
+// access token: the P2 reactive refresh path mints a new token, the key no
+// longer matches, and the next batch re-runs the SRP unlock (self-invalidation).
+private val unlockedScopes = java.util.concurrent.ConcurrentHashMap<String, String>()
+
 private class ProtonClient {
   private val api = "https://mail.proton.me/api"
 
@@ -568,6 +575,13 @@ private class ProtonClient {
    * then PUT /core/v4/users/unlock with the same SRP proofs as login.
    */
   private fun unlockLockedScope(session: ProtonSession, password: String) {
+    if (unlockedScopes[session.uid] == session.accessToken) {
+      Log.i(
+        ProtonModule.TAG,
+        "Proton locked-scope unlock cached (P3) — skipping SRP reauth for this scan",
+      )
+      return
+    }
     val info = postJson(
       "$api/auth/v4/info",
       JSONObject().put("Intent", "Proton").put("ReauthScope", "locked").toString(),
@@ -595,6 +609,7 @@ private class ProtonClient {
       .put("ClientProof", srp.clientProof)
       .put("SRPSession", srpSession)
     putJson("$api/core/v4/users/unlock", body.toString(), session)
+    unlockedScopes[session.uid] = session.accessToken
     Log.i(ProtonModule.TAG, "Proton locked-scope unlock ok")
   }
 
