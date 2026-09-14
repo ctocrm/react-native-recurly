@@ -5,7 +5,7 @@
 import type { SQLiteDatabase } from "expo-sqlite";
 
 /** Bump when adding a migration. Stored in PRAGMA user_version. */
-export const SCHEMA_VERSION = 15;
+export const SCHEMA_VERSION = 16;
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS subscriptions (
@@ -443,6 +443,58 @@ export const MIGRATIONS: ((db: SQLiteDatabase) => Promise<void>)[] = [
         CREATE INDEX IF NOT EXISTS idx_merchant_day_actuals_key ON merchant_day_actuals(bucket_type, bucket_key);
       `);
     }
+  },
+
+  // 16 (F-2): canonical Zoho identity. "zohoaccounts" is Zoho's product/infra
+  // host label, not a brand (user-locked: "it's just zoho"). Rename the card,
+  // its icon keys, crawl state, reports, and projection buckets in lockstep so
+  // the merchant joins survive the rename: nameToSlug("Zoho") === "zoho" ===
+  // the key future scans mint (classifier canonical map, PARSER_VERSION 13).
+  // Idempotent: every statement matches only 'zohoaccounts' rows, and PK/UNIQUE
+  // conflicts (a pre-existing 'zoho' row) fall back to the target row via
+  // UPDATE OR IGNORE + DELETE of the leftover source. Icon/queue/session/report
+  // and bucket renames are gated on the subscriptions rename having happened
+  // (or no zohoaccounts card existing at all), so a pre-existing separate
+  // "zoho" card is never merged into by accident.
+  async (db) => {
+    await db.execAsync(`
+      UPDATE subscriptions
+         SET name = 'Zoho',
+             icon_key = 'zoho',
+             updated_at = datetime('now')
+       WHERE (icon_key = 'zohoaccounts' OR lower(name) = 'zohoaccounts')
+         AND NOT EXISTS (
+           SELECT 1 FROM subscriptions WHERE icon_key = 'zoho'
+         );
+    `);
+    const renamed = await db.getFirstAsync<{ n: number }>(
+      `SELECT COUNT(*) AS n FROM subscriptions
+        WHERE icon_key = 'zoho' AND lower(name) = 'zoho'`,
+    );
+    if (!renamed || renamed.n === 0) return;
+    await db.execAsync(`
+      UPDATE OR IGNORE icon_cache SET icon_key = 'zoho'
+       WHERE icon_key = 'zohoaccounts';
+      DELETE FROM icon_cache WHERE icon_key = 'zohoaccounts';
+
+      UPDATE OR IGNORE icon_crawl_queue SET icon_key = 'zoho'
+       WHERE icon_key = 'zohoaccounts';
+      DELETE FROM icon_crawl_queue WHERE icon_key = 'zohoaccounts';
+
+      UPDATE OR IGNORE icon_crawl_sessions
+         SET icon_key = 'zoho', official_domain = 'zoho.com'
+       WHERE icon_key = 'zohoaccounts';
+      DELETE FROM icon_crawl_sessions WHERE icon_key = 'zohoaccounts';
+
+      UPDATE icon_crawl_results SET icon_key = 'zoho'
+       WHERE icon_key = 'zohoaccounts';
+      UPDATE icon_reports SET icon_key = 'zoho'
+       WHERE icon_key = 'zohoaccounts';
+
+      UPDATE OR IGNORE merchant_day_actuals SET bucket_key = 'zoho'
+       WHERE bucket_key = 'zohoaccounts';
+      DELETE FROM merchant_day_actuals WHERE bucket_key = 'zohoaccounts';
+    `);
   },
 ];
 
