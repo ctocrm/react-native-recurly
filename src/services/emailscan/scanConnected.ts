@@ -5,6 +5,10 @@ import {
   waitIfScanActive,
 } from "@/services/scanState";
 import { createLegProgressLogger } from "./legProgress";
+import {
+  formatScanBudgetLine,
+  shouldSkipRemainingLegs,
+} from "./scanTotalBudget";
 import { candidateToSubscription } from "./importCandidate";
 import { listMailboxesAsync } from "./persist";
 import {
@@ -80,7 +84,18 @@ async function runScan(opts: {
     opts.existing.map((s) => [`${s.name}::${s.paymentMethod ?? ""}`, s]),
   );
 
-  for (const box of boxes) {
+  // R13: scan-wide budget — bounds TOTAL scan duration, not just per-leg
+  // silence. Checked between legs only: an in-flight leg is never killed
+  // mid-chunk (its own watchdog bounds silence), completed legs keep their
+  // results, and endScan() still always runs in the caller's finally.
+  const scanStartedAt = Date.now();
+  for (let legIndex = 0; legIndex < boxes.length; legIndex += 1) {
+    const box = boxes[legIndex];
+    const elapsedMs = Date.now() - scanStartedAt;
+    if (shouldSkipRemainingLegs(elapsedMs)) {
+      console.log(formatScanBudgetLine(elapsedMs, boxes.length - legIndex));
+      break;
+    }
     // R13: one progress pacer per leg — a line every 30s plus a terminal line,
     // so a live scan reads as progress and a stalled leg is visible as silence.
     const pacer = createLegProgressLogger(box.mailboxId);
