@@ -20,6 +20,7 @@ import {
   foldActuals,
   loadActualsAsync,
   localDayKey,
+  onProjectionRebuilt,
   rebuildProjectionAsync,
   type MerchantDayActual,
   type ProjectionSourceRow,
@@ -309,6 +310,46 @@ describe("rebuild + load roundtrip", () => {
 
     const loaded = await loadActualsAsync();
     expect(loaded).toEqual(fake.actualRows);
+  });
+});
+
+describe("onProjectionRebuilt (F-6 staleness fix)", () => {
+  it("notifies listeners after a successful rebuild, with the bucket count", async () => {
+    const seen: number[] = [];
+    const off = onProjectionRebuilt((n) => seen.push(n));
+    try {
+      const buckets = await rebuildProjectionAsync();
+      expect(seen).toEqual([buckets]);
+    } finally {
+      off();
+    }
+  });
+
+  it("stops notifying after unsubscribe", async () => {
+    const seen: number[] = [];
+    const off = onProjectionRebuilt((n) => seen.push(n));
+    off();
+    await rebuildProjectionAsync();
+    expect(seen).toEqual([]);
+  });
+
+  it("listener errors never break the rebuild", async () => {
+    const logSpy = jest.spyOn(console, "log").mockImplementation(() => {});
+    const off = onProjectionRebuilt(() => {
+      throw new Error("listener boom");
+    });
+    try {
+      const buckets = await rebuildProjectionAsync();
+      expect(typeof buckets).toBe("number");
+      expect(
+        logSpy.mock.calls.some((call) =>
+          String(call[0]).includes("projection rebuilt listener FAILED"),
+        ),
+      ).toBe(true);
+    } finally {
+      off();
+      logSpy.mockRestore();
+    }
   });
 });
 

@@ -17,6 +17,7 @@ import {
 } from "@/services/emailscan/projectionDisplay";
 import {
   loadActualsAsync,
+  onProjectionRebuilt,
   type MerchantDayActual,
 } from "@/services/emailscan/projection";
 import { getPreference, setPreference } from "@/services/database";
@@ -89,6 +90,31 @@ export function useChargeDisplay(subscriptions: Subscription[]) {
       cancelled = true;
     };
   }, [subscriptions.length]);
+
+  // F-6: rebuilds land off the write path (coalesced, fire-and-forget), so
+  // without subscribing this hook kept summing boot-time buckets while imports
+  // changed the rows — 2026-09-14 the audit read projection=669.31 vs
+  // legacy=519.31 (match=NO) with zero fold error; a fresh load read both at
+  // 519.31 (delta 0.00). Reload actuals on every successful rebuild.
+  useEffect(() => {
+    let cancelled = false;
+    const off = onProjectionRebuilt(() => {
+      void loadActualsAsync()
+        .then((rows) => {
+          if (!cancelled) setActuals(rows);
+        })
+        .catch((err) => {
+          console.log(
+            "[MailScan] spend-audit: projection reload FAILED",
+            err instanceof Error ? err.message : String(err),
+          );
+        });
+    });
+    return () => {
+      cancelled = true;
+      off();
+    };
+  }, []);
 
   // R26/DEC-001 verification: once per boot, after the projection UI has
   // settled, run the legacy full-scan total in the background and log it

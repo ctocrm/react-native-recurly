@@ -31,6 +31,45 @@ interface StoredClassifiedRow {
 }
 
 /** Full fold of local rows → projection table. Returns bucket-row count. */
+// ---------------------------------------------------------------------------
+// Rebuilt notification (F-6): the projection is a rebuildable cache; UI
+// snapshots that sum it (useChargeDisplay's actuals) must reload when it
+// changes, or pre-scan buckets render against post-scan rows — 2026-09-14:
+// the audit read projection=669.31 (boot-time buckets) vs legacy=519.31
+// (fresh rows), match=NO, purely from snapshot staleness; a fresh load
+// matched at 0.00.
+// ---------------------------------------------------------------------------
+
+type ProjectionRebuiltListener = (bucketCount: number) => void;
+
+const rebuiltListeners = new Set<ProjectionRebuiltListener>();
+
+/**
+ * Subscribe to successful projection rebuilds. Returns an unsubscribe
+ * function. Listener errors are logged and never break the rebuild.
+ */
+export function onProjectionRebuilt(
+  listener: ProjectionRebuiltListener,
+): () => void {
+  rebuiltListeners.add(listener);
+  return () => {
+    rebuiltListeners.delete(listener);
+  };
+}
+
+function notifyRebuilt(bucketCount: number): void {
+  for (const listener of rebuiltListeners) {
+    try {
+      listener(bucketCount);
+    } catch (err) {
+      console.log(
+        "[MailScan] projection rebuilt listener FAILED",
+        err instanceof Error ? err.message : String(err),
+      );
+    }
+  }
+}
+
 export async function rebuildProjectionAsync(): Promise<number> {
   const db = getDatabase();
   const t0 = Date.now();
@@ -96,6 +135,7 @@ export async function rebuildProjectionAsync(): Promise<number> {
       `${source.length} charges (${unparseable} unparseable skipped) in ` +
       `${Date.now() - t0}ms`,
   );
+  notifyRebuilt(agg.length);
   return agg.length;
 }
 
