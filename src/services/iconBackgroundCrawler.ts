@@ -18,7 +18,7 @@ import {
   setCachedIcon,
   updateIconCrawlSession,
 } from "@/services/database";
-import { isScanActive } from "@/services/scanState";
+import { isScanActive, waitIfScanActive } from "@/services/scanState";
 import { rankOfficialDomainCandidates } from "@/services/domain/domainDiscovery";
 import {
   canonicalBrandFor,
@@ -1060,6 +1060,9 @@ export async function findIconUrls(
   // keeps maximum-search behavior without making first results wait on DDG,
   // Bing, Google, or a multi-page spider crawl.
   const officialHostHint = [...officialHosts][0] ?? null;
+  // J2: a flow can reach this point as a scan starts — park here too, not
+  // only at chain start (enqueueScanIconCrawl), so no stage runs mid-scan.
+  await waitIfScanActive();
   const immediatelyAttempted = await fetchInitialCandidates(
     iconKey,
     urlsToFetch,
@@ -1083,7 +1086,7 @@ export async function findIconUrls(
 
   const searchBrand = canonicalBrand?.display ?? iconKey;
   const [searchResults, linkResults] = await Promise.all([
-    searchAllSources(searchBrand).catch((e) => {
+    searchAllSources(searchBrand, waitIfScanActive).catch((e) => {
       providerFailures++;
       console.log(
         `[SEARCH] TIER 3: searchAllSources failed:`,
@@ -1091,7 +1094,7 @@ export async function findIconUrls(
       );
       return [] as Awaited<ReturnType<typeof searchAllSources>>;
     }),
-    searchForLinksToSpider(searchBrand).catch((e) => {
+    searchForLinksToSpider(searchBrand, waitIfScanActive).catch((e) => {
       providerFailures++;
       console.log(
         `[SEARCH] TIER 3: searchForLinksToSpider failed:`,

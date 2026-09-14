@@ -922,6 +922,12 @@ export async function runDorkSearches(
 
 export async function searchAllSources(
   brand: string,
+  /**
+   * J2: async gate awaited between engine stages. The crawler passes
+   * `waitIfScanActive` so a discovery flow that started before a scan parks
+   * at the next boundary instead of stealing JS/network from the mail legs.
+   */
+  gate?: () => Promise<void>,
 ): Promise<ImageSearchResult[]> {
   console.log(
     `[SEARCH_ENGINE] ===== searchAllSources starting for "${brand}" =====`,
@@ -951,6 +957,7 @@ export async function searchAllSources(
   };
 
   // Run DuckDuckGo with multiple variations - this is the most reliable engine
+  await gate?.();
   console.log(`[SEARCH_ENGINE] Running DuckDuckGo searches (primary engine)`);
   const ddgResults = await Promise.all(
     SEARCH_VARIATIONS.slice(0, 5).map((_, i) =>
@@ -961,6 +968,7 @@ export async function searchAllSources(
   dedupe(ddgResults);
 
   // Bing Images — high yield when DDG SPA/HTML has few direct image URLs
+  await gate?.();
   console.log(`[SEARCH_ENGINE] Running Bing image searches`);
   const bingResults = (
     await Promise.all(
@@ -996,6 +1004,7 @@ export async function searchAllSources(
   }
 
   // Run Google dork searches - these will be skipped if Google is rate-limited
+  await gate?.();
   console.log(`[SEARCH_ENGINE] Running Google dork searches`);
   const dorkResults = await runDorkSearches(brand);
   console.log(`[SEARCH_ENGINE] Dork total: ${dorkResults.length} results`);
@@ -1050,10 +1059,15 @@ export async function searchAllSources(
   return top;
 }
 
-export async function searchForLinksToSpider(brand: string): Promise<string[]> {
+export async function searchForLinksToSpider(
+  brand: string,
+  /** J2: same scan-pause gate as searchAllSources — see its docstring. */
+  gate?: () => Promise<void>,
+): Promise<string[]> {
   console.log(
     `[SEARCH_ENGINE] ===== searchForLinksToSpider starting for "${brand}" =====`,
   );
+  await gate?.();
   const allLinks: string[] = [];
   const seenLinks = new Set<string>();
 
