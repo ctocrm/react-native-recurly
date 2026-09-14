@@ -53,6 +53,7 @@ This is the living execution plan for app-side quality and reliability **without
 | **5.5** | Professional cleanup (artifacts, docs, structure)      | **Done**                              | complete                            |
 | **MF**  | Icon crawler → picker → upscale pipeline recovery      | **A–F landed; hops 1–5 proven on device** | full cross-layer gate every hop     |
 | **UI**  | Post-Major-Fix UI improvements                         | **Phases 0–4 done; hops A–E done**    | skill loop after Phase 0            |
+| **J**   | Final gap-closing sequence (F-6 spend integrity → Gate A starvation → dead-host strategy → Phase I background-scan UX → hygiene) | **Planned** — spec in "Completion roadmap" Phase J | per-item gates: J1 audit `match=yes`; J2 fastbtc repro; J5 popup evidence tiers; J3 user-path |
 | **6**   | Ship polish                                            | **After UI Improvements**             | full smoke + doc pass               |
 
 ---
@@ -147,9 +148,36 @@ Current state: results DO land live per leg and icons drain async AFTER a scan, 
 - I4 (separately gated): icons-during-scan — only after re-proving the OOM ceiling that motivated Gate A (2026-09-05 192MB crash); else Gate A parking stays.
 - Gate: user-path — tap scan, navigate tabs while it runs, cards land per leg, pill tracks legs, app usable throughout; release-build memory check if I4 attempted. One phase per session — do not mix with other work.
 
+### Phase J — final gap-closing sequence (locked 2026-09-14, user-approved)
+
+Covers every confirmed open gap. One item per session, in this order; each item carries its own user-facing gate. Sequencing rationale: data integrity → scan health → user-requested strategy → feature → hygiene.
+
+**J1 — F-6 spend integrity (first).** `spend-projection-audit: projection=669.31 legacy=519.31 delta=150.00 match=NO` (2026-09-14, after scan #1's 59 workspace candidates; Home renders $669.31 vs $599.68 pre-scan; prior sibling: 09-12 $588.55→$438.55 "audit item ①"). J1a recompute the projection fold and the legacy fold over current rows; identify the diverging row/class ($150.00 exact — hypotheses: a yearly row's monthly-contribution treatment diverges between projection buckets and legacy fold; sparse/recurring split from the workspace candidates; `both`-bucket overlap correction). J1b fix + extend the projection≡legacy fixture suite with the failing case. J1c gates: unit equality green; device boot audit `match=yes`; Home number explainable card-by-card; survives a re-scan. **Named outcome: Home's Monthly Spend provably equals the row data.**
+
+**J2 — Gate A starvation fix.** A discovery flow started just before a scan (fastbtc, 2026-09-14) runs INTO the scan and starves legs — Gate A pauses the queue drain but not in-flight discovery flows; a 3-message workspace leg took ~2.5 min and nearly drew a false watchdog kill. J2a make scan-start pause (or abort-and-requeue) in-flight discovery stages: move the `waitIfScanActive` gate inside the discovery loop, or have `startIconCrawl` abort-and-requeue when `isScanActive()` flips. J2b gates: unit test for the pause; device repro of the fastbtc case (start a crawl, immediately scan) — leg timings unaffected, no false watchdog kill.
+
+**J5 — Dead-host strategy: DNS/RDAP liveness evidence → confidence score → user popup → crawl short-circuit.** (User directive 2026-09-14: zerosupporthosting.ca was the user's old company and no longer exists; the app should detect this and tell the user.) Evidence tiers, pure + `fetchImpl`-injected like `rdap.ts`:
+
+| Tier | Evidence | Meaning | Score | Popup wording |
+| --- | --- | --- | --- | --- |
+| 1 | RDAP 404 | Domain **not registered** (zerosupporthosting.ca case) | ~95 | "domain no longer exists (unregistered)" — defunct popup justified |
+| 2 | DNS NXDOMAIN (DoH) | Gone from DNS | ~90 | same as tier 1 |
+| 3 | NS delegation missing (DoH) | Registered but effectively dead | ~85 | defunct popup justified |
+| 4 | Registered, no A/AAAA + no MX | No web/mail service — NOT necessarily defunct (zohoaccounts.ca: registered by Zoho, mail-only) | ~70 | soft: "no website found" — never "defunct" |
+| 5 | Registered, DNS fine, HTTP dead | Unreachable — may be blocking/geo | ~30–40 | badge at most |
+| — | Probes themselves fail | unknown | — | no popup; crawl behaves as today |
+
+Build notes: extend `rdap.ts` to surface the RDAP status code (today `lookupRdapOrg` collapses 404 into `org: null`); new `dnsEvidence.ts` via DNS-over-HTTPS JSON (Google/Cloudflare — pure `fetch`, no native module; port-43 whois unreachable from RN, RDAP is the whois equivalent); score = pure `hostLivenessScore`; persist status/score/evidence-timestamp + the user's decision (schema or JSON column, decided in-session). UX: card-scoped popup at crawl end when score ≥ ~85 — Keep / Mark defunct / Delete; **never auto-delete** (a dead website ≠ a stopped charge); decision persisted, no re-popup; tiers <4 get a badge at most. Crawl cost win: high-confidence dead host short-circuits TIER-3/DDG discovery and retry drains (kills the recurring 7-retryable dead-host drain and the ~44s picker-open heal waste); cheap re-probe only on the next crawl attempt. **Gate:** unit tests per tier (fixture fetchImpls: RDAP 404, NXDOMAIN, empty-NOERROR, registered-with-org); device — zerosupporthosting card → popup with "unregistered" evidence; zohoaccounts → tier-4 soft wording; zoho.com → no popup.
+
+**J3 — Phase I background scan UX** (the drafted I1–I3 above; I4 only with OOM re-proof). The big feature; sits on a healthier pipeline once J1/J2/J5 land.
+
+**J4 — Verification & hygiene sweep.** 6-step reveal-toggle protocol + G1 brand-grid gate re-run on current HEAD (post F-2 rename + crawl changes); reconcile the stale 09-14 baseline row 15 against the 09-13 reveal-toggle closure; close the zohoaccounts "flagged for D/E" residue as mooted by F-2 (docs-only, pointer to today's receipts); document the opportunistic email-seed apply protocol (C4 steps on the next natural 0-icon sub with a live host — zerosupporthosting can never demonstrate it, user-confirmed dead).
+
+**Watch / deferred (not scheduled):** F-4 morning stall — escalate with heap/stats capture only if it recurs; Phase 6 ship polish — user-deferred (2026-09-04); I4 icons-during-scan — OOM re-proof prerequisite; email-seed visual apply — external blocker, opportunistic.
+
 ### Order & dependencies
 
-A → B → C → D → E → F → G0 → G1 → G2 → (H optional). A is trivial on purpose (verification only — calibrates the workflow). After F the app is one Phase-6 session from ship; G is the only multi-session phase.
+Executor roadmap: A → B → C → D → E → F → G0 → G1 → G2 → H → **J: J1 → J2 → J5 → J3 (Phase I) → J4.** A was trivial on purpose (verification only — calibrates the workflow). After F the app is one Phase-6 session from ship; G was the only multi-session phase; J3 (Phase I) is the only multi-session item remaining.
 
 
 ## Cadence identity (blocker before Phase 4 OAuth) — Clerk-out + package+scheme proven ✅
