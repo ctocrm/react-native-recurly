@@ -21,7 +21,7 @@ import {
 import { isScanActive } from "@/services/scanState";
 import { rankOfficialDomainCandidates } from "@/services/domain/domainDiscovery";
 import {
-  knownOfficialDomainForBrand,
+  canonicalBrandFor,
   officialHostFromCompoundSlug,
   officialSiteUrlForHost,
   sanitizeOfficialHost,
@@ -797,7 +797,9 @@ export async function findIconUrls(
     );
   }
 
-  // TIER 0: Discover official website. Scan seeds skip search.
+  // TIER 0: Discover official website. Scan seeds skip search — but a curated
+  // canonical brand identity outranks everything: email seeds have entrenched
+  // wrong-market hosts before (zohoaccounts.ca for brand Zoho — dead for icons).
   console.log(`[SEARCH] TIER 0: Discovering official website`);
   let officialSiteUrl: string | null = null;
   let officialHosts = officialHostsForBrand(iconKey);
@@ -806,8 +808,17 @@ export async function findIconUrls(
     ? sanitizeOfficialHost(sessionHint.officialDomain)
     : null;
   const reconstructedHost = officialHostFromCompoundSlug(iconKey);
-  const knownHost = knownOfficialDomainForBrand(iconKey);
-  if (seededHost) {
+  const canonicalBrand = canonicalBrandFor(iconKey);
+  if (canonicalBrand) {
+    officialSiteUrl = officialSiteUrlForHost(canonicalBrand.host);
+    officialHosts = officialHostsForBrand(iconKey, canonicalBrand.host);
+    await updateIconCrawlSession(iconKey, {
+      officialDomain: canonicalBrand.host,
+    });
+    console.log(
+      `[SEARCH] TIER 0: Canonical brand ${canonicalBrand.display} — official site ${officialSiteUrl} (overrides any seed)`,
+    );
+  } else if (seededHost) {
     officialSiteUrl = officialSiteUrlForHost(seededHost);
     officialHosts = officialHostsForBrand(iconKey, seededHost);
     console.log(`[SEARCH] TIER 0: Using seeded official site: ${officialSiteUrl}`);
@@ -819,15 +830,6 @@ export async function findIconUrls(
     });
     console.log(
       `[SEARCH] TIER 0: Reconstructed compound-label site: ${officialSiteUrl}`,
-    );
-  } else if (knownHost) {
-    officialSiteUrl = officialSiteUrlForHost(knownHost);
-    officialHosts = officialHostsForBrand(iconKey, knownHost);
-    await updateIconCrawlSession(iconKey, {
-      officialDomain: knownHost,
-    });
-    console.log(
-      `[SEARCH] TIER 0: Using known official domain for ${iconKey}: ${officialSiteUrl}`,
     );
   } else {
     try {
@@ -1067,6 +1069,8 @@ export async function findIconUrls(
 
   // TIER 3: Multi-engine image/dork search (direct logo URLs) + page links to spider
   // Restored searchAllSources — removed in 1a7cf9c and left as dead code.
+  // Query the canonical brand, not a scan-minted artifact slug ("zoho", not
+  // "zohoaccounts") — searching a non-brand finds nothing brand-correct.
   console.log(`[SEARCH] TIER 3: Image/dork search + links to spider`);
   await reportCrawlProgress(
     iconKey,
@@ -1077,8 +1081,9 @@ export async function findIconUrls(
   const isSearchEngineHost = (u: string) =>
     /google\.|bing\.|duckduckgo\.|yandex\./i.test(u);
 
+  const searchBrand = canonicalBrand?.display ?? iconKey;
   const [searchResults, linkResults] = await Promise.all([
-    searchAllSources(iconKey).catch((e) => {
+    searchAllSources(searchBrand).catch((e) => {
       providerFailures++;
       console.log(
         `[SEARCH] TIER 3: searchAllSources failed:`,
@@ -1086,7 +1091,7 @@ export async function findIconUrls(
       );
       return [] as Awaited<ReturnType<typeof searchAllSources>>;
     }),
-    searchForLinksToSpider(iconKey).catch((e) => {
+    searchForLinksToSpider(searchBrand).catch((e) => {
       providerFailures++;
       console.log(
         `[SEARCH] TIER 3: searchForLinksToSpider failed:`,

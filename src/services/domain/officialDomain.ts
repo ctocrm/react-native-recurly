@@ -113,23 +113,46 @@ export function officialHostFromCompoundSlug(slug: string): string | null {
 }
 
 /**
- * Curated official domains for brands whose real site is not reachable by
- * slug reconstruction. Every entry MUST be the brand's genuine official host —
- * verify it live and brand-owned before adding (wert.io: Wert's official NFT
- * checkout / fiat onramp site, operated by SHA2 Solutions Inc. — confirmed
- * live 2026-09-12). Pure lookup; the crawler persists it as the TIER 0 seed.
+ * Curated canonical brand identities for slugs that are NOT the brand itself —
+ * product/infra host labels a scan can mint as a merchant ("zohoaccounts" is
+ * Zoho's accounts host, not a company called "Zohoaccounts").
+ *
+ * Every entry MUST be verified live and brand-owned before adding:
+ *  - zoho / zohoaccounts → zoho.com: zoho.com A 136.143.190.155, MX smtpin.zoho.com;
+ *    zohoaccounts.com MX zc-mx.zohocorp.com (DNS checked 2026-09-14); device RDAP
+ *    2026-09-12 read org "Zoho Canada Corporation" for zohoaccounts.ca. The user
+ *    locked the identity: "it's just zoho".
+ *  - wert.io: Wert's official NFT checkout / fiat onramp site, operated by SHA2
+ *    Solutions Inc. — confirmed live 2026-09-12.
+ *  - cline.bot: RDAP-backed oddball TLD (2026-09-12).
+ * Pure lookup; the crawler persists the host as the TIER 0 seed and uses the
+ * display name for search queries and library-slug candidates.
  */
-const KNOWN_OFFICIAL_DOMAINS: Record<string, string> = {
-  wert: "wert.io",
-  cline: "cline.bot",
-  clinebotinc: "cline.bot",
+const CANONICAL_BRANDS: Record<string, { host: string; display: string }> = {
+  wert: { host: "wert.io", display: "Wert" },
+  cline: { host: "cline.bot", display: "Cline" },
+  clinebotinc: { host: "cline.bot", display: "Cline" },
+  zoho: { host: "zoho.com", display: "Zoho" },
+  zohoaccounts: { host: "zoho.com", display: "Zoho" },
 };
 
-export function knownOfficialDomainForBrand(brand: string): string | null {
+export interface CanonicalBrand {
+  host: string;
+  display: string;
+}
+
+/** Canonical brand identity for a scan-minted slug, or null when uncurated. */
+export function canonicalBrandFor(brand: string): CanonicalBrand | null {
   const key = brand.toLowerCase().trim().replace(/[^a-z0-9]/g, "");
-  const host = KNOWN_OFFICIAL_DOMAINS[key];
+  const entry = CANONICAL_BRANDS[key];
+  if (!entry) return null;
+  const host = sanitizeOfficialHost(entry.host);
   if (!host) return null;
-  return sanitizeOfficialHost(host);
+  return { host, display: entry.display };
+}
+
+export function knownOfficialDomainForBrand(brand: string): string | null {
+  return canonicalBrandFor(brand)?.host ?? null;
 }
 
 export function officialDomainFromAddress(from: string): string | null {

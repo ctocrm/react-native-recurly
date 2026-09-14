@@ -1,5 +1,6 @@
 import { Directory, File, Paths } from "expo-file-system";
 import { writeAsStringAsync } from "expo-file-system/legacy";
+import { canonicalBrandFor } from "@/services/domain/officialDomain";
 
 interface ScrapedIcon {
   source: "simple-icons" | "tabler" | "devicons" | "boxicons" | "icons8";
@@ -104,6 +105,31 @@ export function generateAlternativeSlugs(name: string): string[] {
   }
 
   return [...new Set(alternatives)];
+}
+
+/**
+ * Slug candidates the library CDNs should try for a brand: the exact slug plus
+ * the fuzzy alternatives, and — when a curated canonical brand exists — the
+ * canonical brand token itself ("zohoaccounts" must also try "zoho": simple-icons
+ * keys the logo under the brand, not under the product host label). Curated
+ * entries only; unknown slugs never get speculative splits.
+ */
+export function slugCandidatesForBrand(brandName: string): {
+  slug: string;
+  altSlugs: string[];
+} {
+  const slug = nameToSlug(brandName);
+  const altSlugs = generateAlternativeSlugs(brandName).filter(
+    (s) => s !== slug,
+  );
+  const canonical = canonicalBrandFor(brandName);
+  if (canonical) {
+    const brandSlug = nameToSlug(canonical.display);
+    if (brandSlug && brandSlug !== slug && !altSlugs.includes(brandSlug)) {
+      altSlugs.push(brandSlug);
+    }
+  }
+  return { slug, altSlugs };
 }
 
 // Shared timeout-aware fetch helper
@@ -251,10 +277,7 @@ async function tryIcons8(
 export async function findIconFromLibraries(
   brandName: string,
 ): Promise<ScrapedIcon | null> {
-  const slug = nameToSlug(brandName);
-  const altSlugs = generateAlternativeSlugs(brandName).filter(
-    (s) => s !== slug,
-  );
+  const { slug, altSlugs } = slugCandidatesForBrand(brandName);
 
   console.log(
     `[ICON_SCRAPER] findIconFromLibraries: "${brandName}" -> slug="${slug}", alternatives=[${altSlugs.join(", ")}]`,
@@ -287,10 +310,7 @@ export async function findIconFromLibraries(
 export async function findAllIconSources(
   brandName: string,
 ): Promise<ScrapedIcon[]> {
-  const slug = nameToSlug(brandName);
-  const altSlugs = generateAlternativeSlugs(brandName).filter(
-    (s) => s !== slug,
-  );
+  const { slug, altSlugs } = slugCandidatesForBrand(brandName);
   const results: ScrapedIcon[] = [];
 
   console.log(
