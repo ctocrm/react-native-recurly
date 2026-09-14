@@ -17,6 +17,10 @@ import { useScanProgress } from "@/hooks/useScanProgress";
 import { formatCurrency } from "@/lib/utils";
 import { importFromConnectedMailboxes } from "@/services/emailscan";
 import { getScanProgress } from "@/services/emailscan/scanProgress";
+import {
+  setHostDecision,
+  subscribeHostLiveness,
+} from "@/services/domain/hostLiveness";
 import { listMailboxesAsync } from "@/services/emailscan/persist";
 import { useUser } from "@/context/AuthContext";
 import dayjs from "dayjs";
@@ -73,6 +77,46 @@ const App = () => {
   const [iconPickerVisible, setIconPickerVisible] = useState(false);
   const [mailboxCount, setMailboxCount] = useState(0);
   const scanProgress = useScanProgress();
+
+  // J5: dead-host popup — when a crawl ends with a defunct-confident
+  // liveness assessment (score ≥85: unregistered / nxdomain / delegation
+  // gone) and the user has not already decided for this domain, surface the
+  // evidence ONCE with Keep / Mark as Canceled / Delete. Never auto-deletes.
+  useEffect(() => {
+    const off = subscribeHostLiveness((event) => {
+      const sub = subscriptions.find((s) => s.icon_key === event.iconKey);
+      if (!sub) return;
+      Alert.alert(
+        `${sub.name}: domain ${event.label.replace(/-/g, " ")}`,
+        `${event.domain} — ${event.evidence.join("; ")}. This subscription may be defunct. What would you like to do?`,
+        [
+          {
+            text: "Keep",
+            style: "cancel",
+            onPress: () => {
+              void setHostDecision(event.domain, "keep", event.score);
+            },
+          },
+          {
+            text: "Mark as Canceled",
+            onPress: () => {
+              void updateSubscription(sub.id, { status: "cancelled" });
+              void setHostDecision(event.domain, "canceled", event.score);
+            },
+          },
+          {
+            text: "Delete",
+            style: "destructive",
+            onPress: () => {
+              void deleteSubscription(sub.id);
+              void setHostDecision(event.domain, "deleted", event.score);
+            },
+          },
+        ],
+      );
+    });
+    return off;
+  }, [subscriptions, updateSubscription, deleteSubscription]);
 
   const refreshMailboxCount = useCallback(async () => {
     try {

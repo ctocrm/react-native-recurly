@@ -262,6 +262,56 @@ export function brandTokenOverlap(brand: string, org: string | null): string[] {
   return [...hits];
 }
 
+export type RdapRegistrationStatus =
+  | "registered"
+  | "unregistered"
+  | "unknown";
+
+export interface RdapRegistration {
+  status: RdapRegistrationStatus;
+  org: string | null;
+}
+
+/**
+ * J5: RDAP registration status for a domain. Unlike lookupRdapOrg (which
+ * collapses every non-OK into `org: null`), this distinguishes the registry's
+ * 404 — the domain is NOT registered, the strongest dead-host signal — from
+ * infrastructure failures (`unknown`). RDAP is the whois equivalent reachable
+ * from RN; classic port-43 whois is not.
+ */
+export async function lookupRdapRegistration(
+  domain: string,
+  fetchImpl: FetchImpl = fetch,
+): Promise<RdapRegistration> {
+  try {
+    const bases = await getRdapBootstrap(fetchImpl);
+    const baseList = bases.get(tldOfDomain(domain));
+    if (!baseList || baseList.length === 0) {
+      return { status: "unknown", org: null };
+    }
+    const base = baseList[0].replace(/\/?$/, "/");
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), RDAP_TIMEOUT_MS);
+    try {
+      const res = await fetchImpl(
+        `${base}domain/${encodeURIComponent(domain)}`,
+        {
+          signal: controller.signal,
+          headers: { Accept: "application/rdap+json" },
+        },
+      );
+      if (res.status === 404) return { status: "unregistered", org: null };
+      if (!res.ok) return { status: "unknown", org: null };
+      const json = (await res.json()) as unknown;
+      return { status: "registered", org: registrantOrgFromRdap(json) };
+    } finally {
+      clearTimeout(timer);
+    }
+  } catch {
+    return { status: "unknown", org: null };
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Lookup + corroboration entry points
 // ---------------------------------------------------------------------------

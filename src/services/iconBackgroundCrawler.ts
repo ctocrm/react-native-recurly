@@ -26,7 +26,15 @@ import {
   officialSiteUrlForHost,
   sanitizeOfficialHost,
 } from "@/services/domain/officialDomain";
-import { rdapCorroborateBrand } from "@/services/domain/rdap";
+import {
+  registeredDomainOf,
+  rdapCorroborateBrand,
+} from "@/services/domain/rdap";
+import {
+  assessHostLiveness,
+  isKnownDeadHost,
+  recordHostLiveness,
+} from "@/services/domain/hostLiveness";
 import {
   admitsWithHostCap,
   canCandidateBeatCached,
@@ -760,6 +768,36 @@ export async function findIconUrls(
     existing.map((r) => r.originalUrl).filter((u): u is string => Boolean(u)),
   );
 
+  // J5: derive the probe domain (email seed host first, then stored crawl
+  // rows) — a known-dead host short-circuits the whole web discovery.
+  let livenessDomain: string | null = null;
+  const firstSeedHost = (() => {
+    try {
+      return emailSeeds?.[0] ? new URL(emailSeeds[0]).hostname : null;
+    } catch {
+      return null;
+    }
+  })();
+  if (firstSeedHost) livenessDomain = registeredDomainOf(firstSeedHost);
+  if (!livenessDomain) {
+    const firstStored = existing.find((r) => r.originalUrl);
+    if (firstStored?.originalUrl) {
+      try {
+        livenessDomain = registeredDomainOf(
+          new URL(firstStored.originalUrl).hostname,
+        );
+      } catch {
+        livenessDomain = null;
+      }
+    }
+  }
+  if (livenessDomain && (await isKnownDeadHost(livenessDomain))) {
+    console.log(
+      `[SEARCH] short-circuit: ${livenessDomain} is a known dead host (cached liveness ≥85) — skipping web discovery for ${iconKey}`,
+    );
+    return 0;
+  }
+
   // LOCAL ICON - immediate, no download needed
   console.log(`[SEARCH] LOCAL: Checking for ${iconKey}`);
   const localIcon = icons[iconKey as keyof typeof icons];
@@ -1349,6 +1387,26 @@ export async function findIconUrls(
     // may have already consumed), so the retries actually execute. Await it so
     // the re-search completes only after cache promotion is done.
     await retryPendingDownloads(iconKey, retryRows);
+  }
+
+  // J5: nothing valid anywhere? The host itself may be dead — probe DNS/RDAP
+  // once, cache the liveness, and (if defunct-confident and undecided) raise
+  // the UI event. Best-effort: its own errors never break the crawl.
+  if (counts.downloaded === 0 && livenessDomain) {
+    try {
+      const assessment = await assessHostLiveness(livenessDomain, {
+        httpDead: true,
+      });
+      console.log(
+        `[SEARCH] host liveness: ${livenessDomain} = ${assessment.label} (score ${assessment.score})`,
+      );
+      await recordHostLiveness(livenessDomain, iconKey, assessment);
+    } catch (err) {
+      console.log(
+        `[SEARCH] host liveness probe FAILED for ${livenessDomain}`,
+        err instanceof Error ? err.message : String(err),
+      );
+    }
   }
 
   console.log(`[SEARCH] ===== FINISHED SEARCH for ${iconKey} =====`);
