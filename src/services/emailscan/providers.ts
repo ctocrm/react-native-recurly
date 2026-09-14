@@ -548,6 +548,10 @@ export function createGmailFetcher(
           backoffMs / 1000,
         )}s, then one retry`,
       );
+      // F-4: a quota backoff is server-acknowledged progress (the API told
+      // us to wait); feed so a legitimate ≤120s backoff cannot be
+      // stall-killed by the no-progress clock.
+      feedScanWatchdog();
       await sleep(backoffMs);
     }
     // Unreachable: the loop either returns or throws.
@@ -640,7 +644,16 @@ export function createGmailFetcher(
           bodies += 1;
         }
         await onChunk(pageMsgs);
-      } while (pageToken);
+        // F-4 (2026-09-14 baseline): INITIAL_SCAN_LIMIT was passed down but
+        // only capped the page size — a mailbox with more matches listed
+        // forever (witnessed: 2000+ ids listed against limit=500, the leg
+        // ran 52 minutes). Bound the walk: stop once listed reaches limit.
+      } while (pageToken && listed < limit);
+      if (pageToken) {
+        console.log(
+          `[MailGmail] limit ${limit} reached — truncating listing at ${listed} ids (more pages existed)`,
+        );
+      }
       console.log(
         `[MailGmail] listed ${listed} pages=${pages} bodies=${bodies} of ${listed}`,
       );
@@ -747,6 +760,14 @@ export function createGraphFetcher(
           bodies += 1;
         }
         await onChunk(pageMsgs);
+        // F-4: same limit enforcement as the Gmail loop — Graph walked
+        // @odata.nextLink without ever checking the requested limit.
+        if (listed >= limit) url = null;
+      }
+      if (url) {
+        console.log(
+          `[MailGraph] limit ${limit} reached — truncating listing at ${listed} ids (more pages existed)`,
+        );
       }
       console.log(
         `[MailGraph] listed ${listed} pages=${pages} bodies=${bodies} of ${listed}`,
@@ -955,8 +976,14 @@ export function createJmapFetcher(
  * aborts the underlying request natively so a timed-out call cannot leak
  * its socket. A black-holed socket must surface as a per-mailbox error
  * instead of freezing the whole scan loop (R9: the 2026-09-03 18-min scan
- * hang). Every settled call — ok or not — also feeds the R14 scan watchdog:
- * a delivered response is scan progress and restarts the no-progress clock.
+ * hang).
+ *
+ * F-4 (2026-09-14 baseline): settled HTTP calls NO LONGER feed the R14
+ * watchdog. A page walk completes one metadata call every couple of
+ * seconds while real ingestion is wedged, so per-call feeding kept the
+ * 180s no-progress clock alive through a 13-minute stall (the leg only
+ * "resumed" when the wedge lifted). Progress is fed per flushed chunk in
+ * runIncrementalScan — data that reached the scan, not sockets that moved.
  */
 async function fetchOnce(
   url: string,
@@ -976,7 +1003,6 @@ async function fetchOnce(
       fetch(url, { ...init, signal: controller.signal }),
       timeout,
     ]);
-    feedScanWatchdog();
     return res;
   } finally {
     if (timer) clearTimeout(timer);
@@ -1278,6 +1304,7 @@ export function createMailProvider(
         mailboxId: box,
         providerId,
         fetcher,
+        onLegProgress: opts?.onLegProgress,
       });
     },
   };

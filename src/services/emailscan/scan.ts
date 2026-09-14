@@ -163,6 +163,8 @@ export async function runIncrementalScan(opts: {
   store: ScanCacheStore;
   limit?: number;
   watchdog?: ScanWatchdogControl;
+  /** R13: called once per fetched chunk with the cumulative staged count. */
+  onLegProgress?: (staged: number) => void;
 }): Promise<IncrementalScanResult> {
   const watchdog = opts.watchdog ?? defaultWatchdog;
   const limit = opts.limit ?? INITIAL_SCAN_LIMIT;
@@ -221,7 +223,14 @@ export async function runIncrementalScan(opts: {
             };
             accepted += 1;
           }
+          // R13: one progress callback per chunk (pacer throttles to 30s).
+          opts.onLegProgress?.(accepted);
           next.cursor = advanceCursor(next.cursor, chunk);
+          // F-4: feed the no-progress watchdog per FLUSHED chunk, not per
+          // HTTP call — a completed page is progress even when every message
+          // on it screens out, and per-call feeding kept the clock alive
+          // through the 2026-09-14 13-minute wedge.
+          feedScanWatchdog();
         },
       ),
       stall.promise,
