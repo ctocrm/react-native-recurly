@@ -1,8 +1,27 @@
 # Lessons Learned — jsmastery Project
 
-**Last updated:** 2026-08-25
+**Last updated:** 2026-09-14
   
 **Purpose:** Document every mistake made during the jsmastery development cycle so they are never repeated. This file is the single source of truth for what went wrong and why.
+
+---
+
+## 0. The Never-Again List (2026-09-14)
+
+The twelve recurring failures, distilled on user demand after yet another repeat. Every line below has already happened at least once and been forgiven once. If a session is about to do any of these, STOP and re-read the linked section. These rules outrank convenience, deadlines, and partial wins.
+
+1. **Never claim "fixed" without end-to-end proof on the user's named path** — build, emulator, and the reported behavior reproduced. Lint, types, unit tests, and exit 0 are supporting evidence only, never the gate. (§2.7)
+2. **Never touch unrelated files while fixing one issue** — one user-named outcome per cycle; a newly found issue gets recorded in the plan, not silently fixed. No layered compound fixes. (§2.3, §2.5)
+3. **Never edit before reading** — source files, git history, prior sessions, and interaction code before testing any UI. (§2.1, §2.8, §2.10)
+4. **Never repeat a failed tool call unchanged** — one failure: diagnose; two: change mechanism; three: stop that path and report the blocker. (§2.2, §2.13)
+5. **Never substitute an easier artifact for the named outcome** — a markdown document is not a Cline Workflow; a nearby improvement is not the agreed hop (Tuta BlobAccessToken POST then GET); a cosmetic half is not an identity/binding change. (§2.12, §2.14)
+6. **Never use docs or process as fake progress** — no post-mortems, plan commits, rebuilds, wipes, or apologies in place of the agreed next action. Docs only after the user-facing gate is proven. (§1 step 4, §2.14)
+7. **Never turn 3-strike into quitting** — it is pause + 2–5 options + wait; after the user picks, resume is mandatory. Never ask the user to weaken safeguards. (§2.14)
+8. **Never declare success from easy-case tests** — crawler/icon work needs at least 5 real, diverse subscriptions (user standard: include rare ones, ~20); results must be brand-correct icons, not merely valid images. (§2.9, §3.2, §3.3)
+9. **Never make the user pay for compute while wiring is unverified** — prove the app loads and runs an existing known model end-to-end before any training recommendation. (§2.6, §3.1)
+10. **Never say "created/fixed/done" without the artifact in the thread** — described is not done; after any crash or resume, re-derive state from git log/reflog and disk before trusting any "done" summary. (§2.7, Lessons 35–37)
+11. **Never ship bare magic values or cosmetic halves** — every "why this value" fact gets a comment at the literal; cross-check doc-pinned constants against git history; if the full change has a real dependency, name it and wait. (Lesson 36)
+12. **Never treat a reset as a fresh start** — "read all history" means carry the lessons forward and re-derive what actually landed before continuing. (§2.11, Lesson 37)
 
 ---
 
