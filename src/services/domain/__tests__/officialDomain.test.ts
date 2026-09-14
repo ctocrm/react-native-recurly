@@ -53,18 +53,22 @@ describe("officialDomain (Hop 1 scan seed)", () => {
   it("maps Zoho product-host slugs to the canonical Zoho brand", () => {
     // User-locked identity: "zohoaccounts" is Zoho's accounts host, not a brand.
     expect(canonicalBrandFor("zohoaccounts")).toEqual({
+      key: "zoho",
       host: "zoho.com",
       display: "Zoho",
     });
     expect(canonicalBrandFor("zohoaccounts ")).toEqual({
+      key: "zoho",
       host: "zoho.com",
       display: "Zoho",
     });
     expect(canonicalBrandFor("Zoho Accounts")).toEqual({
+      key: "zoho",
       host: "zoho.com",
       display: "Zoho",
     });
     expect(canonicalBrandFor("zoho")).toEqual({
+      key: "zoho",
       host: "zoho.com",
       display: "Zoho",
     });

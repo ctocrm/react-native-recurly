@@ -49,6 +49,17 @@ describe("emailscan classifier (subject-first)", () => {
       merchantKey: "x",
       merchantName: "X",
     });
+    // F-2: Zoho's accounts host is not a brand — mint the canonical brand.
+    expect(
+      merchantFromAddress("Zoho <notification@zohoaccounts.com>"),
+    ).toEqual({
+      merchantKey: "zoho",
+      merchantName: "Zoho",
+    });
+    expect(merchantFromAddress("notification@accounts.zoho.com")).toEqual({
+      merchantKey: "zoho",
+      merchantName: "Zoho",
+    });
   });
 
   it("classifies the planned fixture subjects", () => {

@@ -2,7 +2,10 @@
  * Subject-first classifier. Body and invoice-like attachments run only
  * for money classes (recurring / sparse). No LLM.
  */
-import { officialDomainFromAddress } from "@/services/domain/officialDomain";
+import {
+  canonicalBrandFor,
+  officialDomainFromAddress,
+} from "@/services/domain/officialDomain";
 import {
   hasDiscoveryUrlSignal,
   isGenericSocialImage,
@@ -214,6 +217,12 @@ export function merchantFromAddress(from: string): {
     .filter(Boolean)
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(" ");
+  // F-2: a product/infra host label is not a brand ("zohoaccounts" is Zoho's
+  // accounts host — user-locked: "it's just zoho"). Mint the canonical brand.
+  const canonical = canonicalBrandFor(key);
+  if (canonical) {
+    return { merchantKey: canonical.key, merchantName: canonical.display };
+  }
   return { merchantKey: key, merchantName };
 }
 

@@ -3,7 +3,9 @@
  * A subscription is an account; a bill is optional evidence.
  */
 
-export const PARSER_VERSION = 12;
+// 13: F-2 canonical brands — zohoaccounts mints as Zoho (reclassifies cached
+//      From-hosts so mail history re-keys onto the canonical brand).
+export const PARSER_VERSION = 13;
 
 
 export type MailProviderId =

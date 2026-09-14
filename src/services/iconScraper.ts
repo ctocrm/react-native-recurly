@@ -124,9 +124,8 @@ export function slugCandidatesForBrand(brandName: string): {
   );
   const canonical = canonicalBrandFor(brandName);
   if (canonical) {
-    const brandSlug = nameToSlug(canonical.display);
-    if (brandSlug && brandSlug !== slug && !altSlugs.includes(brandSlug)) {
-      altSlugs.push(brandSlug);
+    if (canonical.key !== slug && !altSlugs.includes(canonical.key)) {
+      altSlugs.push(canonical.key);
     }
   }
   return { slug, altSlugs };

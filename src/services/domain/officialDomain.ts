@@ -128,15 +128,20 @@ export function officialHostFromCompoundSlug(slug: string): string | null {
  * Pure lookup; the crawler persists the host as the TIER 0 seed and uses the
  * display name for search queries and library-slug candidates.
  */
-const CANONICAL_BRANDS: Record<string, { host: string; display: string }> = {
-  wert: { host: "wert.io", display: "Wert" },
-  cline: { host: "cline.bot", display: "Cline" },
-  clinebotinc: { host: "cline.bot", display: "Cline" },
-  zoho: { host: "zoho.com", display: "Zoho" },
-  zohoaccounts: { host: "zoho.com", display: "Zoho" },
+const CANONICAL_BRANDS: Record<
+  string,
+  { key: string; host: string; display: string }
+> = {
+  wert: { key: "wert", host: "wert.io", display: "Wert" },
+  cline: { key: "cline", host: "cline.bot", display: "Cline" },
+  clinebotinc: { key: "cline", host: "cline.bot", display: "Cline" },
+  zoho: { key: "zoho", host: "zoho.com", display: "Zoho" },
+  zohoaccounts: { key: "zoho", host: "zoho.com", display: "Zoho" },
 };
 
 export interface CanonicalBrand {
+  /** Canonical brand slug — the merchant key scans should mint. */
+  key: string;
   host: string;
   display: string;
 }
@@ -148,7 +153,7 @@ export function canonicalBrandFor(brand: string): CanonicalBrand | null {
   if (!entry) return null;
   const host = sanitizeOfficialHost(entry.host);
   if (!host) return null;
-  return { host, display: entry.display };
+  return { key: entry.key, host, display: entry.display };
 }
 
 export function knownOfficialDomainForBrand(brand: string): string | null {
