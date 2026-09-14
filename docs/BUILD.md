@@ -83,17 +83,13 @@ Features:
 
 ### Step-by-Step Build
 
-#### Step 1: Generate the AI Model
+#### Step 1: Models (already bundled — no generation step)
+
+70 TFLite models ship in `assets/models/` (35 ESPCN "fast" + 35 FSRCNN "sharp"; registry-generated map in `src/services/generatedModelMap.ts`). **Training is frozen** — see `docs/AI_UPSCALING.md`. Only if `assets/models/model_registry.json` changes, regenerate the Metro map:
 
 ```bash
-# Check if model needs regeneration (fast)
-npm run generate-model
-
-# Or force regeneration (required if train_espcn_fast.py changed)
-npm run generate-model:force
+npm run generate-model-map
 ```
-
-The model is output to `assets/models/espcn_2x.tflite`.
 
 #### Step 2: Prebuild the Android Project
 
@@ -154,8 +150,7 @@ Output per architecture:
 
 | Command                                       | Description                           |
 | --------------------------------------------- | ------------------------------------- |
-| `npm run generate-model`                      | Generate TFLite model if needed       |
-| `npm run generate-model:force`                | Force model regeneration              |
+| `npm run generate-model-map`                  | Regenerate Metro model map from registry   |
 | `npm run prebuild:android`                    | Generate native Android project       |
 | `./scripts/android/build-android.sh`                  | Build all archs (sequential)          |
 | `./scripts/android/build-android.sh --dev --watch`    | Quick dev build + install + launch    |

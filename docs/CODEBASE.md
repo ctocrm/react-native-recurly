@@ -1,8 +1,8 @@
 # Codebase overview — jsmastery
 
-**Last verified against source:** 2026-08-25 (Hop 4 proven `2d0ba23` + `32521cb`; crawler still `210c908`).
+**Last verified against source:** 2026-09-13 (full-project read at HEAD `b552f22`; evidence in `docs/audit-2026-09-13-full-project-read.md`).
 
-Expo **~54.0.34** / React Native **0.81.5** / expo-router **~6.0.23** subscription tracker with an on-device icon crawler, optional TFLite AI upscaler, SQLCipher storage, and scoped cloud sync. NativeWind v5 (`^5.0.0-preview.4`). Auth is Clerk (`@clerk/expo@3.1.12`). Analytics is PostHog.
+Expo **~54.0.34** / React Native **0.81.5** / expo-router **~6.0.23** subscription tracker with an on-device icon crawler, optional TFLite AI upscaler, SQLCipher storage, and scoped cloud sync. NativeWind v5 (`^5.0.0-preview.4`). Auth is local Continue (`userId: "local"`, SecureStore session; Clerk removed 2026-08-28 in `f005865` — deliberate, so testing needs no Clerk backend). Analytics is PostHog.
 
 **Training is frozen.** Do not modify `scripts/train/`, `assets/models/*.keras`, or start `npm run train:models*`. See `docs/AI_UPSCALING.md` and `docs/plan.md` §Frozen.
 
@@ -15,7 +15,7 @@ This file is the current-code map for UI work. Icon-pipeline _contracts_ live in
 ```
 app/_layout.tsx
   PostHogProvider
-    ClerkProvider
+    AuthProvider (local Continue)
       IconCacheProvider          // in-memory icon map; exists before DB is open
         Stack (headerless)
           (auth)/*               // signed-out
@@ -35,11 +35,11 @@ app/_layout.tsx
 
 | Route         | File                                  | Purpose                                                                                                  | Safe area / bottom padding                                                                                                                                                                                         | Create / add                                                                |
 | ------------- | ------------------------------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------- |
-| Root stack    | `app/_layout.tsx`                     | Fonts (Plus Jakarta), splash hide, PostHog screen tracking, Clerk + IconCache                            | None. No `SafeAreaProvider` here.                                                                                                                                                                                  | n/a                                                                         |
+| Root stack    | `app/_layout.tsx`                     | Fonts (Plus Jakarta), splash hide, PostHog screen tracking, Auth (local) + IconCache                            | None. No `SafeAreaProvider` here.                                                                                                                                                                                  | n/a                                                                         |
 | Onboarding    | `app/onboarding.tsx`                  | First-run placeholder                                                                                    | Minimal                                                                                                                                                                                                            | n/a                                                                         |
-| Auth layout   | `app/(auth)/_layout.tsx`              | Clerk-gated auth stack                                                                                   | —                                                                                                                                                                                                                  | n/a                                                                         |
-| Sign in / up  | `app/(auth)/signIn.tsx`, `signUp.tsx` | Clerk screens                                                                                            | Auth classes (`auth-safe-area` / `auth-screen`)                                                                                                                                                                    | n/a                                                                         |
-| Tabs layout   | `app/(tabs)/_layout.tsx`              | Clerk-gated `<Tabs>`; floating pill tab bar; mounts `HiddenSearchWebView` + `ProtonCaptchaModal`         | Tab bar is **`position: "absolute"`** with `bottom: Math.max(insets.bottom, tabBar.horizontalInset)` (`horizontalInset` = 20). Height 72, radius 32, icon frame 48 (`src/constants/theme.ts` `components.tabBar`). **Do not restyle this pill.** | n/a                                                                         |
+| Auth layout   | `app/(auth)/_layout.tsx`              | Local auth stack (Continue → tabs)                                                                       | —                                                                                                                                                                                                                  | n/a                                                                         |
+| Sign in / up  | `app/(auth)/signIn.tsx`, `signUp.tsx` | Continue sign-in; `signUp` redirects to `signIn`                                                          | Auth classes (`auth-safe-area` / `auth-screen`)                                                                                                                                                                    | n/a                                                                         |
+| Tabs layout   | `app/(tabs)/_layout.tsx`              | Auth-gated `<Tabs>` (Redirect to signIn when signed out); floating pill tab bar; mounts `HiddenSearchWebView` + `ProtonCaptchaModal`         | Tab bar is **`position: "absolute"`** with `bottom: Math.max(insets.bottom, tabBar.horizontalInset)` (`horizontalInset` = 20). Height 72, radius 32, icon frame 48 (`src/constants/theme.ts` `components.tabBar`). **Do not restyle this pill.** | n/a                                                                         |
 | Home          | `app/(tabs)/index.tsx`                | Monthly spend from mail, upcoming, preview list, header `icons.add`, Scan                                | `SafeAreaView` edges `top/left/right` + `pagePadding`. List `tabListPadding`. `useChargeDisplay`.                                                                                                                                                  | Header `+` opens `CreateSubscriptionModal` via `addSubscription` then crawl |
 | Subscriptions | `app/(tabs)/subscriptions.tsx`        | Full list: search, All/Upcoming, expand/edit/delete/stats, header `+`, **long-press card icon → picker** | Same `useBottomClearance()` + `useChargeDisplay`. Header `+` opens the same `CreateSubscriptionModal` as Home.                                                                                                                                     | Header `+` → `addSubscription` then crawl                                   |
 | Insights      | `app/(tabs)/insights.tsx`             | This-month actuals, kind bars, top merchants, **Monthly spend from mail** + period chips                 | Same clearance. Bars from `monthlyChartFromMail`. After Year swipe, leftover horizontal offset can hide This Month until remount.                                                                                                                  | n/a                                                                         |
@@ -88,7 +88,7 @@ None of these files call `useSafeAreaInsets`. Shared sheet chrome is `.modal-con
 
 Three lanes:
 
-1. **Subscriptions** — Clerk user → encrypted SQLite → CRUD + prefs + analytics.
+1. **Subscriptions** — local user (`local`) → encrypted SQLite → CRUD + prefs + analytics.
 2. **Icon pipeline** — crawl discover/fetch → `icon_crawl_results` (device-local) → optional auto-promote into `icon_cache` → in-memory IconCache + UI listeners. On-demand AI upscale is separate from crawl.
 3. **Cloud sync** — scoped payload of subscriptions + preferences + chosen `icon_cache` only. Crawl ephemera never leaves the device.
 
@@ -100,7 +100,7 @@ Three lanes:
 
 | File                                          | Role                                                                                                                                                                                                                                                                                       |
 | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `iconBackgroundCrawler.ts`                    | Staged discovery: TIER 0 official-domain rank → 0.5 first-party extract → 1 libraries → 2 favicon → 3 image/dork + spider. Progressive publish. Last-good tree `7309add` + spinner `210c908` (not `063ac4b`). Card auto-assign uses `isPaintableCardIcon` (no SVG default). Key exports: `startIconCrawl`, `queueIconForScraping`, `processIconQueue`, `getIconCollection`, `findIconUrls`, `promoteFirstIconToCache`. |
+| `iconBackgroundCrawler.ts`                    | Staged discovery: TIER 0 official-domain rank → 0.5 first-party extract → 1 libraries → 2 favicon → 3 image/dork + spider. Progressive publish. Current era: G1 admission filters `6894795`, report-aware promote, reveal-toggle fixes `7199efb`/`6f860c8` (device-verified 2026-09-13). Card auto-assign uses `isPaintableCardIcon` (no SVG default). Key exports: `startIconCrawl`, `queueIconForScraping`, `processIconQueue`, `getIconCollection`, `findIconUrls`, `promoteFirstIconToCache`. |
 | `domain/domainDiscovery.ts`                   | **Pure** brand→domain ranking/confidence. No crawler/search imports (the reverted Tranche B recursion was `domainDiscovery → searchForLinksToSpider → getOfficialDomainGuesses → domainDiscovery`).                                                                                        |
 | `domain/provenance.ts`                        | `classifyCandidate` → official / library / brand-token / untrusted. Gates TIER 3 + spider. Untrusted URLs are rejected (the random-picture fix).                                                                                                                                           |
 | `searchEngines.ts`                            | DDG/Bing/Google image + dork helpers; `searchAllSources`, `searchForLinksToSpider`. DDG is often CAPTCHA-blocked on emulator; discovery must fall back, not crash.                                                                                                                         |
@@ -129,14 +129,7 @@ Three lanes:
 
 ### Tests (jest-expo, `npm test`)
 
-- `src/services/__tests__/iconQuality.test.ts`
-- `src/services/__tests__/iconScraper.test.ts`
-- `src/services/__tests__/crawlLifecycle.test.ts`
-- `src/services/domain/__tests__/domainDiscovery.test.ts`
-- `src/services/domain/__tests__/provenance.test.ts`
-- `src/services/emailscan/__tests__/chargeDisplay.test.ts`
-- `src/services/emailscan/__tests__/classifier.test.ts`
-- `src/services/emailscan/__tests__/scan.test.ts`
+34 suites / 286 tests across `src/services/__tests__`, `src/services/emailscan/__tests__`, `src/services/domain/__tests__`, `src/services/cloudsync/__tests__` (count re-verified 2026-09-13: 33/33 suites, 286/286 pass). Key suites: iconQuality, iconCandidate, crawlLifecycle, iconSelfHeal, scanState, classifier, scan, persist, projection(+Display), chargeDisplay, oauthSession/Refresh, scanWatchdog, domainDiscovery, provenance, officialDomain, rdap, authedRequest, dropboxOAuth.
 
 Characterization tests assert **actual** current behavior, not hoped-for behavior.
 
@@ -156,7 +149,7 @@ Characterization tests assert **actual** current behavior, not hoped-for behavio
 | `src/constants/theme.ts`                         | Colors, spacing scale (no 25), `components.tabBar`     |
 | `src/constants/icons.ts`, `images.ts`, `data.ts` | Bundled icons, images, tab/category data               |
 | `src/types/fast-tflite.d.ts`                     | TFLite module types                                    |
-| `src/config/`                                    | Not present as a source dir today                      |
+| `src/config/posthog.ts`                         | PostHog client (token via `extra`)                      |
 
 ---
 
