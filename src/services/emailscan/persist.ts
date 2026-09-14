@@ -585,6 +585,7 @@ export async function runPersistedScan(opts: {
   providerId: MailProviderId;
   fetcher: import("./types").MessageFetcher;
   limit?: number;
+  onLegProgress?: (staged: number) => void;
 }) {
   const { runIncrementalScan } = await import("./scan");
   const existing = await getMailboxAsync(opts.mailboxId);
@@ -605,6 +606,7 @@ export async function runPersistedScan(opts: {
     fetcher: opts.fetcher,
     store,
     limit: opts.limit,
+    onLegProgress: opts.onLegProgress,
   });
   const next = memory.get(opts.mailboxId);
   if (next) await saveMailboxAsync(next);

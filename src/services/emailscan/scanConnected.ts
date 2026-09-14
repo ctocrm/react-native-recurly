@@ -4,6 +4,7 @@ import {
   endScan,
   waitIfScanActive,
 } from "@/services/scanState";
+import { createLegProgressLogger } from "./legProgress";
 import { candidateToSubscription } from "./importCandidate";
 import { listMailboxesAsync } from "./persist";
 import {
@@ -80,9 +81,16 @@ async function runScan(opts: {
   );
 
   for (const box of boxes) {
+    // R13: one progress pacer per leg — a line every 30s plus a terminal line,
+    // so a live scan reads as progress and a stalled leg is visible as silence.
+    const pacer = createLegProgressLogger(box.mailboxId);
     try {
       const provider = createMailProvider(box.providerId, opts.userId);
-      const result = await provider.scan({ mailboxId: box.mailboxId });
+      const result = await provider.scan({
+        mailboxId: box.mailboxId,
+        onLegProgress: pacer.tick,
+      });
+      pacer.done(result.fetched, result.candidates.length);
       const keep = result.candidates.filter(
         (c) =>
           c.kind === "recurring" || c.kind === "sparse" || c.kind === "free",

@@ -193,5 +193,8 @@ export interface MailProvider {
   connect(): Promise<void>;
   disconnect(): Promise<void>;
   isConnected(): Promise<boolean>;
-  scan(opts?: { mailboxId?: string }): Promise<IncrementalScanResult>;
+  scan(opts?: {
+    mailboxId?: string;
+    onLegProgress?: (staged: number) => void;
+  }): Promise<IncrementalScanResult>;
 }
