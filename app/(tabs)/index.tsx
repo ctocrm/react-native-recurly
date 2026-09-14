@@ -13,8 +13,10 @@ import { useSubscriptions } from "@/context/SubscriptionContext";
 import "@/global.css";
 import { useBottomClearance } from "@/hooks/useBottomClearance";
 import { useChargeDisplay } from "@/hooks/useChargeDisplay";
+import { useScanProgress } from "@/hooks/useScanProgress";
 import { formatCurrency } from "@/lib/utils";
 import { importFromConnectedMailboxes } from "@/services/emailscan";
+import { getScanProgress } from "@/services/emailscan/scanProgress";
 import { listMailboxesAsync } from "@/services/emailscan/persist";
 import { useUser } from "@/context/AuthContext";
 import dayjs from "dayjs";
@@ -23,12 +25,12 @@ import { styled } from "nativewind";
 import { usePostHog } from "posthog-react-native";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   FlatList,
   Image,
   Pressable,
   Text,
+  ToastAndroid,
   View,
 } from "react-native";
 import { SafeAreaView as RNSafeAreaView } from "react-native-safe-area-context";
@@ -70,7 +72,7 @@ const App = () => {
     useState<Subscription | null>(null);
   const [iconPickerVisible, setIconPickerVisible] = useState(false);
   const [mailboxCount, setMailboxCount] = useState(0);
-  const [scanning, setScanning] = useState(false);
+  const scanProgress = useScanProgress();
 
   const refreshMailboxCount = useCallback(async () => {
     try {
@@ -126,36 +128,44 @@ const App = () => {
     router.push("/(tabs)/subscriptions");
   };
 
-  const handleHomeScanTap = async () => {
+  // Phase I (J3/I2): the scan runs fire-and-forget — the button never blocks
+  // navigation, live progress comes from the scanProgress store (rendered on
+  // the button), and completion surfaces as a toast. Errors keep the R2 Alert
+  // (per-mailbox detail will not fit a toast).
+  const handleHomeScanTap = () => {
     if (mailboxCount === 0) {
       router.push("/(tabs)/subscriptions?addMailbox=1");
       return;
     }
-    setScanning(true);
-    try {
-      const { imported, errors } = await importFromConnectedMailboxes({
-        userId: user?.id || "anonymous",
-        existing: subscriptions,
-        addSubscription,
-        updateSubscription,
+    if (getScanProgress().active) return;
+    void importFromConnectedMailboxes({
+      userId: user?.id || "anonymous",
+      existing: subscriptions,
+      addSubscription,
+      updateSubscription,
+    })
+      .then(async ({ imported, errors }) => {
+        await refreshSubscriptions();
+        await refreshMailboxCount();
+        if (errors.length) {
+          // R2 parity: per-mailbox errors always surface, even when some rows
+          // imported.
+          Alert.alert("Scan", errors.join("\n"));
+          return;
+        }
+        ToastAndroid.show(
+          imported > 0
+            ? `Scan complete — ${imported} new subscription${imported === 1 ? "" : "s"}`
+            : "Scan complete — no new subscriptions.",
+          ToastAndroid.SHORT,
+        );
+      })
+      .catch((error: unknown) => {
+        Alert.alert(
+          "Scan",
+          error instanceof Error ? error.message : "Scan failed",
+        );
       });
-      await refreshSubscriptions();
-      await refreshMailboxCount();
-      if (errors.length) {
-        // Parity with EmailScanSection: surface per-mailbox errors even when
-        // some rows imported (R2 — errors were hidden whenever imported > 0).
-        Alert.alert("Scan", errors.join("\n"));
-      } else if (imported === 0) {
-        Alert.alert("Scan", "No new subscriptions.");
-      }
-    } catch (error) {
-      Alert.alert(
-        "Scan",
-        error instanceof Error ? error.message : "Scan failed",
-      );
-    } finally {
-      setScanning(false);
-    }
   };
 
   const handleCreateSubscription = async (subscription: Subscription) => {
@@ -290,21 +300,19 @@ const App = () => {
                 mailboxCount > 0 ? "bg-accent" : "bg-muted"
               }`}
               onPress={handleHomeScanTap}
-              disabled={scanning}
+              disabled={scanProgress.active}
             >
-              {scanning ? (
-                <ActivityIndicator size="small" color="white" />
-              ) : (
-                <Text
-                  className={`text-sm font-sans-bold ${
-                    mailboxCount > 0 ? "text-white" : "text-primary"
-                  }`}
-                >
-                  {mailboxCount > 0
+              <Text
+                className={`text-sm font-sans-bold ${
+                  mailboxCount > 0 ? "text-white" : "text-primary"
+                }`}
+              >
+                {scanProgress.active
+                  ? `Scanning… leg ${scanProgress.legIndex + 1}/${scanProgress.legTotal}`
+                  : mailboxCount > 0
                     ? "Scan mailbox for subscriptions"
                     : "Add at least one mailbox to scan"}
-                </Text>
-              )}
+              </Text>
             </Pressable>
           </>
         }

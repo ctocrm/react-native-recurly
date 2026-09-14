@@ -6,6 +6,14 @@ import {
 } from "@/services/scanState";
 import { createLegProgressLogger } from "./legProgress";
 import {
+  scanProgressFinish,
+  scanProgressLegDone,
+  scanProgressLegError,
+  scanProgressLegStart,
+  scanProgressStaged,
+  scanProgressStart,
+} from "./scanProgress";
+import {
   formatScanBudgetLine,
   shouldSkipRemainingLegs,
 } from "./scanTotalBudget";
@@ -78,6 +86,7 @@ async function runScan(opts: {
   ) => Promise<void>;
 }): Promise<{ imported: number; errors: string[] }> {
   const boxes = await listMailboxesAsync();
+  scanProgressStart(boxes.length);
   let imported = 0;
   const errors: string[] = [];
   const existingByKey = new Map(
@@ -96,16 +105,24 @@ async function runScan(opts: {
       console.log(formatScanBudgetLine(elapsedMs, boxes.length - legIndex));
       break;
     }
+    // J3/I1: surface the leg to the in-app progress store.
+    scanProgressLegStart(legIndex, box.mailboxId);
     // R13: one progress pacer per leg — a line every 30s plus a terminal line,
     // so a live scan reads as progress and a stalled leg is visible as silence.
     const pacer = createLegProgressLogger(box.mailboxId);
+    let legCounted = false;
     try {
       const provider = createMailProvider(box.providerId, opts.userId);
       const result = await provider.scan({
         mailboxId: box.mailboxId,
-        onLegProgress: pacer.tick,
+        onLegProgress: (staged) => {
+          pacer.tick(staged);
+          scanProgressStaged(staged);
+        },
       });
       pacer.done(result.fetched, result.candidates.length);
+      scanProgressLegDone();
+      legCounted = true;
       const keep = result.candidates.filter(
         (c) =>
           c.kind === "recurring" || c.kind === "sparse" || c.kind === "free",
@@ -218,8 +235,10 @@ async function runScan(opts: {
         error,
       );
       errors.push(`${box.mailboxId}: ${message}`);
+      if (!legCounted) scanProgressLegError(message);
     }
   }
 
+  scanProgressFinish(imported, errors);
   return { imported, errors };
 }
