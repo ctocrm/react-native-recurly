@@ -690,6 +690,80 @@ async function fetchAndSaveUrl(
 }
 
 /**
+ * Phase L (email-icon immediate populate): the brand's own email carried logo
+ * URLs (extracted at classify time, ranked best-first). Try to populate the
+ * card DIRECTLY from ≤3 of them — download + validate + save with `email_*`
+ * provenance + promote through the same report-stick, cache-ownership-aware
+ * auto-assign the crawl uses (downloadImageAsBase64 promotes on every save)
+ * — BEFORE any web discovery runs.
+ *
+ * Returns true only when the card icon cache now holds a valid EMAIL-sourced
+ * icon, in which case the caller skips the web crawl entirely. Every other
+ * outcome (no seeds, crawl already active, card already populated, downloads
+ * failed, promote skipped/downgraded) returns false and the caller falls back
+ * to the seeded crawl — exactly the previous behavior. Runs at drain (the
+ * scan-crawl chain parks on waitIfScanActive first), so the apply lands the
+ * moment the scan ends, ahead of every crawl.
+ */
+export async function tryApplyEmailIconDirect(
+  iconKey: string,
+  seedUrls?: string[],
+): Promise<boolean> {
+  if (!seedUrls || seedUrls.length === 0) return false;
+  if (isLeftoverTypingSlug(iconKey)) return false;
+  // A crawl mid-flight for this key owns publication — never race it (the
+  // caller's startIconCrawl handles the duplicate-start case gracefully).
+  if (activeCrawls.has(iconKey)) return false;
+  // Card already populated: nothing to immediately populate, and the crawl
+  // path stays the owner of picker-collection enrichment (today's behavior).
+  const cachedBefore = await getCachedIcon(iconKey);
+  if (
+    cachedBefore?.imageData &&
+    isBase64IconValid(cachedBefore.imageData, cachedBefore.format)
+  ) {
+    return false;
+  }
+  const picks = seedUrls.slice(0, 3);
+  const existingUrls = new Set(
+    (await getCrawlResults(iconKey))
+      .map((r) => r.originalUrl)
+      .filter((u): u is string => Boolean(u)),
+  );
+  console.log(
+    `[EMAIL-DIRECT] ${iconKey}: trying ${picks.length} email icon URL(s) directly before web crawl`,
+  );
+  for (const url of picks) {
+    // Same provenance split + format sniff as the seed enqueue in findIconUrls.
+    const source = /(?:^|[/?#_.=-])(?:signature|sig)(?:$|[/?#_.=-])/i.test(url)
+      ? "email_signature"
+      : "email_logo";
+    const formatMatch = url.match(/\.(svg|png|jpe?g|webp|ico)(?:[?#]|$)/i);
+    const format = (formatMatch?.[1] ?? "png").toLowerCase();
+    if (!existingUrls.has(url)) {
+      // Record the candidate even if the download fails, so the fallback
+      // crawl's discovery dedupes it and the shared queue can retry it.
+      await saveCrawlResult(iconKey, "", source, format, url);
+      existingUrls.add(url);
+    }
+    await fetchAndSaveUrl(url, source, iconKey, format);
+  }
+  const cachedAfter = await getCachedIcon(iconKey);
+  const applied =
+    !!cachedAfter?.imageData &&
+    isBase64IconValid(cachedAfter.imageData, cachedAfter.format) &&
+    (cachedAfter.source === "email_logo" ||
+      cachedAfter.source === "email_signature");
+  if (applied) {
+    console.log(`[EMAIL-DIRECT] ${iconKey}: card icon applied from email`);
+  } else {
+    console.log(
+      `[EMAIL-DIRECT] ${iconKey}: email direct-apply did not land — falling back to web crawl`,
+    );
+  }
+  return applied;
+}
+
+/**
  * Start the high-confidence candidates immediately. Deep search continues to
  * expand the same persistent per-icon collection; it never gates first icons.
  */

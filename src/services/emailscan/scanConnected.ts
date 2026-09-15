@@ -1,4 +1,8 @@
-import { processIconQueue, startIconCrawl } from "@/services/iconBackgroundCrawler";
+import {
+  processIconQueue,
+  startIconCrawl,
+  tryApplyEmailIconDirect,
+} from "@/services/iconBackgroundCrawler";
 import {
   beginScan,
   endScan,
@@ -45,12 +49,22 @@ function enqueueScanIconCrawl(
 ): Promise<void> {
   scanCrawlChain = scanCrawlChain
     .then(() => waitIfScanActive())
-    .then(() =>
-      startIconCrawl(iconKey, subscriptionId, {
+    .then(async () => {
+      // Phase L: the brand's own email carries ranked logo URLs — try a
+      // direct apply here at drain BEFORE any web discovery. Success skips
+      // the crawl entirely; anything else falls back to the seeded crawl
+      // (the previous behavior). The park above keeps this off the mail legs.
+      if (await tryApplyEmailIconDirect(iconKey, emailIconUrls)) {
+        console.log(
+          `[MailScan] ${iconKey}: icon applied directly from email — web crawl skipped`,
+        );
+        return;
+      }
+      await startIconCrawl(iconKey, subscriptionId, {
         officialDomain: officialDomain ?? undefined,
         seedUrls: emailIconUrls,
-      }),
-    )
+      });
+    })
     .catch((error) => {
       console.warn(`[MailScan] icon crawl failed for ${iconKey}:`, error);
     });
