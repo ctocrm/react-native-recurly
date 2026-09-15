@@ -11,7 +11,11 @@
 //      freemail sender falls back to display-name/body evidence and imports
 //      sparse. google.com-family senders resolve to the right Google product,
 //      never "Gmail".
-export const PARSER_VERSION = 14;
+// v15→v16 (Phase L): the proton/tuta/imap legs now recover message HTML from
+// the native `text` payload (htmlFromNativeText), changing what the
+// classifier can extract. Bump forces one full restage so stored rows gain
+// emailIconUrls.
+export const PARSER_VERSION = 16;
 
 
 export type MailProviderId =

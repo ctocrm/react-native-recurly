@@ -7,6 +7,127 @@ import { NativeModules, Platform } from "react-native";
 import { requestProtonCaptcha } from "./protonCaptcha";
 import type { MessageFetcher, NormalizedMessage } from "./types";
 
+/**
+ * Phase L root-cause fix: recover the HTML body from the native `text`
+ * payload. The native bridges never emit an `html` field — Proton delivers
+ * its decrypted body as a FULL MIME DOCUMENT (the text/html part is
+ * quoted-printable or base64 encoded inside `text`), Tuta delivers the
+ * MailBody as raw HTML, and IMAP yields the raw body text. The Phase C
+ * extractor (`extractEmailIconUrls`) reads ONLY `message.html`, so without
+ * this recovery the proton/tuta/imap legs could never surface brand-sent
+ * icon seeds. Pure single-string ops, per-message, nothing retained —
+ * OOM-safe by the same construction as the classifier (R19).
+ */
+
+/** Upper bound on the string we scan for MIME structure (defensive). */
+const MIME_MAX_SCAN_CHARS = 2_000_000;
+
+/** Decode UTF-8 bytes (as a 0-255 char-code string) into a JS string. */
+function utf8FromBinary(bin: string): string {
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i) & 0xff;
+  let out = "";
+  let i = 0;
+  while (i < bytes.length) {
+    const b = bytes[i];
+    if (b < 0x80) {
+      out += String.fromCharCode(b);
+      i += 1;
+    } else if (b < 0xe0 && i + 1 < bytes.length) {
+      out += String.fromCharCode(((b & 0x1f) << 6) | (bytes[i + 1] & 0x3f));
+      i += 2;
+    } else if (b < 0xf0 && i + 2 < bytes.length) {
+      out += String.fromCharCode(
+        ((b & 0x0f) << 12) | ((bytes[i + 1] & 0x3f) << 6) | (bytes[i + 2] & 0x3f),
+      );
+      i += 3;
+    } else if (i + 3 < bytes.length) {
+      const cp =
+        ((b & 0x07) << 18) |
+        ((bytes[i + 1] & 0x3f) << 12) |
+        ((bytes[i + 2] & 0x3f) << 6) |
+        (bytes[i + 3] & 0x3f);
+      const o = cp - 0x10000;
+      out += String.fromCharCode(0xd800 + (o >> 10), 0xdc00 + (o & 0x3ff));
+      i += 4;
+    } else {
+      i += 1;
+    }
+  }
+  return out;
+}
+
+/** quoted-printable → UTF-8 text (drops soft breaks, decodes =XX bytes). */
+function decodeQuotedPrintable(input: string): string {
+  const collapsed = input.replace(/=\r?\n/g, "");
+  const bin = collapsed.replace(
+    /=([0-9A-Fa-f]{2})/g,
+    (_m: string, h: string) => String.fromCharCode(parseInt(h, 16)),
+  );
+  return utf8FromBinary(bin);
+}
+
+/** base64 → UTF-8 text; null when undecodable. */
+function decodeBase64ToUtf8(input: string): string | null {
+  const compact = input.replace(/[^A-Za-z0-9+/=]/g, "");
+  if (compact.length < 4) return null;
+  const atobFn = typeof globalThis.atob === "function" ? globalThis.atob : null;
+  if (!atobFn) return null;
+  try {
+    return utf8FromBinary(atobFn(compact));
+  } catch {
+    return null;
+  }
+}
+
+/** Find the text/html leaf inside a MIME document (depth-capped recursion). */
+function mimeHtmlPart(body: string, depth: number): string | null {
+  if (depth > 3) return null;
+  const bm =
+    body.match(/boundary="([^"]+)"/i) ?? body.match(/boundary=([^\s;"]+)/i);
+  if (!bm) return null;
+  const delim = `--${bm[1]}`;
+  const chunks = body.split(delim);
+  for (let c = 1; c < chunks.length; c += 1) {
+    const chunk = chunks[c];
+    if (chunk.startsWith("--")) continue; // closing boundary marker
+    const headerEnd = chunk.search(/\r?\n\r?\n/);
+    if (headerEnd < 0) continue;
+    const headers = chunk.slice(0, headerEnd);
+    const payload = chunk.slice(headerEnd).replace(/^\r?\n\r?\n/, "");
+    if (/content-type:\s*text\/html/i.test(headers)) {
+      if (/quoted-printable/i.test(headers)) return decodeQuotedPrintable(payload);
+      if (/base64/i.test(headers)) return decodeBase64ToUtf8(payload) ?? payload;
+      return payload.trim();
+    }
+    if (/content-type:\s*multipart\//i.test(headers)) {
+      const nested = mimeHtmlPart(`${headers}\n\n${payload}`, depth + 1);
+      if (nested) return nested;
+    }
+  }
+  return null;
+}
+
+/**
+ * Best-effort HTML recovery from the native body text. Returns undefined
+ * for plain-text bodies (correct negative — no invented HTML).
+ */
+export function htmlFromNativeText(
+  text?: string | null,
+): string | undefined {
+  if (!text || text.length < 24) return undefined;
+  const scan =
+    text.length > MIME_MAX_SCAN_CHARS ? text.slice(0, MIME_MAX_SCAN_CHARS) : text;
+  // Tuta-style: the body IS html already.
+  if (/^\s*<[!a-z]/i.test(scan)) return scan;
+  // Proton-style: the decrypted body is a MIME document.
+  if (/content-type:/i.test(scan) && /boundary=/i.test(scan)) {
+    const html = mimeHtmlPart(scan, 0);
+    if (html && /<\/?[a-z][\s\S]*>/i.test(html)) return html;
+  }
+  return undefined;
+}
+
 export interface ImapSocketCreds {
   host: string;
   port: number;
@@ -210,6 +331,7 @@ export function createProtonFetcher(
               subject: m.subject,
               date: m.date,
               text: m.text,
+              html: htmlFromNativeText(m.text),
             }))
             .filter((m) => !seen.has(m.messageId));
           if (fresh.length === 0) break;
@@ -299,6 +421,7 @@ export function createPasswordMailFetcher(
         subject: m.subject,
         date: m.date,
         text: m.text,
+        html: htmlFromNativeText(m.text),
       }));
       // R19-OOM: single native batch streamed straight to the scan.
       // Phase K: the native bridge exposes no listing total — count only.
@@ -334,6 +457,7 @@ export function createImapFetcher(
         subject: m.subject,
         date: m.date,
         text: m.text,
+        html: htmlFromNativeText(m.text),
       }));
       // R19-OOM: single native batch streamed straight to the scan.
       // Phase K: the native bridge exposes no listing total — count only.
