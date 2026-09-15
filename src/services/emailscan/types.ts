@@ -5,7 +5,13 @@
 
 // 13: F-2 canonical brands — zohoaccounts mints as Zoho (reclassifies cached
 //      From-hosts so mail history re-keys onto the canonical brand).
-export const PARSER_VERSION = 13;
+// 14: M triage honesty — freemail hosts (gmail/googlemail/outlook/hotmail/
+//      yahoo/icloud) never mint the merchant from the host alone: a forward
+//      re-keys to the original issuer's From-host or drops, a non-forwarded
+//      freemail sender falls back to display-name/body evidence and imports
+//      sparse. google.com-family senders resolve to the right Google product,
+//      never "Gmail".
+export const PARSER_VERSION = 14;
 
 
 export type MailProviderId =

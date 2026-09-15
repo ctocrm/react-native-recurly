@@ -96,8 +96,8 @@ function reparseStale(state: MailboxScanState): {
 } {
   // R19-OOM note: stored messages are body-stripped (stripBodyForStore), so a
   // parser-version bump reclassifies the subject/header-derived fields only.
-  // Body-derived fields (billNumber, body amounts) refresh when the message
-  // is re-fetched live, exactly like any newer mail.
+  // Body-derived fields (billNumber, body amounts, M forward re-keying)
+  // refresh when the message is re-fetched live, exactly like any newer mail.
   if (state.cursor.parserVersion === PARSER_VERSION) {
     return { state, reparsed: 0 };
   }

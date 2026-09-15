@@ -361,13 +361,238 @@ export function merchantFromProcessorText(text: string): {
   return null;
 }
 
-export function resolveMerchant(message: NormalizedMessage): {
+/**
+ * Phase M (triage honesty): freemail hosts are mailbox providers, not
+ * companies. A sender on one of these hosts can NEVER mint the merchant from
+ * the host alone — a forwarded bill is re-keyed to the original issuer's
+ * From-host inside the forward, and a non-forwarded freemail sender (a small
+ * business billing from a personal address) falls back to display-name / body
+ * evidence and imports sparse. Not every email is a subscription.
+ */
+const FREEMAIL_HOSTS = [
+  "gmail.com",
+  "googlemail.com",
+  "outlook.com",
+  "hotmail.com",
+  "yahoo.com",
+  "icloud.com",
+];
+
+function hostMatchesBase(host: string, base: string): boolean {
+  return host === base || host.endsWith(`.${base}`);
+}
+
+function isFreemailHost(host: string): boolean {
+  const h = host.toLowerCase();
+  return FREEMAIL_HOSTS.some((base) => hostMatchesBase(h, base));
+}
+
+function hostFromAddress(from: string): string | null {
+  const email = extractEmailAddress(from);
+  const at = email.lastIndexOf("@");
+  return at >= 0 ? email.slice(at + 1) : null;
+}
+
+/**
+ * google.com-family senders are Google the company — resolve to the specific
+ * product from subject/body cues, never to "Gmail" (the "$1,439 Gmail"
+ * phantom). No cue means the bill is from Google as a whole, not a product
+ * the classifier can name; it still never mints a mailbox label.
+ */
+function isGoogleFamilyHost(host: string): boolean {
+  return hostMatchesBase(host.toLowerCase(), "google.com");
+}
+
+const GOOGLE_PRODUCT_MATCHERS: {
+  re: RegExp;
+  key: string;
+  name: string;
+  host: string;
+}[] = [
+  {
+    re: /\bgoogle\s+workspace\b|\bgsuite\b|\bg\s?suite\b/i,
+    key: "google-workspace",
+    name: "Google Workspace",
+    host: "workspace.google.com",
+  },
+  {
+    re: /\bgoogle\s+cloud\b|\bgoogle\s+cloud\s+platform\b|\bgcp\b/i,
+    key: "google-cloud",
+    name: "Google Cloud",
+    host: "cloud.google.com",
+  },
+  {
+    re: /\bgoogle\s+ads(?:ense|words)?\b/i,
+    key: "google-ads",
+    name: "Google Ads",
+    host: "ads.google.com",
+  },
+  {
+    re: /\bgoogle\s+one\b/i,
+    key: "google-one",
+    name: "Google One",
+    host: "one.google.com",
+  },
+  {
+    re: /\bgoogle\s+play\b|\bplay\s+billing\b/i,
+    key: "google-play",
+    name: "Google Play",
+    host: "play.google.com",
+  },
+  {
+    re: /\bgoogle\s+drive\b/i,
+    key: "google-drive",
+    name: "Google Drive",
+    host: "drive.google.com",
+  },
+  {
+    re: /\byoutube\b/i,
+    key: "youtube",
+    name: "YouTube",
+    host: "youtube.com",
+  },
+];
+
+function googleProductFromText(
+  text: string | null | undefined,
+): (typeof GOOGLE_PRODUCT_MATCHERS)[number] | null {
+  if (!text) return null;
+  for (const m of GOOGLE_PRODUCT_MATCHERS) {
+    if (m.re.test(text)) return m;
+  }
+  return null;
+}
+
+const FORWARD_SUBJECT_RE = /(?:^|\s)fwd?\s*:/i;
+const FORWARD_BODY_RE = /forwarded message/i;
+const QUOTED_FROM_RE = /^\s*From:\s*(.+)$/gim;
+
+/** The first From: line inside a forwarded body whose host can be an issuer
+ * (dotted, non-freemail). Freemail inner senders are skipped, not fatal. */
+function originalIssuerInForward(
+  body: string,
+): { from: string; host: string } | null {
+  QUOTED_FROM_RE.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = QUOTED_FROM_RE.exec(body)) !== null) {
+    const from = m[1].trim();
+    const host = hostFromAddress(from);
+    if (!host || !host.includes(".") || isFreemailHost(host)) continue;
+    return { from, host };
+  }
+  return null;
+}
+
+interface MerchantResolution {
   merchantKey: string;
   merchantName: string;
   officialDomain: string | null;
   evidence: string[];
   drop: boolean;
-} {
+  /** M: freemail fallback mints import sparse, never recurring. */
+  forceSparse?: boolean;
+}
+
+function resolveGoogleSender(message: NormalizedMessage): MerchantResolution {
+  const product =
+    googleProductFromText(message.subject) ??
+    googleProductFromText(moneyBodyText(message));
+  if (product) {
+    return {
+      merchantKey: product.key,
+      merchantName: product.name,
+      officialDomain: product.host,
+      evidence: [`google-product:${product.key}`],
+      drop: false,
+    };
+  }
+  return {
+    merchantKey: "google",
+    merchantName: "Google",
+    officialDomain: "google.com",
+    evidence: ["google:generic"],
+    drop: false,
+  };
+}
+
+function resolveFreemailSender(message: NormalizedMessage): MerchantResolution {
+  const body = moneyBodyText(message);
+  if (FORWARD_SUBJECT_RE.test(message.subject) || FORWARD_BODY_RE.test(body)) {
+    // The quoted From: line must keep its <address> — moneyBodyText strips
+    // anything angle-bracketed as markup, so scan the raw text first and the
+    // stripped html as a second chance.
+    let original = originalIssuerInForward(message.text ?? "");
+    if (!original && message.html) {
+      original = originalIssuerInForward(stripHtml(message.html));
+    }
+    if (
+      !original &&
+      (FORWARD_BODY_RE.test(body) || FORWARD_BODY_RE.test(message.text ?? ""))
+    ) {
+      return {
+        merchantKey: "unknown",
+        merchantName: "Unknown",
+        officialDomain: null,
+        evidence: ["drop:forward-unresolved"],
+        drop: true,
+      };
+    }
+    if (original) {
+      if (isGoogleFamilyHost(original.host)) {
+        const resolved = resolveGoogleSender(message);
+        return {
+          ...resolved,
+          evidence: [`forward:${original.host}`, ...resolved.evidence],
+        };
+      }
+      return {
+        ...merchantFromAddress(original.from),
+        officialDomain: officialDomainFromAddress(original.from),
+        evidence: [`forward:${original.host}`],
+        drop: false,
+      };
+    }
+  }
+  // Not forwarded: a small business billing from a personal address falls
+  // back to display-name, then body, evidence — and imports sparse. A bare
+  // address (no angled display name) must not mint from the local part.
+  if (message.from.indexOf("<") >= 0) {
+    const display = displayNameFrom(message.from);
+    if (display && !display.includes("@")) {
+      const named = titleCaseMerchant(display);
+      if (named.merchantKey !== "unknown") {
+        return {
+          ...named,
+          officialDomain: null,
+          evidence: ["freemail:display-name"],
+          drop: false,
+          forceSparse: true,
+        };
+      }
+    }
+  }
+  const named = merchantFromProcessorText(body);
+  if (named) {
+    return {
+      ...named,
+      officialDomain: null,
+      evidence: ["freemail:body"],
+      drop: false,
+      forceSparse: true,
+    };
+  }
+  return {
+    merchantKey: "unknown",
+    merchantName: "Unknown",
+    officialDomain: null,
+    evidence: ["drop:freemail-no-identity"],
+    drop: true,
+  };
+}
+
+export function resolveMerchant(
+  message: NormalizedMessage,
+): MerchantResolution {
   if (isSelfMail(message)) {
     return {
       merchantKey: "self",
@@ -389,6 +614,16 @@ export function resolveMerchant(message: NormalizedMessage): {
       evidence: [`drop:generic-name:${fromMerchant.merchantKey}`],
       drop: true,
     };
+  }
+  // Phase M (triage honesty): freemail hosts never mint the merchant from
+  // the host alone, and google.com-family senders resolve to the specific
+  // Google product — never "Gmail".
+  const fromHost = hostFromAddress(message.from);
+  if (fromHost && isFreemailHost(fromHost)) {
+    return resolveFreemailSender(message);
+  }
+  if (fromHost && isGoogleFamilyHost(fromHost)) {
+    return resolveGoogleSender(message);
   }
   if (!isPaymentProcessor(fromMerchant.merchantKey)) {
     return {
@@ -723,7 +958,11 @@ export function classifyMessage(message: NormalizedMessage): ClassifiedMessage {
     evidence.push("body:recurring-cue");
   if (body && USAGE_MONEY_RE.test(body)) evidence.push("body:usage-cue");
 
-  const kind = subjectClass === "recurring" ? "recurring" : "sparse";
+  const kind = resolved.forceSparse
+    ? "sparse"
+    : subjectClass === "recurring"
+      ? "recurring"
+      : "sparse";
 
   return {
     message,
