@@ -49,7 +49,7 @@ type ClearTarget = "iconCache" | "crawlHistory" | "emailScanCache" | null;
 const SafeAreaView = styled(RNSafeAreaView);
 
 const Settings = () => {
-  const { tabListPadding, pagePadding } = useBottomClearance();
+  const { tabListPadding, pagePadding, sheetPadding } = useBottomClearance();
   const { signOut } = useAuth();
   const { user } = useUser();
   const posthog = usePostHog();
@@ -915,7 +915,10 @@ const Settings = () => {
               className="flex-1"
               onPress={() => setDeepSheetOpen(false)}
             />
-            <View className="rounded-t-3xl bg-background p-5">
+            <View
+              className="rounded-t-3xl bg-background p-5"
+              style={{ maxHeight: "85%", paddingBottom: sheetPadding }}
+            >
               <Text className="text-xl font-sans-bold text-primary mb-2">
                 Deep Re-list
               </Text>
@@ -961,7 +964,10 @@ const Settings = () => {
               className="flex-1"
               onPress={() => setDeepOfferOpen(false)}
             />
-            <View className="rounded-t-3xl bg-background p-5">
+            <View
+              className="rounded-t-3xl bg-background p-5"
+              style={{ maxHeight: "85%", paddingBottom: sheetPadding }}
+            >
               <Text className="text-xl font-sans-bold text-primary mb-2">
                 Re-list your entire mailbox history?
               </Text>
