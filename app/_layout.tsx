@@ -1,5 +1,6 @@
 import { AuthProvider } from "@/context/AuthContext";
 import { IconCacheProvider } from "@/context/IconCacheContext";
+import DeepScanBubble from "@/components/DeepScanBubble";
 import { posthog } from "@/config/posthog";
 import { useFonts } from "expo-font";
 import {
@@ -59,6 +60,8 @@ const RootLayout = () => {
       <AuthProvider>
         <IconCacheProvider>
           <Stack screenOptions={{ headerShown: false }} />
+          {/* Phase K: deep re-list gauge bubble — floats over every screen. */}
+          <DeepScanBubble />
         </IconCacheProvider>
       </AuthProvider>
     </PostHogProvider>

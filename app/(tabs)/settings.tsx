@@ -19,10 +19,12 @@ import {
   type IconCacheStats,
   type ImportScanResult,
 } from "@/services/database";
+import { importFromConnectedMailboxes } from "@/services/emailscan";
 import {
   clearScanCacheAsync,
   countScanCacheAsync,
 } from "@/services/emailscan/persist";
+import { getScanProgress } from "@/services/emailscan/scanProgress";
 import { useAuth, useUser } from "@/context/AuthContext";
 import * as DocumentPicker from "expo-document-picker";
 import * as Sharing from "expo-sharing";
@@ -33,9 +35,11 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Modal,
   Pressable,
   ScrollView,
   Text,
+  ToastAndroid,
   View,
 } from "react-native";
 import { SafeAreaView as RNSafeAreaView } from "react-native-safe-area-context";
@@ -50,7 +54,12 @@ const Settings = () => {
   const { user } = useUser();
   const posthog = usePostHog();
   const { isReady } = useDatabase();
-  const { refreshSubscriptions } = useSubscriptions();
+  const {
+    subscriptions,
+    addSubscription,
+    updateSubscription,
+    refreshSubscriptions,
+  } = useSubscriptions();
   const { clearCache } = useIconCache();
   const {
     syncMetadata,
@@ -105,6 +114,11 @@ const Settings = () => {
   const [scanCacheCount, setScanCacheCount] = useState(0);
   const [confirmTarget, setConfirmTarget] = useState<ClearTarget>(null);
   const [clearing, setClearing] = useState(false);
+
+  // Phase K: deep re-list
+  const [deepSheetOpen, setDeepSheetOpen] = useState(false);
+  const [deepOfferOpen, setDeepOfferOpen] = useState(false);
+  const [deepStarting, setDeepStarting] = useState(false);
 
   const loadStats = useCallback(async () => {
     if (!isReady) return;
@@ -360,6 +374,9 @@ const Settings = () => {
       } else {
         await clearScanCacheAsync();
         posthog.capture("settings_clear_email_scan_cache");
+        // Phase K: the recency window is gone — offer the deep re-list so
+        // brands older than the newest 500 ids can come back.
+        setDeepOfferOpen(true);
       }
       await loadStats();
     } catch (error) {
@@ -368,6 +385,51 @@ const Settings = () => {
     } finally {
       setClearing(false);
     }
+  };
+
+  // ---------------------------------------------------------------------------
+  // Deep re-list (Phase K)
+  // ---------------------------------------------------------------------------
+
+  const startDeepRelist = () => {
+    if (getScanProgress().active) {
+      ToastAndroid.show("A scan is already running.", ToastAndroid.SHORT);
+      return;
+    }
+    setDeepSheetOpen(false);
+    setDeepOfferOpen(false);
+    setDeepStarting(true);
+    posthog.capture("deep_relist_started");
+    void importFromConnectedMailboxes({
+      userId: user?.id || "anonymous",
+      existing: subscriptions,
+      addSubscription,
+      updateSubscription,
+      deep: true,
+    })
+      .then(async ({ imported, errors }) => {
+        await refreshSubscriptions();
+        posthog.capture("deep_relist_completed", { imported });
+        if (errors.length) {
+          // R2 parity: per-mailbox errors always surface, even when some rows
+          // imported.
+          Alert.alert("Deep re-list", errors.join("\n"));
+          return;
+        }
+        ToastAndroid.show(
+          imported > 0
+            ? `Deep re-list complete — ${imported} new subscription${imported === 1 ? "" : "s"}`
+            : "Deep re-list complete — no new subscriptions found.",
+          ToastAndroid.LONG,
+        );
+      })
+      .catch((error: unknown) => {
+        Alert.alert(
+          "Deep re-list",
+          error instanceof Error ? error.message : "Deep re-list failed",
+        );
+      })
+      .finally(() => setDeepStarting(false));
   };
 
   // ---------------------------------------------------------------------------
@@ -788,6 +850,17 @@ const Settings = () => {
             cache. Mailbox logins stay signed in.
           </Text>
 
+          {/* Phase K: deep re-list */}
+          <Pressable
+            className={`auth-button bg-accent mb-4 ${deepStarting ? "opacity-50" : ""}`}
+            onPress={() => setDeepSheetOpen(true)}
+            disabled={deepStarting}
+          >
+            <Text className="auth-button-text text-white">
+              Deep Re-list (entire mailbox history)
+            </Text>
+          </Pressable>
+
           <Pressable
             className={`auth-button bg-destructive mb-3 ${clearing || !isReady ? "opacity-50" : ""}`}
             onPress={() => setConfirmTarget("iconCache")}
@@ -829,6 +902,95 @@ const Settings = () => {
         >
           <Text className="auth-button-text text-white">Sign Out</Text>
         </Pressable>
+
+        {/* Phase K: deep re-list warn sheet */}
+        <Modal
+          visible={deepSheetOpen}
+          animationType="slide"
+          transparent
+          onRequestClose={() => setDeepSheetOpen(false)}
+        >
+          <View className="flex-1 justify-end bg-black/50">
+            <Pressable
+              className="flex-1"
+              onPress={() => setDeepSheetOpen(false)}
+            />
+            <View className="rounded-t-3xl bg-background p-5">
+              <Text className="text-xl font-sans-bold text-primary mb-2">
+                Deep Re-list
+              </Text>
+              <Text className="mb-2 text-sm font-sans-medium text-muted-foreground">
+                Lists your ENTIRE mailbox history — every matching email, not
+                just the newest 500. Subscriptions whose mail has aged out of
+                the recent window will be found again.
+              </Text>
+              <Text className="mb-4 text-xs font-sans-medium text-muted-foreground">
+                This can take 30–60+ minutes and uses more network. You can
+                keep using the app — a progress bubble shows live counts.
+              </Text>
+              <Pressable
+                className="mb-3 items-center rounded-2xl bg-accent py-4"
+                onPress={startDeepRelist}
+                disabled={deepStarting}
+              >
+                <Text className="text-base font-sans-bold text-white">
+                  {deepStarting ? "Starting…" : "Start deep re-list"}
+                </Text>
+              </Pressable>
+              <Pressable
+                className="items-center rounded-2xl bg-muted py-4"
+                onPress={() => setDeepSheetOpen(false)}
+              >
+                <Text className="text-base font-sans-bold text-primary">
+                  Cancel
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Phase K: offer after Clear Email Scan Cache */}
+        <Modal
+          visible={deepOfferOpen}
+          animationType="slide"
+          transparent
+          onRequestClose={() => setDeepOfferOpen(false)}
+        >
+          <View className="flex-1 justify-end bg-black/50">
+            <Pressable
+              className="flex-1"
+              onPress={() => setDeepOfferOpen(false)}
+            />
+            <View className="rounded-t-3xl bg-background p-5">
+              <Text className="text-xl font-sans-bold text-primary mb-2">
+                Re-list your entire mailbox history?
+              </Text>
+              <Text className="mb-4 text-sm font-sans-medium text-muted-foreground">
+                The scan cache was cleared, so only the newest emails would be
+                re-listed. A deep re-list walks the entire history instead —
+                subscriptions older than that window come back. It can take
+                30–60+ minutes; a progress bubble shows live counts.
+              </Text>
+              <Pressable
+                className="mb-3 items-center rounded-2xl bg-accent py-4"
+                onPress={startDeepRelist}
+                disabled={deepStarting}
+              >
+                <Text className="text-base font-sans-bold text-white">
+                  {deepStarting ? "Starting…" : "Deep re-list now"}
+                </Text>
+              </Pressable>
+              <Pressable
+                className="items-center rounded-2xl bg-muted py-4"
+                onPress={() => setDeepOfferOpen(false)}
+              >
+                <Text className="text-base font-sans-bold text-primary">
+                  Later
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </Modal>
 
         {/* Conflict Resolution Modal */}
         <ConflictResolutionModal

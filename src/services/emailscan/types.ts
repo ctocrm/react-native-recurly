@@ -109,6 +109,25 @@ export const DEFAULT_DISPLAY_FILTERS: DisplayFilters = {
 /** First-connect recency cap. Later scans use the cursor, not this. */
 export const INITIAL_SCAN_LIMIT = 500;
 
+/**
+ * Phase K deep re-list: the user explicitly opted into listing the ENTIRE
+ * mailbox history, so the recency cap is replaced by a large safety ceiling
+ * (it guards against a runaway provider loop, not against legitimate work).
+ */
+export const DEEP_SCAN_LIMIT = 50_000;
+
+/**
+ * Phase K: progress metadata a fetcher MAY attach to each streamed chunk.
+ * `listed` counts every id seen (screened or staged) in the leg so far;
+ * `total` is the provider-reported size of the listing when the API exposes
+ * one (Gmail resultSizeEstimate, Graph @odata.count) and null when it does
+ * not — the UI must render unknown totals honestly ("scanned N").
+ */
+export interface ChunkMeta {
+  listed: number;
+  total: number | null;
+}
+
 export type MailAuthKind = "oauth" | "imap" | "password";
 
 export interface MailProviderCatalogEntry {
@@ -166,7 +185,10 @@ export interface MessageFetcher {
       since: FetchSince | null;
       limit: number;
     },
-    onChunk: (chunk: NormalizedMessage[]) => void | Promise<void>,
+    onChunk: (
+      chunk: NormalizedMessage[],
+      meta?: ChunkMeta,
+    ) => void | Promise<void>,
   ): Promise<void>;
 }
 
@@ -196,5 +218,13 @@ export interface MailProvider {
   scan(opts?: {
     mailboxId?: string;
     onLegProgress?: (staged: number) => void;
+    /**
+     * Phase K deep re-list: ignore the scan cursor and the recency cap so
+     * the entire mailbox history is listed (user opted in via the warn
+     * modal). Cached messages at the current parser version still skip.
+     */
+    deep?: boolean;
+    /** Phase K: per-chunk listing progress for the in-app gauge. */
+    onListProgress?: (listed: number, total: number | null) => void;
   }): Promise<IncrementalScanResult>;
 }

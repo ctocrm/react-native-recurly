@@ -570,6 +570,8 @@ export function createGmailFetcher(
       let pages = 0;
       let listed = 0;
       let bodies = 0;
+      // Phase K: provider-reported listing total for the in-app gauge.
+      let estimate: number | null = null;
       // Proton/Tuta staging: list ids paged, screen on cheap metadata, and
       // pull full bodies only for subjects the classifier will actually use
       // (recurring/sparse need bodies; drop/account/security never do).
@@ -591,8 +593,12 @@ export function createGmailFetcher(
         const listJson = (await listRes.json()) as {
           messages?: { id: string }[];
           nextPageToken?: string;
+          resultSizeEstimate?: number;
         };
         pageToken = listJson.nextPageToken;
+        if (typeof listJson.resultSizeEstimate === "number") {
+          estimate = listJson.resultSizeEstimate;
+        }
         pages += 1;
         const ids = (listJson.messages || []).map((m) => m.id);
         listed += ids.length;
@@ -643,7 +649,7 @@ export function createGmailFetcher(
           });
           bodies += 1;
         }
-        await onChunk(pageMsgs);
+        await onChunk(pageMsgs, { listed, total: estimate });
         // F-4 (2026-09-14 baseline): INITIAL_SCAN_LIMIT was passed down but
         // only capped the page size — a mailbox with more matches listed
         // forever (witnessed: 2000+ ids listed against limit=500, the leg
@@ -671,6 +677,7 @@ export function createGraphFetcher(
       let pages = 0;
       let listed = 0;
       let bodies = 0;
+      let graphTotal: number | null = null;
       // Proton/Tuta staging: Graph's list returns screening fields directly
       // ($select — no separate metadata pass), pages are followed via
       // @odata.nextLink, and bodies ($select=body) load only for subjects the
@@ -680,6 +687,8 @@ export function createGraphFetcher(
           const params = new URLSearchParams({
             $top: String(Math.min(limit, 100)),
             $select: "id,subject,from,receivedDateTime",
+            // Phase K: ask for @odata.count so the gauge has a real total.
+            $count: "true",
           });
           if (since?.date) {
             params.set("$filter", `receivedDateTime gt ${since.date}`);
@@ -708,8 +717,12 @@ export function createGraphFetcher(
             receivedDateTime?: string;
           }[];
           "@odata.nextLink"?: string;
+          "@odata.count"?: number;
         };
         url = json["@odata.nextLink"] ?? null;
+        if (typeof json["@odata.count"] === "number") {
+          graphTotal = json["@odata.count"];
+        }
         pages += 1;
         const items = json.value || [];
         listed += items.length;
@@ -759,7 +772,7 @@ export function createGraphFetcher(
           });
           bodies += 1;
         }
-        await onChunk(pageMsgs);
+        await onChunk(pageMsgs, { listed, total: graphTotal });
         // F-4: same limit enforcement as the Gmail loop — Graph walked
         // @odata.nextLink without ever checking the requested limit.
         if (listed >= limit) url = null;
@@ -832,8 +845,10 @@ export function createZohoFetcher(
         }[];
       };
       // R19-OOM: stream the single search batch; bounded by the search limit.
+      // Phase K: Zoho's search API exposes no listing total — count only.
+      const rows = json.data || [];
       await onChunk(
-        (json.data || []).map((m) => {
+        rows.map((m) => {
           const received =
             typeof m.receivedTime === "number"
               ? new Date(m.receivedTime).toISOString()
@@ -849,6 +864,7 @@ export function createZohoFetcher(
             text: m.summary,
           };
         }),
+        { listed: rows.length, total: null },
       );
     },
   };
@@ -906,6 +922,8 @@ export function createJmapFetcher(
                 },
             sort: [{ property: "receivedAt", isAscending: false }],
             limit: Math.min(limit, 50),
+            // Phase K: best-effort total — honored only if the bridge supports it.
+            calculateTotal: true,
           },
           "0",
         ],
@@ -950,6 +968,14 @@ export function createJmapFetcher(
         (c: unknown[]) => c[0] === "Email/get",
       );
       const list = getCall?.[1]?.list || [];
+      // Phase K: JMAP Email/query reports `total` when calculateTotal was
+      // requested AND the bridge honors it; otherwise unknown (null).
+      const queryCall = (json.methodResponses || []).find(
+        (c: unknown[]) => c[0] === "Email/query",
+      );
+      const queryTotal = queryCall?.[1]?.total;
+      const jmapTotal: number | null =
+        typeof queryTotal === "number" ? queryTotal : null;
       // R19-OOM: stream the single Email/get batch; bounded by the query limit.
       await onChunk(
         list.map((m: any) => {
@@ -966,6 +992,7 @@ export function createJmapFetcher(
             text: m.preview,
           };
         }),
+        { listed: list.length, total: jmapTotal },
       );
     },
   };
@@ -1305,6 +1332,8 @@ export function createMailProvider(
         providerId,
         fetcher,
         onLegProgress: opts?.onLegProgress,
+        deep: opts?.deep,
+        onListProgress: opts?.onListProgress,
       });
     },
   };

@@ -21,6 +21,14 @@
 
 export const SCAN_TOTAL_BUDGET_MS = 10 * 60_000;
 
+/**
+ * Phase K deep re-list: the user explicitly opted into listing the entire
+ * mailbox history, which legitimately runs far longer than a steady-state
+ * scan. Same between-legs semantics as the default budget (an in-flight leg
+ * is never killed; the watchdog remains the authority on a dead leg).
+ */
+export const DEEP_SCAN_BUDGET_MS = 60 * 60_000;
+
 /** True once the scan has consumed its budget and remaining legs must be skipped. */
 export function shouldSkipRemainingLegs(
   elapsedMs: number,

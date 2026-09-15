@@ -11,6 +11,13 @@
  * Deliberately minimal: no scheduler, no immutability helpers. Mutators
  * replace the state object (stable snapshot reference for useSyncExternalStore)
  * and notify listeners; listener errors are logged, never fatal.
+ *
+ * Phase K (deep re-list): adds {deep, listed, listedTotal} — cumulative ids
+ * listed and the provider-reported total where the API exposes one (Gmail
+ * resultSizeEstimate, Graph @odata.count). listedTotal stays null until some
+ * provider reports a total; legs that report none contribute their count but
+ * not a total, so the UI must render "scanned N" honestly instead of a fake
+ * percentage.
  */
 
 export interface ScanProgress {
@@ -25,6 +32,16 @@ export interface ScanProgress {
   imported: number;
   /** Scan-phase errors (per mailbox); final summary errors ride the finish. */
   errors: string[];
+  /** Phase K: true when this run is a deep re-list (drives the gauge bubble). */
+  deep: boolean;
+  /** Phase K: ids listed so far — completed legs + the current leg. */
+  listed: number;
+  /**
+   * Phase K: sum of provider-reported totals (completed + current leg).
+   * Null until ANY provider reports one; legs without a total contribute
+   * count only.
+   */
+  listedTotal: number | null;
 }
 
 type Listener = () => void;
@@ -39,6 +56,9 @@ function initialState(): ScanProgress {
     legsDone: 0,
     imported: 0,
     errors: [],
+    deep: false,
+    listed: 0,
+    listedTotal: null,
   };
 }
 
@@ -59,6 +79,19 @@ function set(next: Partial<ScanProgress>): void {
   }
 }
 
+// Phase K accumulators (module-level, deliberately outside the state object):
+// the current leg's running numbers plus the completed-leg rollup.
+let doneListed = 0;
+let doneTotal: number | null = null;
+let doneHasTotal = false;
+let curListed = 0;
+let curTotal: number | null = null;
+
+function combinedTotal(): number | null {
+  if (!doneHasTotal && curTotal == null) return null;
+  return (doneTotal ?? 0) + (curTotal ?? 0);
+}
+
 export function getScanProgress(): ScanProgress {
   return state;
 }
@@ -71,14 +104,21 @@ export function subscribeScanProgress(listener: Listener): () => void {
 }
 
 /** Called once the mailbox list is known — resets any previous run. */
-export function scanProgressStart(legTotal: number): void {
-  set({ ...initialState(), active: true, legTotal });
+export function scanProgressStart(legTotal: number, deep = false): void {
+  doneListed = 0;
+  doneTotal = null;
+  doneHasTotal = false;
+  curListed = 0;
+  curTotal = null;
+  set({ ...initialState(), active: true, legTotal, deep });
 }
 
 export function scanProgressLegStart(
   legIndex: number,
   mailboxId: string,
 ): void {
+  curListed = 0;
+  curTotal = null;
   set({ legIndex, mailboxId, staged: 0 });
 }
 
@@ -87,18 +127,53 @@ export function scanProgressStaged(staged: number): void {
   set({ staged });
 }
 
+/**
+ * Phase K: per-chunk listing progress from the fetcher (cumulative for the
+ * leg). `total` is the provider-reported listing size, or null when the API
+ * exposes none.
+ */
+export function scanProgressListed(
+  listed: number,
+  total: number | null,
+): void {
+  curListed = listed;
+  if (total != null) curTotal = total;
+  set({ listed: doneListed + curListed, listedTotal: combinedTotal() });
+}
+
+/** Roll the current leg's counters into the completed-leg accumulators. */
+function rollUpLeg(): void {
+  doneListed += curListed;
+  if (curTotal != null) {
+    doneTotal = (doneTotal ?? 0) + curTotal;
+    doneHasTotal = true;
+  }
+  curListed = 0;
+  curTotal = null;
+}
+
 /** The leg's scan phase completed (imports may still follow). */
 export function scanProgressLegDone(): void {
-  set({ legsDone: state.legsDone + 1, mailboxId: null, staged: 0 });
+  rollUpLeg();
+  set({
+    legsDone: state.legsDone + 1,
+    mailboxId: null,
+    staged: 0,
+    listed: doneListed,
+    listedTotal: combinedTotal(),
+  });
 }
 
 /** The leg's scan phase failed — still counts as finished for k/N. */
 export function scanProgressLegError(message: string): void {
+  rollUpLeg();
   set({
     legsDone: state.legsDone + 1,
     errors: [...state.errors, message],
     mailboxId: null,
     staged: 0,
+    listed: doneListed,
+    listedTotal: combinedTotal(),
   });
 }
 

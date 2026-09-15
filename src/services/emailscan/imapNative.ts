@@ -218,7 +218,11 @@ export function createProtonFetcher(
           }
           // R19-OOM: flush per native chunk — the bridge payload is already
           // chunked; the JS side must not re-accumulate the whole mailbox.
-          await onChunk(fresh);
+          await onChunk(fresh, {
+            listed: seen.size,
+            // The native bridge exposes no listing total — count only.
+            total: null,
+          });
           staged += fresh.length;
           // Terminate on the RAW count: untilIso is a non-strict upper bound,
           // so the boundary message itself is re-returned next batch (and
@@ -288,17 +292,17 @@ export function createPasswordMailFetcher(
         since?.date ?? null,
         limit,
       );
+      const msgs = (result.messages || []).map((m): NormalizedMessage => ({
+        mailboxId,
+        messageId: m.messageId,
+        from: m.from,
+        subject: m.subject,
+        date: m.date,
+        text: m.text,
+      }));
       // R19-OOM: single native batch streamed straight to the scan.
-      await onChunk(
-        (result.messages || []).map((m): NormalizedMessage => ({
-          mailboxId,
-          messageId: m.messageId,
-          from: m.from,
-          subject: m.subject,
-          date: m.date,
-          text: m.text,
-        })),
-      );
+      // Phase K: the native bridge exposes no listing total — count only.
+      await onChunk(msgs, { listed: msgs.length, total: null });
     },
   };
 }
@@ -323,17 +327,17 @@ export function createImapFetcher(
         since?.date ?? null,
         limit,
       );
+      const msgs = (result.messages || []).map((m): NormalizedMessage => ({
+        mailboxId,
+        messageId: m.messageId,
+        from: m.from,
+        subject: m.subject,
+        date: m.date,
+        text: m.text,
+      }));
       // R19-OOM: single native batch streamed straight to the scan.
-      await onChunk(
-        (result.messages || []).map((m): NormalizedMessage => ({
-          mailboxId,
-          messageId: m.messageId,
-          from: m.from,
-          subject: m.subject,
-          date: m.date,
-          text: m.text,
-        })),
-      );
+      // Phase K: the native bridge exposes no listing total — count only.
+      await onChunk(msgs, { listed: msgs.length, total: null });
     },
   };
 }

@@ -11,6 +11,7 @@ import {
 } from "./scanWatchdog";
 import { buildCandidateMap } from "./rollup";
 import {
+    DEEP_SCAN_LIMIT,
     INITIAL_SCAN_LIMIT,
     PARSER_VERSION,
     type IncrementalScanResult,
@@ -165,17 +166,27 @@ export async function runIncrementalScan(opts: {
   watchdog?: ScanWatchdogControl;
   /** R13: called once per fetched chunk with the cumulative staged count. */
   onLegProgress?: (staged: number) => void;
+  /** Phase K: deep re-list — ignore cursor + recency cap (user opted in). */
+  deep?: boolean;
+  /** Phase K: per-chunk listing progress for the in-app gauge. */
+  onListProgress?: (listed: number, total: number | null) => void;
 }): Promise<IncrementalScanResult> {
   const watchdog = opts.watchdog ?? defaultWatchdog;
-  const limit = opts.limit ?? INITIAL_SCAN_LIMIT;
+  const limit = opts.deep ? DEEP_SCAN_LIMIT : (opts.limit ?? INITIAL_SCAN_LIMIT);
   const existing =
     opts.store.getMailbox(opts.mailboxId) ??
     emptyState(opts.mailboxId, opts.providerId);
 
   const { state: primed, reparsed } = reparseStale(existing);
 
-  const since =
-    primed.cursor.lastMessageDate && primed.cursor.lastMessageId
+  // Phase K (deep): the user opted into listing the entire history — the
+  // cursor lower bound is ignored so mail beyond the newest window is
+  // re-listed. Cached messages at the current parser version still skip
+  // (the messages-map check below), so a warm-cache deep run only stages
+  // what is actually missing.
+  const since = opts.deep
+    ? null
+    : primed.cursor.lastMessageDate && primed.cursor.lastMessageId
       ? {
           date: primed.cursor.lastMessageDate,
           messageId: primed.cursor.lastMessageId,
@@ -201,7 +212,7 @@ export async function runIncrementalScan(opts: {
     await Promise.race([
       opts.fetcher.fetchMessages(
         { mailboxId: opts.mailboxId, since, limit },
-        (chunk) => {
+        (chunk, meta) => {
           for (const raw of chunk) {
             if (
               !isNewerThanCursor(raw, primed.cursor) &&
@@ -225,6 +236,8 @@ export async function runIncrementalScan(opts: {
           }
           // R13: one progress callback per chunk (pacer throttles to 30s).
           opts.onLegProgress?.(accepted);
+          // Phase K: listing progress for the in-app gauge (fetcher-provided).
+          if (meta) opts.onListProgress?.(meta.listed, meta.total);
           next.cursor = advanceCursor(next.cursor, chunk);
           // F-4: feed the no-progress watchdog per FLUSHED chunk, not per
           // HTTP call — a completed page is progress even when every message

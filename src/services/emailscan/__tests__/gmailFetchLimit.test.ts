@@ -134,4 +134,50 @@ describe("createGmailFetcher limit enforcement (F-4)", () => {
       logLines.some((l) => l.includes("limit 250 reached") && l.includes("truncating")),
     ).toBe(true);
   });
+
+  test("streams chunk meta {listed, total} for the Phase K gauge", async () => {
+    global.fetch = jest.fn((url: string) => {
+      if (url.includes(LIST_URL)) {
+        return Promise.resolve(
+          jsonResponse(200, {
+            messages: [{ id: "a" }, { id: "b" }],
+            // Phase K: the gauge's total comes from resultSizeEstimate.
+            resultSizeEstimate: 1234,
+          }),
+        );
+      }
+      if (url.includes(META_URL)) {
+        // Drop-classified subjects: no body GETs, but `listed` still counts
+        // every screened id — that is the honest "scanned" number.
+        return Promise.resolve(
+          jsonResponse(200, {
+            payload: {
+              headers: [
+                { name: "Subject", value: "Password reset instructions" },
+              ],
+            },
+          }),
+        );
+      }
+      return Promise.resolve(jsonResponse(404, {}));
+    }) as unknown as typeof fetch;
+
+    const fetcher = createGmailFetcher(
+      createTokenSession({ accessToken: "token-1" }),
+      "workspace-1",
+    );
+    const metas: { listed: number; total: number | null }[] = [];
+    const promise = fetcher.fetchMessages(
+      { mailboxId: "workspace-1", since: null, limit: 500 },
+      async (_chunk, meta) => {
+        if (meta) metas.push(meta);
+      },
+    );
+    // One page: 1 list + 2 metadata, paced 500ms apart — drive well past it.
+    await jest.advanceTimersByTimeAsync(10_000);
+    await promise;
+
+    expect(metas.length).toBeGreaterThan(0);
+    expect(metas[metas.length - 1]).toEqual({ listed: 2, total: 1234 });
+  });
 });

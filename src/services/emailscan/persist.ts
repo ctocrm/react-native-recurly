@@ -586,6 +586,10 @@ export async function runPersistedScan(opts: {
   fetcher: import("./types").MessageFetcher;
   limit?: number;
   onLegProgress?: (staged: number) => void;
+  /** Phase K: deep re-list — ignore cursor + recency cap (user opted in). */
+  deep?: boolean;
+  /** Phase K: per-chunk listing progress for the in-app gauge. */
+  onListProgress?: (listed: number, total: number | null) => void;
 }) {
   const { runIncrementalScan } = await import("./scan");
   const existing = await getMailboxAsync(opts.mailboxId);
@@ -607,6 +611,8 @@ export async function runPersistedScan(opts: {
     store,
     limit: opts.limit,
     onLegProgress: opts.onLegProgress,
+    deep: opts.deep,
+    onListProgress: opts.onListProgress,
   });
   const next = memory.get(opts.mailboxId);
   if (next) await saveMailboxAsync(next);

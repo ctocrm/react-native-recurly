@@ -10,10 +10,12 @@ import {
   scanProgressLegDone,
   scanProgressLegError,
   scanProgressLegStart,
+  scanProgressListed,
   scanProgressStaged,
   scanProgressStart,
 } from "./scanProgress";
 import {
+  DEEP_SCAN_BUDGET_MS,
   formatScanBudgetLine,
   shouldSkipRemainingLegs,
 } from "./scanTotalBudget";
@@ -63,6 +65,8 @@ export async function importFromConnectedMailboxes(opts: {
     id: string,
     data: Partial<Subscription>,
   ) => Promise<void>;
+  /** Phase K: deep re-list — list entire history (user opted in). */
+  deep?: boolean;
 }): Promise<{ imported: number; errors: string[] }> {
   beginScan();
   try {
@@ -84,9 +88,16 @@ async function runScan(opts: {
     id: string,
     data: Partial<Subscription>,
   ) => Promise<void>;
+  /** Phase K: deep re-list — list entire history (user opted in). */
+  deep?: boolean;
 }): Promise<{ imported: number; errors: string[] }> {
   const boxes = await listMailboxesAsync();
-  scanProgressStart(boxes.length);
+  scanProgressStart(boxes.length, !!opts.deep);
+  if (opts.deep) {
+    console.log(
+      "[MailScan] deep re-list: listing entire mailbox history (recency cap off, 60-min budget)",
+    );
+  }
   let imported = 0;
   const errors: string[] = [];
   const existingByKey = new Map(
@@ -101,7 +112,12 @@ async function runScan(opts: {
   for (let legIndex = 0; legIndex < boxes.length; legIndex += 1) {
     const box = boxes[legIndex];
     const elapsedMs = Date.now() - scanStartedAt;
-    if (shouldSkipRemainingLegs(elapsedMs)) {
+    if (
+      shouldSkipRemainingLegs(
+        elapsedMs,
+        opts.deep ? DEEP_SCAN_BUDGET_MS : undefined,
+      )
+    ) {
       console.log(formatScanBudgetLine(elapsedMs, boxes.length - legIndex));
       break;
     }
@@ -115,9 +131,13 @@ async function runScan(opts: {
       const provider = createMailProvider(box.providerId, opts.userId);
       const result = await provider.scan({
         mailboxId: box.mailboxId,
+        deep: opts.deep,
         onLegProgress: (staged) => {
           pacer.tick(staged);
           scanProgressStaged(staged);
+        },
+        onListProgress: (listed, total) => {
+          scanProgressListed(listed, total);
         },
       });
       pacer.done(result.fetched, result.candidates.length);
