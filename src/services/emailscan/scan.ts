@@ -226,18 +226,11 @@ export async function runIncrementalScan(opts: {
             ) {
               continue;
             }
-            // L2-A DIAGNOSTIC (temporary): tuta-leg classification verdicts.
-            const classified = classifyMessage(raw);
-            if (raw.mailboxId?.startsWith("tuta")) {
-              console.log(
-                `[L2-PROBE-T] classified subject="${raw.subject}" kind=${classified.kind} merchant=${classified.merchantName} amount=${classified.amount ?? "?"} bill=${classified.billNumber ?? "none"}`,
-              );
-            }
             next.messages[raw.messageId] = {
               // classifyMessage consumes the FULL body (billNumber, amount,
               // processor merchant extraction); the stored copy is stripped.
               message: stripBodyForStore(raw),
-              classified,
+              classified: classifyMessage(raw),
               parserVersion: PARSER_VERSION,
             };
             accepted += 1;
