@@ -22,7 +22,7 @@ import { NativeModules, Platform } from "react-native";
 import * as SecureStore from "expo-secure-store";
 
 import { getOrCreateDbKey } from "../db/connection";
-import { b64ToHex, b64ToUtf8, utf8ToB64 } from "./bytes";
+import { b64ToUtf8, utf8ToB64 } from "./bytes";
 import {
   generateRecoveryPhrase,
   validateRecoveryPhrase,
@@ -317,32 +317,6 @@ export function setSecureWindow(flag: boolean): void {
 
 export { generateRecoveryPhrase, validateRecoveryPhrase };
 
-// ---------------------------------------------------------------------------
-// Passphrase-derived keys (Phase O: encrypted cross-install backup)
-// ---------------------------------------------------------------------------
-
-export type BackupKdfMeta = { salt: string; iterations: number; bits: number };
-
-/**
- * Derive a HEX SQLCipher key from a user passphrase (PBKDF2-HMAC-SHA256 via
- * the native vault module). Used to encrypt/decrypt cross-install backup
- * files natively with sqlcipher_export / PRAGMA rekey.
- */
-export async function deriveBackupKey(
-  pass: string,
-  saltB64: string,
-  iterations: number,
-  bits: number,
-): Promise<string> {
-  if (!pass) throw new Error("Passphrase required");
-  const keyB64 = await native().pbkdf2Sha256(
-    pass,
-    saltB64,
-    iterations,
-    bits,
-  );
-  return b64ToHex(keyB64);
-}
 
 
 
