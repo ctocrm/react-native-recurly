@@ -48,12 +48,27 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
 
   const completeGate = async (passphrase?: string) => {
     if (!clerkUserId) return;
-    const database = passphrase
-      ? await openDatabase(clerkUserId, { passphrase })
-      : await openDatabase(clerkUserId);
-    setDb(database);
-    setDbError(null);
-    setGate({ status: "open" });
+    try {
+      const database = passphrase
+        ? await openDatabase(clerkUserId, { passphrase })
+        : await openDatabase(clerkUserId);
+      setDb(database);
+      setDbError(null);
+      setGate({ status: "open" });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.includes("database is locked")) {
+        // Dev-reload artifact: a JS reload drops the JS handle but leaves the
+        // previous native SQLite connection holding the file lock; there is
+        // no API to close another context's connection. A full app restart
+        // clears it (force-stop always has). Production never hits this.
+        setDbError(
+          "The database is locked by a previous session. Fully close the app (swipe away) and open it again.",
+        );
+        return;
+      }
+      throw error;
+    }
   };
 
   useEffect(() => {
