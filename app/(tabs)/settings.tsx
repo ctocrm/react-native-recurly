@@ -1,7 +1,14 @@
 import ConfirmModal from "@/components/ConfirmModal";
 import ConflictResolutionModal from "@/components/ConflictResolutionModal";
 import { AppLockCard } from "@/components/auth/AppLockCard";
+import { PasswordInput } from "@/components/auth/PasswordInput";
 import { ExpiredGraceCard } from "@/components/settings/ExpiredGraceCard";
+import {
+  decryptEncryptedBackupToPlain,
+  deleteImportTemp,
+  exportEncryptedBackup,
+} from "@/services/backup/encryptedBackup";
+import { validateExportPassphrase } from "@/services/backup/encryptedBackupEnvelope";
 import images from "@/constants/images";
 import { useCloudSync } from "@/context/CloudSyncContext";
 import { useDatabase } from "@/context/DatabaseProvider";
@@ -117,6 +124,14 @@ const Settings = () => {
   const [confirmTarget, setConfirmTarget] = useState<ClearTarget>(null);
   const [clearing, setClearing] = useState(false);
 
+  // Phase O: encrypted cross-install backup
+  const [encSheet, setEncSheet] = useState<"export" | "import" | null>(null);
+  const [encPass, setEncPass] = useState("");
+  const [encPass2, setEncPass2] = useState("");
+  const [encError, setEncError] = useState<string | null>(null);
+  const [encBusy, setEncBusy] = useState(false);
+  const [encPickedUri, setEncPickedUri] = useState<string | null>(null);
+
   // Phase K: deep re-list
   const [deepSheetOpen, setDeepSheetOpen] = useState(false);
   const [deepOfferOpen, setDeepOfferOpen] = useState(false);
@@ -184,36 +199,12 @@ const Settings = () => {
   // Import
   // ---------------------------------------------------------------------------
 
-  const handleImport = async () => {
-    if (!isReady) return;
-    setImportStep("selecting");
-    setImportResult(null);
-    setImportUri(null);
-    setConflictRows([]);
-    posthog.capture("settings_import_started");
+  // Shared scan phase for both plain and encrypted imports (Phase O).
+  const runImportScan = async (fileUri: string) => {
+    setImportUri(fileUri);
+    setImportStep("scanning");
 
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: "*/*",
-        copyToCacheDirectory: true,
-      });
-
-      if (result.canceled) {
-        setImportStep("idle");
-        return;
-      }
-
-      const file = result.assets?.[0];
-      if (!file) {
-        setImportStep("idle");
-        return;
-      }
-
-      const fileUri = file.uri;
-      setImportUri(fileUri);
-      setImportStep("scanning");
-
-      const scanResult: ImportScanResult = await importBackup(fileUri);
+    const scanResult: ImportScanResult = await importBackup(fileUri);
 
       if (scanResult.conflictingIds.length > 0) {
         setImportResult({
@@ -261,12 +252,116 @@ const Settings = () => {
           rows_imported: imported,
         });
       }
+  };
+
+  const handleImport = async () => {
+    if (!isReady) return;
+    setImportStep("selecting");
+    setImportResult(null);
+    setImportUri(null);
+    setConflictRows([]);
+    posthog.capture("settings_import_started");
+
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: "*/*",
+        copyToCacheDirectory: true,
+      });
+
+      if (result.canceled) {
+        setImportStep("idle");
+        return;
+      }
+
+      const file = result.assets?.[0];
+      if (!file) {
+        setImportStep("idle");
+        return;
+      }
+
+      await runImportScan(file.uri);
     } catch (error) {
       console.error("Import failed:", error);
       setImportStep("idle");
       posthog.capture("settings_import_failed", {
         error: error instanceof Error ? error.message : "Unknown error",
       });
+    }
+  };
+
+  // ---------------------------------------------------------------------------
+  // Encrypted cross-install backup (Phase O)
+  // ---------------------------------------------------------------------------
+
+  const handleEncryptedExport = async () => {
+    if (!isReady || !userId) return;
+    const problem = validateExportPassphrase(encPass, encPass2);
+    if (problem) {
+      setEncError(problem);
+      return;
+    }
+    setEncBusy(true);
+    setEncError(null);
+    posthog.capture("settings_encrypted_export_started");
+    try {
+      const uri = await exportEncryptedBackup(userId, encPass);
+      await Sharing.shareAsync(uri, {
+        mimeType: "application/json",
+        dialogTitle: "Save encrypted backup",
+      });
+      posthog.capture("settings_encrypted_export_completed");
+      setEncSheet(null);
+      setEncPass("");
+      setEncPass2("");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Export failed";
+      setEncError(message);
+      posthog.capture("settings_encrypted_export_failed", { error: message });
+    } finally {
+      setEncBusy(false);
+    }
+  };
+
+  const openEncryptedImportPicker = async () => {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: "*/*",
+      copyToCacheDirectory: true,
+    });
+    if (result.canceled) return;
+    const file = result.assets?.[0];
+    if (!file) return;
+    setEncPickedUri(file.uri);
+    setEncError(null);
+    setEncSheet("import");
+  };
+
+  const handleEncryptedImport = async () => {
+    if (!isReady || !userId || !encPickedUri) return;
+    setEncBusy(true);
+    setEncError(null);
+    posthog.capture("settings_encrypted_import_started");
+    try {
+      const plainUri = await decryptEncryptedBackupToPlain(
+        encPickedUri,
+        encPass,
+        userId,
+      );
+      setEncSheet(null);
+      setEncPass("");
+      setEncPass2("");
+      setEncPickedUri(null);
+      setEncBusy(false);
+      setImportResult(null);
+      setImportUri(null);
+      setConflictRows([]);
+      setImportStep("selecting");
+      await runImportScan(plainUri);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Import failed";
+      setEncError(message);
+      setEncBusy(false);
+      posthog.capture("settings_encrypted_import_failed", { error: message });
     }
   };
 
@@ -320,6 +415,9 @@ const Settings = () => {
 
   const handleConflictCancel = () => {
     setConflictModalVisible(false);
+    if (importUri?.includes("import_plain_")) {
+      void deleteImportTemp(importUri);
+    }
     setImportStep("idle");
     posthog.capture("settings_import_cancelled");
   };
@@ -329,6 +427,9 @@ const Settings = () => {
   // ---------------------------------------------------------------------------
 
   const resetImport = () => {
+    if (importUri?.includes("import_plain_")) {
+      void deleteImportTemp(importUri);
+    }
     setImportStep("idle");
     setImportResult(null);
     setImportUri(null);
@@ -782,6 +883,43 @@ const Settings = () => {
             the native share sheet.
           </Text>
 
+          {/* Phase O: encrypted cross-install backup */}
+          <View className="mb-3 rounded-2xl border border-border bg-card p-3">
+            <Text className="text-sm font-sans-bold text-primary">
+              Cross-device backup
+            </Text>
+            <Text className="mt-1 text-xs font-sans-medium text-muted-foreground">
+              Restorable on a fresh install with a passphrase you choose. The
+              passphrase is the only key — it cannot be recovered. The plain
+              Export above only restores on THIS install.
+            </Text>
+            <View className="mt-3 flex-row gap-2">
+              <Pressable
+                className="flex-1 items-center rounded-xl bg-muted py-3"
+                onPress={() => {
+                  setEncPass("");
+                  setEncPass2("");
+                  setEncError(null);
+                  setEncSheet("export");
+                }}
+                disabled={!isReady}
+              >
+                <Text className="text-xs font-sans-bold text-primary">
+                  Encrypted export
+                </Text>
+              </Pressable>
+              <Pressable
+                className="flex-1 items-center rounded-xl bg-muted py-3"
+                onPress={openEncryptedImportPicker}
+                disabled={!isReady}
+              >
+                <Text className="text-xs font-sans-bold text-primary">
+                  Encrypted import
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+
           {/* Import Backup */}
           {importStep === "idle" && (
             <Pressable
@@ -1023,6 +1161,94 @@ const Settings = () => {
           onCancel={() => setConfirmTarget(null)}
         />
       </ScrollView>
+
+      {/* Phase O: encrypted backup passphrase modal */}
+      <Modal
+        visible={encSheet !== null}
+        animationType="fade"
+        transparent
+        onRequestClose={() => {
+          if (!encBusy) setEncSheet(null);
+        }}
+      >
+        <Pressable
+          className="flex-1 justify-end bg-black/50"
+          onPress={() => {
+            if (!encBusy) setEncSheet(null);
+          }}
+        >
+          <Pressable
+            className="rounded-t-3xl bg-background p-5"
+            style={{ paddingBottom: sheetPadding }}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <Text className="mb-2 text-xl font-sans-bold text-primary">
+              {encSheet === "export" ? "Encrypted export" : "Encrypted import"}
+            </Text>
+            <Text className="mb-4 text-xs font-sans-medium text-muted-foreground">
+              {encSheet === "export"
+                ? "Choose a passphrase for this backup. It is the ONLY way to restore it on a fresh install — it cannot be recovered."
+                : "Enter the passphrase this backup was exported with."}
+            </Text>
+            <PasswordInput
+              value={encPass}
+              onChange={setEncPass}
+              placeholder="Passphrase"
+              autoFocus
+            />
+            {encSheet === "export" ? (
+              <View className="mt-3">
+                <PasswordInput
+                  value={encPass2}
+                  onChange={setEncPass2}
+                  placeholder="Confirm passphrase"
+                />
+              </View>
+            ) : null}
+            {encError ? (
+              <Text className="mt-2 text-xs font-sans-bold text-destructive">
+                {encError}
+              </Text>
+            ) : null}
+            <View className="mt-5 flex-row gap-2">
+              <Pressable
+                className="flex-1 items-center rounded-xl bg-muted py-3"
+                onPress={() => {
+                  setEncSheet(null);
+                  setEncPass("");
+                  setEncPass2("");
+                  setEncError(null);
+                  setEncPickedUri(null);
+                }}
+                disabled={encBusy}
+              >
+                <Text className="text-sm font-sans-bold text-primary">
+                  Cancel
+                </Text>
+              </Pressable>
+              <Pressable
+                className={`flex-1 items-center rounded-xl bg-accent py-3 ${
+                  encBusy ? "opacity-50" : ""
+                }`}
+                onPress={
+                  encSheet === "export"
+                    ? handleEncryptedExport
+                    : handleEncryptedImport
+                }
+                disabled={encBusy}
+              >
+                {encBusy ? (
+                  <ActivityIndicator size="small" color="white" />
+                ) : (
+                  <Text className="text-sm font-sans-bold text-white">
+                    {encSheet === "export" ? "Export" : "Restore"}
+                  </Text>
+                )}
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 };

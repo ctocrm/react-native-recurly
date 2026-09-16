@@ -7,6 +7,8 @@ import {
 import clsx from "clsx";
 import React, { useState } from "react";
 import { ActivityIndicator, Image, Pressable, Text, View } from "react-native";
+import { icons } from "@/constants/icons";
+import { NoThumbnail } from "@/components/NoThumbnail";
 import { isMayHaveExpired } from "@/services/subscriptionStatus";
 import SubscriptionCardMenu from "./SubscriptionCardMenu";
 
@@ -104,8 +106,12 @@ const SubscriptionCard = ({
       );
     }
 
-    // No cached icon available - use the static icon asset
-    // This is either the brand icon or the "plus" default icon set at creation time
+    // No cached icon available - use the static icon asset, UNLESS it is
+    // the plus.png default (no icon chosen/acquired): Phase O renders a
+    // muted no-thumbnail glyph instead of a plus image.
+    if (icon === icons.plus) {
+      return <NoThumbnail size={64} />;
+    }
     return <Image source={icon} className="size-16 rounded-xl" />;
   };
 

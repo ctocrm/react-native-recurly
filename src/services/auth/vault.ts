@@ -317,5 +317,53 @@ export function setSecureWindow(flag: boolean): void {
 
 export { generateRecoveryPhrase, validateRecoveryPhrase };
 
+// ---------------------------------------------------------------------------
+// Passphrase-wrapped secrets (Phase O: encrypted cross-install backup)
+// ---------------------------------------------------------------------------
+
+export type BackupKdfMeta = { salt: string; iterations: number; bits: number };
+
+/**
+ * Wrap an arbitrary secret string (the hex DB key for backups) under a
+ * user-chosen passphrase: AES-256-GCM(KDF(pass), utf8(secret)). Same
+ * primitives and parameters as the app-pass vault leg.
+ */
+export async function wrapSecretWithPassphrase(
+  secret: string,
+  pass: string,
+): Promise<{ kdf: BackupKdfMeta; wrappedKey: string }> {
+  if (!pass) throw new Error("Passphrase required");
+  const meta: KdfMeta = {
+    salt: await newSalt(),
+    iterations: PASS_ITERATIONS,
+    version: FORMAT_VERSION,
+  };
+  const key = await deriveKey(pass, meta);
+  const wrappedKey = await native().aesGcmEncrypt(key, utf8ToB64(secret));
+  return {
+    kdf: { salt: meta.salt, iterations: meta.iterations, bits: KEY_BITS },
+    wrappedKey,
+  };
+}
+
+/**
+ * Unwrap a secret wrapped by wrapSecretWithPassphrase. GCM's auth tag is the
+ * wrong-passphrase detector — a wrong pass throws like a corrupted blob.
+ */
+export async function unwrapSecretWithPassphrase(
+  wrappedKey: string,
+  kdf: BackupKdfMeta,
+  pass: string,
+): Promise<string> {
+  if (!pass) throw new Error("Passphrase required");
+  const key = await deriveKey(pass, {
+    salt: kdf.salt,
+    iterations: kdf.iterations,
+    version: FORMAT_VERSION,
+  });
+  return b64ToUtf8(await native().aesGcmDecrypt(key, wrappedKey));
+}
+
+
 
 
