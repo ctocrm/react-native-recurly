@@ -1927,8 +1927,8 @@ RDAP over HTTPS (no key): bootstrapped from `officialDomain` → RDAP server via
 
 
 ### Phase O — IN PROGRESS (session 2026-09-16, paused for user decision on data loss)
-- **O1 DONE (`d95d021`)**: no-icon placeholder — muted NoThumbnail SVG glyph replaces the plus.png card fallback when a row has no icon (dead-host rows stop showing a fake plus).
-- **O2 DONE (`d95d021`)**: Add-mailbox picker rows show the curated PROVIDER_BRAND_ICONS mark when one exists (tuta today) and the glyph otherwise.
+- **O1 DONE (`d95d021`)**: no-icon placeholder — muted NoThumbnail SVG glyph replaces the plus.png card fallback when a row has no icon (dead-host rows stop showing a fake plus). **Visually verified on device 2026-09-16** (glyph on Rotaryengine/Google One rows, /tmp/gate3_final_home.png).
+- **O2 DONE (`d95d021`)**: Add-mailbox picker rows show the curated PROVIDER_BRAND_ICONS mark when one exists (tuta today) and the glyph otherwise. **Visually verified on device 2026-09-16** (tuta brand mark renders; all other rows glyph, /tmp/o2_picker_brands.png).
 - **O3 DEVICE GATE — PARTIAL (commits `51a7d4c`, `87700e5`, `673e761`)**:
   - Base64-envelope design OOMed on device (39.8MB alloc vs 200MB JS heap) → redesigned STREAMING: the export file IS a SQLCipher DB keyed by the user passphrase (sqlcipher_export native re-encrypt; PBKDF2-SHA512 256k + random salt handled by SQLCipher itself; zero JS-heap payload).
   - **ROUND-TRIP PROVEN ON DEVICE** (2026-09-16): export (29.5MB→135KB fresh / file written, share sheet attempted) → pick → passphrase → probe → PRAGMA rekey under local key → scan → "Import Complete". Wrong-passphrase path surfaces a friendly error.
