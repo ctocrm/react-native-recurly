@@ -1151,6 +1151,27 @@ export async function executeNonConflictingImport(
     const allRows = await importDb.getAllAsync<Record<string, any>>(
       "SELECT * FROM subscriptions",
     );
+    // The classified corpus and the spend buckets folded from it. Encrypted
+    // backups carry both; cloud-sync payloads strip them at export, making
+    // these reads 0-row no-ops there. Without the corpus + buckets a fresh
+    // install folds subscriptions-only spend and loses every sparse charge
+    // (2026-09-16 gate: $74.84 of $355.79 missing, Home rendered $0.00).
+    let corpusRows: Record<string, any>[] = [];
+    try {
+      corpusRows = await importDb.getAllAsync<Record<string, any>>(
+        "SELECT * FROM mail_messages",
+      );
+    } catch {
+      /* legacy backup without the table */
+    }
+    let bucketRows: Record<string, any>[] = [];
+    try {
+      bucketRows = await importDb.getAllAsync<Record<string, any>>(
+        "SELECT * FROM merchant_day_actuals",
+      );
+    } catch {
+      /* legacy backup without the table */
+    }
     const conflictSet = new Set(nonConflictingIds);
     let inserted = 0;
     await db.withTransactionAsync(async () => {
@@ -1175,6 +1196,33 @@ export async function executeNonConflictingImport(
           );
           inserted++;
         }
+      }
+      for (const r of corpusRows) {
+        await db.runAsync(
+          `INSERT OR IGNORE INTO mail_messages (mailbox_id,message_id,from_addr,subject,date,body_text,html,attachments_json,classified_json,parser_version) VALUES(?,?,?,?,?,?,?,?,?,?)`,
+          r.mailbox_id,
+          r.message_id,
+          r.from_addr,
+          r.subject,
+          r.date,
+          r.body_text ?? null,
+          r.html ?? null,
+          r.attachments_json ?? null,
+          r.classified_json,
+          r.parser_version,
+        );
+      }
+      for (const b of bucketRows) {
+        await db.runAsync(
+          `INSERT OR IGNORE INTO merchant_day_actuals (bucket_type,bucket_key,mailbox_id,kind,day,total,count) VALUES(?,?,?,?,?,?,?)`,
+          b.bucket_type,
+          b.bucket_key,
+          b.mailbox_id,
+          b.kind,
+          b.day,
+          b.total,
+          b.count,
+        );
       }
     });
     return inserted;

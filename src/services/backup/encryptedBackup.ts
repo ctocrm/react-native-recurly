@@ -58,6 +58,12 @@ export async function exportEncryptedBackup(
   try {
     await db.execAsync(`SELECT sqlcipher_export('exp');`);
     for (const table of SYNC_LOCAL_ONLY_TABLES) {
+      // mail_messages carries the classified corpus — the email-derived
+      // (sparse) spend. Stripping it silently dropped $74.84 of Monthly
+      // Spend on the 2026-09-16 clean-room gate, so the encrypted backup
+      // keeps it; only crawl ephemera and OAuth mailbox identities (which
+      // are install-local and dead cross-install) are stripped here.
+      if (table === "mail_messages") continue;
       try {
         await db.execAsync(`DELETE FROM exp.${table}`);
       } catch {
