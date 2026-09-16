@@ -1,4 +1,5 @@
 /**
+ *  clerk user should be removed
  * Encrypted SQLite connection lifecycle (per identity — the local session
  * uses LOCAL_USER_ID; a future backend id must never collide with it).
  */

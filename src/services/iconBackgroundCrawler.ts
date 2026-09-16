@@ -690,6 +690,28 @@ async function fetchAndSaveUrl(
 }
 
 /**
+ * L2 residual (user-approved design): brand-sent email seeds for an
+ * ALREADY-ICON'D subscription are acquired into the crawl collection —
+ * download + validate + save with email_* provenance. The existing quality
+ * scorer + report filter inside promoteFirstIconToCache then decide display:
+ * weak cached source → the email icon promotes; official stays first with
+ * email second; user-chosen is never overwritten; reported seeds are
+ * filtered out of promotion. NO web-crawl fallback: an already-icon'd brand
+ * never triggers discovery — acquisition failure just means status quo.
+ */
+export async function acquireEmailIconCollection(
+  iconKey: string,
+  emailIconUrls: string[],
+): Promise<void> {
+  for (const url of emailIconUrls.slice(0, 3)) {
+    const source = /(?:^|[/?#_.=-])(?:signature|sig)(?:$|[/?#_.=-])/i.test(url)
+      ? "email_signature"
+      : "email_logo";
+    await fetchAndSaveUrl(url, source, iconKey, detectUrlFormat(url));
+  }
+}
+
+/**
  * Phase L (email-icon immediate populate): the brand's own email carried logo
  * URLs (extracted at classify time, ranked best-first). Try to populate the
  * card DIRECTLY from ≤3 of them — download + validate + save with `email_*`

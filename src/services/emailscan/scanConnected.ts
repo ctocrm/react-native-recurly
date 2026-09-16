@@ -1,4 +1,5 @@
 import {
+  acquireEmailIconCollection,
   processIconQueue,
   startIconCrawl,
   tryApplyEmailIconDirect,
@@ -41,6 +42,32 @@ import {
 // so no crawl network competes with the mail legs; the chain stays serialized
 // and the parked steps all resume, in enqueue order, when the scan ends.
 let scanCrawlChain: Promise<void> = Promise.resolve();
+
+/**
+ * L2 residual (user-approved design): brand-sent email seeds for an
+ * already-icon'd subscription are ACQUIRED into the crawl collection. The
+ * quality scorer + report filter inside the promote path decide display —
+ * the cache is never force-replaced here, and no web-crawl fallback runs
+ * (an already-icon'd brand never triggers discovery).
+ */
+function enqueueEmailIconAcquisition(
+  iconKey: string,
+  emailIconUrls: string[],
+): Promise<void> {
+  scanCrawlChain = scanCrawlChain
+    .then(() => waitIfScanActive())
+    .then(async () => {
+      await acquireEmailIconCollection(iconKey, emailIconUrls);
+    })
+    .catch((error) => {
+      console.warn(
+        `[MailScan] email icon acquisition failed for ${iconKey}:`,
+        error,
+      );
+    });
+  return scanCrawlChain;
+}
+
 function enqueueScanIconCrawl(
   iconKey: string,
   subscriptionId: string | undefined,
@@ -238,6 +265,11 @@ async function runScan(opts: {
                 candidate.emailIconUrls,
               );
             }
+          } else if (candidate.emailIconUrls?.length) {
+            // L2 residual: the brand already has an icon, but its own email
+            // carried ranked logo seeds — acquire them into the collection
+            // and let the quality scorer + report filter decide display.
+            enqueueEmailIconAcquisition(existingKey, candidate.emailIconUrls);
           }
           continue;
         }
