@@ -29,8 +29,11 @@ export type IconQualityInput = {
 };
 
 function provenanceFor(icon: IconQualityInput): Provenance {
+  const src = (icon.source || "").toLowerCase();
   const url = icon.originalUrl || "";
-  const src = icon.source || "";
+  // Curated provider-brand icons (2026-09-15): brand identity WE curated for
+  // supported mailbox providers — authoritative as official by definition.
+  if (src === "brand_catalog") return "official";
   if (isFirstPartyIconSource(src)) {
     if (!url) return "official";
     const hosts = officialHostsForBrand(icon.brand || "", icon.officialHost);

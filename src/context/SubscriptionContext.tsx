@@ -13,6 +13,8 @@ import {
 } from "@/services/database";
 import { selfHealMissingIcons } from "@/services/iconSelfHeal";
 import { processIconQueue } from "@/services/iconBackgroundCrawler";
+import { seedProviderBrandIcons } from "@/services/iconBrandCatalog";
+import { setCachedIcon } from "@/services/database";
 import dayjs from "dayjs";
 import React, {
   createContext,
@@ -52,6 +54,28 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
   const { db, isReady } = useDatabase();
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [notificationEnabled, setNotificationEnabledState] = useState(true);
+
+  // Curated provider-brand icons (2026-09-15): seed brand-correct icons for
+  // supported mailbox providers once the DB is ready. Idempotent — skips
+  // user-chosen and already-seeded keys. Runs BEFORE processIconQueue so the
+  // curated icon wins first place before any crawl noise is considered.
+  useEffect(() => {
+    if (!isReady) return;
+    seedProviderBrandIcons(
+      (key) => import("@/services/database").then((m) => m.getCachedIcon(key)),
+      (key, imageData, source, format, originalUrl, width, height) =>
+        setCachedIcon(
+          key,
+          imageData,
+          source,
+          format,
+          originalUrl,
+          0,
+          width,
+          height,
+        ),
+    ).catch(console.error);
+  }, [isReady]);
 
   // Process queued icons when the app comes to the foreground.
   // This runs inside DatabaseProvider, so the DB is always ready.
