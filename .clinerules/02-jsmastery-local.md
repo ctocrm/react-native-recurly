@@ -57,3 +57,13 @@ Procedure, in order (steps 1–2 via `bash scripts/baseline.sh`):
    `docs/baselines/<date>.md` (create if absent).
 
 "Baseline" NEVER means: clean slate, reset, stash, re-clone.
+
+## "drain-inject" — pack keyword (2026-09-16)
+
+drain-inject is a PACK keyword, not project vocabulary: it force-revives
+an interrupted session. The hooks inject a revival message explaining
+what was in flight — act on that: acknowledge the interruption, verify
+state, resume smaller. It NEVER means draining mailboxes, re-scanning,
+or injecting subscriptions (wild misresolution 2026-09-16 [5166]: the
+agent constructed exactly that meaning and started reconnecting
+mailbox legs). If the word arrives alone, it is this keyword.
