@@ -15,10 +15,10 @@
 // the native `text` payload (htmlFromNativeText), changing what the
 // classifier can extract. Bump forces one full restage so stored rows gain
 // emailIconUrls.
-// v16→v17 (L2 probe bump, retained): the v17 pass ran the instrumented
-// cid-probe restage; reverting would trigger a redundant full restage on
-// the next scan. Parsing itself is identical to v16.
-export const PARSER_VERSION = 17;
+// v17→v18 (bump-restore fix): a parser bump now DROPS the stripped cache and
+// re-fetches the full window so every message re-classifies from its complete
+// body (fixes the 2026-09-15 sparse-spend degradation on parser bumps).
+export const PARSER_VERSION = 18;
 
 
 export type MailProviderId =

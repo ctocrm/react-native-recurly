@@ -35,7 +35,7 @@ function seededStore(): ScanCacheStore {
       mailboxId: "box",
       lastMessageDate: "2026-09-01T00:00:00.000Z",
       lastMessageId: "seed",
-      parserVersion: 1,
+      parserVersion: PARSER_VERSION,
     },
     messages: {},
   });

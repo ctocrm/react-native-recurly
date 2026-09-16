@@ -323,6 +323,17 @@ export function createProtonFetcher(
             creds.password,
           );
           const raw = listed.messages || [];
+          // L2-A DIAGNOSTIC (temporary): tuta staging census — which subjects
+          // are staged, so the July 14 "New invoice for Tuta" pickup can be
+          // traced through classification.
+          const subjects = raw
+            .map((m) => m.subject ?? "(none)")
+            .slice(0, 12);
+          if (raw.length > 0) {
+            console.log(
+              `[L2-PROBE-T] tuta staged n=${raw.length} subjects=${JSON.stringify(subjects)}`,
+            );
+          }
           const fresh = raw
             .map((m): NormalizedMessage => ({
               mailboxId,

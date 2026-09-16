@@ -90,33 +90,34 @@ function advanceCursor(
   };
 }
 
-function reparseStale(state: MailboxScanState): {
+function resetForParserBump(state: MailboxScanState): {
   state: MailboxScanState;
   reparsed: number;
 } {
-  // R19-OOM note: stored messages are body-stripped (stripBodyForStore), so a
-  // parser-version bump reclassifies the subject/header-derived fields only.
-  // Body-derived fields (billNumber, body amounts, M forward re-keying)
-  // refresh when the message is re-fetched live, exactly like any newer mail.
   if (state.cursor.parserVersion === PARSER_VERSION) {
     return { state, reparsed: 0 };
   }
-  const next: MailboxScanState = {
-    ...state,
-    cursor: { ...state.cursor, parserVersion: PARSER_VERSION },
-    messages: { ...state.messages },
+  // Bump-restore (2026-09-15, user-approved): a parser-version bump must
+  // never re-classify the cached STRIPPED bodies — subject/header fields
+  // would survive but body-derived amounts, bill numbers and forward
+  // re-keying silently degrade (the 2026-09-15 sparse-spend collapse:
+  // $572.56 → $311.09 on the v17 bump). Instead drop the cached bodies and
+  // reset the cursor position: the leg re-fetches the FULL window and every
+  // message re-classifies from its complete body. Cost: one full-window
+  // scan per parser bump — the price of correct classification.
+  return {
+    state: {
+      ...state,
+      cursor: {
+        mailboxId: state.mailboxId,
+        lastMessageDate: null,
+        lastMessageId: null,
+        parserVersion: PARSER_VERSION,
+      },
+      messages: {},
+    },
+    reparsed: 0,
   };
-  let reparsed = 0;
-  for (const [id, cached] of Object.entries(state.messages)) {
-    if (cached.parserVersion === PARSER_VERSION) continue;
-    next.messages[id] = {
-      message: cached.message,
-      classified: classifyMessage(cached.message),
-      parserVersion: PARSER_VERSION,
-    };
-    reparsed += 1;
-  }
-  return { state: next, reparsed };
 }
 
 /**
@@ -177,7 +178,7 @@ export async function runIncrementalScan(opts: {
     opts.store.getMailbox(opts.mailboxId) ??
     emptyState(opts.mailboxId, opts.providerId);
 
-  const { state: primed, reparsed } = reparseStale(existing);
+  const { state: primed, reparsed } = resetForParserBump(existing);
 
   // Phase K (deep): the user opted into listing the entire history — the
   // cursor lower bound is ignored so mail beyond the newest window is
@@ -225,11 +226,18 @@ export async function runIncrementalScan(opts: {
             ) {
               continue;
             }
+            // L2-A DIAGNOSTIC (temporary): tuta-leg classification verdicts.
+            const classified = classifyMessage(raw);
+            if (raw.mailboxId?.startsWith("tuta")) {
+              console.log(
+                `[L2-PROBE-T] classified subject="${raw.subject}" kind=${classified.kind} merchant=${classified.merchantName} amount=${classified.amount ?? "?"} bill=${classified.billNumber ?? "none"}`,
+              );
+            }
             next.messages[raw.messageId] = {
               // classifyMessage consumes the FULL body (billNumber, amount,
               // processor merchant extraction); the stored copy is stripped.
               message: stripBodyForStore(raw),
-              classified: classifyMessage(raw),
+              classified,
               parserVersion: PARSER_VERSION,
             };
             accepted += 1;

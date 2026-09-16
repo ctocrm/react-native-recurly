@@ -132,9 +132,9 @@ describe("emailscan incremental scan", () => {
     expect(shown.length).toBeLessThan(cached.length);
   });
 
-  it("reparses cached mail only after a parser-version bump", async () => {
+  it("bump-restore: a parser bump drops the stripped cache and re-fetches the full window", async () => {
     const store = createMemoryScanStore();
-    const api = fetcherOf([[FIXTURE_WELCOME], []]);
+    const api = fetcherOf([[FIXTURE_WELCOME], [FIXTURE_WELCOME]]);
     await runIncrementalScan({
       mailboxId: "box-1",
       providerId: "gmail",
@@ -154,8 +154,14 @@ describe("emailscan incremental scan", () => {
       fetcher: api,
       store,
     });
-    expect(again.reparsed).toBe(1);
-    expect(again.fetched).toBe(0);
+    // Bump-restore: the stripped cache is dropped, the cursor resets, and the
+    // FULL window re-fetches so the message re-classifies from its FULL body
+    // (body-derived amounts / bill numbers refresh instead of degrading).
+    expect(api.calls[1].since).toBeNull();
+    expect(again.fetched).toBe(1);
+    expect(again.reparsed).toBe(0);
+    const refreshed = store.getMailbox("box-1")?.messages["welcome-github"];
+    expect(refreshed?.parserVersion).toBe(PARSER_VERSION);
     expect(store.getMailbox("box-1")?.cursor.parserVersion).toBe(
       PARSER_VERSION,
     );
