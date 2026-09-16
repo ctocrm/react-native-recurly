@@ -9,6 +9,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Platform, Pressable, Text, TextInput, View } from "react-native";
 
+import { PasswordInput } from "@/components/auth/PasswordInput";
 import {
   changeAppPass,
   disableAppPass,
@@ -32,14 +33,17 @@ function Field(props: {
       <Text className="text-sm font-sans-medium text-muted-foreground mb-1">
         {props.label}
       </Text>
-      <TextInput
-        className="auth-input"
-        value={props.value}
-        onChangeText={props.onChange}
-        secureTextEntry={props.secure ?? false}
-        autoCapitalize="none"
-        autoCorrect={false}
-      />
+      {props.secure ? (
+        <PasswordInput value={props.value} onChange={props.onChange} />
+      ) : (
+        <TextInput
+          className="auth-input"
+          value={props.value}
+          onChangeText={props.onChange}
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+      )}
     </View>
   );
 }
@@ -204,8 +208,16 @@ export function AppLockCard({ userId }: { userId: string }) {
     setNotice(message);
   };
 
-  const fail = (e: unknown) =>
-    setError(e instanceof Error ? e.message : "Something went wrong.");
+  const fail = (e: unknown) => {
+    const msg = e instanceof Error ? e.message : String(e);
+    setError(
+      msg === "WRONG_PASS"
+        ? "Wrong password. Check and try again."
+        : msg === "WRONG_PHRASE"
+          ? "That phrase does not match this device."
+          : msg || "Something went wrong.",
+    );
+  };
 
   const validateNew = (): string | null => {
     if (newPass.length < PASS_MIN) {

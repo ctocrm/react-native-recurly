@@ -19,6 +19,8 @@ import {
 import { SafeAreaView as RNSafeAreaView } from "react-native-safe-area-context";
 import { styled } from "nativewind";
 
+import { PasswordInput } from "@/components/auth/PasswordInput";
+
 import {
   confirmDeviceCredential,
   enrollAppPass,
@@ -57,13 +59,9 @@ function PassField(props: {
       <Text className="text-sm font-sans-medium text-muted-foreground mb-1">
         {props.label}
       </Text>
-      <TextInput
-        className="auth-input"
+      <PasswordInput
         value={props.value}
-        onChangeText={props.onChange}
-        secureTextEntry
-        autoCapitalize="none"
-        autoCorrect={false}
+        onChange={props.onChange}
         autoFocus={props.autoFocus ?? false}
       />
     </View>
