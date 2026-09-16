@@ -7,6 +7,7 @@ import {
 import clsx from "clsx";
 import React, { useState } from "react";
 import { ActivityIndicator, Image, Pressable, Text, View } from "react-native";
+import { isMayHaveExpired } from "@/services/subscriptionStatus";
 import SubscriptionCardMenu from "./SubscriptionCardMenu";
 
 interface SubscriptionCardProps {
@@ -40,6 +41,8 @@ interface SubscriptionCardProps {
   displayPeriodLabel?: string;
   sparseLine?: { amount: number; label: string } | null;
   onCyclePeriod?: () => void;
+  /** Phase N: grace period (days) for the may-have-expired chip. */
+  graceDays?: number;
 }
 
 const SubscriptionCard = ({
@@ -73,6 +76,7 @@ const SubscriptionCard = ({
   displayPeriodLabel,
   sparseLine,
   onCyclePeriod,
+  graceDays,
 }: SubscriptionCardProps) => {
   const [menuVisible, setMenuVisible] = useState(false);
   const { status: iconStatus, iconUri } = useCachedIcon(icon_key);
@@ -105,6 +109,13 @@ const SubscriptionCard = ({
     return <Image source={icon} className="size-16 rounded-xl" />;
   };
 
+  // Phase N: may-have-expired — the renewal lapsed past the grace period
+  // while the row is still active. Deliberately non-destructive.
+  const mayHaveExpired =
+    status !== "paused" &&
+    status !== "cancelled" &&
+    isMayHaveExpired(renewalDate, graceDays ?? 7);
+
   return (
     <>
       <Pressable
@@ -134,6 +145,13 @@ const SubscriptionCard = ({
                   plan?.trim() ||
                   (renewalDate ? formatSubscriptionDateTime(renewalDate) : "")}
               </Text>
+              {mayHaveExpired ? (
+                <View className="self-start rounded-full bg-destructive/10 px-2 py-0.5 mt-1">
+                  <Text className="text-destructive text-xs font-sans-medium">
+                    May have expired
+                  </Text>
+                </View>
+              ) : null}
             </View>
           </View>
 

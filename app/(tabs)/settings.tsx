@@ -1,6 +1,7 @@
 import ConfirmModal from "@/components/ConfirmModal";
 import ConflictResolutionModal from "@/components/ConflictResolutionModal";
 import { AppLockCard } from "@/components/auth/AppLockCard";
+import { ExpiredGraceCard } from "@/components/settings/ExpiredGraceCard";
 import images from "@/constants/images";
 import { useCloudSync } from "@/context/CloudSyncContext";
 import { useDatabase } from "@/context/DatabaseProvider";
@@ -843,6 +844,7 @@ const Settings = () => {
 
         {/* App Lock Section (Phase A) */}
         {userId ? <AppLockCard userId={userId} /> : null}
+        <ExpiredGraceCard />
 
         {/* Cache & Crawl Data Section */}
         <View className="auth-card mb-5">

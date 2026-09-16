@@ -165,6 +165,25 @@ export async function deleteSubscription(id: string): Promise<void> {
   await db.runAsync("DELETE FROM subscriptions WHERE id = ?", id);
 }
 
+export const DEFAULT_EXPIRED_GRACE_DAYS = 7;
+
+export async function getExpiredGraceDays(): Promise<number> {
+  const db = getDatabase();
+  const row = await db.getFirstAsync<{ value: string }>(
+    "SELECT value FROM preferences WHERE key = 'expired_grace_days'",
+  );
+  const n = row ? Number(row.value) : NaN;
+  return Number.isFinite(n) && n > 0 ? n : DEFAULT_EXPIRED_GRACE_DAYS;
+}
+
+export async function setExpiredGraceDays(days: number): Promise<void> {
+  const db = getDatabase();
+  await db.runAsync(
+    "INSERT OR REPLACE INTO preferences (key, value) VALUES ('expired_grace_days', ?)",
+    String(days),
+  );
+}
+
 export async function updateSubscriptionStatus(
   id: string,
   status: "active" | "paused" | "cancelled",

@@ -8,6 +8,11 @@ import SubscriptionIconPickerModal from "@/components/SubscriptionIconPickerModa
 import SubscriptionStatsModal from "@/components/SubscriptionStatsModal";
 import { icons } from "@/constants/icons";
 import { useSubscriptions } from "@/context/SubscriptionContext";
+import { getExpiredGraceDays } from "@/services/database";
+import {
+  DEFAULT_EXPIRED_GRACE_DAYS as DEFAULT_GRACE,
+  subscriptionBucket,
+} from "@/services/subscriptionStatus";
 import "@/global.css";
 import { useBottomClearance } from "@/hooks/useBottomClearance";
 import { useChargeDisplay } from "@/hooks/useChargeDisplay";
@@ -28,11 +33,20 @@ import { SafeAreaView as RNSafeAreaView } from "react-native-safe-area-context";
 
 const SafeAreaView = styled(RNSafeAreaView);
 
-const FILTER_OPTIONS = ["All", "Upcoming"] as const;
+const FILTER_OPTIONS = [
+  "All",
+  "Active",
+  "Upcoming",
+  "Sparse",
+  "Expired",
+] as const;
 
 const Subscriptions = () => {
   const { tabListPadding, pagePadding } = useBottomClearance();
   const posthog = usePostHog();
+  // Phase N: the may-have-expired grace period (user-configurable in
+  // Settings); re-read on foreground so a Settings change applies on return.
+  const [graceDays, setGraceDays] = useState(DEFAULT_GRACE);
   const { filter: initialFilter, addMailbox } = useLocalSearchParams<{
     filter?: string;
     addMailbox?: string;
@@ -86,12 +100,36 @@ const Subscriptions = () => {
     return new Set(upcoming.map((u) => u.id));
   }, [getUpcomingSubscriptions]);
 
+  const expiredCount = useMemo(() => {
+    return subscriptions.filter(
+      (sub) => subscriptionBucket(sub, graceDays) === "expired",
+    ).length;
+  }, [subscriptions, graceDays]);
+
+  useEffect(() => {
+    getExpiredGraceDays()
+      .then(setGraceDays)
+      .catch(() => setGraceDays(DEFAULT_GRACE));
+  }, []);
+
   const filteredSubscriptions = useMemo(() => {
     let filtered = subscriptions;
 
-    // Apply filter
+    // Apply filter (Phase N buckets)
     if (activeFilter === "Upcoming") {
       filtered = filtered.filter((sub) => upcomingIds.has(sub.id));
+    } else if (activeFilter === "Active") {
+      filtered = filtered.filter(
+        (sub) => subscriptionBucket(sub, graceDays) === "active",
+      );
+    } else if (activeFilter === "Sparse") {
+      filtered = filtered.filter(
+        (sub) => subscriptionBucket(sub, graceDays) === "sparse",
+      );
+    } else if (activeFilter === "Expired") {
+      filtered = filtered.filter(
+        (sub) => subscriptionBucket(sub, graceDays) === "expired",
+      );
     }
 
     // Apply search
@@ -111,7 +149,7 @@ const Subscriptions = () => {
     }
 
     return filtered;
-  }, [searchQuery, subscriptions, activeFilter, upcomingIds]);
+  }, [searchQuery, subscriptions, activeFilter, upcomingIds, graceDays]);
 
   const handleSearchChange = (text: string) => {
     setSearchQuery(text);
@@ -235,6 +273,7 @@ const Subscriptions = () => {
                   >
                     {filter}
                     {filter === "Upcoming" && ` (${upcomingIds.size})`}
+                    {filter === "Expired" && ` (${expiredCount})`}
                   </Text>
                 </Pressable>
               ))}
@@ -256,6 +295,7 @@ const Subscriptions = () => {
         renderItem={({ item }) => (
           <SubscriptionCard
             {...item}
+            graceDays={graceDays}
             expanded={expandedSubscriptionId === item.id}
             displayPrice={displayFor(item).amount}
             displayUnknown={displayFor(item).unknown}
