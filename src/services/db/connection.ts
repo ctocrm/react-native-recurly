@@ -4,6 +4,7 @@
  * uses LOCAL_USER_ID; a future backend id must never collide with it).
  */
 import * as Crypto from "expo-crypto";
+import { File, Paths } from "expo-file-system";
 import * as SecureStore from "expo-secure-store";
 import { type SQLiteDatabase, openDatabaseAsync } from "expo-sqlite";
 import { applySchema } from "./schema";
@@ -46,12 +47,21 @@ export async function openDatabase(
   if (activeDb && activeUserId === userId) return activeDb;
   if (activeDb && activeUserId !== userId) await closeDatabase();
 
-  const passphrase =
+  let passphrase =
     opts?.passphrase ?? (await getOrCreateDbKey(userId, { noCreate: true }));
   if (!passphrase) {
-    throw new Error(
-      "Vault is locked — unlock the app pass (or recovery phrase) before opening the database.",
-    );
+    // Phase O fresh-install fix: on a lock-screen device the gate routes a
+    // brand-new install through device-prompt BEFORE any key exists. The OS
+    // has just verified the user and there is NO existing encrypted
+    // database file for this identity — mint the first key (same as the
+    // pre-gate first run). If the file DOES exist, keep the locked error:
+    // never silently replace the key of an encrypted database.
+    if (new File(Paths.document, `SQLite/user_${userId}.db`).exists) {
+      throw new Error(
+        "Vault is locked — unlock the app pass (or recovery phrase) before opening the database.",
+      );
+    }
+    passphrase = await getOrCreateDbKey(userId);
   }
   const filename = `user_${userId}.db`;
   const db = await openDatabaseAsync(filename);
