@@ -1,5 +1,6 @@
 import ConfirmModal from "@/components/ConfirmModal";
 import ConflictResolutionModal from "@/components/ConflictResolutionModal";
+import { AppLockCard } from "@/components/auth/AppLockCard";
 import images from "@/constants/images";
 import { useCloudSync } from "@/context/CloudSyncContext";
 import { useDatabase } from "@/context/DatabaseProvider";
@@ -50,7 +51,7 @@ const SafeAreaView = styled(RNSafeAreaView);
 
 const Settings = () => {
   const { tabListPadding, pagePadding, sheetPadding } = useBottomClearance();
-  const { signOut } = useAuth();
+  const { signOut, userId } = useAuth();
   const { user } = useUser();
   const posthog = usePostHog();
   const { isReady } = useDatabase();
@@ -839,6 +840,9 @@ const Settings = () => {
             </View>
           )}
         </View>
+
+        {/* App Lock Section (Phase A) */}
+        {userId ? <AppLockCard userId={userId} /> : null}
 
         {/* Cache & Crawl Data Section */}
         <View className="auth-card mb-5">
