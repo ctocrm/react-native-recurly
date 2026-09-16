@@ -16,7 +16,7 @@ import { Directory, File, Paths } from "expo-file-system";
 import { openDatabaseAsync } from "expo-sqlite";
 
 import { getOrCreateDbKey } from "../db/connection";
-import { exportSyncBackup } from "../database";
+import { getDatabase, SYNC_LOCAL_ONLY_TABLES } from "../database";
 import { escapeSqlText } from "./encryptedBackupEnvelope";
 
 const IMPORT_MIN_LENGTH = 8;
@@ -27,8 +27,16 @@ function toPath(uri: string): string {
 
 /**
  * Build the encrypted backup file and return its URI (share via the native
- * share sheet). Uses the cloud-sync variant: crawl/ephemeral tables are
- * stripped; subscriptions, preferences and chosen icons survive.
+ * share sheet). Keeps subscriptions, preferences and chosen icons; strips
+ * crawl/ephemeral tables from the export copy.
+ *
+ * IMPORTANT: this must never closeDatabase() the live app database. The DB
+ * is shared with background workers (icon crawl heal, sync timers); the old
+ * close-copy-reopen flow raced their statements and SIGSEGV'd the process
+ * natively (sqlite3_column_name use-after-free, tombstone 2026-09-16).
+ * Instead, the passphrase-keyed output file is ATTACHed to the live
+ * connection and `sqlcipher_export('exp')` re-encrypts natively — the
+ * ~30MB payload never enters the JS heap and the live connection stays up.
  */
 export async function exportEncryptedBackup(
   userId: string,
@@ -38,27 +46,35 @@ export async function exportEncryptedBackup(
   if (pass.length < IMPORT_MIN_LENGTH) {
     throw new Error("Passphrase must be at least 8 characters.");
   }
-  const localKey = await getOrCreateDbKey(userId);
-  const plainUri = await exportSyncBackup();
   const exportsDir = new Directory(Paths.cache, "exports");
   try {
     await exportsDir.create({ intermediates: true });
   } catch {}
   const out = new File(exportsDir, `cadence_encrypted_${Date.now()}.cbak`);
-  const db = await openDatabaseAsync(plainUri);
+  const db = getDatabase();
+  await db.execAsync(
+    `ATTACH DATABASE '${toPath(out.uri)}' AS exp KEY '${escapeSqlText(pass)}';`,
+  );
   try {
-    await db.execAsync(`PRAGMA key = '${escapeSqlText(localKey)}';`);
-    await db.execAsync(
-      `ATTACH DATABASE '${toPath(out.uri)}' AS exp KEY '${escapeSqlText(pass)}';`,
-    );
     await db.execAsync(`SELECT sqlcipher_export('exp');`);
-    await db.execAsync(`DETACH DATABASE exp;`);
+    for (const table of SYNC_LOCAL_ONLY_TABLES) {
+      try {
+        await db.execAsync(`DELETE FROM exp.${table}`);
+      } catch {
+        /* table may not exist in very old schemas */
+      }
+    }
+    // Do not ship remote file ids from this device into another install's meta
+    try {
+      await db.execAsync(
+        `UPDATE exp.sync_metadata SET remote_file_id = NULL, remote_file_hash = NULL, remote_file_modified = NULL WHERE id = 1`,
+      );
+    } catch {
+      /* optional */
+    }
   } finally {
-    await db.closeAsync();
+    await db.execAsync(`DETACH DATABASE exp;`);
   }
-  try {
-    await new File(plainUri).delete();
-  } catch {}
   return out.uri;
 }
 
