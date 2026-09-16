@@ -306,7 +306,7 @@ const Settings = () => {
     try {
       const uri = await exportEncryptedBackup(userId, encPass);
       await Sharing.shareAsync(uri, {
-        mimeType: "application/json",
+        mimeType: "application/octet-stream",
         dialogTitle: "Save encrypted backup",
       });
       posthog.capture("settings_encrypted_export_completed");

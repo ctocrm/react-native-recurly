@@ -1,56 +1,41 @@
 import {
-  buildEncryptedBackupEnvelope,
+  buildEncryptedBackupHeader,
+  ENCRYPTED_BACKUP_HEADER_SIZE,
   ENCRYPTED_BACKUP_MAGIC,
-  parseEncryptedBackupEnvelope,
+  parseEncryptedBackupHeader,
   validateExportPassphrase,
 } from "../encryptedBackupEnvelope";
 
-const KDF = { salt: "c2FsdA==", iterations: 600_000, bits: 256 };
+const META = { salt: "c2FsdA==", iterations: 600_000, bits: 256 };
 
-describe("encrypted backup envelope (Phase O)", () => {
-  it("round-trips a valid envelope", () => {
-    const text = buildEncryptedBackupEnvelope({
-      kdf: KDF,
-      wrappedKey: "d3JhcHBlZA==",
-      db: "ZGJieXRlcw==",
-    });
-    const parsed = parseEncryptedBackupEnvelope(text);
-    expect(parsed.magic).toBe(ENCRYPTED_BACKUP_MAGIC);
-    expect(parsed.v).toBe(1);
-    expect(parsed.kdf).toEqual(KDF);
-    expect(parsed.wrappedKey).toBe("d3JhcHBlZA==");
-    expect(parsed.db).toBe("ZGJieXRlcw==");
+describe("encrypted backup header (Phase O)", () => {
+  it("round-trips a valid header at exactly 512 bytes", () => {
+    const text = buildEncryptedBackupHeader(META);
+    expect(text.length).toBe(ENCRYPTED_BACKUP_HEADER_SIZE);
+    const parsed = parseEncryptedBackupHeader(text);
+    expect(parsed.salt).toBe(META.salt);
+    expect(parsed.iterations).toBe(META.iterations);
+    expect(parsed.bits).toBe(META.bits);
   });
 
   it("rejects non-JSON and wrong-magic files", () => {
-    expect(() => parseEncryptedBackupEnvelope("not json")).toThrow(
-      /invalid JSON/i,
+    expect(() => parseEncryptedBackupHeader("not json")).toThrow(
+      /Not a Cadence encrypted backup/,
     );
     expect(() =>
-      parseEncryptedBackupEnvelope(JSON.stringify({ magic: "other", v: 1 })),
+      parseEncryptedBackupHeader(JSON.stringify({ magic: "other", v: 1 })),
     ).toThrow(/Not a Cadence encrypted backup/);
   });
 
   it("rejects unsupported versions and incomplete payloads", () => {
     expect(() =>
-      parseEncryptedBackupEnvelope(
+      parseEncryptedBackupHeader(
         JSON.stringify({ magic: ENCRYPTED_BACKUP_MAGIC, v: 99 }),
       ),
     ).toThrow(/Unsupported backup version/i);
     expect(() =>
-      parseEncryptedBackupEnvelope(
+      parseEncryptedBackupHeader(
         JSON.stringify({ magic: ENCRYPTED_BACKUP_MAGIC, v: 1 }),
-      ),
-    ).toThrow(/incomplete or corrupted/i);
-    expect(() =>
-      parseEncryptedBackupEnvelope(
-        JSON.stringify({
-          magic: ENCRYPTED_BACKUP_MAGIC,
-          v: 1,
-          kdf: { salt: "s", iterations: 1, bits: 256 },
-          wrappedKey: "w",
-          db: "",
-        }),
       ),
     ).toThrow(/incomplete or corrupted/i);
   });

@@ -1,79 +1,81 @@
 /**
- * Phase O: encrypted cross-install backup envelope (pure logic, no imports).
+ * Phase O: encrypted cross-install backup header codec (pure, no imports).
  *
- * Format: a JSON file with
- *   magic "cadence-encrypted-backup", v: 1,
- *   kdf { salt b64, iterations, bits },       — PBKDF2-HMAC-SHA256 params
- *   wrappedKey b64,                            — AES-256-GCM(KDF(pass), utf8(dbKeyHex))
- *   db b64,                                    — the stripped SQLCipher database
+ * Format: a single file =
+ *   [headerSize-byte plaintext JSON header (padded with '\n')]
+ *   [SQLCipher database, key = PBKDF2-HMAC-SHA256(passphrase, salt), with
+ *    `cipher_plaintext_header_size = headerSize` so the header stays plain]
  *
- * The wrap lives in services/auth/vault.ts (same primitives as the app-pass
- * vault). The envelope itself is inert bytes — pure module so jest can test
- * it without native or file-system mocks.
+ * The database itself is written/read natively by SQLCipher (sqlcipher_export
+ * / PRAGMA rekey) — the 30MB payload never enters the JS heap. This module
+ * only builds/parses the small self-describing header.
  */
 
 export const ENCRYPTED_BACKUP_MAGIC = "cadence-encrypted-backup";
 export const ENCRYPTED_BACKUP_VERSION = 1;
+export const ENCRYPTED_BACKUP_HEADER_SIZE = 512;
 
 export type BackupKdfMeta = {
-  salt: string;
+  salt: string; // base64
   iterations: number;
   bits: number;
 };
 
-export type EncryptedBackupEnvelope = {
+export type EncryptedBackupHeader = BackupKdfMeta & {
   magic: string;
   v: number;
-  kdf: BackupKdfMeta;
-  wrappedKey: string;
-  db: string;
+  headerSize: number;
 };
 
-export type EnvelopeInput = {
-  kdf: BackupKdfMeta;
-  wrappedKey: string;
-  db: string;
-};
-
-export function buildEncryptedBackupEnvelope(
-  input: EnvelopeInput,
+export function buildEncryptedBackupHeader(
+  meta: BackupKdfMeta,
 ): string {
-  const envelope: EncryptedBackupEnvelope = {
+  const header: EncryptedBackupHeader = {
     magic: ENCRYPTED_BACKUP_MAGIC,
     v: ENCRYPTED_BACKUP_VERSION,
-    kdf: input.kdf,
-    wrappedKey: input.wrappedKey,
-    db: input.db,
+    headerSize: ENCRYPTED_BACKUP_HEADER_SIZE,
+    salt: meta.salt,
+    iterations: meta.iterations,
+    bits: meta.bits,
   };
-  return JSON.stringify(envelope);
+  const json = JSON.stringify(header);
+  if (json.length > ENCRYPTED_BACKUP_HEADER_SIZE) {
+    throw new Error("Backup header overflow");
+  }
+  // Pad to exactly the header size (JSON.parse ignores trailing whitespace).
+  return json.padEnd(ENCRYPTED_BACKUP_HEADER_SIZE, "\n");
 }
 
-export function parseEncryptedBackupEnvelope(text: string): EncryptedBackupEnvelope {
+export function parseEncryptedBackupHeader(
+  firstBytes: string,
+): BackupKdfMeta {
+  const json = firstBytes.replace(/\n+$/, "").trim();
   let parsed: unknown;
   try {
-    parsed = JSON.parse(text);
+    parsed = JSON.parse(json);
   } catch {
-    throw new Error("Not a Cadence encrypted backup (invalid JSON).");
-  }
-  const env = parsed as Partial<EncryptedBackupEnvelope> | null;
-  if (!env || env.magic !== ENCRYPTED_BACKUP_MAGIC) {
     throw new Error("Not a Cadence encrypted backup.");
   }
-  if (env.v !== ENCRYPTED_BACKUP_VERSION) {
+  const header = parsed as Partial<EncryptedBackupHeader> | null;
+  if (!header || header.magic !== ENCRYPTED_BACKUP_MAGIC) {
+    throw new Error("Not a Cadence encrypted backup.");
+  }
+  if (header.v !== ENCRYPTED_BACKUP_VERSION) {
     throw new Error("Unsupported backup version.");
   }
   if (
-    !env.kdf ||
-    typeof env.kdf.salt !== "string" ||
-    typeof env.kdf.iterations !== "number" ||
-    typeof env.kdf.bits !== "number" ||
-    typeof env.wrappedKey !== "string" ||
-    typeof env.db !== "string" ||
-    env.db.length === 0
+    typeof header.salt !== "string" ||
+    typeof header.iterations !== "number" ||
+    typeof header.bits !== "number" ||
+    typeof header.headerSize !== "number"
   ) {
-    throw new Error("Backup file is incomplete or corrupted.");
+    throw new Error("Backup header is incomplete or corrupted.");
   }
-  return env as EncryptedBackupEnvelope;
+  return {
+    salt: header.salt,
+    iterations: header.iterations,
+    bits: header.bits,
+  };
 }
 
 /** The passphrase rules for a new export (pure; UI-agnostic). */
