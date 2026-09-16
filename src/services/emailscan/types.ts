@@ -15,10 +15,11 @@
 // the native `text` payload (htmlFromNativeText), changing what the
 // classifier can extract. Bump forces one full restage so stored rows gain
 // emailIconUrls.
-// v17→v18 (bump-restore fix): a parser bump now DROPS the stripped cache and
-// re-fetches the full window so every message re-classifies from its complete
-// body (fixes the 2026-09-15 sparse-spend degradation on parser bumps).
-export const PARSER_VERSION = 18;
+// v18→v19 (Tuta bill-number fix): extractBillNumber now handles Tuta's long
+// numeric references (tag-strip, no length cap, invoice-keyword digit-run
+// fallback). Bump re-classifies the tuta rows so the July 14 invoice gains
+// its bill number (bump-restore: full fresh-body restage).
+export const PARSER_VERSION = 19;
 
 
 export type MailProviderId =

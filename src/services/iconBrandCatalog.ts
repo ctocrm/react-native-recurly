@@ -61,5 +61,6 @@ export async function seedProviderBrandIcons(
       );
     }
   }
+  console.log(`[BRAND_ICONS] seed run complete, seeded=${seeded}`);
   return seeded;
 }

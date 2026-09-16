@@ -39,6 +39,34 @@ describe("extractBillNumber (best-effort, R18)", () => {
     expect(extractBillNumber("receipt no: 48372911")).toBe("48372911");
   });
 
+  it("extracts Tuta-style long numeric references (2026-09-16 case)", () => {
+    expect(
+      extractBillNumber(
+        "New invoice for Tuta\nInvoice</td><td>number 1915642915167825625098",
+      ),
+    ).toBe("1915642915167825625098");
+  });
+
+  it("grows with the reference: 40 digits still match", () => {
+    expect(
+      extractBillNumber(
+        "Invoice number 1234567890123456789012345678901234567890",
+      ),
+    ).toBe("1234567890123456789012345678901234567890");
+  });
+
+  it("a bare long digit run in an invoice email is accepted", () => {
+    expect(
+      extractBillNumber(
+        "New invoice for Tuta — view it online. Ref 1915642915167825625098",
+      ),
+    ).toBe("1915642915167825625098");
+  });
+
+  it("still refuses a bare digit run without the invoice keyword", () => {
+    expect(extractBillNumber("tracking 1915642915167825625098")).toBeUndefined();
+  });
+
   it("refuses prose and digit-less tokens", () => {
     expect(
       extractBillNumber("in order to confirm your subscription"),

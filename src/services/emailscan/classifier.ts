@@ -761,15 +761,28 @@ export function inferCadenceFromPayments(
 /** R18: best-effort bill reference (invoice/order/receipt number). Deliberately
  * conservative: the keyword must sit right next to the id and the id must
  * contain a digit, so prose like "in order to confirm" never matches. Often
- * null — the field stays user-editable. */
+ * null — the field stays user-editable.
+ * 2026-09-16: invoice emails are HTML — tags between the keyword and the
+ * number are stripped before matching; the id length cap is removed (Tuta's
+ * numeric references grow over time); and a bare long digit run in an email
+ * whose subject says "invoice" is accepted even when markup separated it from
+ * the keyword (the 2026-07-14 "New invoice for Tuta" case). */
 const BILL_NUMBER_RE =
-  /\b(?:invoice|order|receipt)\s*(?:#|no\.?|number)?\s*[:#-]?\s*([A-Z0-9][A-Z0-9/-]{3,29})\b/i;
+  /\b(?:invoice|order|receipt)\s*(?:#|no\.?|number)?\s*[:#-]?\s*([A-Z0-9][A-Z0-9/-]{3,})\b/i;
+const LONG_DIGIT_RUN_RE = /\b\d{10,}\b/;
 
 export function extractBillNumber(text: string): string | undefined {
   if (!text) return undefined;
-  const token = text.match(BILL_NUMBER_RE)?.[1];
-  if (!token || !/\d/.test(token)) return undefined;
-  return token;
+  const plain = text.replace(/<[^>]*>/g, " ").replace(/&nbsp;/gi, " ");
+  const token = plain.match(BILL_NUMBER_RE)?.[1];
+  if (token && /\d/.test(token)) return token;
+  // Link-style invoices (Tuta): the subject says "invoice" and the body
+  // carries a bare long numeric reference. Ten digits or more keeps prose
+  // numbers (years, totals) out.
+  if (/\binvoice\b/i.test(plain)) {
+    return plain.match(LONG_DIGIT_RUN_RE)?.[0];
+  }
+  return undefined;
 }
 
 // ---------------------------------------------------------------------------
