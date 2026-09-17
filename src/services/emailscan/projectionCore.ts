@@ -26,6 +26,13 @@ export interface ProjectionSourceRow {
   /** Classified kind; the fold keeps only recurring/sparse charges. */
   kind: string;
   amount: number;
+  /**
+   * True when the merchant evidence proves a payment but its amount was
+   * unreadable (paid-unknown, "?"): the charge is bucketed with total 0 and
+   * unknownCount 1 so window readers can honestly render "?" anchored to the
+   * payment's own window. (schema v16 / 2026-09-16.)
+   */
+  unknown?: boolean;
   /** ISO-8601 charge-email date. */
   date: string;
 }
@@ -38,7 +45,10 @@ export interface MerchantDayActual {
   /** Device-local calendar day, YYYY-MM-DD. */
   day: string;
   total: number;
+  /** Known-amount charges only. */
   count: number;
+  /** Paid-unknown charges bucketed into this row (total contributes 0). */
+  unknownCount: number;
 }
 
 /** Local calendar day of an ISO date, or null when unparseable. */
@@ -67,12 +77,18 @@ export function foldActuals(rows: ProjectionSourceRow[]): MerchantDayActual[] {
     kind: ActualsKind,
     day: string,
     amount: number,
+    unknown: boolean,
   ) => {
     const key = `${bucketType}\u0000${bucketKey}\u0000${mailboxId}\u0000${kind}\u0000${day}`;
     const cur = totals.get(key);
     if (cur) {
       cur.total += amount;
-      cur.count += 1;
+      // `count` mirrors legacy sparseSecondaryLine semantics: KNOWN charges
+      // only. Paid-unknown charges ride unknown_count instead, so a window
+      // with only unreadable charges stays "no sparse line" (parity with the
+      // legacy reader's undefined-amount skip).
+      if (!unknown) cur.count += 1;
+      if (unknown) cur.unknownCount += 1;
     } else {
       totals.set(key, {
         bucketType,
@@ -81,7 +97,8 @@ export function foldActuals(rows: ProjectionSourceRow[]): MerchantDayActual[] {
         kind,
         day,
         total: amount,
-        count: 1,
+        count: unknown ? 0 : 1,
+        unknownCount: unknown ? 1 : 0,
       });
     }
   };
@@ -93,9 +110,9 @@ export function foldActuals(rows: ProjectionSourceRow[]): MerchantDayActual[] {
     const kind: ActualsKind = row.kind;
     const merchantKey = row.merchantKey;
     const lowerName = row.merchantName.toLowerCase();
-    add("slug", merchantKey, row.mailboxId, kind, day, row.amount);
+    add("slug", merchantKey, row.mailboxId, kind, day, row.amount, Boolean(row.unknown));
     if (lowerName !== merchantKey) {
-      add("name", lowerName, row.mailboxId, kind, day, row.amount);
+      add("name", lowerName, row.mailboxId, kind, day, row.amount, Boolean(row.unknown));
       add(
         "both",
         bothBucketKey(merchantKey, lowerName),
@@ -103,6 +120,7 @@ export function foldActuals(rows: ProjectionSourceRow[]): MerchantDayActual[] {
         kind,
         day,
         row.amount,
+        Boolean(row.unknown),
       );
     }
   }

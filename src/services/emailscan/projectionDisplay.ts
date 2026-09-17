@@ -23,11 +23,12 @@ function sumBuckets(
   start: Date,
   end: Date,
   withCounts: boolean,
-): number | { total: number; count: number } {
+): number | { total: number; count: number; unknown: number } {
   const S = nameToSlug(subscription.name);
   const L = subscription.name.toLowerCase();
   let total = 0;
   let count = 0;
+  let unknown = 0;
   for (const a of actuals) {
     if (a.kind !== kind) continue;
     if (
@@ -43,15 +44,18 @@ function sumBuckets(
     if (a.bucketType === "slug" && a.bucketKey === S) {
       total += a.total;
       count += a.count;
+      unknown += a.unknownCount ?? 0;
     } else if (a.bucketType === "name" && a.bucketKey === L) {
       total += a.total;
       count += a.count;
+      unknown += a.unknownCount ?? 0;
     } else if (a.bucketType === "both" && a.bucketKey === bothBucketKey(S, L)) {
       total -= a.total;
       count -= a.count;
+      unknown -= a.unknownCount ?? 0;
     }
   }
-  return withCounts ? { total, count } : total;
+  return withCounts ? { total, count, unknown } : total;
 }
 
 function explicitCadence(sub: Subscription): string | null {
@@ -96,7 +100,7 @@ export function projectionSparseSecondaryLine(
     start,
     end,
     true,
-  ) as { total: number; count: number };
+  ) as { total: number; count: number; unknown: number };
   if (count === 0) return null;
   return { amount: total, label: "Sparse" };
 }
@@ -126,18 +130,33 @@ export function projectionDisplayedAmount(
   }
   if (sub.category === "sparse") {
     const explicit = explicitCadence(sub);
-    if (explicit && !sub.priceUnknown) {
-      return { amount: sub.price, unknown: false, label: explicit };
+    // Mirror of chargeDisplay.displayedAmount (paid-unknown rule, 2026-09-16):
+    // billed sparse rows render their own cadence ("Monthly ?" when the price
+    // is unreadable); actuals windows render the known sum and "?" only when
+    // the window contains a paid-unknown charge.
+    if (explicit) {
+      return {
+        amount: sub.priceUnknown ? 0 : sub.price,
+        unknown: Boolean(sub.priceUnknown),
+        label: explicit,
+      };
     }
     if (period !== "week" && period !== "month" && period !== "year") {
       return projectionDisplayedAmount(sub, "month", actuals, now);
     }
-    const amount = projectionSparseActuals(sub, actuals, period, now);
-    const unknown = amount === 0 && Boolean(sub.priceUnknown);
-    return { amount, unknown, label };
+    const { start, end } = windowForPeriod(period, now);
+    const { total: amount, unknown } = sumBuckets(
+      sub,
+      actuals,
+      "sparse",
+      start,
+      end,
+      true,
+    ) as { total: number; unknown: number };
+    return { amount, unknown: unknown > 0, label };
   }
   if (sub.priceUnknown) {
-    return { amount: 0, unknown: true, label };
+    return { amount: 0, unknown: true, label: explicitCadence(sub) ?? label };
   }
   const target: "yearly" | "weekly" | "monthly" =
     period === "yearly" ? "yearly" : period === "weekly" ? "weekly" : "monthly";

@@ -48,7 +48,9 @@ function merchantIndex(messages: ClassifiedMessage[]): MerchantIndex {
   };
   for (const hit of messages) {
     if (hit.kind !== "recurring" && hit.kind !== "sparse") continue;
-    if (hit.amount === undefined) continue;
+    // Paid-unknown hits (amount undefined, 2026-09-16) stay indexed: the
+    // window anchoring reader must see them. Sum paths are unaffected —
+    // matchesSubscription and the secondary-line walker skip them.
     let slugBuckets = index.bySlug.get(hit.merchantKey);
     if (!slugBuckets) {
       slugBuckets = { recurring: [], sparse: [] };
@@ -276,6 +278,38 @@ export function sparseSecondaryLine(
   return { amount: total, label: "Sparse" };
 }
 
+/** Paid-unknown anchoring (2026-09-16): count the sparse charges in the
+ * window whose merchant/mailbox evidence matches `sub` but whose amount is
+ * unreadable — a proven payment we cannot price (Tuta-invoice class). These
+ * hits are excluded from `matchesSubscription` sums, so this walks them
+ * separately: their presence in a window is what makes "?" honest there. */
+function sparseUnknownChargesInWindow(
+  sub: Subscription,
+  messages: ClassifiedMessage[],
+  start: Date,
+  end: Date,
+): number {
+  let unknown = 0;
+  for (const hit of matchCandidates(sub, messages, "sparse")) {
+    if (hit.kind !== "sparse") continue;
+    if (hit.amount !== undefined) continue;
+    const mailbox = sub.paymentMethod;
+    if (mailbox && hit.message.mailboxId !== mailbox) continue;
+    const key = cachedSlug(sub.name);
+    if (
+      hit.merchantKey !== key &&
+      hit.merchantName.toLowerCase() !== sub.name.toLowerCase()
+    ) {
+      continue;
+    }
+    const charged = new Date(hit.message.date);
+    if (Number.isNaN(charged.getTime())) continue;
+    if (charged < start || charged > end) continue;
+    unknown += 1;
+  }
+  return unknown;
+}
+
 export function displayedAmount(
   sub: Subscription,
   period: DisplayPeriod,
@@ -287,22 +321,33 @@ export function displayedAmount(
     return { amount: 0, unknown: false, label };
   }
   if (isSparseSubscription(sub)) {
-    // R18: a sparse row with an explicit cadence and a known price (Porkbun:
-    // Yearly $47.74) is shown AS BILLED — not forced into a this-month
-    // actuals window that reads $0 / "?" eleven months of the year.
+    // R18: a sparse row with an explicit cadence is shown AS BILLED — its own
+    // billing label, not a this-month actuals window that reads $0 / "?"
+    // eleven months of the year. 2026-09-16: an unreadable price keeps the
+    // billing label too ("Monthly ?" / "Yearly ?") — "?" rides the billing
+    // cadence, never an actuals window.
     const explicit = explicitCadenceLabel(sub);
-    if (explicit && !sub.priceUnknown) {
-      return { amount: sub.price, unknown: false, label: explicit };
+    if (explicit) {
+      return {
+        amount: sub.priceUnknown ? 0 : sub.price,
+        unknown: Boolean(sub.priceUnknown),
+        label: explicit,
+      };
     }
     if (period !== "week" && period !== "month" && period !== "year") {
       return displayedAmount(sub, "month", messages, now);
     }
     const amount = sparseActuals(sub, messages, period, now);
-    const unknown = amount === 0 && Boolean(sub.priceUnknown);
+    // Paid-unknown rule: "?" only when the window itself contains a proven
+    // payment whose amount we could not read; an empty window is $0.00.
+    const { start, end } = windowForPeriod(period, now);
+    const unknown = sparseUnknownChargesInWindow(sub, messages, start, end) > 0;
     return { amount, unknown, label };
   }
   if (sub.priceUnknown) {
-    return { amount: 0, unknown: true, label };
+    // Recurring rows do pay every cycle — the honest "?" carries the billing
+    // cadence ("Monthly ?"), not the actuals-window label.
+    return { amount: 0, unknown: true, label: explicitCadenceLabel(sub) ?? label };
   }
   const target: RecurringDisplayPeriod =
     period === "yearly"

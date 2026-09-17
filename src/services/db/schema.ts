@@ -5,7 +5,7 @@
 import type { SQLiteDatabase } from "expo-sqlite";
 
 /** Bump when adding a migration. Stored in PRAGMA user_version. */
-export const SCHEMA_VERSION = 16;
+export const SCHEMA_VERSION = 17;
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS subscriptions (
@@ -146,6 +146,7 @@ CREATE TABLE IF NOT EXISTS merchant_day_actuals (
   day         TEXT NOT NULL,
   total       REAL NOT NULL DEFAULT 0,
   count       INTEGER NOT NULL DEFAULT 0,
+  unknown_count INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (bucket_type, bucket_key, mailbox_id, kind, day)
 );
 CREATE INDEX IF NOT EXISTS idx_merchant_day_actuals_key ON merchant_day_actuals(bucket_type, bucket_key);
@@ -438,6 +439,7 @@ export const MIGRATIONS: ((db: SQLiteDatabase) => Promise<void>)[] = [
           day         TEXT NOT NULL,
           total       REAL NOT NULL DEFAULT 0,
           count       INTEGER NOT NULL DEFAULT 0,
+          unknown_count INTEGER NOT NULL DEFAULT 0,
           PRIMARY KEY (bucket_type, bucket_key, mailbox_id, kind, day)
         );
         CREATE INDEX IF NOT EXISTS idx_merchant_day_actuals_key ON merchant_day_actuals(bucket_type, bucket_key);
@@ -495,6 +497,22 @@ export const MIGRATIONS: ((db: SQLiteDatabase) => Promise<void>)[] = [
        WHERE bucket_key = 'zohoaccounts';
       DELETE FROM merchant_day_actuals WHERE bucket_key = 'zohoaccounts';
     `);
+  },
+  // 17 (2026-09-16): paid-unknown window anchoring. merchant_day_actuals
+  // gains unknown_count — the fold buckets a charge whose evidence proves a
+  // payment but whose amount was unreadable (Tuta-invoice class) with total 0
+  // and unknown_count 1, so window readers render "?" anchored to the
+  // payment's OWN window instead of any window the row's priceUnknown flag
+  // touches. Pre-projection DBs ALTER in with DEFAULT 0; the projection
+  // rebuild re-folds local rows (the SSOT) so no data backfill is needed.
+  async (db) => {
+    if (!(await tableExists(db, "merchant_day_actuals"))) return;
+    const names = await columnNames(db, "merchant_day_actuals");
+    if (!names.includes("unknown_count")) {
+      await db.execAsync(
+        `ALTER TABLE merchant_day_actuals ADD COLUMN unknown_count INTEGER NOT NULL DEFAULT 0;`,
+      );
+    }
   },
 ];
 

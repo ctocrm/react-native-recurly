@@ -89,17 +89,21 @@ export async function rebuildProjectionAsync(): Promise<number> {
       if (
         typeof c.merchantKey !== "string" ||
         typeof c.merchantName !== "string" ||
-        (c.kind !== "recurring" && c.kind !== "sparse") ||
-        typeof c.amount !== "number"
+        (c.kind !== "recurring" && c.kind !== "sparse")
       ) {
         continue;
       }
+      // Paid-unknown charges (proven payment, unreadable amount — schema v17)
+      // are folded with total 0 + unknown_count 1 so windows can render "?"
+      // anchored to the payment's own date.
+      const known = typeof c.amount === "number";
       source.push({
         merchantKey: c.merchantKey,
         merchantName: c.merchantName,
         mailboxId: row.mailbox_id,
         kind: c.kind,
-        amount: c.amount,
+        amount: known ? (c.amount as number) : 0,
+        unknown: !known,
         date: row.date,
       });
     } catch {
@@ -111,8 +115,8 @@ export async function rebuildProjectionAsync(): Promise<number> {
   await db.withTransactionAsync(async () => {
     const stmt = await db.prepareAsync(
       `INSERT OR REPLACE INTO merchant_day_actuals
-         (bucket_type, bucket_key, mailbox_id, kind, day, total, count)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+         (bucket_type, bucket_key, mailbox_id, kind, day, total, count, unknown_count)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     );
     try {
       for (const a of agg) {
@@ -124,6 +128,7 @@ export async function rebuildProjectionAsync(): Promise<number> {
           a.day,
           a.total,
           a.count,
+          a.unknownCount,
         );
       }
     } finally {
@@ -143,7 +148,8 @@ export async function loadActualsAsync(): Promise<MerchantDayActual[]> {
   const db = getDatabase();
   return db.getAllAsync<MerchantDayActual>(
     `SELECT bucket_type AS bucketType, bucket_key AS bucketKey,
-            mailbox_id AS mailboxId, kind, day, total, count
+            mailbox_id AS mailboxId, kind, day, total, count,
+            unknown_count AS unknownCount
      FROM merchant_day_actuals`,
   );
 }

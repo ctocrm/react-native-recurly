@@ -73,6 +73,7 @@ jest.mock("@/services/db/connection", () => {
             day: params[4] as string,
             total: params[5] as number,
             count: params[6] as number,
+            unknownCount: params[7] as number,
           });
         },
         finalizeAsync: async () => undefined,
@@ -289,12 +290,23 @@ describe("rebuild + load roundtrip", () => {
         date: "2026-03-12T09:00:00",
         classified_json: "{not json",
       },
+      {
+        // Paid-unknown (Tuta-invoice class): proven payment, unreadable
+        // amount — buckets with total 0 + unknown_count 1 (schema v17).
+        mailbox_id: "mb1",
+        date: "2026-03-15T09:00:00",
+        classified_json: JSON.stringify({
+          merchantKey: "netflix",
+          merchantName: "Netflix",
+          kind: "recurring",
+        }),
+      },
     ];
     fake.actualRows = [];
     fake.deletes = [];
 
     const buckets = await rebuildProjectionAsync();
-    expect(buckets).toBe(1);
+    expect(buckets).toBe(2);
     expect(fake.deletes).toHaveLength(1);
     expect(fake.actualRows).toEqual([
       {
@@ -305,6 +317,17 @@ describe("rebuild + load roundtrip", () => {
         day: localDayKey("2026-03-10T09:00:00"),
         total: 15,
         count: 1,
+        unknownCount: 0,
+      },
+      {
+        bucketType: "slug",
+        bucketKey: "netflix",
+        mailboxId: "mb1",
+        kind: "recurring",
+        day: localDayKey("2026-03-15T09:00:00"),
+        total: 0,
+        count: 0,
+        unknownCount: 1,
       },
     ]);
 

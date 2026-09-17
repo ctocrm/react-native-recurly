@@ -152,6 +152,66 @@ describe("charge display periods", () => {
     expect(week.amount).toBe(0);
   });
 
+  it("renders $0.00 (never ?) for a priceUnknown sparse row with an empty window", () => {
+    const now = new Date("2026-08-24T12:00:00.000Z");
+    const month = displayedAmount(sparseNoCadence, "month", [], now);
+    expect(month.amount).toBe(0);
+    expect(month.unknown).toBe(false);
+    expect(month.label).toBe("This month");
+  });
+
+  it("anchors ? to the window that contains the paid-unknown charge (Tuta rule)", () => {
+    const now = new Date("2026-08-24T12:00:00.000Z");
+    const messages = [
+      // Proven payment, unreadable amount (Tuta-invoice class), THIS month.
+      {
+        ...hit(
+          "XAI",
+          0,
+          "2026-08-10T00:00:00.000Z",
+          sparseNoCadence.paymentMethod!,
+        ),
+        amount: undefined,
+      },
+    ];
+    const month = displayedAmount(sparseNoCadence, "month", messages, now);
+    expect(month.amount).toBe(0);
+    expect(month.unknown).toBe(true);
+    expect(month.label).toBe("This month");
+    // The same payment does not anchor ? to a window that excludes it.
+    const week = displayedAmount(sparseNoCadence, "week", messages, now);
+    expect(week.amount).toBe(0);
+    expect(week.unknown).toBe(false);
+  });
+
+  it("keeps the billing label for a billed sparse row with an unreadable price (Yearly ?)", () => {
+    const tutaBilledUnknown = { ...porkbun, price: 0, priceUnknown: true };
+    const now = new Date("2026-08-24T12:00:00.000Z");
+    for (const period of [
+      "week",
+      "month",
+      "year",
+      "yearly",
+      "weekly",
+      "monthly",
+    ] as const) {
+      const view = displayedAmount(tutaBilledUnknown, period, [], now);
+      expect(view.label).toBe("Yearly");
+      expect(view.unknown).toBe(true);
+    }
+  });
+
+  it("renders a recurring priceUnknown row as Monthly ? (billed cadence, not This month)", () => {
+    const view = displayedAmount(
+      { ...proton, priceUnknown: true },
+      "month",
+      [],
+      new Date("2026-08-24T12:00:00.000Z"),
+    );
+    expect(view.label).toBe("Monthly");
+    expect(view.unknown).toBe(true);
+  });
+
   it("adds recurring amortized + sparse this-month into Monthly Spend", () => {
     const now = new Date("2026-08-24T12:00:00.000Z");
     const messages = [
