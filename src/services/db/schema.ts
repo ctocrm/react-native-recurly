@@ -3,9 +3,10 @@
  * SCHEMA_SQL is the full shape for new DBs. MIGRATIONS upgrade older files.
  */
 import type { SQLiteDatabase } from "expo-sqlite";
+import { nameToSlug } from "@/services/iconScraper";
 
 /** Bump when adding a migration. Stored in PRAGMA user_version. */
-export const SCHEMA_VERSION = 17;
+export const SCHEMA_VERSION = 18;
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS subscriptions (
@@ -511,6 +512,75 @@ export const MIGRATIONS: ((db: SQLiteDatabase) => Promise<void>)[] = [
     if (!names.includes("unknown_count")) {
       await db.execAsync(
         `ALTER TABLE merchant_day_actuals ADD COLUMN unknown_count INTEGER NOT NULL DEFAULT 0;`,
+      );
+    }
+  },
+  // 18 (2026-09-17): ONE card per merchant+mailbox. Rows used to be matched
+  // by display name, so name variants ("YouTube" vs "Youtube" — product map
+  // vs From-host mint, or restore-era names) minted duplicate cards instead
+  // of repairing. Group stored rows by NAME SLUG + mailbox (icon_key is NOT
+  // identity — it may be the default "plus" or a user-picked icon); keep the
+  // strongest row (paper-trail first, then known price, then freshest),
+  // merge any missing paper-trail links from the twin, delete the twin.
+  // merchant_day_actuals is merchant-keyed, so twins share buckets — nothing
+  // to clean there. Idempotent: a second pass finds no groups of 2+.
+  async (db) => {
+    const rows = await db.getAllAsync<{
+      id: string;
+      name: string;
+      payment_method: string | null;
+      source_message_id: string | null;
+      bill_number: string | null;
+      start_date: string | null;
+      price_unknown: number | null;
+    }>(
+      `SELECT id, name, payment_method, source_message_id,
+              bill_number, start_date, price_unknown
+       FROM subscriptions`,
+    );
+    const groups = new Map<string, typeof rows>();
+    for (const row of rows) {
+      const slug = nameToSlug(row.name).toLowerCase();
+      const key = `${slug}::${row.payment_method ?? ""}`;
+      const list = groups.get(key);
+      if (list) list.push(row);
+      else groups.set(key, [row]);
+    }
+    let removed = 0;
+    let merged = 0;
+    let groupsHit = 0;
+    for (const list of groups.values()) {
+      if (list.length < 2) continue;
+      groupsHit += 1;
+      const sorted = [...list].sort((a, b) => {
+        const score = (r: (typeof rows)[number]) =>
+          (r.source_message_id ? 2 : 0) + (r.price_unknown ? 0 : 1);
+        if (score(a) !== score(b)) return score(b) - score(a);
+        return (b.start_date ?? "").localeCompare(a.start_date ?? "");
+      });
+      const keeper = sorted[0];
+      for (const twin of sorted.slice(1)) {
+        const patchSource = !keeper.source_message_id && twin.source_message_id;
+        const patchBill = !keeper.bill_number && twin.bill_number;
+        if (patchSource || patchBill) {
+          await db.runAsync(
+            `UPDATE subscriptions SET
+               source_message_id = COALESCE(source_message_id, ?),
+               bill_number = COALESCE(bill_number, ?)
+             WHERE id = ?`,
+            twin.source_message_id,
+            twin.bill_number,
+            keeper.id,
+          );
+          merged += 1;
+        }
+        await db.runAsync(`DELETE FROM subscriptions WHERE id = ?`, twin.id);
+        removed += 1;
+      }
+    }
+    if (removed > 0) {
+      console.log(
+        `[MIGRATE] subscription dedupe v18: ${removed} twin row(s) removed across ${groupsHit} group(s), ${merged} paper-trail merge(s)`,
       );
     }
   },

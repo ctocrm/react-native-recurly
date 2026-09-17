@@ -25,6 +25,7 @@ import {
   shouldSkipRemainingLegs,
 } from "./scanTotalBudget";
 import { candidateToSubscription } from "./importCandidate";
+import { nameToSlug } from "@/services/iconScraper";
 import { listMailboxesAsync } from "./persist";
 import {
   createMailProvider,
@@ -141,8 +142,15 @@ async function runScan(opts: {
   }
   let imported = 0;
   const errors: string[] = [];
+  // R28: rows match by merchant IDENTITY (name slug + mailbox), never by
+  // display name or icon_key — "YouTube" vs "Youtube" variants (product map
+  // vs From-host mint, or restore-era names) used to defeat the match and
+  // MINT a duplicate card instead of repairing the row. icon_key is NOT
+  // identity: it may be the default "plus" or a user-picked icon.
+  const rowIdentity = (s: Subscription) =>
+    `${nameToSlug(s.name).toLowerCase()}::${s.paymentMethod ?? ""}`;
   const existingByKey = new Map(
-    opts.existing.map((s) => [`${s.name}::${s.paymentMethod ?? ""}`, s]),
+    opts.existing.map((s) => [rowIdentity(s), s]),
   );
 
   // R13: scan-wide budget — bounds TOTAL scan duration, not just per-leg
@@ -189,7 +197,7 @@ async function runScan(opts: {
           c.kind === "recurring" || c.kind === "sparse" || c.kind === "free",
       );
       for (const candidate of keep) {
-        const key = `${candidate.merchant}::${candidate.mailboxId}`;
+        const key = `${candidate.merchantKey.toLowerCase()}::${candidate.mailboxId}`;
         const already = existingByKey.get(key);
         const next = candidateToSubscription(candidate);
         if (already) {
