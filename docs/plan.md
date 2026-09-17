@@ -1720,7 +1720,7 @@ Goal: cards tell the truth about cadence and amount (Porkbun shows Yearly + its 
 User decisions (binding):
 - Purchases NEVER become their own card. ONE card per merchant+mailbox. When that merchant also has sparse activity, the card renders a SECOND stacked amount+label line (`sparse`) under the primary subscription line — only when present. Pure-sparse merchants keep today's single sparse card with actuals.
 - Bill number = best-effort extraction from the email body (invoice/order/receipt patterns), often absent → null; always manually editable; the source email (mailbox + message id + date) is stored automatically as the paper-trail.
-- Cadence may be inferred from clockwork payment spacing — ≥3 charges, median interval ≈7/30/365 days, tight spread — for RECURRING candidates with unknown cadence only. Regex wins when present. Sparse is NEVER promoted to recurring.
+- Cadence may be inferred from clockwork payment spacing — ≥3 charges, median interval ≈7/30/365 days, tight spread — for RECURRING candidates with unknown cadence only. Regex wins when present. Sparse is NEVER promoted to recurring. **(AMENDED 2026-09-16, user direction: a sparse group meeting the same strict clockwork evidence AND amount consistency — every amount within ±25% of the median — IS promoted to recurring, `cadence:clockwork-promoted-*`; the old default-Monthly mint that papered over cadence-less candidates is removed. $0 imports as free. See baseline 2026-09-16 + commit `90479df`.)**
 - Stats/spend keep counting both streams (subscription + purchases); totals stay truthful.
 
 ### Phase A — cadence truth
