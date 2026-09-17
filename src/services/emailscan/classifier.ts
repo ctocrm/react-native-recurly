@@ -129,24 +129,21 @@ const USAGE_MONEY_RE =
 /**
  * R27 purchase-proof gate: a price in an email is not a charge. Marketing
  * email routinely quotes prices, while a real charge names the payment
- * event. These anchors are the positive evidence; at least one is required
- * before an amount is believed and (with marketing signals present) before
- * the message is kept as money at all.
+ * event. STRONG anchors are concrete charge artifacts (a document number, a
+ * total, a card, a GPA order id) — they beat marketing every time. GENERIC
+ * anchors are soft phrases ("payment method", the word "receipt") that ad
+ * fine-print also uses: they beat only a light marketing footprint (<4);
+ * heavy marketing (pre-order + bulk headers, ≥4) beats generic-only proof.
  */
-const PAYMENT_PROOF_RES: { re: RegExp; tag: string }[] = [
+const PAYMENT_PROOF_STRONG_RES: { re: RegExp; tag: string }[] = [
   { re: /\btotal\s+(?:charged|due|amount)\b/i, tag: "total" },
   { re: /\bamount\s+(?:charged|paid|due)\b/i, tag: "amount-paid" },
   { re: /\byou\s+paid\b/i, tag: "you-paid" },
   { re: /\bwe(?:'ve)?\s+(?:charged|received\s+(?:your\s+)?payment)/i, tag: "we-charged" },
-  { re: /\bpayment\s+(?:method|received|complete|successful|confirmed|failed)\b/i, tag: "payment-event" },
   { re: /\b(?:visa|mastercard|amex|discover|card)\s+(?:ending|·|•)\b/i, tag: "card-ending" },
-  { re: /\bbilled\s+to\b/i, tag: "billed-to" },
   { re: /\b(?:invoice|receipt|order)\s*(?:#|no\.?|number)\b/i, tag: "doc-number" },
   { re: /\bthank you for your (?:purchase|order|payment)\b/i, tag: "thanks-purchase" },
   { re: /\border confirmation\b/i, tag: "order-confirmation" },
-  { re: /\breceipt\b/i, tag: "receipt-word" },
-  { re: /\binvoice\b/i, tag: "invoice-word" },
-  { re: /\bstatement\b/i, tag: "statement-word" },
   { re: /\bGPA\.[A-Z0-9]+-[A-Z0-9]+-[A-Z0-9]+\b/, tag: "gpa-order" },
   // Renewal/total shapes from real billing mail (Prime "membership renews
   // for $14.99/mo", Amazon "Order total $12.49", "Total: $47.74").
@@ -156,6 +153,17 @@ const PAYMENT_PROOF_RES: { re: RegExp; tag: string }[] = [
   { re: /\border\s+total\b/i, tag: "order-total" },
   { re: /\btotal\b[^\n]{0,16}(?:USD\s*)?(?:US)?\$\s*\d/i, tag: "total-price" },
 ];
+
+/** Soft anchors: legit in receipts, but ad fine-print uses them too. */
+const PAYMENT_PROOF_GENERIC_RES: { re: RegExp; tag: string }[] = [
+  { re: /\bpayment\s+(?:method|received|complete|successful|confirmed|failed)\b/i, tag: "payment-event" },
+  { re: /\bbilled\s+to\b/i, tag: "billed-to" },
+  { re: /\breceipt\b/i, tag: "receipt-word" },
+  { re: /\binvoice\b/i, tag: "invoice-word" },
+  { re: /\bstatement\b/i, tag: "statement-word" },
+];
+
+const PAYMENT_PROOF_RES = [...PAYMENT_PROOF_STRONG_RES, ...PAYMENT_PROOF_GENERIC_RES];
 
 /** R27: marketing markers. Subject hits weigh most (the pitch IS the mail);
  * body hits are CTA noise. Any of these without payment proof drops the
@@ -1169,9 +1177,13 @@ export function classifyMessage(message: NormalizedMessage): ClassifiedMessage {
   // R27 purchase-proof gate: payment anchors decide everything downstream.
   // Hints are optional provider weights (Gmail/Workspace only) — the gate
   // must stand on its own without them.
-  const proofTags = PAYMENT_PROOF_RES.filter((p) =>
+  const strongProofTags = PAYMENT_PROOF_STRONG_RES.filter((p) =>
     p.re.test(`${message.subject}\n${body}`),
   ).map((p) => `proof:${p.tag}`);
+  const genericProofTags = PAYMENT_PROOF_GENERIC_RES.filter((p) =>
+    p.re.test(`${message.subject}\n${body}`),
+  ).map((p) => `proof:${p.tag}`);
+  const proofTags = [...strongProofTags, ...genericProofTags];
   const marketingTags: string[] = [];
   let marketingScore = 0;
   for (const m of MARKETING_SUBJECT_RES) {
@@ -1216,11 +1228,19 @@ export function classifyMessage(message: NormalizedMessage): ClassifiedMessage {
   }
 
   // Marketing evidence with zero payment anchors = advertising (the Pixel
-  // Watch 5 pre-order class): drop — no kind, no amount, no row. Proof
-  // always wins over marketing (real receipts keep their unsubscribe
-  // footers). Threshold 2: one soft body marker ("learn more") alone must
-  // not drop a plain statement email.
-  if (proofTags.length === 0 && marketingScore >= 2) {
+  // Watch 5 pre-order class): drop — no kind, no amount, no row. STRONG
+  // proof always wins (real receipts keep their unsubscribe footers), but
+  // GENERIC proof alone survives only a light marketing footprint: heavy
+  // marketing (≥4 — e.g. a pre-order pitch with List-Unsubscribe +
+  // Precedence: bulk) with no concrete charge artifact is still an ad —
+  // its "payment method" fine-print is not a payment event.
+  // Threshold 2 for the no-proof case: one soft body marker ("learn
+  // more") alone must not drop a plain statement email.
+  if (
+    strongProofTags.length === 0 &&
+    ((proofTags.length === 0 && marketingScore >= 2) ||
+      (proofTags.length > 0 && marketingScore >= 4))
+  ) {
     return {
       message,
       subjectClass,
@@ -1232,6 +1252,7 @@ export function classifyMessage(message: NormalizedMessage): ClassifiedMessage {
       needsBody: false,
       evidence: [
         ...evidence,
+        ...proofTags,
         ...marketingTags,
         "drop:marketing-no-proof",
       ],

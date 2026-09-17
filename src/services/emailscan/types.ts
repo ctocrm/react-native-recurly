@@ -28,7 +28,13 @@
 // is its own product, and cadence requires a strong billing statement (or
 // weak word + proof on a recurring hit). Bump restages all legs with fresh
 // bodies (and, on Gmail/Workspace, provider hints).
-export const PARSER_VERSION = 20;
+// v20→v21 (R27 tuning, device evidence): proof is tiered — STRONG charge
+// artifacts (doc number, total, card, GPA id) always beat marketing, but
+// GENERIC soft anchors ("payment method", bare receipt/invoice words)
+// survive only a light marketing footprint (<4). The Pixel Watch 5 pre-
+// order ad's fine-print proof no longer saves it. One more fresh-body
+// restage so v20-classified ad rows re-derive under the tiered gate.
+export const PARSER_VERSION = 21;
 
 
 export type MailProviderId =

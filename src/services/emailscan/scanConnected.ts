@@ -188,6 +188,15 @@ async function runScan(opts: {
         (c) =>
           c.kind === "recurring" || c.kind === "sparse" || c.kind === "free",
       );
+      // R27 TEMP DIAGNOSTIC: candidate evidence for the Google family —
+      // remove after the ad-import tuning lands.
+      for (const c of keep) {
+        if (/^(youtube|google)/.test(c.merchantKey)) {
+          console.log(
+            `[R27DIAG] candidate ${c.merchantKey} kind=${c.kind} amount=${c.amount} cadence=${c.cadence} conf=${c.confidence} evidence=${JSON.stringify(c.evidence)}`,
+          );
+        }
+      }
       for (const candidate of keep) {
         const key = `${candidate.merchant}::${candidate.mailboxId}`;
         const already = existingByKey.get(key);

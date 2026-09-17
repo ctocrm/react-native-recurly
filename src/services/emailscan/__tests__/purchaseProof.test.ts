@@ -61,6 +61,42 @@ describe("R27 purchase-proof gate", () => {
     expect(hit.merchantKey).toBe("google-store");
   });
 
+  it("drops the REAL ad shape: 'payment method' fine-print cannot save heavy marketing (2026-09-17 device evidence)", () => {
+    const hit = classifyMessage(
+      base({
+        messageId: "pixel-ad-real",
+        from: "Google Store <googlestore-noreply@google.com>",
+        subject: "Pre-order the new Google Pixel Watch 5",
+        text: "The new Pixel Watch 5. Your payment method will be charged when your order ships. Or finance it for $22.91/mo for 24 months. Pre-order yours today. Learn more. Unsubscribe",
+        hints: {
+          listUnsubscribe: true,
+          listId: "list.googlestoresupport.com",
+          precedence: "bulk",
+        },
+      }),
+    );
+    // Generic proof (payment-event) + marketing ≥ 4 (pre-order 2 + CTA/body
+    // 3 + bulk headers 5) = advertising, not a charge.
+    expect(hit.kind).toBeNull();
+    expect(hit.amount).toBeUndefined();
+    expect(hit.evidence).toContain("proof:payment-event");
+    expect(hit.evidence).toContain("drop:marketing-no-proof");
+  });
+
+  it("generic proof with only a light marketing footprint still imports", () => {
+    const hit = classifyMessage(
+      base({
+        messageId: "generic-keep",
+        from: "SaaS <billing@saas.io>",
+        subject: "Your SaaS invoice",
+        text: "Your payment method was updated. Invoice attached. Learn more about billing.",
+      }),
+    );
+    expect(hit.kind).toBe("sparse");
+    expect(hit.evidence).toContain("proof:payment-event");
+    expect(hit.evidence).toContain("proof:invoice-word");
+  });
+
   it("keeps a real Google Store order — distinct product, proof-anchored amount", () => {
     const hit = classifyMessage(
       base({
