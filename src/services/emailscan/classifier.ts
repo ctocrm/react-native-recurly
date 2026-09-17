@@ -14,6 +14,7 @@ import {
 } from "@/services/iconCandidate";
 import type {
   Cadence,
+  CandidateKind,
   ClassifiedMessage,
   MailAttachment,
   NormalizedMessage,
@@ -124,6 +125,70 @@ const RECURRING_MONEY_RE =
   /(\/mo\b|per\s+month|monthly|annual(?:ly)?|\/yr\b|per\s+year|renews)/i;
 const USAGE_MONEY_RE =
   /\b(usage|overage|this\s+period|pay[- ]as[- ]you[- ]go)\b/i;
+
+/**
+ * R27 purchase-proof gate: a price in an email is not a charge. Marketing
+ * email routinely quotes prices, while a real charge names the payment
+ * event. These anchors are the positive evidence; at least one is required
+ * before an amount is believed and (with marketing signals present) before
+ * the message is kept as money at all.
+ */
+const PAYMENT_PROOF_RES: { re: RegExp; tag: string }[] = [
+  { re: /\btotal\s+(?:charged|due|amount)\b/i, tag: "total" },
+  { re: /\bamount\s+(?:charged|paid|due)\b/i, tag: "amount-paid" },
+  { re: /\byou\s+paid\b/i, tag: "you-paid" },
+  { re: /\bwe(?:'ve)?\s+(?:charged|received\s+(?:your\s+)?payment)/i, tag: "we-charged" },
+  { re: /\bpayment\s+(?:method|received|complete|successful|confirmed|failed)\b/i, tag: "payment-event" },
+  { re: /\b(?:visa|mastercard|amex|discover|card)\s+(?:ending|·|•)\b/i, tag: "card-ending" },
+  { re: /\bbilled\s+to\b/i, tag: "billed-to" },
+  { re: /\b(?:invoice|receipt|order)\s*(?:#|no\.?|number)\b/i, tag: "doc-number" },
+  { re: /\bthank you for your (?:purchase|order|payment)\b/i, tag: "thanks-purchase" },
+  { re: /\border confirmation\b/i, tag: "order-confirmation" },
+  { re: /\breceipt\b/i, tag: "receipt-word" },
+  { re: /\binvoice\b/i, tag: "invoice-word" },
+  { re: /\bstatement\b/i, tag: "statement-word" },
+  { re: /\bGPA\.[A-Z0-9]+-[A-Z0-9]+-[A-Z0-9]+\b/, tag: "gpa-order" },
+  // Renewal/total shapes from real billing mail (Prime "membership renews
+  // for $14.99/mo", Amazon "Order total $12.49", "Total: $47.74").
+  { re: /\b(?:membership|subscription|plan)\s+renews?\b/i, tag: "renewal-event" },
+  { re: /\b(?:renewal|registration)\s+(?:price|fee|total)\b/i, tag: "renewal-price" },
+  { re: /\bdomain\s+registration\b/i, tag: "domain-registration" },
+  { re: /\border\s+total\b/i, tag: "order-total" },
+  { re: /\btotal\b[^\n]{0,16}(?:USD\s*)?(?:US)?\$\s*\d/i, tag: "total-price" },
+];
+
+/** R27: marketing markers. Subject hits weigh most (the pitch IS the mail);
+ * body hits are CTA noise. Any of these without payment proof drops the
+ * message — the Pixel Watch 5 pre-order ad class. */
+const MARKETING_SUBJECT_RES: { re: RegExp; tag: string }[] = [
+  { re: /\bpre[- ]?order\b/i, tag: "subject:pre-order" },
+  { re: /\b\d{1,3}\s*%\s*off\b/i, tag: "subject:percent-off" },
+  { re: /\b(?:black\s+friday|cyber\s+monday)\b/i, tag: "subject:sale-event" },
+  { re: /\b(?:introducing|meet|discover)\s+the\s+new\b/i, tag: "subject:launch" },
+  { re: /\bnow\s+available\b/i, tag: "subject:now-available" },
+  { re: /\bjust\s+dropped\b/i, tag: "subject:just-dropped" },
+  { re: /\b(?:shop|store)\s+(?:now|today|the)\b/i, tag: "subject:shop" },
+  { re: /\blimited\s+(?:time|offer|stock)\b/i, tag: "subject:limited" },
+  { re: /\bback\s+in\s+stock\b/i, tag: "subject:restock" },
+  { re: /\bsave\s+\$/i, tag: "subject:save" },
+  { re: /\bexclusive\s+(?:offer|deal|discount)\b/i, tag: "subject:exclusive" },
+];
+
+const MARKETING_BODY_RES: { re: RegExp; tag: string }[] = [
+  { re: /\bshop\s+(?:now|today)\b/i, tag: "body:shop-now" },
+  { re: /\bbuy\s+now\b/i, tag: "body:buy-now" },
+  { re: /\bpre[- ]?order\s+(?:now|today|yours)\b/i, tag: "body:pre-order-now" },
+  { re: /\blearn\s+more\b/i, tag: "body:learn-more" },
+  { re: /\bsave\s+(?:up\s+to\s+)?\$/i, tag: "body:save" },
+  { re: /\blimited\s+(?:time|quantit|stock|offer)\b/i, tag: "body:limited" },
+  { re: /\bsale\s+ends\b/i, tag: "body:sale-ends" },
+  { re: /\bview\s+in\s+(?:your\s+)?browser\b/i, tag: "body:view-browser" },
+  { re: /\bunsubscribe\b/i, tag: "body:unsubscribe" },
+];
+
+/** Pricing grammar that only exists in advertising: a range/starting price. */
+const MARKETING_PRICE_RES =
+  /(?:\bfrom|\bas\s+low\s+as|\bstarting\s+at|\bonly|\bjust)\s+(?:US)?\$\s*\d/i;
 
 const INVOICE_NAME_RE = /(invoice|receipt|statement)\.pdf$/i;
 const IMAGE_NAME_RE = /\.(png|jpe?g|gif|webp|svg|ico)$/i;
@@ -403,50 +468,72 @@ function isGoogleFamilyHost(host: string): boolean {
   return hostMatchesBase(host.toLowerCase(), "google.com");
 }
 
+/**
+ * R27: subject-tier regexes decide the product from the subject; body-tier
+ * patterns require a product URL or a qualified product phrase. A bare
+ * "YouTube" in body text (social footer, cross-sell link) no longer keys
+ * the email — that is how a Google Store ad became a "YouTube" charge.
+ */
 const GOOGLE_PRODUCT_MATCHERS: {
   re: RegExp;
+  /** Body-tier: stricter — URL or qualified product phrase only. */
+  bodyRe?: RegExp;
   key: string;
   name: string;
   host: string;
 }[] = [
   {
+    re: /\bgoogle\s+store\b|store\.google\.com|\bgooglestore\b/i,
+    bodyRe: /\bgoogle\s+store\b|store\.google\.com|\bgooglestore\b/i,
+    key: "google-store",
+    name: "Google Store",
+    host: "store.google.com",
+  },
+  {
     re: /\bgoogle\s+workspace\b|\bgsuite\b|\bg\s?suite\b/i,
+    bodyRe: /\bgoogle\s+workspace\b|\bgsuite\b|workspace\.google\.com/i,
     key: "google-workspace",
     name: "Google Workspace",
     host: "workspace.google.com",
   },
   {
     re: /\bgoogle\s+cloud\b|\bgoogle\s+cloud\s+platform\b|\bgcp\b/i,
+    bodyRe: /\bgoogle\s+cloud\b|\bgcp\b|cloud\.google\.com/i,
     key: "google-cloud",
     name: "Google Cloud",
     host: "cloud.google.com",
   },
   {
     re: /\bgoogle\s+ads(?:ense|words)?\b/i,
+    bodyRe: /\bgoogle\s+ads(?:ense|words)?\b|ads\.google\.com/i,
     key: "google-ads",
     name: "Google Ads",
     host: "ads.google.com",
   },
   {
     re: /\bgoogle\s+one\b/i,
+    bodyRe: /\bgoogle\s+one\b|one\.google\.com/i,
     key: "google-one",
     name: "Google One",
     host: "one.google.com",
   },
   {
     re: /\bgoogle\s+play\b|\bplay\s+billing\b/i,
+    bodyRe: /\bgoogle\s+play\b|\bplay\s+billing\b|play\.google\.com|\bGPA\.[A-Z0-9]+/i,
     key: "google-play",
     name: "Google Play",
     host: "play.google.com",
   },
   {
     re: /\bgoogle\s+drive\b/i,
+    bodyRe: /\bgoogle\s+drive\b|drive\.google\.com/i,
     key: "google-drive",
     name: "Google Drive",
     host: "drive.google.com",
   },
   {
     re: /\byoutube\b/i,
+    bodyRe: /\byoutube\s+(?:premium|tv|music|kids)\b|youtube\.com/i,
     key: "youtube",
     name: "YouTube",
     host: "youtube.com",
@@ -455,10 +542,12 @@ const GOOGLE_PRODUCT_MATCHERS: {
 
 function googleProductFromText(
   text: string | null | undefined,
+  tier: "subject" | "body",
 ): (typeof GOOGLE_PRODUCT_MATCHERS)[number] | null {
   if (!text) return null;
   for (const m of GOOGLE_PRODUCT_MATCHERS) {
-    if (m.re.test(text)) return m;
+    if (tier === "subject" ? m.re.test(text) : m.bodyRe && m.bodyRe.test(text))
+      return m;
   }
   return null;
 }
@@ -494,9 +583,31 @@ interface MerchantResolution {
 }
 
 function resolveGoogleSender(message: NormalizedMessage): MerchantResolution {
+  // R27: the sender's local part is the strongest product cue — Google's
+  // no-reply addresses name the product line (googlestore-noreply@…).
+  const fromEmail = extractEmailAddress(message.from).toLowerCase();
+  const localPart = fromEmail.split("@")[0] ?? "";
+  if (/googlestore/.test(localPart)) {
+    return {
+      merchantKey: "google-store",
+      merchantName: "Google Store",
+      officialDomain: "store.google.com",
+      evidence: ["google-sender:googlestore"],
+      drop: false,
+    };
+  }
+  if (/\bplay\b/.test(localPart)) {
+    return {
+      merchantKey: "google-play",
+      merchantName: "Google Play",
+      officialDomain: "play.google.com",
+      evidence: ["google-sender:play"],
+      drop: false,
+    };
+  }
   const product =
-    googleProductFromText(message.subject) ??
-    googleProductFromText(moneyBodyText(message));
+    googleProductFromText(message.subject, "subject") ??
+    googleProductFromText(moneyBodyText(message), "body");
   if (product) {
     return {
       merchantKey: product.key,
@@ -713,17 +824,114 @@ function parseAmount(
   return null;
 }
 
-function inferCadence(text: string): Cadence | undefined {
-  if (
-    /(\/yr\b|per\s+year|annual(?:ly)?|domain\s+registration|renewal\s+price)/i.test(
-      text,
-    )
-  ) {
-    return "yearly";
+interface CadenceEvidence {
+  cadence?: Cadence;
+  strong: boolean;
+  tag: string;
+}
+
+/**
+ * R27: cadence by evidence, not by word-match. STRONG anchors state the
+ * billing relationship (billed/renews + cadence, "your monthly plan", a
+ * price with its billing unit "$13.99/mo") and are sufficient alone. A bare
+ * cadence word in prose ("monthly") is WEAK: it only counts on a
+ * payment-proven recurring hit — a pre-order ad that says "monthly" in
+ * marketing copy never earns a cadence, and sparse one-offs never do from
+ * weak words.
+ */
+const STRONG_CADENCE_RES: { re: RegExp; cadence: Cadence; tag: string }[] = [
+  {
+    re: /\bbilled\s+(?:yearly|annually|every\s+year)\b/i,
+    cadence: "yearly",
+    tag: "billed-yearly",
+  },
+  {
+    re: /\bbilled\s+(?:monthly|every\s+month)\b/i,
+    cadence: "monthly",
+    tag: "billed-monthly",
+  },
+  { re: /\bbilled\s+weekly\b/i, cadence: "weekly", tag: "billed-weekly" },
+  {
+    re: /\brenew(?:s|ed)?\s+(?:yearly|annually)\b/i,
+    cadence: "yearly",
+    tag: "renews-yearly",
+  },
+  {
+    re: /\brenew(?:s|ed)?\s+(?:monthly|weekly)\b/i,
+    cadence: "monthly",
+    tag: "renews-monthly",
+  },
+  {
+    re: /\byour\s+(?:yearly|annual)\s+(?:plan|subscription|membership)\b/i,
+    cadence: "yearly",
+    tag: "your-yearly-plan",
+  },
+  {
+    re: /\byour\s+(?:monthly|weekly)\s+(?:plan|subscription|membership)\b/i,
+    cadence: "monthly",
+    tag: "your-monthly-plan",
+  },
+  {
+    re: /\b(?:yearly|annual)\s+(?:plan|subscription|membership)\b/i,
+    cadence: "yearly",
+    tag: "yearly-plan",
+  },
+  {
+    re: /\b(?:monthly|weekly)\s+(?:plan|subscription|membership)\b/i,
+    cadence: "monthly",
+    tag: "monthly-plan",
+  },
+  {
+    re: /(?:US)?\$\s*\d[\d.,]*\s*(?:\/|per\s+)\s*(?:yr|year)\b/i,
+    cadence: "yearly",
+    tag: "price-per-year",
+  },
+  {
+    re: /(?:US)?\$\s*\d[\d.,]*\s*(?:\/|per\s+)\s*(?:mo|month)\b/i,
+    cadence: "monthly",
+    tag: "price-per-month",
+  },
+  {
+    re: /(?:US)?\$\s*\d[\d.,]*\s*(?:\/|per\s+)\s*(?:wk|week)\b/i,
+    cadence: "weekly",
+    tag: "price-per-week",
+  },
+  {
+    re: /\bdomain\s+registration\b/i,
+    cadence: "yearly",
+    tag: "domain-registration",
+  },
+  {
+    re: /\brenewal\s+price\b/i,
+    cadence: "yearly",
+    tag: "renewal-price",
+  },
+];
+
+const WEAK_CADENCE_RES: { re: RegExp; cadence: Cadence; word: string }[] = [
+  { re: /\byearly\b|\bannually\b|\bannual\b/i, cadence: "yearly", word: "yearly" },
+  { re: /\bmonthly\b/i, cadence: "monthly", word: "monthly" },
+  { re: /\bweekly\b/i, cadence: "weekly", word: "weekly" },
+];
+
+function inferCadenceEvidence(
+  text: string,
+  hasProof: boolean,
+  kind: CandidateKind,
+): CadenceEvidence {
+  for (const m of STRONG_CADENCE_RES) {
+    if (m.re.test(text)) {
+      return { cadence: m.cadence, strong: true, tag: m.tag };
+    }
   }
-  if (/(\/mo\b|per\s+month|monthly)/i.test(text)) return "monthly";
-  if (/\brenews\b/i.test(text)) return "unknown";
-  return undefined;
+  if (hasProof && kind === "recurring") {
+    for (const m of WEAK_CADENCE_RES) {
+      if (m.re.test(text)) {
+        return { cadence: m.cadence, strong: false, tag: `weak-${m.word}` };
+      }
+    }
+  }
+  return { strong: false, tag: "none" };
 }
 
 /** R18: clockwork payment-spacing inference. When the same merchant charges
@@ -957,27 +1165,121 @@ export function classifyMessage(message: NormalizedMessage): ClassifiedMessage {
   }
 
   const body = moneyBodyText(message);
+
+  // R27 purchase-proof gate: payment anchors decide everything downstream.
+  // Hints are optional provider weights (Gmail/Workspace only) — the gate
+  // must stand on its own without them.
+  const proofTags = PAYMENT_PROOF_RES.filter((p) =>
+    p.re.test(`${message.subject}\n${body}`),
+  ).map((p) => `proof:${p.tag}`);
+  const marketingTags: string[] = [];
+  let marketingScore = 0;
+  for (const m of MARKETING_SUBJECT_RES) {
+    if (m.re.test(message.subject)) {
+      marketingTags.push(m.tag);
+      marketingScore += 2;
+    }
+  }
+  for (const m of MARKETING_BODY_RES) {
+    if (body && m.re.test(body)) {
+      marketingTags.push(m.tag);
+      marketingScore += 1;
+    }
+  }
+  if (MARKETING_PRICE_RES.test(message.subject)) {
+    marketingTags.push("subject:marketing-price");
+    marketingScore += 2;
+  }
+  if (body && MARKETING_PRICE_RES.test(body)) {
+    marketingTags.push("body:marketing-price");
+    marketingScore += 2;
+  }
+  if (message.hints?.gmailCategory === "CATEGORY_PROMOTIONS") {
+    marketingTags.push("gmail:promotions");
+    marketingScore += 3;
+  }
+  if (message.hints?.gmailCategory === "CATEGORY_SOCIAL") {
+    marketingTags.push("gmail:social");
+    marketingScore += 2;
+  }
+  if (message.hints?.listUnsubscribe) {
+    marketingTags.push("header:list-unsubscribe");
+    marketingScore += 3;
+  }
+  if (message.hints?.listId) {
+    marketingTags.push("header:list-id");
+    marketingScore += 1;
+  }
+  if (message.hints?.precedence && /bulk|junk|list/i.test(message.hints.precedence)) {
+    marketingTags.push("header:precedence-bulk");
+    marketingScore += 1;
+  }
+
+  // Marketing evidence with zero payment anchors = advertising (the Pixel
+  // Watch 5 pre-order class): drop — no kind, no amount, no row. Proof
+  // always wins over marketing (real receipts keep their unsubscribe
+  // footers). Threshold 2: one soft body marker ("learn more") alone must
+  // not drop a plain statement email.
+  if (proofTags.length === 0 && marketingScore >= 2) {
+    return {
+      message,
+      subjectClass,
+      merchantKey,
+      merchantName,
+      officialDomain,
+      kind: null,
+      amountUnknown: false,
+      needsBody: false,
+      evidence: [
+        ...evidence,
+        ...marketingTags,
+        "drop:marketing-no-proof",
+      ],
+      confidence: "high",
+    };
+  }
+
+  // Amounts are only believed when a payment anchor exists — ad copy prices
+  // ("$549.99") must never mint charges. Exception: a money-classified
+  // subject carrying a price with zero marketing evidence (Proton's "Your
+  // Proton subscription $4.99") is a subject-anchored price, not ad copy.
+  const subjectAnchored =
+    proofTags.length === 0 &&
+    marketingScore === 0 &&
+    /\$\s*\d/.test(message.subject);
   const parsed =
-    (body ? parseAmount(body) : null) || parseAmount(message.subject);
-  const cadence = body
-    ? inferCadence(body) || inferCadence(message.subject)
-    : inferCadence(message.subject);
-  const amountUnknown = !parsed;
-
-  if (parsed) evidence.push(`amount:${parsed.currency} ${parsed.amount}`);
-  if (amountUnknown) evidence.push("amount-unknown");
-  if (cadence) evidence.push(`cadence:${cadence}`);
-  if (body && RECURRING_MONEY_RE.test(body))
-    evidence.push("body:recurring-cue");
-  if (body && USAGE_MONEY_RE.test(body)) evidence.push("body:usage-cue");
-
-  const kind = resolved.forceSparse
+    proofTags.length > 0 || subjectAnchored
+      ? (body ? parseAmount(body) : null) || parseAmount(message.subject)
+      : undefined;
+  if (subjectAnchored && proofTags.length === 0) {
+    evidence.push("proof:subject-amount");
+  }
+  const hasProof = proofTags.length > 0;
+  const kind: CandidateKind = resolved.forceSparse
     ? "sparse"
     : subjectClass === "recurring"
       ? "recurring"
       : "sparse";
+  const cadenceEvidence = inferCadenceEvidence(
+    `${message.subject}\n${body}`,
+    hasProof,
+    kind,
+  );
+  const cadence = cadenceEvidence.cadence;
+  const amountUnknown = !parsed;
 
-  return {
+  evidence.push(...proofTags);
+  if (marketingTags.length > 0) {
+    evidence.push(...marketingTags, "marketing-with-proof");
+  }
+  if (parsed) evidence.push(`amount:${parsed.currency} ${parsed.amount}`);
+  if (amountUnknown) evidence.push("amount-unknown");
+  if (cadence) evidence.push(`cadence:${cadenceEvidence.tag}`);
+  if (body && RECURRING_MONEY_RE.test(body))
+    evidence.push("body:recurring-cue");
+  if (body && USAGE_MONEY_RE.test(body)) evidence.push("body:usage-cue");
+
+  const keep: ClassifiedMessage = {
     message,
     subjectClass,
     merchantKey,
@@ -992,8 +1294,9 @@ export function classifyMessage(message: NormalizedMessage): ClassifiedMessage {
     amountUnknown,
     needsBody: true,
     evidence,
-    confidence: parsed ? "high" : amountUnknown ? "medium" : "medium",
+    confidence: parsed ? "high" : hasProof ? "medium" : "low",
   };
+  return keep;
 }
 
 /** Phase C: attach extracted brand-sent icon seeds + compact evidence lines.

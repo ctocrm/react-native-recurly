@@ -19,7 +19,16 @@
 // numeric references (tag-strip, no length cap, invoice-keyword digit-run
 // fallback). Bump re-classifies the tuta rows so the July 14 invoice gains
 // its bill number (bump-restore: full fresh-body restage).
-export const PARSER_VERSION = 19;
+// v19→v20 (R27 purchase-proof): a price in an email is not a charge. Amounts
+// are extracted only when a payment anchor exists (total charged, order
+// number, card ending, …); marketing signals (pre-order, % off, shop-now,
+// List-Unsubscribe, Gmail PROMOTIONS) drop proof-less messages. google.com-
+// family senders resolve products from subject/URLs only (no bare body
+// words — a social-footer "YouTube" no longer keys the email), google-store
+// is its own product, and cadence requires a strong billing statement (or
+// weak word + proof on a recurring hit). Bump restages all legs with fresh
+// bodies (and, on Gmail/Workspace, provider hints).
+export const PARSER_VERSION = 20;
 
 
 export type MailProviderId =
@@ -47,6 +56,23 @@ export interface MailAttachment {
   text?: string;
 }
 
+/**
+ * R27: provider-supplied classification hints. OPTIONAL and source-tagged —
+ * a fetcher sets them only when its API exposes them (Gmail/Workspace: the
+ * labelIds + list headers are already in the metadata response; Outlook: the
+ * Graph internetMessageHeaders subset). Absent hints are neutral: the
+ * classifier's payment-proof and marketing heuristics must stand on their
+ * own for every provider (Proton/Tuta/IMAP send no hints today).
+ */
+export interface MessageHints {
+  /** Gmail system category (CATEGORY_PROMOTIONS, CATEGORY_SOCIAL, …). */
+  gmailCategory?: string;
+  /** List-Unsubscribe header present — the sender self-identifies as bulk. */
+  listUnsubscribe?: boolean;
+  listId?: string;
+  precedence?: string;
+}
+
 export interface NormalizedMessage {
   mailboxId: string;
   messageId: string;
@@ -57,6 +83,7 @@ export interface NormalizedMessage {
   text?: string;
   html?: string;
   attachments?: MailAttachment[];
+  hints?: MessageHints;
 }
 
 export interface ClassifiedMessage {

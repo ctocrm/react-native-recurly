@@ -616,17 +616,39 @@ export function createGmailFetcher(
             console.log(`[MailGmail] screening ${screened}/${ids.length} on page ${pages}`);
           }
           const metaRes = await gmailApi(
-            `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date`,
+            `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date&metadataHeaders=List-Unsubscribe&metadataHeaders=List-Id&metadataHeaders=Precedence`,
           );
           if (!metaRes.ok) continue;
           const meta = (await metaRes.json()) as {
             id?: string;
+            labelIds?: string[];
             payload?: { headers?: { name: string; value: string }[] };
           };
           const headers = meta.payload?.headers ?? [];
           const subject = headerOf(headers, "Subject");
           const cls = classifySubject(subject);
           if (cls !== "recurring" && cls !== "sparse") continue;
+
+          // R27: provider hints are optional scoring weights. Gmail's system
+          // category (CATEGORY_PROMOTIONS…) rides on the metadata response,
+          // and the bulk-sender headers (RFC 8058; Google sender guidelines)
+          // are only returned when named in metadataHeaders. Absent = unset —
+          // other providers classify without them.
+          const gmailCategory = (meta.labelIds ?? []).find((l) =>
+            l.startsWith("CATEGORY_"),
+          );
+          const listUnsubscribe = headerOf(headers, "List-Unsubscribe");
+          const listId = headerOf(headers, "List-Id");
+          const precedence = headerOf(headers, "Precedence");
+          const hints =
+            gmailCategory || listUnsubscribe || listId || precedence
+              ? {
+                  gmailCategory: gmailCategory || undefined,
+                  listUnsubscribe: Boolean(listUnsubscribe),
+                  listId: listId || undefined,
+                  precedence: precedence || undefined,
+                }
+              : undefined;
 
           const fullRes = await gmailApi(
             `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=full`,
@@ -646,6 +668,7 @@ export function createGmailFetcher(
             text: body.text,
             html: body.html,
             attachments: gmailAttachments(raw.payload),
+            hints,
           });
           bodies += 1;
         }
@@ -686,7 +709,12 @@ export function createGraphFetcher(
         (() => {
           const params = new URLSearchParams({
             $top: String(Math.min(limit, 100)),
-            $select: "id,subject,from,receivedDateTime",
+            // R27: internetMessageHeaders rides the list call — Graph returns
+            // a SUBSET of internet headers there (no extra request). Bulk
+            // hints (List-Unsubscribe/List-Id/Precedence) are parsed when
+            // present; absence is neutral, never a negative.
+            $select:
+              "id,subject,from,receivedDateTime,internetMessageHeaders",
             // Phase K: ask for @odata.count so the gauge has a real total.
             $count: "true",
           });
@@ -715,6 +743,7 @@ export function createGraphFetcher(
             subject?: string;
             from?: { emailAddress?: { address?: string; name?: string } };
             receivedDateTime?: string;
+            internetMessageHeaders?: { name?: string; value?: string }[];
           }[];
           "@odata.nextLink"?: string;
           "@odata.count"?: number;
@@ -732,6 +761,14 @@ export function createGraphFetcher(
         // Never hold the whole leg's bodies — that is what exhausted the
         // Java heap mid-leg on 2026-09-07.
         const pageMsgs: NormalizedMessage[] = [];
+        // R27: bulk-sender hints from the list response's header subset.
+        const graphHeader = (
+          headers: { name?: string; value?: string }[] | undefined,
+          name: string,
+        ): string | undefined =>
+          headers?.find(
+            (h) => (h.name ?? "").toLowerCase() === name.toLowerCase(),
+          )?.value;
         for (const m of items) {
           const addr = m.from?.emailAddress?.address || "";
           const name = m.from?.emailAddress?.name;
@@ -739,6 +776,24 @@ export function createGraphFetcher(
           const subject = m.subject || "";
           const cls = classifySubject(subject);
           if (cls !== "recurring" && cls !== "sparse") continue;
+
+          const gListUnsub = graphHeader(
+            m.internetMessageHeaders,
+            "List-Unsubscribe",
+          );
+          const gListId = graphHeader(m.internetMessageHeaders, "List-Id");
+          const gPrecedence = graphHeader(
+            m.internetMessageHeaders,
+            "Precedence",
+          );
+          const hints =
+            gListUnsub || gListId || gPrecedence
+              ? {
+                  listUnsubscribe: Boolean(gListUnsub),
+                  listId: gListId || undefined,
+                  precedence: gPrecedence || undefined,
+                }
+              : undefined;
 
           const bodyRes = await fetchWithSession(
             session,
@@ -769,6 +824,7 @@ export function createGraphFetcher(
             date: m.receivedDateTime || new Date().toISOString(),
             text,
             html,
+            hints,
           });
           bodies += 1;
         }
