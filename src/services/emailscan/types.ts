@@ -34,7 +34,12 @@
 // survive only a light marketing footprint (<4). The Pixel Watch 5 pre-
 // order ad's fine-print proof no longer saves it. One more fresh-body
 // restage so v20-classified ad rows re-derive under the tiered gate.
-export const PARSER_VERSION = 21;
+// v21→v22 (R29 ESP rails): shopifyemail.com (and the ESP family) never
+// mints a merchant — the real store resolves from the From display name or
+// body purchase phrasing and imports sparse; bare ESP mail drops. Kills
+// the "Shopifyemail $1,439 Monthly" ghost class. Bump restages so stored
+// shopifyemail hits re-key.
+export const PARSER_VERSION = 22;
 
 
 export type MailProviderId =

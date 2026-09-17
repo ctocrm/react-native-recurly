@@ -451,6 +451,35 @@ const FREEMAIL_HOSTS = [
   "icloud.com",
 ];
 
+/**
+ * R29: email-service-provider (ESP) hosts are delivery rails, not merchants.
+ * A store running on Shopify sends its order mail from
+ * orders@shopifyemail.com — the STORE is the merchant (From display name or
+ * body), never the host. The 2026-09-17 device state had "Shopifyemail
+ * sparse $1,439.00 Monthly" minted this way (a one-off order total stamped
+ * by the old default-cadence bug — the user's "$1,439/month is absurd"
+ * report). Same treatment as freemail hosts: resolve the real merchant and
+ * import sparse, or drop — not every email is a subscription.
+ */
+const ESP_HOSTS = [
+  "shopifyemail.com",
+  "email.shopify.com",
+  "checkout.shopify.com",
+  "sendgrid.net",
+  "mailgun.net",
+  "mailgun.org",
+  "mandrillapp.com",
+  "sparkpostmail.com",
+  "amazonses.com",
+  "sendinblue.com",
+  "brevo.com",
+];
+
+function isEspHost(host: string): boolean {
+  const h = host.toLowerCase();
+  return ESP_HOSTS.some((base) => hostMatchesBase(h, base));
+}
+
 function hostMatchesBase(host: string, base: string): boolean {
   return host === base || host.endsWith(`.${base}`);
 }
@@ -634,6 +663,57 @@ function resolveGoogleSender(message: NormalizedMessage): MerchantResolution {
   };
 }
 
+/**
+ * R29: an ESP-host sender resolves to the real STORE — From display name
+ * first, then the body's purchase/order phrasing — and imports sparse (a
+ * store order is a one-off). A bare ESP address with no store evidence
+ * drops: infrastructure mail, not a subscription.
+ */
+function resolveEspSender(message: NormalizedMessage): MerchantResolution {
+  if (message.from.indexOf("<") >= 0) {
+    const display = displayNameFrom(message.from);
+    if (display && !display.includes("@")) {
+      const named = titleCaseMerchant(display);
+      if (named.merchantKey !== "unknown") {
+        return {
+          ...named,
+          officialDomain: null,
+          evidence: ["esp:display-name"],
+          drop: false,
+          forceSparse: true,
+        };
+      }
+    }
+  }
+  const body = moneyBodyText(message);
+  const storePatterns = [
+    /\b(?:purchase|order)\s+(?:from|at)\s+([A-Za-z0-9][A-Za-z0-9 &''-]{1,40}?)(?:\s*[.!,\n]|$)/i,
+    /\b([A-Za-z0-9][A-Za-z0-9 &''-]{1,40}?)\s+order\s*(?:#|no\.?|number)/i,
+  ];
+  for (const re of storePatterns) {
+    const m = body.match(re);
+    if (m?.[1]) {
+      const named = titleCaseMerchant(m[1].trim());
+      if (named.merchantKey !== "unknown") {
+        return {
+          ...named,
+          officialDomain: null,
+          evidence: ["esp:body-store"],
+          drop: false,
+          forceSparse: true,
+        };
+      }
+    }
+  }
+  return {
+    merchantKey: "unknown",
+    merchantName: "Unknown",
+    officialDomain: null,
+    evidence: ["drop:esp-unresolved"],
+    drop: true,
+  };
+}
+
 function resolveFreemailSender(message: NormalizedMessage): MerchantResolution {
   const body = moneyBodyText(message);
   if (FORWARD_SUBJECT_RE.test(message.subject) || FORWARD_BODY_RE.test(body)) {
@@ -743,6 +823,10 @@ export function resolveMerchant(
   }
   if (fromHost && isGoogleFamilyHost(fromHost)) {
     return resolveGoogleSender(message);
+  }
+  // R29: ESP hosts are rails — resolve the store, never mint the ESP.
+  if (fromHost && isEspHost(fromHost)) {
+    return resolveEspSender(message);
   }
   if (!isPaymentProcessor(fromMerchant.merchantKey)) {
     return {
