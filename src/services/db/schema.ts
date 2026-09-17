@@ -520,10 +520,12 @@ export const MIGRATIONS: ((db: SQLiteDatabase) => Promise<void>)[] = [
   // vs From-host mint, or restore-era names) minted duplicate cards instead
   // of repairing. Group stored rows by NAME SLUG + mailbox (icon_key is NOT
   // identity — it may be the default "plus" or a user-picked icon); keep the
-  // strongest row (paper-trail first, then known price, then freshest),
-  // merge any missing paper-trail links from the twin, delete the twin.
-  // merchant_day_actuals is merchant-keyed, so twins share buckets — nothing
-  // to clean there. Idempotent: a second pass finds no groups of 2+.
+  // FRESHEST row (scan-era rows postdate restore-era stamps), then
+  // paper-trail, then known price; merge any missing paper-trail links from
+  // the twin, delete the twin. Known price must rank LAST: a stale twin
+  // often carries a wrong-but-known price while the honest fresh row is
+  // priceUnknown. merchant_day_actuals is merchant-keyed, so twins share
+  // buckets — nothing to clean there. Idempotent.
   async (db) => {
     const rows = await db.getAllAsync<{
       id: string;
@@ -553,10 +555,11 @@ export const MIGRATIONS: ((db: SQLiteDatabase) => Promise<void>)[] = [
       if (list.length < 2) continue;
       groupsHit += 1;
       const sorted = [...list].sort((a, b) => {
+        const date = (b.start_date ?? "").localeCompare(a.start_date ?? "");
+        if (date !== 0) return date;
         const score = (r: (typeof rows)[number]) =>
           (r.source_message_id ? 2 : 0) + (r.price_unknown ? 0 : 1);
-        if (score(a) !== score(b)) return score(b) - score(a);
-        return (b.start_date ?? "").localeCompare(a.start_date ?? "");
+        return score(b) - score(a);
       });
       const keeper = sorted[0];
       for (const twin of sorted.slice(1)) {
