@@ -80,14 +80,51 @@ describe("rollupCandidates clockwork wiring", () => {
     ).toBe(false);
   });
 
-  it("never infers for sparse merchants", () => {
+  it("promotes a clockwork-regular sparse merchant to recurring (2026-09-16)", () => {
+    // Same strict spacing evidence as recurring, plus amount consistency.
     const candidates = rollupCandidates([
       hit("2026-06-01", { kind: "sparse" }),
       hit("2026-07-01", { kind: "sparse" }),
       hit("2026-08-01", { kind: "sparse" }),
     ]);
     expect(candidates).toHaveLength(1);
+    expect(candidates[0].kind).toBe("recurring");
+    expect(candidates[0].cadence).toBe("monthly");
+    expect(candidates[0].evidence).toContain(
+      "cadence:clockwork-promoted-monthly",
+    );
+  });
+
+  it("keeps an irregular sparse merchant sparse (no promotion)", () => {
+    // One irregular gap → no cadence → no promotion.
+    const candidates = rollupCandidates([
+      hit("2026-06-01", { kind: "sparse" }),
+      hit("2026-06-20", { kind: "sparse" }),
+      hit("2026-08-01", { kind: "sparse" }),
+    ]);
+    expect(candidates).toHaveLength(1);
     expect(candidates[0].kind).toBe("sparse");
     expect(candidates[0].cadence).toBeUndefined();
+  });
+
+  it("refuses promotion when the amounts are wildly inconsistent", () => {
+    // Clockwork spacing, but the amounts are NOT "approximately the same".
+    const candidates = rollupCandidates([
+      hit("2026-06-01", { kind: "sparse", amount: 5 }),
+      hit("2026-07-01", { kind: "sparse", amount: 40 }),
+      hit("2026-08-01", { kind: "sparse", amount: 5 }),
+    ]);
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0].kind).toBe("sparse");
+  });
+
+  it("refuses promotion with fewer than three known amounts", () => {
+    const candidates = rollupCandidates([
+      hit("2026-06-01", { kind: "sparse" }),
+      hit("2026-07-01", { kind: "sparse" }),
+      hit("2026-08-01", { kind: "sparse", amount: undefined }),
+    ]);
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0].kind).toBe("sparse");
   });
 });

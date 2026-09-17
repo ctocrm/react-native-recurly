@@ -31,6 +31,7 @@ function rollupKey(hit: ClassifiedMessage): string {
 export function rollupCandidates(hits: ClassifiedMessage[]): ScanCandidate[] {
   const map = new Map<string, ScanCandidate>();
   const datesByKey = new Map<string, string[]>();
+  const amountsByKey = new Map<string, number[]>();
 
   for (const hit of hits) {
     if (!hit.kind) continue;
@@ -61,6 +62,9 @@ export function rollupCandidates(hits: ClassifiedMessage[]): ScanCandidate[] {
           : {}),
       });
       datesByKey.set(key, [hit.message.date]);
+      if (hit.amount !== undefined) {
+        amountsByKey.set(key, [hit.amount]);
+      }
       continue;
     }
 
@@ -68,6 +72,9 @@ export function rollupCandidates(hits: ClassifiedMessage[]): ScanCandidate[] {
       existing.messageIds.push(messageId);
     }
     datesByKey.set(key, [...(datesByKey.get(key) ?? []), hit.message.date]);
+    if (hit.amount !== undefined) {
+      amountsByKey.set(key, [...(amountsByKey.get(key) ?? []), hit.amount]);
+    }
     existing.evidence = [...existing.evidence, ...evidence];
 
     if (hit.amount !== undefined) {
@@ -119,6 +126,36 @@ export function rollupCandidates(hits: ClassifiedMessage[]): ScanCandidate[] {
         candidate.evidence = [
           ...candidate.evidence,
           `cadence:clockwork-${inferred}`,
+        ];
+        continue;
+      }
+    }
+    // 2026-09-16 (user direction — supersedes the R18 "sparse never
+    // promoted" line): a SPARSE group whose charges are clockwork-regular
+    // AND amount-consistent is a subscription the emails never named. Same
+    // strict spacing evidence as R18 (≥3 charges, every gap inside one
+    // band), plus every amount within ±25% of the median (the "price
+    // changes slightly" tolerance). Promoted candidates heal their stored
+    // sparse rows via the scan's recurring-repairs-sparse rule.
+    if (
+      candidate.kind === "sparse" &&
+      (!candidate.cadence || candidate.cadence === "unknown")
+    ) {
+      const dates = [...(datesByKey.get(key) ?? [])].sort();
+      const amounts = amountsByKey.get(key) ?? [];
+      const inferred = inferCadenceFromPayments(dates);
+      if (!inferred || amounts.length < 3) continue;
+      const sorted = [...amounts].sort((a, b) => a - b);
+      const median = sorted[Math.floor(sorted.length / 2)];
+      const consistent = median > 0 && sorted[0] >= median * 0.75 && sorted[sorted.length - 1] <= median * 1.25;
+      if (consistent) {
+        candidate.kind = "recurring";
+        candidate.cadence = inferred;
+        candidate.amount = median;
+        candidate.amountUnknown = false;
+        candidate.evidence = [
+          ...candidate.evidence,
+          `cadence:clockwork-promoted-${inferred}`,
         ];
       }
     }

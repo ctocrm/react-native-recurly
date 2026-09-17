@@ -217,15 +217,28 @@ async function runScan(opts: {
             kindCompatible &&
             ((!already.sourceMessageId && !!next.sourceMessageId) ||
               (!already.billNumber && !!next.billNumber));
+          // 2026-09-16: a promoted (clockwork) candidate or a $0→free flip
+          // changes the row's STREAM with nothing else necessarily differing.
+          const streamFlip =
+            kindCompatible &&
+            next.category !== already.category &&
+            (next.category === "free" || next.category === "recurring");
           if (
-            (richer || cadenceRepair || paperTrailBackfill) &&
+            (richer || cadenceRepair || paperTrailBackfill || streamFlip) &&
             opts.updateSubscription
           ) {
+            // 2026-09-16 (user rule): the stream CAN flip when the evidence
+            // does — a $0 candidate is free by definition, and a promoted
+            // clockwork-regular candidate upgrades its sparse row to
+            // recurring (importCandidate/rollup decide the stream now).
+            const category =
+              next.category === "free" || next.category === "recurring"
+                ? next.category
+                : already.category;
             const patch: Partial<Subscription> = {
               billing: next.billing,
               frequency: next.frequency,
-              // repairs never flip the row's stream; import decides it once
-              category: already.category,
+              category,
             };
             if (richer) {
               patch.price = next.price;

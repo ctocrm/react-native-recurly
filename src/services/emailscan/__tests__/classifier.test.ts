@@ -312,6 +312,42 @@ describe("emailscan subject amounts + no fake $0", () => {
     expect(sub.icon_key).toBe("tuta");
   });
 
+  it("never defaults the cadence: a cadence-less candidate mints without one (2026-09-16)", () => {
+    const sub = candidateToSubscription({
+      mailboxId: "gmail:david@bohbotweb.com",
+      merchantKey: "uber",
+      merchant: "Uber",
+      kind: "sparse",
+      amount: 47.25,
+      amountUnknown: false,
+      currency: "USD",
+      evidence: ["amount-regex"],
+      messageIds: ["uber-1"],
+      confidence: "high",
+    });
+    expect(sub.billing).toBe("");
+    expect(sub.frequency).toBe("");
+    expect(sub.category).toBe("sparse");
+  });
+
+  it("imports a known-$0 candidate as free (the definition of free, 2026-09-16)", () => {
+    const sub = candidateToSubscription({
+      mailboxId: "gmail:david@bohbotweb.com",
+      merchantKey: "transunion",
+      merchant: "Transunion",
+      kind: "sparse",
+      amount: 0,
+      amountUnknown: false,
+      currency: "USD",
+      evidence: ["amount-regex"],
+      messageIds: ["tu-1"],
+      confidence: "high",
+    });
+    expect(sub.category).toBe("free");
+    expect(sub.price).toBe(0);
+    expect(sub.priceUnknown).toBe(false);
+  });
+
   it("keeps Porkbun verify + welcome as $0 and upgrades the order to $47.74 yearly", () => {
     const verify = classifyMessage({
       mailboxId: "tuta:picksandshovels@tutamail.com",

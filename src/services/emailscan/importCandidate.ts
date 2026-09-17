@@ -7,6 +7,9 @@ import type { ScanCandidate } from "./types";
 export function candidateToSubscription(
   candidate: ScanCandidate,
 ): Subscription {
+  // 2026-09-16 (user rule): NO default cadence. A candidate whose emails
+  // never evidenced a cadence mints without one — the old `"Monthly"`
+  // fallback silently stamped the whole sparse corpus "Monthly sparse".
   const cadence =
     candidate.cadence === "yearly"
       ? "Yearly"
@@ -14,8 +17,11 @@ export function candidateToSubscription(
         ? "Weekly"
         : candidate.cadence === "monthly"
           ? "Monthly"
-          : "Monthly";
+          : "";
   const known = candidate.amount !== undefined;
+  // $0 is the very definition of free (user rule): a candidate with a known
+  // zero amount imports as free regardless of the stream kind.
+  const free = candidate.kind === "free" || (known && candidate.amount === 0);
   const priceUnknown = !known && candidate.kind !== "free";
   const iconKey = nameToSlug(candidate.merchant) || "plus";
   return {
@@ -23,7 +29,7 @@ export function candidateToSubscription(
     icon: require("@assets/icons/plus.png"),
     icon_key: iconKey,
     name: candidate.merchant,
-    category: candidate.kind,
+    category: free ? "free" : candidate.kind,
     status: "active",
     startDate: new Date().toISOString(),
     price: known ? candidate.amount! : 0,
