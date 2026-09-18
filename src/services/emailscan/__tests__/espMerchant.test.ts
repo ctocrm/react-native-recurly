@@ -93,6 +93,32 @@ describe("R29 ESP-host senders are rails, not merchants", () => {
     expect(hit.evidence).toContain("drop:esp-unresolved");
   });
 
+  // R37: the ghost's RE-MINT source — Shopify's own system mail brands the
+  // display name as the ESP itself. That is rail branding, not a store.
+  it("never mints from an ESP-brand display name (Shopifyemail)", () => {
+    const hit = classifyMessage(
+      base({
+        from: "Shopifyemail <orders@shopifyemail.com>",
+        subject: "Your order #77",
+        text: "Thanks for your purchase. Order total $19.99.",
+      }),
+    );
+    expect(hit.merchantKey).not.toBe("shopifyemail");
+    expect(hit.kind).toBeNull();
+    expect(hit.evidence).toContain("drop:esp-unresolved");
+  });
+
+  it("an ESP-brand display name with a real body store still resolves the store", () => {
+    const hit = classifyMessage(
+      base({
+        from: "Shopifyemail <orders@shopifyemail.com>",
+        subject: "Order confirmation",
+        text: "Thank you for your purchase from Northwind Supply. Order total $12.50.",
+      }),
+    );
+    expect(hit.merchantKey).toBe("northwind-supply");
+  });
+
   it("sendgrid-family hosts get the same rail treatment", () => {
     const hit = classifyMessage(
       base({

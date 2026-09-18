@@ -6,7 +6,7 @@
  * re-classifying its stored source message; when that is impossible the row
  * is archived (kept for audit, hidden from the app) — never hard-deleted.
  */
-import { classifyMessage, ESP_HOSTS } from "./classifier";
+import { classifyMessage, isEspBrandName } from "./classifier";
 import { nameToSlug } from "@/services/iconScraper";
 import type { NormalizedMessage } from "./types";
 
@@ -35,21 +35,9 @@ interface MessageRow {
   attachments_json: string | null;
 }
 
-/**
- * ESP host bases that can masquerade as a merchant NAME: single-label bases
- * only ("shopifyemail.com" → "shopifyemail"). Multi-label bases
- * ("email.shopify.com") can never round-trip a name-slug.
- */
-const ESP_NAME_TOKENS = new Set<string>(
-  ESP_HOSTS.flatMap((host) => {
-    const parts = host.split(".");
-    return parts.length === 2 ? [parts[0]] : [];
-  }),
-);
-
 /** True when a subscription row's name was minted from an ESP host. */
 export function isEspNamedRow(name: string): boolean {
-  return ESP_NAME_TOKENS.has(nameToSlug(name));
+  return isEspBrandName(name);
 }
 
 function rowToMessage(row: MessageRow): NormalizedMessage {

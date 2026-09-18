@@ -484,6 +484,24 @@ function isEspHost(host: string): boolean {
   return ESP_HOSTS.some((base) => hostMatchesBase(h, base));
 }
 
+/**
+ * R37: ESP brand names ("Shopifyemail", "Temuemail") are rails even when
+ * they arrive as a From DISPLAY name — Shopify's own system mail comes as
+ * `Shopifyemail <orders@shopifyemail.com>` and the ESP display-name tier
+ * re-minted the exact ghost R33 archives at every boot. Derived from the
+ * single-label ESP host bases.
+ */
+const ESP_BRAND_SLUGS = new Set(
+  ESP_HOSTS.flatMap((host) => {
+    const parts = host.split(".");
+    return parts.length === 2 ? [parts[0]] : [];
+  }),
+);
+
+export function isEspBrandName(name: string): boolean {
+  return ESP_BRAND_SLUGS.has(name.toLowerCase().replace(/[^a-z0-9]+/g, ""));
+}
+
 function hostMatchesBase(host: string, base: string): boolean {
   return host === base || host.endsWith(`.${base}`);
 }
@@ -678,7 +696,12 @@ function resolveEspSender(message: NormalizedMessage): MerchantResolution {
     const display = displayNameFrom(message.from);
     if (display && !display.includes("@")) {
       const named = titleCaseMerchant(display);
-      if (named.merchantKey !== "unknown") {
+      // R37: a display name that IS the ESP brand ("Shopifyemail") is the
+      // rail branding itself, not a store — fall through to the body tier.
+      if (
+        named.merchantKey !== "unknown" &&
+        !isEspBrandName(named.merchantName)
+      ) {
         return {
           ...named,
           officialDomain: null,
@@ -698,7 +721,10 @@ function resolveEspSender(message: NormalizedMessage): MerchantResolution {
     const m = body.match(re);
     if (m?.[1]) {
       const named = titleCaseMerchant(m[1].trim());
-      if (named.merchantKey !== "unknown") {
+      if (
+        named.merchantKey !== "unknown" &&
+        !isEspBrandName(named.merchantName)
+      ) {
         return {
           ...named,
           officialDomain: null,

@@ -42,7 +42,9 @@
 // v22→v23 (R33): temuemail.com joins the ESP rails — Temu's sending domain
 // minted a "Temuemail" ghost the same way shopifyemail.com minted
 // "Shopifyemail". Bump restages stored temuemail hits under the ESP rules.
-export const PARSER_VERSION = 23;
+// v23→v24 (R37): ESP-brand DISPLAY names ("Shopifyemail
+// <orders@shopifyemail.com>") no longer mint — the ghost's re-mint source.
+export const PARSER_VERSION = 24;
 
 
 export type MailProviderId =
