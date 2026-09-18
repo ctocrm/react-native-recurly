@@ -33,6 +33,7 @@ import {
 import {
   assessHostLiveness,
   isKnownDeadHost,
+  isKnownDeadOrUnreachableHost,
   isKnownUnreachableHost,
   recordHostLiveness,
 } from "@/services/domain/hostLiveness";
@@ -1598,13 +1599,44 @@ export async function processIconQueue(): Promise<void> {
             );
           }
 
+          // R30: queue backlog can also point at dead hosts — stored URLs
+          // from earlier sessions are fetched blind on every drain, keeping
+          // a retry storm alive even after discovery is short-circuited.
+          // A defunct or fresh-unreachable host (30-day window) contributes
+          // nothing; its URLs skip the fetch loop. Items stay queued — the
+          // window may reopen.
+          const liveUrls: string[] = [];
+          let deadHostSkipped = 0;
+          for (const u of admittedUrls) {
+            let host: string | null = null;
+            try {
+              host = new URL(u).hostname;
+            } catch {
+              host = null;
+            }
+            if (
+              host &&
+              (await isKnownDeadOrUnreachableHost(host))
+            ) {
+              deadHostSkipped += 1;
+              continue;
+            }
+            liveUrls.push(u);
+          }
+          if (deadHostSkipped > 0) {
+            console.log(
+              `[QUEUE] Skipped ${deadHostSkipped} dead-host URL(s) for ${item.icon_key} (cached liveness)`,
+            );
+          }
+          const fetchableUrls = liveUrls;
+
           console.log(
             `[QUEUE] Found ${unfetchedUrls.length} URLs to fetch for ${item.icon_key}`,
           );
 
           // Prefer high-quality candidates; skip domains still in cooldown
           const candidates = sortUrlsByQuality(
-            admittedUrls
+            fetchableUrls
               .map((url) => {
                 const crawlResult = crawlResults.find(
                   (r) => r.originalUrl === url,

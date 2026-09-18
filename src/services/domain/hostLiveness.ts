@@ -237,6 +237,32 @@ export async function isKnownUnreachableHost(
   }
 }
 
+/**
+ * R30: one cache read covering both gates — defunct (≥85, no expiry) OR a
+ * fresh tier-5 unreachable verdict. Used by the icon QUEUE drain: stored
+ * URLs from earlier sessions are fetched blind otherwise, keeping a retry
+ * storm alive even after discovery is short-circuited.
+ */
+export async function isKnownDeadOrUnreachableHost(domain: string): Promise<boolean> {
+  try {
+    const raw = await getPreference(HOST_LIVENESS_CACHE_PREF_KEY);
+    if (!raw) return false;
+    const cache = JSON.parse(raw) as Record<
+      string,
+      { label: string; score: number; at: number }
+    >;
+    const entry = cache[domain];
+    if (!entry) return false;
+    if ((entry.score ?? 0) >= 85) return true;
+    return (
+      entry.label === "unreachable" &&
+      Date.now() - (entry.at ?? 0) < UNREACHABLE_REPROBE_AFTER_MS
+    );
+  } catch {
+    return false;
+  }
+}
+
 /** Cache the assessment (short-circuit fuel) and fire the UI event. */
 export async function recordHostLiveness(
   domain: string,

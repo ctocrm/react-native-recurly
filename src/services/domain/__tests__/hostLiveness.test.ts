@@ -11,6 +11,7 @@ import {
   hostLivenessScore,
   isDefunctConfident,
   isKnownDeadHost,
+  isKnownDeadOrUnreachableHost,
   isKnownUnreachableHost,
   recordHostLiveness,
   setHostDecision,
@@ -372,6 +373,21 @@ describe("R30 (J5b) tier-5 unreachable short-circuit window", () => {
     });
     // Defunct hosts route through isKnownDeadHost, not the tier-5 window.
     expect(await isKnownUnreachableHost("gone.example")).toBe(false);
+  });
+
+  it("isKnownDeadOrUnreachableHost covers both gates in one read (queue drain)", async () => {
+    await recordHostLiveness("q-blocked.example", "q", {
+      domain: "q-blocked.example",
+      label: "unreachable",
+      score: 35,
+      evidence: [],
+    });
+    expect(await isKnownDeadOrUnreachableHost("q-blocked.example")).toBe(
+      true,
+    );
+    expect(await isKnownDeadOrUnreachableHost("gone.example")).toBe(true);
+    expect(await isKnownDeadOrUnreachableHost("alive.example")).toBe(false);
+    expect(await isKnownDeadOrUnreachableHost("never.example")).toBe(false);
   });
 });
 
