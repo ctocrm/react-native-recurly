@@ -4,6 +4,7 @@
  */
 import { nameToSlug } from "@/services/iconScraper";
 import type { ClassifiedMessage } from "./types";
+import { isLapsedRecurring } from "./lapse";
 
 /** R23: nameToSlug is 5+ regex passes; matchesSubscription runs it once per
  * (subscription, cached hit) pair — 125 subs × 2209 hits re-slugged the same
@@ -74,8 +75,8 @@ function merchantIndex(messages: ClassifiedMessage[]): MerchantIndex {
 /** The only hits that could possibly match `sub` (its merchant's messages
  * of `wantKind` — default: the stream kind the row consumes), in stable
  * order. Callers still run the full per-hit checks — this only removes the
- * other ~2190 misses. */
-function matchCandidates(
+ * other ~2190 misses. Exported for the R35 lapse walker. */
+export function matchCandidates(
   sub: Subscription,
   messages: ClassifiedMessage[],
   wantKind?: "recurring" | "sparse",
@@ -362,6 +363,26 @@ export function displayedAmount(
   };
 }
 
+/**
+ * R35: latest recurring-kind charge date for the row's merchant+mailbox —
+ * the corpus evidence the lapse check runs on. Paid-unknown hits carry a
+ * date too (a proven charge we can't price still proves payment).
+ */
+export function lastRecurringChargeDate(
+  sub: Subscription,
+  messages: ClassifiedMessage[],
+): Date | null {
+  let latest: number | null = null;
+  for (const hit of matchCandidates(sub, messages, "recurring")) {
+    if (hit.kind !== "recurring") continue;
+    const mailbox = sub.paymentMethod;
+    if (mailbox && hit.message.mailboxId !== mailbox) continue;
+    const t = new Date(hit.message.date).getTime();
+    if (!Number.isNaN(t) && (latest === null || t > latest)) latest = t;
+  }
+  return latest === null ? null : new Date(latest);
+}
+
 /** Home Monthly Spend: recurring amortized + sparse this-month actuals. */
 export function monthlySpendContribution(
   sub: Subscription,
@@ -374,6 +395,14 @@ export function monthlySpendContribution(
     return sparseActuals(sub, messages, "month", now);
   }
   if (sub.priceUnknown || sub.category === "free") return 0;
+  // R35: a lapsed recurring row (last corpus charge older than a full
+  // period + slack + default grace) is not being paid — it must not
+  // contribute. Prime Video class: correct cadence, months uncharged.
+  if (
+    isLapsedRecurring(sub, lastRecurringChargeDate(sub, messages), 7, now)
+  ) {
+    return 0;
+  }
   return convertStoredPrice(sub.price, storedCadence(sub), "monthly");
 }
 

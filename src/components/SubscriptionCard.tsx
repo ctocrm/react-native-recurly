@@ -45,6 +45,8 @@ interface SubscriptionCardProps {
   onCyclePeriod?: () => void;
   /** Phase N: grace period (days) for the may-have-expired chip. */
   graceDays?: number;
+  /** R35: corpus-derived lapse (last charge older than period + grace). */
+  lapsed?: boolean;
 }
 
 const SubscriptionCard = ({
@@ -79,6 +81,7 @@ const SubscriptionCard = ({
   sparseLine,
   onCyclePeriod,
   graceDays,
+  lapsed,
 }: SubscriptionCardProps) => {
   const [menuVisible, setMenuVisible] = useState(false);
   const { status: iconStatus, iconUri } = useCachedIcon(icon_key);
@@ -117,10 +120,12 @@ const SubscriptionCard = ({
 
   // Phase N: may-have-expired — the renewal lapsed past the grace period
   // while the row is still active. Deliberately non-destructive.
+  // R35: scanned rows never carry a renewalDate, so a corpus-derived lapse
+  // (no charge in a full period + grace) drives the same chip.
   const mayHaveExpired =
     status !== "paused" &&
     status !== "cancelled" &&
-    isMayHaveExpired(renewalDate, graceDays ?? 7);
+    (isMayHaveExpired(renewalDate, graceDays ?? 7) || (lapsed ?? false));
 
   return (
     <>

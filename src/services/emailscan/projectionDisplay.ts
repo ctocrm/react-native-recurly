@@ -15,6 +15,7 @@ import {
   type DisplayPeriod,
   type SpendKind,
 } from "./chargeDisplay";
+import { isLapsedRecurring } from "./lapse";
 
 function sumBuckets(
   subscription: Subscription,
@@ -105,6 +106,31 @@ export function projectionSparseSecondaryLine(
   return { amount: total, label: "Sparse" };
 }
 
+/**
+ * R35: projection twin of chargeDisplay.lastRecurringChargeDate — latest
+ * recurring-kind bucket day for the row's merchant+mailbox. Reuses the
+ * sumBuckets matching rules (slug/name/both + mailbox) without the window.
+ */
+export function projectionLastRecurringChargeDate(
+  sub: Subscription,
+  actuals: MerchantDayActual[],
+): Date | null {
+  const S = nameToSlug(sub.name);
+  const L = sub.name.toLowerCase();
+  let latest: number | null = null;
+  for (const a of actuals) {
+    if (a.kind !== "recurring") continue;
+    if (sub.paymentMethod && a.mailboxId !== sub.paymentMethod) continue;
+    const matches =
+      (a.bucketType === "slug" && a.bucketKey === S) ||
+      (a.bucketType === "name" && a.bucketKey === L);
+    if (!matches) continue;
+    const t = new Date(`${a.day}T12:00:00`).getTime();
+    if (!Number.isNaN(t) && (latest === null || t > latest)) latest = t;
+  }
+  return latest === null ? null : new Date(latest);
+}
+
 export function projectionMonthlySpendContribution(
   sub: Subscription,
   actuals: MerchantDayActual[],
@@ -116,6 +142,18 @@ export function projectionMonthlySpendContribution(
     return projectionSparseActuals(sub, actuals, "month", now);
   }
   if (sub.priceUnknown || sub.category === "free") return 0;
+  // R35: lapsed recurring rows contribute nothing (parity with the legacy
+  // monthlySpendContribution path — Prime Video class).
+  if (
+    isLapsedRecurring(
+      sub,
+      projectionLastRecurringChargeDate(sub, actuals),
+      7,
+      now,
+    )
+  ) {
+    return 0;
+  }
   return convertStoredPrice(sub.price, storedCadence(sub), "monthly");
 }
 

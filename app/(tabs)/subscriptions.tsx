@@ -60,7 +60,7 @@ const Subscriptions = () => {
     getUpcomingSubscriptions,
     refreshSubscriptions,
   } = useSubscriptions();
-  const { displayFor, sparseLineFor, cyclePeriod } =
+  const { displayFor, sparseLineFor, cyclePeriod, lapseFor } =
     useChargeDisplay(subscriptions);
   const [detailsSubscription, setDetailsSubscription] =
     useState<Subscription | null>(null);
@@ -120,7 +120,9 @@ const Subscriptions = () => {
       filtered = filtered.filter((sub) => upcomingIds.has(sub.id));
     } else if (activeFilter === "Active") {
       filtered = filtered.filter(
-        (sub) => subscriptionBucket(sub, graceDays) === "active",
+        (sub) =>
+          subscriptionBucket(sub, graceDays) === "active" &&
+          !lapseFor(sub, graceDays),
       );
     } else if (activeFilter === "Sparse") {
       filtered = filtered.filter(
@@ -128,7 +130,9 @@ const Subscriptions = () => {
       );
     } else if (activeFilter === "Expired") {
       filtered = filtered.filter(
-        (sub) => subscriptionBucket(sub, graceDays) === "expired",
+        (sub) =>
+          subscriptionBucket(sub, graceDays) === "expired" ||
+          lapseFor(sub, graceDays),
       );
     }
 
@@ -149,7 +153,14 @@ const Subscriptions = () => {
     }
 
     return filtered;
-  }, [searchQuery, subscriptions, activeFilter, upcomingIds, graceDays]);
+  }, [
+    searchQuery,
+    subscriptions,
+    activeFilter,
+    upcomingIds,
+    graceDays,
+    lapseFor,
+  ]);
 
   const handleSearchChange = (text: string) => {
     setSearchQuery(text);
@@ -302,6 +313,7 @@ const Subscriptions = () => {
             displayPeriodLabel={displayFor(item).label}
             onCyclePeriod={() => cyclePeriod(item)}
             sparseLine={sparseLineFor(item)}
+            lapsed={lapseFor(item, graceDays)}
             onPress={() => {
               const isExpanding = expandedSubscriptionId !== item.id;
               setExpandedSubscriptionId((currentId) =>

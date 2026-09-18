@@ -13,6 +13,7 @@ import { useSubscriptions } from "@/context/SubscriptionContext";
 import "@/global.css";
 import { useBottomClearance } from "@/hooks/useBottomClearance";
 import { useChargeDisplay } from "@/hooks/useChargeDisplay";
+import { DEFAULT_EXPIRED_GRACE_DAYS } from "@/services/subscriptionStatus";
 import { useScanProgress } from "@/hooks/useScanProgress";
 import { formatCurrency } from "@/lib/utils";
 import { importFromConnectedMailboxes } from "@/services/emailscan";
@@ -58,7 +59,7 @@ const App = () => {
     getUpcomingSubscriptions,
     refreshSubscriptions,
   } = useSubscriptions();
-  const { displayFor, sparseLineFor, cyclePeriod, monthlySpend } =
+  const { displayFor, sparseLineFor, cyclePeriod, monthlySpend, lapseFor } =
     useChargeDisplay(subscriptions);
   const [detailsSubscription, setDetailsSubscription] =
     useState<Subscription | null>(null);
@@ -371,6 +372,7 @@ const App = () => {
             displayPeriodLabel={displayFor(item).label}
             onCyclePeriod={() => cyclePeriod(item)}
             sparseLine={sparseLineFor(item)}
+            lapsed={lapseFor(item, DEFAULT_EXPIRED_GRACE_DAYS)}
             onPress={() => {
               const isExpanding = expandedSubscriptionId !== item.id;
               setExpandedSubscriptionId((currentId) =>

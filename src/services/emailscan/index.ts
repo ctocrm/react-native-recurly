@@ -75,12 +75,15 @@ export {
     convertStoredPrice,
     defaultDisplayPeriod,
     displayedAmount,
+    lastRecurringChargeDate,
     monthlySpendContribution,
     nextDisplayPeriod,
     sparseSecondaryLine,
     thisMonthInsights,
     monthlyChartFromMail,
 } from "./chargeDisplay";
+export { isLapsedRecurring } from "./lapse";
+export { projectionLastRecurringChargeDate } from "./projectionDisplay";
 export type { DisplayPeriod } from "./chargeDisplay";
 
 export { importFromConnectedMailboxes } from "./scanConnected";

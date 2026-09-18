@@ -1,6 +1,8 @@
 import {
   defaultDisplayPeriod,
   displayedAmount,
+  isLapsedRecurring,
+  lastRecurringChargeDate,
   monthlySpendContribution,
   nextDisplayPeriod,
   sparseSecondaryLine,
@@ -14,6 +16,7 @@ import {
   projectionDisplayedAmount,
   projectionMonthlySpendContribution,
   projectionSparseSecondaryLine,
+  projectionLastRecurringChargeDate,
 } from "@/services/emailscan/projectionDisplay";
 import {
   loadActualsAsync,
@@ -192,6 +195,19 @@ export function useChargeDisplay(subscriptions: Subscription[]) {
     [messages, actuals, usingProjection],
   );
 
+  // R35: corpus-derived lapse for a recurring row (last charge older than a
+  // period + slack + the caller's grace days). Null-safe: rows without
+  // corpus evidence are unjudgeable.
+  const lapseFor = useCallback(
+    (sub: Subscription, graceDays: number) => {
+      const lastCharge = usingProjection
+        ? projectionLastRecurringChargeDate(sub, actuals)
+        : lastRecurringChargeDate(sub, messages);
+      return isLapsedRecurring(sub, lastCharge, graceDays);
+    },
+    [messages, actuals, usingProjection],
+  );
+
   const monthlySpend = useMemo(() => {
     // R23 audit: split the total so cold-boot vs post-scan deltas name their
     // owner (recurring amortized vs sparse actuals) in logcat.
@@ -230,6 +246,7 @@ export function useChargeDisplay(subscriptions: Subscription[]) {
     usingProjection,
     displayFor,
     sparseLineFor,
+    lapseFor,
     cyclePeriod,
     monthlySpend,
   };
