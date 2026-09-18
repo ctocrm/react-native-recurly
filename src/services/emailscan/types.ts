@@ -46,7 +46,9 @@
 // <orders@shopifyemail.com>") no longer mint — the ghost's re-mint source.
 // v24→v25 (R37c): the ESP-brand guard moved into titleCaseMerchant — every
 // naming tier (freemail/forward/body included) re-derives under it.
-export const PARSER_VERSION = 25;
+// v25→v26 (R37d): the guard also covers host-label variants that escape the
+// ESP_HOSTS base list (shopifyemail.co.uk minted "Shopifyemail" live).
+export const PARSER_VERSION = 26;
 
 
 export type MailProviderId =

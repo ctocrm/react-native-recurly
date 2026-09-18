@@ -133,6 +133,28 @@ describe("R29 ESP-host senders are rails, not merchants", () => {
     expect(hit.merchantKey).not.toBe("shopifyemail");
   });
 
+  // Host VARIANTS that escape the ESP_HOSTS base list (shopifyemail.co.uk,
+  // e.shopifyemail.net) must not mint the rail from the host label either —
+  // the re-mint source that survived both earlier guards (R37d).
+  it("never mints an ESP brand from a host-label variant", () => {
+    const a = classifyMessage(
+      base({
+        from: "Shopifyemail <orders@shopifyemail.co.uk>",
+        subject: "Order #1",
+        text: "Order total $10.00.",
+      }),
+    );
+    expect(a.merchantKey).not.toBe("shopifyemail");
+    const b = classifyMessage(
+      base({
+        from: "Shopify Email <x@e.shopifyemail.net>",
+        subject: "Order #2",
+        text: "Order total $10.00.",
+      }),
+    );
+    expect(b.merchantKey).not.toBe("shopifyemail");
+  });
+
   it("sendgrid-family hosts get the same rail treatment", () => {
     const hit = classifyMessage(
       base({

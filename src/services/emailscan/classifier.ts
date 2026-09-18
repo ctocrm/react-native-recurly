@@ -285,6 +285,13 @@ export function merchantFromAddress(from: string): {
   if (key === "tutanota" || key === "tutamail") {
     return { merchantKey: "tuta", merchantName: "Tuta" };
   }
+  // R37: ESP-brand labels (host variants like shopifyemail.co.uk or
+  // e.shopifyemail.net that escape the ESP_HOSTS base list) are rails —
+  // return unknown so the caller's body/forward tiers can resolve the real
+  // store. Never mint the rail.
+  if (isEspBrandName(key)) {
+    return { merchantKey: "unknown", merchantName: "Unknown" };
+  }
   const merchantName = label
     .split(/[-_]/)
     .filter(Boolean)
