@@ -6,7 +6,7 @@ import type { SQLiteDatabase } from "expo-sqlite";
 import { nameToSlug } from "@/services/iconScraper";
 
 /** Bump when adding a migration. Stored in PRAGMA user_version. */
-export const SCHEMA_VERSION = 19;
+export const SCHEMA_VERSION = 20;
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS subscriptions (
@@ -593,6 +593,78 @@ export const MIGRATIONS: ((db: SQLiteDatabase) => Promise<void>)[] = [
   async (db) => {
     const { migrateEspOrphans } = await import("../emailscan/espOrphan");
     await migrateEspOrphans(db);
+  },
+  // 20: null-mailbox twin merge (R37). Restore-era rows with a NULL
+  // payment_method could never match a scan candidate's slug::mailbox key,
+  // so scans minted twins; the twins the boot dedupes missed (different
+  // payment_method grouping) lingered (the "Amazon · Primevideo · Amazon"
+  // triple). Merge SCAN-BORN null-mailbox rows (source_message_id set) into
+  // the freshest same-slug BOUND row — paper-trail holes backfilled, twin
+  // deleted. Hand-entered null rows (no source message) and lone null rows
+  // survive untouched. Idempotent.
+  async (db) => {
+    const rows = await db.getAllAsync<{
+      id: string;
+      name: string;
+      payment_method: string | null;
+      source_message_id: string | null;
+      bill_number: string | null;
+      start_date: string | null;
+    }>(
+      `SELECT id, name, payment_method, source_message_id, bill_number,
+              start_date
+       FROM subscriptions`,
+    );
+    const bySlug = new Map<string, typeof rows>();
+    for (const row of rows) {
+      const slug = nameToSlug(row.name).toLowerCase();
+      const list = bySlug.get(slug);
+      if (list) list.push(row);
+      else bySlug.set(slug, [row]);
+    }
+    let removed = 0;
+    let merged = 0;
+    for (const list of bySlug.values()) {
+      const bound = list
+        .filter((r) => r.payment_method)
+        .sort((a, b) =>
+          (b.start_date ?? "").localeCompare(a.start_date ?? ""),
+        );
+      if (bound.length === 0) continue;
+      const keeper = bound[0];
+      const twins = list.filter(
+        (r) => !r.payment_method && r.source_message_id,
+      );
+      for (const twin of twins) {
+        if (!keeper.source_message_id && twin.source_message_id) {
+          await db.runAsync(
+            `UPDATE subscriptions
+                SET source_message_id = COALESCE(source_message_id, ?)
+              WHERE id = ?`,
+            twin.source_message_id,
+            keeper.id,
+          );
+          merged += 1;
+        }
+        if (!keeper.bill_number && twin.bill_number) {
+          await db.runAsync(
+            `UPDATE subscriptions
+                SET bill_number = COALESCE(bill_number, ?)
+              WHERE id = ?`,
+            twin.bill_number,
+            keeper.id,
+          );
+          merged += 1;
+        }
+        await db.runAsync(`DELETE FROM subscriptions WHERE id = ?`, twin.id);
+        removed += 1;
+      }
+    }
+    if (removed > 0) {
+      console.log(
+        `[MIGRATE] null-mailbox twin merge v20: ${removed} twin row(s) removed, ${merged} paper-trail merge(s)`,
+      );
+    }
   },
 ];
 

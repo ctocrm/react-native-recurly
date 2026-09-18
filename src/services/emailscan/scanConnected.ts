@@ -152,6 +152,27 @@ async function runScan(opts: {
   const existingByKey = new Map(
     opts.existing.map((s) => [rowIdentity(s), s]),
   );
+  // R37: restore-era rows can carry a NULL payment_method — their identity
+  // ("slug::") can never equal a candidate key ("slug::mailbox"), so every
+  // scan MINTED a twin (Amazon/Elite Ti/Transunion twins; the boot
+  // migrations healed them after the fact). Index those unbound rows by
+  // slug so a candidate can CLAIM and repair them instead of minting.
+  const unboundBySlug = new Map<string, Subscription[]>();
+  for (const s of opts.existing) {
+    if (s.paymentMethod) continue;
+    const slug = nameToSlug(s.name).toLowerCase();
+    const list = unboundBySlug.get(slug);
+    if (list) list.push(s);
+    else unboundBySlug.set(slug, [s]);
+  }
+  const claimUnbound = (s: Subscription) => {
+    const slug = nameToSlug(s.name).toLowerCase();
+    const list = unboundBySlug.get(slug);
+    if (!list) return;
+    const next = list.filter((row) => row.id !== s.id);
+    if (next.length === 0) unboundBySlug.delete(slug);
+    else unboundBySlug.set(slug, next);
+  };
 
   // R13: scan-wide budget — bounds TOTAL scan duration, not just per-leg
   // silence. Checked between legs only: an in-flight leg is never killed
@@ -198,7 +219,20 @@ async function runScan(opts: {
       );
       for (const candidate of keep) {
         const key = `${candidate.merchantKey.toLowerCase()}::${candidate.mailboxId}`;
-        const already = existingByKey.get(key);
+        let already = existingByKey.get(key);
+        // R37: exact identity first; then CLAIM an unbound (null-mailbox)
+        // row of the same slug instead of minting a twin. A row bound to a
+        // DIFFERENT mailbox is never claimed — the same merchant in two
+        // mailboxes is two honest rows.
+        let claimedUnbound = false;
+        if (!already) {
+          const slug = candidate.merchantKey.toLowerCase();
+          const unbound = unboundBySlug.get(slug);
+          if (unbound && unbound.length > 0) {
+            already = unbound[0];
+            claimedUnbound = true;
+          }
+        }
         const next = candidateToSubscription(candidate);
         if (already) {
           // R18: a SPARSE candidate must never repair a RECURRING row —
@@ -207,6 +241,13 @@ async function runScan(opts: {
           // row (e.g. Porkbun's yearly order receipt).
           const kindCompatible =
             next.category === "recurring" || already.category === "sparse";
+          // R37: a claimed unbound row binds to this mailbox for the rest
+          // of the scan (and, for scan-born rows, in storage) — the claim
+          // must stick even when no other repair gate fires.
+          if (claimedUnbound) {
+            claimUnbound(already);
+            existingByKey.set(key, { ...already, paymentMethod: candidate.mailboxId });
+          }
           // cadenceRepair: the candidate carries a confident cadence
           // (Yearly/Weekly — unknown maps to "Monthly" and no-ops) that
           // differs from the stored one. Repairs billing even when the
@@ -288,6 +329,12 @@ async function runScan(opts: {
             }
             if (!already.billNumber && next.billNumber) {
               patch.billNumber = next.billNumber;
+            }
+            // R37: a claimed unbound SCAN-BORN row binds to the candidate's
+            // mailbox so future scans match it exactly. Hand-entered rows
+            // (no source message) keep their mailbox freedom.
+            if (claimedUnbound && already.sourceMessageId) {
+              patch.paymentMethod = candidate.mailboxId;
             }
             await opts.updateSubscription(already.id, patch);
             existingByKey.set(key, { ...already, ...patch, id: already.id });
