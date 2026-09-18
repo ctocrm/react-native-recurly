@@ -11,6 +11,7 @@ import {
   hostLivenessScore,
   isDefunctConfident,
   isKnownDeadHost,
+  isKnownUnreachableHost,
   recordHostLiveness,
   setHostDecision,
   subscribeHostLiveness,
@@ -327,6 +328,50 @@ describe("recordHostLiveness event + decisions (J5)", () => {
     });
     expect(await isKnownDeadHost("dead.example")).toBe(true);
     expect(await isKnownDeadHost("never-probed.example")).toBe(false);
+  });
+});
+
+describe("R30 (J5b) tier-5 unreachable short-circuit window", () => {
+  it("a fresh unreachable verdict short-circuits crawls", async () => {
+    await recordHostLiveness("blocked.example", "blocked", {
+      domain: "blocked.example",
+      label: "unreachable",
+      score: 35,
+      evidence: [],
+    });
+    expect(await isKnownUnreachableHost("blocked.example")).toBe(true);
+    // Tier-5 is NOT defunct — the ≥85 gate must stay closed for it.
+    expect(await isKnownDeadHost("blocked.example")).toBe(false);
+  });
+
+  it("an expired window re-earns one full crawl attempt", async () => {
+    await recordHostLiveness("stale-blocked.example", "stale", {
+      domain: "stale-blocked.example",
+      label: "unreachable",
+      score: 35,
+      evidence: [],
+    });
+    expect(
+      await isKnownUnreachableHost("stale-blocked.example", -1),
+    ).toBe(false);
+  });
+
+  it("non-unreachable labels never hit the tier-5 gate", async () => {
+    await recordHostLiveness("alive.example", "alive", {
+      domain: "alive.example",
+      label: "alive",
+      score: 5,
+      evidence: [],
+    });
+    expect(await isKnownUnreachableHost("alive.example")).toBe(false);
+    await recordHostLiveness("gone.example", "gone", {
+      domain: "gone.example",
+      label: "unregistered",
+      score: 95,
+      evidence: [],
+    });
+    // Defunct hosts route through isKnownDeadHost, not the tier-5 window.
+    expect(await isKnownUnreachableHost("gone.example")).toBe(false);
   });
 });
 

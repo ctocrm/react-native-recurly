@@ -207,6 +207,36 @@ export async function isKnownDeadHost(domain: string): Promise<boolean> {
   }
 }
 
+/**
+ * R30 (J5b, user-set 2026-09-17): a cached tier-5 "unreachable" verdict
+ * (DNS fine, HTTP dead — blocking/geo class) also short-circuits crawls,
+ * but only while FRESH: unlike defunct hosts these can recover, so they
+ * earn one full crawl attempt per window (30 days). Device motivation:
+ * leadingedgehealthemails.com (unreachable, score 35, cached) re-ran FULL
+ * discovery every heal pass — TIER 0.5–3 searches plus fetch-retry drains —
+ * because only score ≥85 short-circuited, starving the JS thread.
+ */
+export const UNREACHABLE_REPROBE_AFTER_MS = 30 * 24 * 60 * 60 * 1000;
+
+export async function isKnownUnreachableHost(
+  domain: string,
+  maxAgeMs: number = UNREACHABLE_REPROBE_AFTER_MS,
+): Promise<boolean> {
+  try {
+    const raw = await getPreference(HOST_LIVENESS_CACHE_PREF_KEY);
+    if (!raw) return false;
+    const cache = JSON.parse(raw) as Record<
+      string,
+      { label: string; score: number; at: number }
+    >;
+    const entry = cache[domain];
+    if (!entry || entry.label !== "unreachable") return false;
+    return Date.now() - (entry.at ?? 0) < maxAgeMs;
+  } catch {
+    return false;
+  }
+}
+
 /** Cache the assessment (short-circuit fuel) and fire the UI event. */
 export async function recordHostLiveness(
   domain: string,

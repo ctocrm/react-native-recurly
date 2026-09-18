@@ -33,6 +33,7 @@ import {
 import {
   assessHostLiveness,
   isKnownDeadHost,
+  isKnownUnreachableHost,
   recordHostLiveness,
 } from "@/services/domain/hostLiveness";
 import {
@@ -890,6 +891,15 @@ export async function findIconUrls(
   if (livenessDomain && (await isKnownDeadHost(livenessDomain))) {
     console.log(
       `[SEARCH] short-circuit: ${livenessDomain} is a known dead host (cached liveness ≥85) — skipping web discovery for ${iconKey}`,
+    );
+    return 0;
+  }
+  // R30 (J5b): tier-5 unreachable verdicts short-circuit too, for 30 days —
+  // a blocked/geo host earns ONE full attempt per window, not one per heal
+  // pass (the 2026-09-17 leadingedgehealthemails retry-storm loop).
+  if (livenessDomain && (await isKnownUnreachableHost(livenessDomain))) {
+    console.log(
+      `[SEARCH] short-circuit: ${livenessDomain} is unreachable (tier-5 cached, re-probe window open) — skipping web discovery for ${iconKey}`,
     );
     return 0;
   }
