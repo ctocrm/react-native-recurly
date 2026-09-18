@@ -6,7 +6,7 @@ import type { SQLiteDatabase } from "expo-sqlite";
 import { nameToSlug } from "@/services/iconScraper";
 
 /** Bump when adding a migration. Stored in PRAGMA user_version. */
-export const SCHEMA_VERSION = 18;
+export const SCHEMA_VERSION = 19;
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS subscriptions (
@@ -586,6 +586,13 @@ export const MIGRATIONS: ((db: SQLiteDatabase) => Promise<void>)[] = [
         `[MIGRATE] subscription dedupe v18: ${removed} twin row(s) removed across ${groupsHit} group(s), ${merged} paper-trail merge(s)`,
       );
     }
+  },
+  // 19: ESP-orphan retirement (R33) — runs LAST so mail_messages certainly
+  // exists on every DB shape. Dynamic import keeps classifier out of the
+  // module-init path of schema consumers that never migrate.
+  async (db) => {
+    const { migrateEspOrphans } = await import("../emailscan/espOrphan");
+    await migrateEspOrphans(db);
   },
 ];
 

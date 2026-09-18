@@ -465,6 +465,7 @@ const ESP_HOSTS = [
   "shopifyemail.com",
   "email.shopify.com",
   "checkout.shopify.com",
+  "temuemail.com",
   "sendgrid.net",
   "mailgun.net",
   "mailgun.org",
@@ -474,6 +475,9 @@ const ESP_HOSTS = [
   "sendinblue.com",
   "brevo.com",
 ];
+
+/** R33: shared with the esp-orphan migration (name-token derivation). */
+export { ESP_HOSTS };
 
 function isEspHost(host: string): boolean {
   const h = host.toLowerCase();

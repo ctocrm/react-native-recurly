@@ -68,8 +68,11 @@ function rowToSubscription(row: Record<string, any>): Subscription {
 
 export async function getAllSubscriptions(): Promise<Subscription[]> {
   const db = getDatabase();
+  // R33: archived rows (ESP orphans) stay in the DB for audit but leave the
+  // app-wide read — every consumer (list, spend, upcoming, filters) skips
+  // them consistently. Backup/import paths use their own full reads.
   const rows = await db.getAllAsync<Record<string, any>>(
-    "SELECT * FROM subscriptions ORDER BY created_at DESC",
+    "SELECT * FROM subscriptions WHERE status != 'archived' ORDER BY created_at DESC",
   );
   return rows.map(rowToSubscription);
 }

@@ -39,7 +39,10 @@
 // body purchase phrasing and imports sparse; bare ESP mail drops. Kills
 // the "Shopifyemail $1,439 Monthly" ghost class. Bump restages so stored
 // shopifyemail hits re-key.
-export const PARSER_VERSION = 22;
+// v22→v23 (R33): temuemail.com joins the ESP rails — Temu's sending domain
+// minted a "Temuemail" ghost the same way shopifyemail.com minted
+// "Shopifyemail". Bump restages stored temuemail hits under the ESP rules.
+export const PARSER_VERSION = 23;
 
 
 export type MailProviderId =

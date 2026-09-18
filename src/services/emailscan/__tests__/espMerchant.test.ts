@@ -67,6 +67,32 @@ describe("R29 ESP-host senders are rails, not merchants", () => {
     expect(hit.merchantKey).not.toBe("shopifyemail");
   });
 
+  // R33: Temu's sending domain is the same rail class — never "Temuemail".
+  it("treats temuemail.com as an ESP rail, never a merchant", () => {
+    const hit = classifyMessage(
+      base({
+        from: "Temu <deals@temuemail.com>",
+        subject: "Your Temu order #T9Y8X",
+        text: "Order total $19.99 from Temu. Thank you for your purchase.",
+      }),
+    );
+    expect(hit.merchantKey).not.toBe("temuemail");
+    expect(hit.merchantKey).toBe("temu");
+    expect(hit.evidence).toContain("esp:display-name");
+  });
+
+  it("drops a bare temuemail sender with no store evidence", () => {
+    const hit = classifyMessage(
+      base({
+        from: "no-reply@temuemail.com",
+        subject: "Your order",
+        text: "Thanks. Order total $19.99.",
+      }),
+    );
+    expect(hit.kind).toBeNull();
+    expect(hit.evidence).toContain("drop:esp-unresolved");
+  });
+
   it("sendgrid-family hosts get the same rail treatment", () => {
     const hit = classifyMessage(
       base({

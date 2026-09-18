@@ -368,7 +368,8 @@ export function monthlySpendContribution(
   messages: ClassifiedMessage[],
   now = new Date(),
 ): number {
-  if (sub.status === "cancelled" || sub.status === "paused") return 0;
+  if (sub.status === "cancelled" ||
+    sub.status === "paused" || sub.status === "archived") return 0;
   if (isSparseSubscription(sub) && sub.paymentMethod) {
     return sparseActuals(sub, messages, "month", now);
   }
@@ -402,7 +403,8 @@ export function thisMonthInsights(
   const merchants: { name: string; amount: number; kind: SpendKind }[] = [];
   let count = 0;
   for (const sub of subscriptions) {
-    if (sub.status === "cancelled" || sub.status === "paused") continue;
+    if (sub.status === "cancelled" ||
+    sub.status === "paused" || sub.status === "archived") continue;
     count += 1;
     const kind = spendKind(sub);
     const amount = monthlySpendContribution(sub, messages, now);
@@ -454,7 +456,8 @@ export function monthlyChartFromMail(
     const { start, end } = monthWindow(cursor.getFullYear(), cursor.getMonth());
     let amount = 0;
     for (const sub of subscriptions) {
-      if (sub.status === "cancelled" || sub.status === "paused") continue;
+      if (sub.status === "cancelled" ||
+    sub.status === "paused" || sub.status === "archived") continue;
       if (isSparseSubscription(sub) && sub.paymentMethod) {
         amount += sumChargesInWindow(sub, messages, start, end);
         continue;

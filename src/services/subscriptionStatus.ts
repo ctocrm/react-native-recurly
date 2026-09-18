@@ -42,7 +42,10 @@ export function subscriptionBucket(
   graceDays: number,
   now: Date = new Date(),
 ): "expired" | "sparse" | "active" {
-  const stopped = sub.status === "paused" || sub.status === "cancelled";
+  const stopped =
+    sub.status === "paused" ||
+    sub.status === "cancelled" ||
+    sub.status === "archived";
   if (!stopped && isMayHaveExpired(sub.renewalDate, graceDays, now)) {
     return "expired";
   }

@@ -110,7 +110,8 @@ export function projectionMonthlySpendContribution(
   actuals: MerchantDayActual[],
   now = new Date(),
 ): number {
-  if (sub.status === "cancelled" || sub.status === "paused") return 0;
+  if (sub.status === "cancelled" ||
+    sub.status === "paused" || sub.status === "archived") return 0;
   if (sub.category === "sparse" && sub.paymentMethod) {
     return projectionSparseActuals(sub, actuals, "month", now);
   }
@@ -185,7 +186,8 @@ export function projectionThisMonthInsights(
   const merchants: { name: string; amount: number; kind: SpendKind }[] = [];
   let count = 0;
   for (const sub of subscriptions) {
-    if (sub.status === "cancelled" || sub.status === "paused") continue;
+    if (sub.status === "cancelled" ||
+    sub.status === "paused" || sub.status === "archived") continue;
     count += 1;
     const kind = spendKind(sub);
     const amount = projectionMonthlySpendContribution(sub, actuals, now);
@@ -224,7 +226,8 @@ export function projectionMonthlyChartFromMail(
     const { start, end } = monthWindow(cursor.getFullYear(), cursor.getMonth());
     let amount = 0;
     for (const sub of subscriptions) {
-      if (sub.status === "cancelled" || sub.status === "paused") continue;
+      if (sub.status === "cancelled" ||
+    sub.status === "paused" || sub.status === "archived") continue;
       if (sub.category === "sparse" && sub.paymentMethod) {
         amount += projectionSumChargesInWindow(sub, actuals, start, end);
         continue;
