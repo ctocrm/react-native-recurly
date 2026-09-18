@@ -2,6 +2,7 @@
  * Phase 4 email-scan types. Shared parser does not know Gmail vs IMAP.
  * A subscription is an account; a bill is optional evidence.
  */
+import type { OrderMarkup } from "./orderMarkup";
 
 // 13: F-2 canonical brands — zohoaccounts mints as Zoho (reclassifies cached
 //      From-hosts so mail history re-keys onto the canonical brand).
@@ -48,8 +49,12 @@
 // naming tier (freemail/forward/body included) re-derives under it.
 // v25→v26 (R37d): the guard also covers host-label variants that escape the
 // ESP_HOSTS base list (shopifyemail.co.uk minted "Shopifyemail" live).
-export const PARSER_VERSION = 26;
-
+// v26→v27 (R38 P1): schema.org Order markup (ld+json) is the top evidence
+// tier — an Order payload with a price is strong payment proof, its price
+// is authoritative over body regex, and seller/items/orderNumber ride on
+// the classified row for the rail policy. Bump restages so stored rows can
+// gain markup facts where senders embed them.
+export const PARSER_VERSION = 27;
 
 export type MailProviderId =
   | "gmail"
@@ -132,6 +137,14 @@ export interface ClassifiedMessage {
   needsBody: boolean;
   evidence: string[];
   confidence: "low" | "medium" | "high";
+  /**
+   * R38 Phase 1: schema.org Order payload parsed from the email's ld+json —
+   * the top evidence tier. Present only when the sender actually embedded
+   * markup (the common case is absent — regex tiers apply). The rail policy
+   * (R38 Phase 2) reads seller/items to key processor/rail receipts to the
+   * real merchant instead of the rail brand.
+   */
+  orderMarkup?: OrderMarkup;
 }
 
 export interface ScanCandidate {

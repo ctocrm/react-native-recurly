@@ -20,6 +20,7 @@ import type {
   NormalizedMessage,
   SubjectClass,
 } from "./types";
+import { extractOrderMarkup } from "./orderMarkup";
 
 const LOCAL_PARTS_TO_STRIP = new Set([
   "noreply",
@@ -139,16 +140,34 @@ const PAYMENT_PROOF_STRONG_RES: { re: RegExp; tag: string }[] = [
   { re: /\btotal\s+(?:charged|due|amount)\b/i, tag: "total" },
   { re: /\bamount\s+(?:charged|paid|due)\b/i, tag: "amount-paid" },
   { re: /\byou\s+paid\b/i, tag: "you-paid" },
-  { re: /\bwe(?:'ve)?\s+(?:charged|received\s+(?:your\s+)?payment)/i, tag: "we-charged" },
-  { re: /\b(?:visa|mastercard|amex|discover|card)\s+(?:ending|·|•)\b/i, tag: "card-ending" },
-  { re: /\b(?:invoice|receipt|order)\s*(?:#|no\.?|number)\b/i, tag: "doc-number" },
-  { re: /\bthank you for your (?:purchase|order|payment)\b/i, tag: "thanks-purchase" },
+  {
+    re: /\bwe(?:'ve)?\s+(?:charged|received\s+(?:your\s+)?payment)/i,
+    tag: "we-charged",
+  },
+  {
+    re: /\b(?:visa|mastercard|amex|discover|card)\s+(?:ending|·|•)\b/i,
+    tag: "card-ending",
+  },
+  {
+    re: /\b(?:invoice|receipt|order)\s*(?:#|no\.?|number)\b/i,
+    tag: "doc-number",
+  },
+  {
+    re: /\bthank you for your (?:purchase|order|payment)\b/i,
+    tag: "thanks-purchase",
+  },
   { re: /\border confirmation\b/i, tag: "order-confirmation" },
   { re: /\bGPA\.[A-Z0-9]+-[A-Z0-9]+-[A-Z0-9]+\b/, tag: "gpa-order" },
   // Renewal/total shapes from real billing mail (Prime "membership renews
   // for $14.99/mo", Amazon "Order total $12.49", "Total: $47.74").
-  { re: /\b(?:membership|subscription|plan)\s+renews?\b/i, tag: "renewal-event" },
-  { re: /\b(?:renewal|registration)\s+(?:price|fee|total)\b/i, tag: "renewal-price" },
+  {
+    re: /\b(?:membership|subscription|plan)\s+renews?\b/i,
+    tag: "renewal-event",
+  },
+  {
+    re: /\b(?:renewal|registration)\s+(?:price|fee|total)\b/i,
+    tag: "renewal-price",
+  },
   { re: /\bdomain\s+registration\b/i, tag: "domain-registration" },
   { re: /\border\s+total\b/i, tag: "order-total" },
   { re: /\btotal\b[^\n]{0,16}(?:USD\s*)?(?:US)?\$\s*\d/i, tag: "total-price" },
@@ -156,14 +175,20 @@ const PAYMENT_PROOF_STRONG_RES: { re: RegExp; tag: string }[] = [
 
 /** Soft anchors: legit in receipts, but ad fine-print uses them too. */
 const PAYMENT_PROOF_GENERIC_RES: { re: RegExp; tag: string }[] = [
-  { re: /\bpayment\s+(?:method|received|complete|successful|confirmed|failed)\b/i, tag: "payment-event" },
+  {
+    re: /\bpayment\s+(?:method|received|complete|successful|confirmed|failed)\b/i,
+    tag: "payment-event",
+  },
   { re: /\bbilled\s+to\b/i, tag: "billed-to" },
   { re: /\breceipt\b/i, tag: "receipt-word" },
   { re: /\binvoice\b/i, tag: "invoice-word" },
   { re: /\bstatement\b/i, tag: "statement-word" },
 ];
 
-const PAYMENT_PROOF_RES = [...PAYMENT_PROOF_STRONG_RES, ...PAYMENT_PROOF_GENERIC_RES];
+const PAYMENT_PROOF_RES = [
+  ...PAYMENT_PROOF_STRONG_RES,
+  ...PAYMENT_PROOF_GENERIC_RES,
+];
 
 /** R27: marketing markers. Subject hits weigh most (the pitch IS the mail);
  * body hits are CTA noise. Any of these without payment proof drops the
@@ -172,7 +197,10 @@ const MARKETING_SUBJECT_RES: { re: RegExp; tag: string }[] = [
   { re: /\bpre[- ]?order\b/i, tag: "subject:pre-order" },
   { re: /\b\d{1,3}\s*%\s*off\b/i, tag: "subject:percent-off" },
   { re: /\b(?:black\s+friday|cyber\s+monday)\b/i, tag: "subject:sale-event" },
-  { re: /\b(?:introducing|meet|discover)\s+the\s+new\b/i, tag: "subject:launch" },
+  {
+    re: /\b(?:introducing|meet|discover)\s+the\s+new\b/i,
+    tag: "subject:launch",
+  },
   { re: /\bnow\s+available\b/i, tag: "subject:now-available" },
   { re: /\bjust\s+dropped\b/i, tag: "subject:just-dropped" },
   { re: /\b(?:shop|store)\s+(?:now|today|the)\b/i, tag: "subject:shop" },
@@ -593,7 +621,8 @@ const GOOGLE_PRODUCT_MATCHERS: {
   },
   {
     re: /\bgoogle\s+play\b|\bplay\s+billing\b/i,
-    bodyRe: /\bgoogle\s+play\b|\bplay\s+billing\b|play\.google\.com|\bGPA\.[A-Z0-9]+/i,
+    bodyRe:
+      /\bgoogle\s+play\b|\bplay\s+billing\b|play\.google\.com|\bGPA\.[A-Z0-9]+/i,
     key: "google-play",
     name: "Google Play",
     host: "play.google.com",
@@ -929,16 +958,17 @@ function stripHtml(html: string): string {
     .replace(/<[^>]+>/g, " ")
     .replace(/&nbsp;/gi, " ")
     .replace(/&amp;/g, "&")
-    .replace(/&#(\d+);/g, (_, n) =>
-      String.fromCharCode(Number.parseInt(n, 10)),
-    )
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number.parseInt(n, 10)))
     .replace(/&/g, "&")
     .replace(/\s+/g, " ")
     .trim();
 }
 
 function looksLikeMarkup(text: string): boolean {
-  return /<\/?[a-z][\s\S]*>/i.test(text) || /&(nbsp|amp|lt|gt|quot|#\d+);/i.test(text);
+  return (
+    /<\/?[a-z][\s\S]*>/i.test(text) ||
+    /&(nbsp|amp|lt|gt|quot|#\d+);/i.test(text)
+  );
 }
 
 function parseAmount(
@@ -1046,7 +1076,11 @@ const STRONG_CADENCE_RES: { re: RegExp; cadence: Cadence; tag: string }[] = [
 ];
 
 const WEAK_CADENCE_RES: { re: RegExp; cadence: Cadence; word: string }[] = [
-  { re: /\byearly\b|\bannually\b|\bannual\b/i, cadence: "yearly", word: "yearly" },
+  {
+    re: /\byearly\b|\bannually\b|\bannual\b/i,
+    cadence: "yearly",
+    word: "yearly",
+  },
   { re: /\bmonthly\b/i, cadence: "monthly", word: "monthly" },
   { re: /\bweekly\b/i, cadence: "weekly", word: "weekly" },
 ];
@@ -1090,7 +1124,11 @@ export function inferCadenceFromPayments(
   for (let i = 1; i < times.length; i += 1) {
     intervals.push((times[i] - times[i - 1]) / DAY);
   }
-  const bands: { cadence: "weekly" | "monthly" | "yearly"; min: number; max: number }[] = [
+  const bands: {
+    cadence: "weekly" | "monthly" | "yearly";
+    min: number;
+    max: number;
+  }[] = [
     { cadence: "weekly", min: 5, max: 9 },
     { cadence: "monthly", min: 26, max: 34 },
     { cadence: "yearly", min: 355, max: 375 },
@@ -1216,7 +1254,11 @@ export function extractEmailIconUrls(
     const signatureToken = EMAIL_SIGNATURE_TOKEN_RE.test(url.toLowerCase());
     // Explicit logo-sized dimensions (24–256px) also mark a header image.
     const sizedLogo =
-      !signatureToken && width >= 24 && width <= 256 && height >= 24 && height <= 256;
+      !signatureToken &&
+      width >= 24 &&
+      width <= 256 &&
+      height >= 24 &&
+      height <= 256;
     if (!logoToken && !signatureToken && !sizedLogo) continue;
 
     if (seen.has(url)) continue;
@@ -1303,6 +1345,15 @@ export function classifyMessage(message: NormalizedMessage): ClassifiedMessage {
 
   const body = moneyBodyText(message);
 
+  // R38 Phase 1: schema.org Order markup (ld+json in the email HTML) is the
+  // top evidence tier — the sender states seller/items/price as data instead
+  // of us mining rendered text. Absent markup (the common case) changes
+  // nothing: regex tiers apply unchanged.
+  const orderMarkup = extractOrderMarkup(
+    message.html ??
+      (message.text && looksLikeMarkup(message.text) ? message.text : null),
+  );
+
   // R27 purchase-proof gate: payment anchors decide everything downstream.
   // Hints are optional provider weights (Gmail/Workspace only) — the gate
   // must stand on its own without them.
@@ -1312,6 +1363,12 @@ export function classifyMessage(message: NormalizedMessage): ClassifiedMessage {
   const genericProofTags = PAYMENT_PROOF_GENERIC_RES.filter((p) =>
     p.re.test(`${message.subject}\n${body}`),
   ).map((p) => `proof:${p.tag}`);
+  // An Order payload with a price is a machine-readable charge artifact —
+  // it outranks regex proof and must count BEFORE the marketing drop gate,
+  // so a promo-looking subject carrying a real Order never drops.
+  if (orderMarkup && orderMarkup.price !== undefined) {
+    strongProofTags.push("proof:order-markup");
+  }
   const proofTags = [...strongProofTags, ...genericProofTags];
   const marketingTags: string[] = [];
   let marketingScore = 0;
@@ -1351,7 +1408,10 @@ export function classifyMessage(message: NormalizedMessage): ClassifiedMessage {
     marketingTags.push("header:list-id");
     marketingScore += 1;
   }
-  if (message.hints?.precedence && /bulk|junk|list/i.test(message.hints.precedence)) {
+  if (
+    message.hints?.precedence &&
+    /bulk|junk|list/i.test(message.hints.precedence)
+  ) {
     marketingTags.push("header:precedence-bulk");
     marketingScore += 1;
   }
@@ -1397,10 +1457,17 @@ export function classifyMessage(message: NormalizedMessage): ClassifiedMessage {
     proofTags.length === 0 &&
     marketingScore === 0 &&
     /\$\s*\d/.test(message.subject);
+  // R38 Phase 1: a stated Order price is authoritative — the sender encoded
+  // it as data; regex mining of stripped HTML never overrides it.
   const parsed =
-    proofTags.length > 0 || subjectAnchored
-      ? (body ? parseAmount(body) : null) || parseAmount(message.subject)
-      : undefined;
+    orderMarkup?.price !== undefined
+      ? {
+          amount: orderMarkup.price,
+          currency: orderMarkup.currency ?? "USD",
+        }
+      : proofTags.length > 0 || subjectAnchored
+        ? (body ? parseAmount(body) : null) || parseAmount(message.subject)
+        : undefined;
   if (subjectAnchored && proofTags.length === 0) {
     evidence.push("proof:subject-amount");
   }
@@ -1421,6 +1488,17 @@ export function classifyMessage(message: NormalizedMessage): ClassifiedMessage {
   evidence.push(...proofTags);
   if (marketingTags.length > 0) {
     evidence.push(...marketingTags, "marketing-with-proof");
+  }
+  if (orderMarkup) {
+    evidence.push("markup:order");
+    if (orderMarkup.seller)
+      evidence.push(`markup:seller ${orderMarkup.seller}`.slice(0, 80));
+    if (orderMarkup.orderNumber)
+      evidence.push(`markup:order-no ${orderMarkup.orderNumber}`.slice(0, 80));
+    if (orderMarkup.items.length > 0)
+      evidence.push(
+        `markup:items ${orderMarkup.items.join(" | ")}`.slice(0, 120),
+      );
   }
   if (parsed) evidence.push(`amount:${parsed.currency} ${parsed.amount}`);
   if (amountUnknown) evidence.push("amount-unknown");
@@ -1444,7 +1522,15 @@ export function classifyMessage(message: NormalizedMessage): ClassifiedMessage {
     amountUnknown,
     needsBody: true,
     evidence,
-    confidence: parsed ? "high" : hasProof ? "medium" : "low",
+    confidence:
+      orderMarkup?.price !== undefined
+        ? "high"
+        : parsed
+          ? "high"
+          : hasProof
+            ? "medium"
+            : "low",
+    ...(orderMarkup ? { orderMarkup } : {}),
   };
   return keep;
 }
