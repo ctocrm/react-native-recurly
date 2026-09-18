@@ -215,7 +215,11 @@ async function runScan(opts: {
       legCounted = true;
       const keep = result.candidates.filter(
         (c) =>
-          c.kind === "recurring" || c.kind === "sparse" || c.kind === "free",
+          // R37d: an "unknown" merchant (ESP-rail variants whose host label
+          // resolves to nothing) must never import — it minted an "Unknown"
+          // row live. Only named merchants become candidates.
+          c.merchantKey !== "unknown" &&
+          (c.kind === "recurring" || c.kind === "sparse" || c.kind === "free"),
       );
       for (const candidate of keep) {
         const key = `${candidate.merchantKey.toLowerCase()}::${candidate.mailboxId}`;
