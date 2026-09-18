@@ -3,6 +3,7 @@
  * Stored billing/frequency is never rewritten here.
  */
 import { nameToSlug } from "@/services/iconScraper";
+import { familyMemberSlugs } from "@/services/merchantFamily";
 import type { ClassifiedMessage } from "./types";
 import { isLapsedRecurring } from "./lapse";
 
@@ -75,7 +76,8 @@ function merchantIndex(messages: ClassifiedMessage[]): MerchantIndex {
 /** The only hits that could possibly match `sub` (its merchant's messages
  * of `wantKind` — default: the stream kind the row consumes), in stable
  * order. Callers still run the full per-hit checks — this only removes the
- * other ~2190 misses. Exported for the R35 lapse walker. */
+ * other ~2190 misses. Exported for the R35 lapse walker.
+ * R36: for a family member the bucket union spans the whole family. */
 export function matchCandidates(
   sub: Subscription,
   messages: ClassifiedMessage[],
@@ -83,11 +85,14 @@ export function matchCandidates(
 ): ClassifiedMessage[] {
   const kind = wantKind ?? (isSparseSubscription(sub) ? "sparse" : "recurring");
   const index = merchantIndex(messages);
-  const key = cachedSlug(sub.name);
-  const primary = index.bySlug.get(key)?.[kind] ?? [];
+  const primary: ClassifiedMessage[] = [];
+  for (const slug of familyMemberSlugs(sub.name)) {
+    primary.push(...(index.bySlug.get(slug)?.[kind] ?? []));
+  }
   const lowerName = sub.name.toLowerCase();
+  const ownSlug = cachedSlug(sub.name);
   const secondary =
-    lowerName === key
+    lowerName === ownSlug
       ? []
       : (index.byLowerName.get(lowerName)?.[kind] ?? []);
   if (secondary.length === 0) return primary;
@@ -247,7 +252,9 @@ export function sparseActuals(
 /** R18: the stacked second card line — this calendar month's sparse
  * purchases for a subscription's own merchant+mailbox. Null when the
  * merchant has no sparse activity at all ("only show sparse if it's sparse
- * at all"). Recurring rows only: a pure-sparse card IS the sparse line. */
+ * at all"). Recurring rows only: a pure-sparse card IS the sparse line.
+ * R36: the line aggregates the merchant's FAMILY (primevideo's card stacks
+ * the amazon store purchases) — matched by member slug set. */
 export function sparseSecondaryLine(
   sub: Subscription,
   messages: ClassifiedMessage[],
@@ -256,7 +263,7 @@ export function sparseSecondaryLine(
   if (isSparseSubscription(sub) || sub.category === "free") return null;
   const { start, end } = windowForPeriod("month", now);
   const mailbox = sub.paymentMethod;
-  const key = cachedSlug(sub.name);
+  const memberSlugs = new Set(familyMemberSlugs(sub.name));
   let total = 0;
   let any = false;
   for (const hit of matchCandidates(sub, messages, "sparse")) {
@@ -264,7 +271,7 @@ export function sparseSecondaryLine(
     if (hit.amount === undefined) continue;
     if (mailbox && hit.message.mailboxId !== mailbox) continue;
     if (
-      hit.merchantKey !== key &&
+      !memberSlugs.has(hit.merchantKey) &&
       hit.merchantName.toLowerCase() !== sub.name.toLowerCase()
     ) {
       continue;

@@ -47,6 +47,9 @@ interface SubscriptionCardProps {
   graceDays?: number;
   /** R35: corpus-derived lapse (last charge older than period + grace). */
   lapsed?: boolean;
+  /** R36: family card — display title + member names for the meta line. */
+  familyTitle?: string;
+  familyMembers?: string[];
 }
 
 const SubscriptionCard = ({
@@ -82,6 +85,8 @@ const SubscriptionCard = ({
   onCyclePeriod,
   graceDays,
   lapsed,
+  familyTitle,
+  familyMembers,
 }: SubscriptionCardProps) => {
   const [menuVisible, setMenuVisible] = useState(false);
   const { status: iconStatus, iconUri } = useCachedIcon(icon_key);
@@ -149,12 +154,16 @@ const SubscriptionCard = ({
             </View>
             <View className="sub-copy">
               <Text numberOfLines={1} className="sub-title">
-                {name}
+                {familyTitle ?? name}
               </Text>
               <Text numberOfLines={1} ellipsizeMode="tail" className="sub-meta">
-                {category?.trim() ||
-                  plan?.trim() ||
-                  (renewalDate ? formatSubscriptionDateTime(renewalDate) : "")}
+                {familyMembers?.length
+                  ? familyMembers.join(" · ")
+                  : category?.trim() ||
+                    plan?.trim() ||
+                    (renewalDate
+                      ? formatSubscriptionDateTime(renewalDate)
+                      : "")}
               </Text>
               {mayHaveExpired ? (
                 <View className="self-start rounded-full bg-destructive/10 px-2 py-0.5 mt-1">
@@ -185,12 +194,16 @@ const SubscriptionCard = ({
               {displayPeriodLabel ?? billing}
             </Text>
             {/* R18: stacked second line — this month's sparse purchases for
-                this merchant; hidden entirely when there is none. */}
+                this merchant; hidden entirely when there is none.
+                R36: divider only when both streams render (family shape). */}
             {sparseLine ? (
-              <Text className="sub-billing">
-                +{formatCurrency(sparseLine.amount, currency, false)}{" "}
-                {sparseLine.label}
-              </Text>
+              <>
+                <View className="my-1 h-px w-full bg-border" />
+                <Text className="sub-billing">
+                  +{formatCurrency(sparseLine.amount, currency, false)}{" "}
+                  {sparseLine.label}
+                </Text>
+              </>
             ) : null}
           </Pressable>
         </View>

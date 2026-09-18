@@ -5,6 +5,7 @@
  * paths can be audited side by side at runtime.
  */
 import { nameToSlug } from "@/services/iconScraper";
+import { familyMemberSlugs } from "@/services/merchantFamily";
 import { bothBucketKey, type MerchantDayActual } from "./projectionCore";
 import {
   convertStoredPrice,
@@ -94,14 +95,28 @@ export function projectionSparseSecondaryLine(
 ): { amount: number; label: string } | null {
   if (sub.category === "sparse" || sub.category === "free") return null;
   const { start, end } = windowForPeriod("month", now);
-  const { total, count } = sumBuckets(
-    sub,
-    actuals,
-    "sparse",
-    start,
-    end,
-    true,
-  ) as { total: number; count: number; unknown: number };
+  // R36: family-aggregated sparse actuals (primevideo stacks amazon's store
+  // purchases) — bucket keys matched against the member slug set.
+  const memberSlugs = new Set(familyMemberSlugs(sub.name));
+  let total = 0;
+  let count = 0;
+  for (const a of actuals) {
+    if (a.kind !== "sparse") continue;
+    if (sub.paymentMethod && a.mailboxId !== sub.paymentMethod) continue;
+    const matches =
+      (a.bucketType === "slug" && memberSlugs.has(a.bucketKey)) ||
+      (a.bucketType === "name" &&
+        a.bucketKey === sub.name.toLowerCase());
+    if (!matches) continue;
+    const [y, m, d] = a.day.split("-").map(Number);
+    const dayStart = new Date(y, m - 1, d);
+    const dayEnd = new Date(y, m - 1, d, 23, 59, 59, 999);
+    if (dayEnd < start || dayStart > end) continue;
+    total += a.total;
+    // KNOWN charges only — parity with the legacy walker (a window with
+    // only paid-unknown charges renders no sparse line).
+    count += a.count;
+  }
   if (count === 0) return null;
   return { amount: total, label: "Sparse" };
 }
@@ -115,14 +130,14 @@ export function projectionLastRecurringChargeDate(
   sub: Subscription,
   actuals: MerchantDayActual[],
 ): Date | null {
-  const S = nameToSlug(sub.name);
+  const memberSlugs = new Set(familyMemberSlugs(sub.name));
   const L = sub.name.toLowerCase();
   let latest: number | null = null;
   for (const a of actuals) {
     if (a.kind !== "recurring") continue;
     if (sub.paymentMethod && a.mailboxId !== sub.paymentMethod) continue;
     const matches =
-      (a.bucketType === "slug" && a.bucketKey === S) ||
+      (a.bucketType === "slug" && memberSlugs.has(a.bucketKey)) ||
       (a.bucketType === "name" && a.bucketKey === L);
     if (!matches) continue;
     const t = new Date(`${a.day}T12:00:00`).getTime();

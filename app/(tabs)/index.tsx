@@ -14,6 +14,11 @@ import "@/global.css";
 import { useBottomClearance } from "@/hooks/useBottomClearance";
 import { useChargeDisplay } from "@/hooks/useChargeDisplay";
 import { DEFAULT_EXPIRED_GRACE_DAYS } from "@/services/subscriptionStatus";
+import {
+  familyDisplayName,
+  familyForName,
+  groupByFamily,
+} from "@/services/merchantFamily";
 import { useScanProgress } from "@/hooks/useScanProgress";
 import { formatCurrency } from "@/lib/utils";
 import { importFromConnectedMailboxes } from "@/services/emailscan";
@@ -61,6 +66,12 @@ const App = () => {
   } = useSubscriptions();
   const { displayFor, sparseLineFor, cyclePeriod, monthlySpend, lapseFor } =
     useChargeDisplay(subscriptions);
+
+  // R36: one card per merchant family (Amazon shape).
+  const familyGroups = useMemo(
+    () => groupByFamily(subscriptions),
+    [subscriptions],
+  );
   const [detailsSubscription, setDetailsSubscription] =
     useState<Subscription | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
@@ -361,43 +372,57 @@ const App = () => {
             </Pressable>
           </>
         }
-        data={subscriptions}
-        keyExtractor={(item) => item.id}
+        data={familyGroups}
+        keyExtractor={(item) => item.primary.id}
         renderItem={({ item }) => (
           <SubscriptionCard
-            {...item}
-            expanded={expandedSubscriptionId === item.id}
-            displayPrice={displayFor(item).amount}
-            displayUnknown={displayFor(item).unknown}
-            displayPeriodLabel={displayFor(item).label}
-            onCyclePeriod={() => cyclePeriod(item)}
-            sparseLine={sparseLineFor(item)}
-            lapsed={lapseFor(item, DEFAULT_EXPIRED_GRACE_DAYS)}
+            {...item.primary}
+            expanded={expandedSubscriptionId === item.primary.id}
+            displayPrice={displayFor(item.primary).amount}
+            displayUnknown={displayFor(item.primary).unknown}
+            displayPeriodLabel={displayFor(item.primary).label}
+            onCyclePeriod={() => cyclePeriod(item.primary)}
+            sparseLine={sparseLineFor(item.primary)}
+            lapsed={lapseFor(item.primary, DEFAULT_EXPIRED_GRACE_DAYS)}
+            familyTitle={
+              item.members.length > 1
+                ? familyDisplayName(familyForName(item.primary.name) ?? "")
+                : undefined
+            }
+            familyMembers={
+              item.members.length > 1
+                ? item.members
+                    .filter((m) => m.id !== item.primary.id)
+                    .map((m) => m.name)
+                : undefined
+            }
             onPress={() => {
-              const isExpanding = expandedSubscriptionId !== item.id;
+              const isExpanding = expandedSubscriptionId !== item.primary.id;
               setExpandedSubscriptionId((currentId) =>
-                currentId === item.id ? null : item.id,
+                currentId === item.primary.id ? null : item.primary.id,
               );
               posthog.capture(
                 isExpanding
                   ? "subscription_card_expanded"
                   : "subscription_card_collapsed",
                 {
-                  subscription_id: item.id,
-                  subscription_name: item.name,
-                  subscription_category: item.category ?? "",
-                  billing_cycle: item.billing,
+                  subscription_id: item.primary.id,
+                  subscription_name: item.primary.name,
+                  subscription_category: item.primary.category ?? "",
+                  billing_cycle: item.primary.billing,
                 },
               );
             }}
-            onEdit={() => handleEdit(item)}
-            onDelete={() => handleDelete(item)}
-            onMarkActive={() => handleStatusChange(item, "active")}
-            onMarkPaused={() => handleStatusChange(item, "paused")}
-            onMarkCancelled={() => handleStatusChange(item, "cancelled")}
-            onViewStats={() => handleViewStats(item)}
-            onViewDetails={() => setDetailsSubscription(item)}
-            onIconLongPress={() => handleIconLongPress(item)}
+            onEdit={() => handleEdit(item.primary)}
+            onDelete={() => handleDelete(item.primary)}
+            onMarkActive={() => handleStatusChange(item.primary, "active")}
+            onMarkPaused={() => handleStatusChange(item.primary, "paused")}
+            onMarkCancelled={() =>
+              handleStatusChange(item.primary, "cancelled")
+            }
+            onViewStats={() => handleViewStats(item.primary)}
+            onViewDetails={() => setDetailsSubscription(item.primary)}
+            onIconLongPress={() => handleIconLongPress(item.primary)}
           />
         )}
         extraData={expandedSubscriptionId}
