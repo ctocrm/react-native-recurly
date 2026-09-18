@@ -211,8 +211,11 @@ async function runScan(opts: {
           // (Yearly/Weekly — unknown maps to "Monthly" and no-ops) that
           // differs from the stored one. Repairs billing even when the
           // price is unchanged, so stale wrong-cadence rows heal.
+          // R34: an EMPTY candidate cadence is NOT a repair — the guarded
+          // un-stamp (cadenceClear below) owns clearing.
           const cadenceRepair =
             kindCompatible &&
+            next.billing !== "" &&
             next.billing !== "Monthly" &&
             (already.billing !== next.billing ||
               already.frequency !== next.frequency);
@@ -231,8 +234,27 @@ async function runScan(opts: {
             kindCompatible &&
             next.category !== already.category &&
             (next.category === "free" || next.category === "recurring");
+          // R34: cadence un-stamp. A sparse row carrying a stored cadence the
+          // corpus no longer supports (legacy default-cadence stamps —
+          // "Uber $47.25 Monthly", "Intuit $680.92 Monthly") heals when the
+          // merchant's own corpus evidences NO cadence across ≥2 messages.
+          // cadenceRepair alone can never clear: it only writes non-Monthly
+          // cadences. Scan-born rows only — a hand-entered row keeps its
+          // cadence — and never on a recurring row (its cadence is
+          // load-bearing).
+          const cadenceClear =
+            already.category === "sparse" &&
+            next.category === "sparse" &&
+            next.billing === "" &&
+            already.billing !== "" &&
+            (candidate.messageIds?.length ?? 0) >= 2 &&
+            !!already.sourceMessageId;
           if (
-            (richer || cadenceRepair || paperTrailBackfill || streamFlip) &&
+            (richer ||
+              cadenceRepair ||
+              paperTrailBackfill ||
+              streamFlip ||
+              cadenceClear) &&
             opts.updateSubscription
           ) {
             // 2026-09-16 (user rule): the stream CAN flip when the evidence
@@ -244,10 +266,15 @@ async function runScan(opts: {
                 ? next.category
                 : already.category;
             const patch: Partial<Subscription> = {
-              billing: next.billing,
-              frequency: next.frequency,
               category,
             };
+            // R34: billing rides the patch only when the candidate carries a
+            // cadence or the stamp is being cleared — a paper-trail backfill
+            // alone must never rewrite (or wipe) a row's cadence.
+            if (next.billing !== "" || cadenceRepair || cadenceClear) {
+              patch.billing = next.billing;
+              patch.frequency = next.frequency;
+            }
             if (richer) {
               patch.price = next.price;
               patch.priceUnknown = next.priceUnknown;
