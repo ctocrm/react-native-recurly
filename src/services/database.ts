@@ -1513,17 +1513,55 @@ export async function getIconCacheStats(): Promise<IconCacheStats> {
 }
 
 /**
+ * R32: the cache/crawl clears run while the background icon chain writes on
+ * the same SQLite connection. With the non-exclusive withTransactionAsync,
+ * Expo absorbs interleaved queries into the open transaction (SDK 54 docs),
+ * which can end it out from under the clear — the observed
+ * "cannot rollback - no transaction is active" (ERR_INTERNAL_SQLITE_ERROR).
+ * The clears are idempotent DELETEs, so a bounded retry on that transient
+ * signature is safe.
+ */
+async function runClearWithRetry(
+  label: string,
+  op: () => Promise<void>,
+): Promise<void> {
+  const MAX_ATTEMPTS = 3;
+  for (let attempt = 1; ; attempt++) {
+    try {
+      await op();
+      return;
+    } catch (error) {
+      const err = error as { code?: string; message?: string };
+      const message = err?.message ?? String(error);
+      const transient =
+        err?.code === "ERR_INTERNAL_SQLITE_ERROR" ||
+        message.includes("no transaction is active") ||
+        message.includes("has been rejected");
+      if (!transient || attempt >= MAX_ATTEMPTS) throw error;
+      console.warn(
+        `[DB] ${label} hit transient contention (attempt ${attempt}/${MAX_ATTEMPTS}); retrying`,
+      );
+      await new Promise((resolve) => setTimeout(resolve, 300 * attempt));
+    }
+  }
+}
+
+/**
  * Clears stored icon image data: the chosen icon cache, all crawl candidate
  * results, and the pending background fetch queue. The crawled_urls dedup
  * table is preserved, so previously crawled URLs may not be re-downloaded.
  */
 export async function clearIconCache(): Promise<void> {
   const db = getDatabase();
-  await db.withTransactionAsync(async () => {
-    await db.execAsync("DELETE FROM icon_cache");
-    await db.execAsync("DELETE FROM icon_crawl_results");
-    await db.execAsync("DELETE FROM icon_crawl_queue");
-    await db.execAsync("DELETE FROM icon_crawl_sessions");
+  await runClearWithRetry("clearIconCache", async () => {
+    // Exclusive transaction: only these DELETEs run inside it, so concurrent
+    // crawler writes cannot be absorbed into (or roll back) the clear.
+    await db.withExclusiveTransactionAsync(async (tx) => {
+      await tx.execAsync("DELETE FROM icon_cache");
+      await tx.execAsync("DELETE FROM icon_crawl_results");
+      await tx.execAsync("DELETE FROM icon_crawl_queue");
+      await tx.execAsync("DELETE FROM icon_crawl_sessions");
+    });
   });
   // Notify listeners so in-memory cache state is invalidated.
   setTimeout(async () => {
@@ -1539,15 +1577,17 @@ export async function clearIconCache(): Promise<void> {
  */
 export async function clearCrawlHistory(): Promise<void> {
   const db = getDatabase();
-  await db.withTransactionAsync(async () => {
-    await db.execAsync("DELETE FROM crawled_urls");
-    await db.execAsync("DELETE FROM icon_crawl_sessions");
-    // icon_reports is created lazily; swallow errors if it doesn't exist yet.
-    try {
-      await db.execAsync("DELETE FROM icon_reports");
-    } catch {
-      /* table not yet created */
-    }
+  await runClearWithRetry("clearCrawlHistory", async () => {
+    await db.withExclusiveTransactionAsync(async (tx) => {
+      await tx.execAsync("DELETE FROM crawled_urls");
+      await tx.execAsync("DELETE FROM icon_crawl_sessions");
+      // icon_reports is created lazily; swallow errors if it doesn't exist yet.
+      try {
+        await tx.execAsync("DELETE FROM icon_reports");
+      } catch {
+        /* table not yet created */
+      }
+    });
   });
   // Reset persisted rate-limit cooldowns (SecureStore + in-memory).
   try {
