@@ -119,6 +119,20 @@ describe("R29 ESP-host senders are rails, not merchants", () => {
     expect(hit.merchantKey).toBe("northwind-supply");
   });
 
+  // The guard lives in titleCaseMerchant — EVERY tier is covered, not just
+  // the ESP one (the first fix missed the freemail path and re-minted).
+  it("never mints an ESP brand from a FREEMAIL display name either", () => {
+    const hit = classifyMessage(
+      base({
+        from: "Shopify Email <shopify.notifications@gmail.com>",
+        subject: "Your order #88",
+        text: "Thanks for your purchase. Order total $30.00.",
+      }),
+    );
+    expect(hit.merchantKey).not.toBe("shopify-email");
+    expect(hit.merchantKey).not.toBe("shopifyemail");
+  });
+
   it("sendgrid-family hosts get the same rail treatment", () => {
     const hit = classifyMessage(
       base({

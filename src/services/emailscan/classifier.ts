@@ -406,7 +406,15 @@ function titleCaseMerchant(raw: string): {
     .join("-")
     .toLowerCase()
     .replace(/[^a-z0-9-]/g, "");
-  if (!key || PAYMENT_PROCESSORS.has(key) || SELF_DISPLAY_NAMES.has(key)) {
+  if (
+    !key ||
+    PAYMENT_PROCESSORS.has(key) ||
+    SELF_DISPLAY_NAMES.has(key) ||
+    // R37: ESP brand names ("Shopifyemail", "Temu Email") are rails, never
+    // merchants — no matter which tier extracted the name (display, body,
+    // freemail, forward). One guard, every caller.
+    isEspBrandName(key)
+  ) {
     return { merchantKey: "unknown", merchantName: "Unknown" };
   }
   const merchantName = words
