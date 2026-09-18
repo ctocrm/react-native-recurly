@@ -44,7 +44,9 @@
 // "Shopifyemail". Bump restages stored temuemail hits under the ESP rules.
 // v23→v24 (R37): ESP-brand DISPLAY names ("Shopifyemail
 // <orders@shopifyemail.com>") no longer mint — the ghost's re-mint source.
-export const PARSER_VERSION = 24;
+// v24→v25 (R37c): the ESP-brand guard moved into titleCaseMerchant — every
+// naming tier (freemail/forward/body included) re-derives under it.
+export const PARSER_VERSION = 25;
 
 
 export type MailProviderId =
