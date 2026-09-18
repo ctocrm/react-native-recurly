@@ -52,7 +52,8 @@ const Insights = () => {
   const { tabListPadding, pagePadding } = useBottomClearance();
   const posthog = usePostHog();
   const { subscriptions } = useSubscriptions();
-  const { messages, actuals, usingProjection } = useChargeDisplay(subscriptions);
+  const { messages, actuals, usingProjection } =
+    useChargeDisplay(subscriptions);
   const [selectedPeriod, setSelectedPeriod] = useState<Period>("This Month");
 
   useEffect(() => {
@@ -140,9 +141,7 @@ const Insights = () => {
 
             {/* Summary Card */}
             <View className="insights-summary-card">
-              <Text className="insights-summary-label">
-                This month actuals
-              </Text>
+              <Text className="insights-summary-label">This month actuals</Text>
               <Text className="insights-summary-amount">
                 {formatCurrency(totalMonthlySpend)}
               </Text>
@@ -176,9 +175,7 @@ const Insights = () => {
 
             {/* Category Breakdown */}
             <View className="insights-section-head">
-              <Text className="insights-section-title">
-                This month by kind
-              </Text>
+              <Text className="insights-section-title">This month by kind</Text>
             </View>
 
             {categoryBreakdown.map((category) => {
@@ -223,9 +220,9 @@ const Insights = () => {
             <View className="insights-section-head mt-2">
               <Text className="insights-section-title">Top merchants</Text>
             </View>
-            {merchants.slice(0, 5).map((row) => (
+            {merchants.slice(0, 5).map((row, index) => (
               <View
-                key={row.name}
+                key={`${row.name}-${index}`}
                 className="mb-3 flex-row items-center justify-between rounded-2xl border border-border bg-card p-4"
               >
                 <View>
