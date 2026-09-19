@@ -158,6 +158,12 @@ export interface ScanCandidate {
   currency?: string;
   cadence?: Cadence;
   nextDate?: string;
+  /**
+   * Earliest evidence email date (ISO) across the candidate corpus. The
+   * scan-date bug fix: the import mints startDate from this instead of the
+   * scan wall-clock, so a May receipt imported in September starts in May.
+   */
+  firstSeen?: string;
   /** R18: best-effort bill number carried to import. */
   billNumber?: string | null;
   /** Phase C: brand-sent icon seeds for the scan-fired crawl (best-first). */

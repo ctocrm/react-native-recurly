@@ -24,6 +24,15 @@ export function candidateToSubscription(
   const free = candidate.kind === "free" || (known && candidate.amount === 0);
   const priceUnknown = !known && candidate.kind !== "free";
   const iconKey = nameToSlug(candidate.merchant) || "plus";
+  // Scan-date bug fix: the row starts when its earliest evidence email
+  // arrived, not when the scan ran. Fallback (and unparseable-date guard)
+  // keeps the wall-clock only for candidates with no usable date.
+  const firstSeenMs = candidate.firstSeen
+    ? new Date(candidate.firstSeen).getTime()
+    : NaN;
+  const startDate = Number.isNaN(firstSeenMs)
+    ? new Date().toISOString()
+    : new Date(firstSeenMs).toISOString();
   return {
     id: Date.now().toString(),
     icon: require("@assets/icons/plus.png"),
@@ -31,7 +40,7 @@ export function candidateToSubscription(
     name: candidate.merchant,
     category: free ? "free" : candidate.kind,
     status: "active",
-    startDate: new Date().toISOString(),
+    startDate,
     price: known ? candidate.amount! : 0,
     priceUnknown,
     currency: candidate.currency ?? "USD",

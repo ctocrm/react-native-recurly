@@ -161,6 +161,16 @@ export function rollupCandidates(hits: ClassifiedMessage[]): ScanCandidate[] {
     }
   }
 
+  // Scan-date bug fix: the corpus's earliest email date rides the candidate
+  // so the import mints the row's start from evidence, never from the scan
+  // wall-clock. ISO dates sort lexicographically.
+  for (const [key, candidate] of map) {
+    const dates = datesByKey.get(key);
+    if (dates?.length) {
+      candidate.firstSeen = [...dates].sort()[0];
+    }
+  }
+
   return [...map.values()].sort((a, b) => {
     const kind = kindRank(b.kind) - kindRank(a.kind);
     if (kind !== 0) return kind;
@@ -216,6 +226,12 @@ export function collapseFreeIntoMoney(
         ...c,
         evidence: [...c.evidence, ...free.evidence],
         messageIds,
+        // The account starts when its earliest mail arrived — an absorbed
+        // free welcome email can pull the money row's start earlier, never
+        // later.
+        ...(free.firstSeen && (!c.firstSeen || free.firstSeen < c.firstSeen)
+          ? { firstSeen: free.firstSeen }
+          : {}),
       };
     });
 

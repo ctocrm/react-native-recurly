@@ -294,12 +294,24 @@ async function runScan(opts: {
             already.billing !== "" &&
             (candidate.messageIds?.length ?? 0) >= 2 &&
             !!already.sourceMessageId;
+          // Scan-date bug: a scan-born row minted with the scan wall-clock
+          // as its start heals to the corpus's earliest evidence email when
+          // the candidate's firstSeen is EARLIER. Min-only: a stored start
+          // earlier than any corpus mail (hand-corrected, pre-restore) is
+          // never moved, and a later firstSeen can never push the start
+          // forward. Hand-entered rows (no source message) untouched.
+          const startDateRepair =
+            !!next.startDate &&
+            !!already.startDate &&
+            next.startDate < already.startDate &&
+            !!already.sourceMessageId;
           if (
             (richer ||
               cadenceRepair ||
               paperTrailBackfill ||
               streamFlip ||
-              cadenceClear) &&
+              cadenceClear ||
+              startDateRepair) &&
             opts.updateSubscription
           ) {
             // 2026-09-16 (user rule): the stream CAN flip when the evidence
@@ -324,6 +336,9 @@ async function runScan(opts: {
               patch.price = next.price;
               patch.priceUnknown = next.priceUnknown;
               patch.currency = next.currency;
+            }
+            if (startDateRepair) {
+              patch.startDate = next.startDate;
             }
             // R22: backfill the R18 paper-trail when the stored row predates
             // it or arrived through the rollup path that dropped messageIds
