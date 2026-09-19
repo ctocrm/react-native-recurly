@@ -1,15 +1,51 @@
 import * as FileSystem from "expo-file-system/legacy";
 import * as SecureStore from "expo-secure-store";
 import { CloudStorageProvider } from "@/services/cloudsync/types";
+import {
+  authedRequest,
+  type CloudTokenBlob,
+  createCloudSession,
+  makeOAuthTokenRefresher,
+} from "@/services/cloudsync/authedRequest";
+import type { TokenSession } from "@/services/emailscan/oauthSession";
 
 const GOOGLE_DRIVE_API_BASE = "https://www.googleapis.com/drive/v3";
 
 export class GoogleDriveStorage implements CloudStorageProvider {
   private tokens: any = null;
   private userId: string = "";
+  private session: TokenSession | null = null;
 
   constructor(userId: string) {
     this.userId = userId;
+  }
+
+  /** R17: expiry-aware session — a Drive access token lives 1h; the session
+   * refreshes BEFORE each request when life is short (persisting the rotated
+   * token) and force-retries once on a 401 for early revocation. */
+  private ensureSession(): TokenSession {
+    if (!this.session) {
+      const tokens = (this.tokens ?? { accessToken: "" }) as CloudTokenBlob;
+      this.session = createCloudSession({
+        tokens,
+        storageKey: `gdrive_tokens_${this.userId}`,
+        refresher:
+          tokens.refreshToken && process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID
+            ? makeOAuthTokenRefresher({
+                tokenEndpoint: "https://oauth2.googleapis.com/token",
+                clientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID,
+              })
+            : null,
+      });
+    }
+    return this.session;
+  }
+
+  private req(url: string, init?: RequestInit): Promise<Response> {
+    if (!this.tokens?.accessToken) {
+      throw new Error("Not authenticated");
+    }
+    return authedRequest(this.ensureSession(), url, init, "GoogleDrive");
   }
 
   async authenticate(): Promise<void> {
@@ -65,7 +101,7 @@ export class GoogleDriveStorage implements CloudStorageProvider {
       parents: ["appDataFolder"], // Hidden folder, not visible to user
     };
 
-    const response = await fetch(
+    const response = await this.req(
       `${GOOGLE_DRIVE_API_BASE}/files?uploadType=multipart&fields=id,modifiedTime,size`,
       {
         method: "POST",
@@ -113,7 +149,7 @@ export class GoogleDriveStorage implements CloudStorageProvider {
       throw new Error("Not authenticated");
     }
 
-    const response = await fetch(
+    const response = await this.req(
       `${GOOGLE_DRIVE_API_BASE}/files/${fileId}?alt=media`,
       {
         headers: {
@@ -154,7 +190,7 @@ export class GoogleDriveStorage implements CloudStorageProvider {
       throw new Error("Not authenticated");
     }
 
-    const response = await fetch(`${GOOGLE_DRIVE_API_BASE}/files/${fileId}`, {
+    const response = await this.req(`${GOOGLE_DRIVE_API_BASE}/files/${fileId}`, {
       method: "DELETE",
       headers: {
         Authorization: `Bearer ${this.tokens.accessToken}`,
@@ -176,7 +212,7 @@ export class GoogleDriveStorage implements CloudStorageProvider {
       throw new Error("Not authenticated");
     }
 
-    const response = await fetch(
+    const response = await this.req(
       `${GOOGLE_DRIVE_API_BASE}/files/${fileId}?fields=id,modifiedTime,size`,
       {
         headers: {
@@ -216,7 +252,7 @@ export class GoogleDriveStorage implements CloudStorageProvider {
       `name='${fileName}' and 'appDataFolder' in parents`,
     );
 
-    const response = await fetch(
+    const response = await this.req(
       `${GOOGLE_DRIVE_API_BASE}/files?q=${query}&fields=files(id,modifiedTime,size)`,
       {
         headers: {

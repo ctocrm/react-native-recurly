@@ -8,6 +8,24 @@
 import * as AuthSession from "expo-auth-session";
 import * as SecureStore from "expo-secure-store";
 import { runPersistedScan } from "./persist";
+import { classifySubject } from "./classifier";
+import { ensureOnline, feedScanWatchdog } from "./scanWatchdog";
+import {
+  refreshAccessToken,
+  TokenRefreshRejectedError,
+  tokenNeedsRefresh,
+} from "./oauthRefresh";
+import {
+  createTokenSession,
+  LiveToken,
+  type TokenSession,
+} from "./oauthSession";
+import {
+  acquireTokenInteractively,
+  acquireTokenSilently,
+  buildMsalFailureMessage,
+  classifyMsalError,
+} from "./msalAuth";
 import type {
   IncrementalScanResult,
   MailProvider,
@@ -44,6 +62,10 @@ interface TokenBlob {
   expiresAt?: number;
   accountHint?: string;
   uid?: string;
+  /** MSAL account id (Microsoft accounts only, M2). Present → silent token
+   * acquisition goes through MSAL's encrypted cache; the provider refresh
+   * token is NOT stored for these accounts (it lives inside MSAL). */
+  msalAccountId?: string;
 }
 
 /** SecureStore keys may only use A-Z a-z 0-9 . - _ */
@@ -195,6 +217,37 @@ function oauthSpec(providerId: MailProviderId): OAuthSpec {
   }
 }
 
+// Google's secure-response-handling policy rejects arbitrary custom schemes
+// (Error 400: invalid_request on `cadence://auth`). Native Google OAuth
+// clients must redirect via the reverse-client-ID scheme instead. The same
+// scheme must be registered as an intent filter on MainActivity.
+function googleRedirectUri(clientId: string): string {
+  const bare = clientId.replace(/\.apps\.googleusercontent\.com$/, "");
+  return `com.googleusercontent.apps.${bare}:/oauthredirect`;
+}
+
+/**
+ * Microsoft accounts authenticate through the official MSAL SDK (M2): the
+ * full MSA journey — including any emailed verification-code challenge —
+ * runs inside MSAL's managed auth surface. No provider refresh token is
+ * stored: the refresh token lives in MSAL's encrypted cache and is consumed
+ * via acquireTokenSilent (token reuse when valid). A failed/cancelled
+ * attempt is never retried automatically (MSA challenge bombardment,
+ * 2026-09-04).
+ */
+async function msalTokenBlob(): Promise<TokenBlob> {
+  try {
+    const result = await acquireTokenInteractively();
+    return {
+      accessToken: result.accessToken,
+      expiresAt: result.expiresAt,
+      msalAccountId: result.accountId,
+    };
+  } catch (error) {
+    throw new MailConnectError(buildMsalFailureMessage(error, "Microsoft"));
+  }
+}
+
 export async function promptOAuth(
   providerId: MailProviderId,
   userId: string,
@@ -205,8 +258,22 @@ export async function promptOAuth(
       `${providerId} OAuth is not configured (missing public client id).`,
     );
   }
+  // Microsoft accounts go through the official MSAL SDK (M2): the full MSA
+  // journey — including any emailed verification-code challenge — runs in
+  // MSAL's managed surface. See msalTokenBlob above.
+  if (providerId === "outlook" || providerId === "office365") {
+    return msalTokenBlob();
+  }
   const spec = oauthSpec(providerId);
-  const redirectUri = AuthSession.makeRedirectUri({ scheme: "jsmastery" });
+  // Google requires the reverse-client-ID redirect (secure-response-handling
+  // policy); every other provider keeps the cadence:// custom scheme.
+  const redirectUri =
+    providerId === "gmail" || providerId === "workspace"
+      ? googleRedirectUri(clientId)
+      : AuthSession.makeRedirectUri({
+          scheme: "cadence",
+          native: "cadence://auth",
+        });
   const request = new AuthSession.AuthRequest({
     clientId,
     scopes: spec.scopes,
@@ -225,17 +292,40 @@ export async function promptOAuth(
     );
   }
   const params = result.params;
-  const accessToken = params.access_token || params.accessToken;
+  let accessToken = params.access_token || params.accessToken;
+  let refreshToken = params.refresh_token || params.refreshToken;
+  let expiresAt = params.expires_in
+    ? Date.now() + Number.parseInt(params.expires_in, 10) * 1000
+    : undefined;
+
+  if (!accessToken && params.code) {
+    // PKCE / authorization-code flow: the redirect carries `code`, not an
+    // access token. Exchange it at the provider's token endpoint. SDK 54 has
+    // no `codeVerifier` field on token requests, so it rides via extraParams.
+    if (!request.codeVerifier) {
+      throw new MailConnectError(
+        "OAuth PKCE verifier missing for code exchange.",
+      );
+    }
+    const token = await AuthSession.exchangeCodeAsync(
+      {
+        clientId,
+        code: params.code,
+        redirectUri,
+        scopes: spec.scopes,
+        extraParams: { code_verifier: request.codeVerifier },
+      },
+      { tokenEndpoint: spec.tokenEndpoint },
+    );
+    accessToken = token.accessToken;
+    refreshToken = token.refreshToken ?? refreshToken;
+    expiresAt = token.expiresIn ? Date.now() + token.expiresIn * 1000 : expiresAt;
+  }
+
   if (!accessToken) {
     throw new MailConnectError("OAuth returned no access token");
   }
-  return {
-    accessToken,
-    refreshToken: params.refresh_token || params.refreshToken,
-    expiresAt: params.expires_in
-      ? Date.now() + Number.parseInt(params.expires_in, 10) * 1000
-      : undefined,
-  };
+  return { accessToken, refreshToken, expiresAt };
 }
 
 async function accountHintFromToken(
@@ -244,7 +334,7 @@ async function accountHintFromToken(
 ): Promise<string> {
   try {
     if (providerId === "gmail" || providerId === "workspace") {
-      const res = await fetch(
+      const res = await fetchWithTimeout(
         "https://gmail.googleapis.com/gmail/v1/users/me/profile",
         { headers: { Authorization: `Bearer ${accessToken}` } },
       );
@@ -254,7 +344,7 @@ async function accountHintFromToken(
       }
     }
     if (providerId === "outlook" || providerId === "office365") {
-      const res = await fetch("https://graph.microsoft.com/v1.0/me", {
+      const res = await fetchWithTimeout("https://graph.microsoft.com/v1.0/me", {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       if (res.ok) {
@@ -331,136 +421,446 @@ function gmailAttachments(payload: any): NormalizedMessage["attachments"] {
   return out.length ? out : undefined;
 }
 
+/** Provider scan errors must surface the reason: pull the API's error
+ * message out of the response body (Gmail/Graph nest it under `error`). */
+async function providerErrorReason(res: Response): Promise<string> {
+  try {
+    const json = (await res.json()) as {
+      error?: { message?: string } | string;
+      error_description?: string;
+      message?: string;
+    };
+    if (typeof json.error === "object" && json.error?.message) {
+      return json.error.message;
+    }
+    if (typeof json.error === "string") {
+      return json.error_description
+        ? `${json.error} (${json.error_description})`
+        : json.error;
+    }
+    if (json.message) return json.message;
+  } catch {
+    // Non-JSON body - nothing useful to surface.
+  }
+  return "";
+}
+
+/**
+ * R17: the ONE authed-request path for the OAuth JSON fetchers (Graph, Zoho,
+ * JMAP — Gmail keeps its own quota-paced loop but uses the same session).
+ * Proactive: `session.valid()` refreshes BEFORE the request when remaining
+ * token life is under the request margin, so an expiring token can never
+ * reach the provider (the 2026-09-06 Gmail mid-leg 401 class). Reactive
+ * backstop: a 401 still forces one refresh and one replay, bounded per
+ * request, for early server-side revocation.
+ */
+async function fetchWithSession(
+  session: TokenSession,
+  url: string,
+  init: RequestInit | undefined,
+  scheme: (token: string) => string,
+  label: string,
+): Promise<Response> {
+  const token = await session.valid();
+  const res = await fetchWithTimeout(url, {
+    ...init,
+    headers: { ...init?.headers, Authorization: scheme(token) },
+  });
+  if (res.status !== 401) return res;
+  console.log(
+    `[${label}] 401 — access token rejected; refreshing and retrying once`,
+  );
+  const next = await session.force();
+  if (!next || next === token) return res;
+  return fetchWithTimeout(url, {
+    ...init,
+    headers: { ...init?.headers, Authorization: scheme(next) },
+  });
+}
+
 export function createGmailFetcher(
-  accessToken: string,
+  /** R17: expiry-aware session — proactive refresh + 401 backstop. */
+  session: TokenSession,
   mailboxId: string,
 ): MessageFetcher {
+  // Gmail API quota (2026-09-05: the Workspace leg died with a 403 "Total
+  // Query Cost / Units per minute per user" because list + per-message
+  // metadata GETs + body GETs fired back-to-back). Pace every Gmail call to
+  // MIN_INTERVAL_MS between request starts, and treat a quota 403/429 as
+  // retryable after a ~60s backoff (once) instead of failing the whole leg.
+  // Live evidence for 500ms: at 250ms the leg clipped the per-minute ceiling
+  // every ~2min (four backoff-recoveries in 9min); 500ms stays under it —
+  // slightly slower calls, but no 60s stalls.
+  const MIN_INTERVAL_MS = 500;
+  const QUOTA_BACKOFF_MS = 60_000;
+  const MAX_BACKOFF_MS = 120_000;
+  let nextSlot = 0;
+
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+  async function gmailApi(url: string): Promise<Response> {
+    let refreshed = false;
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      // R17: proactive — a token within the request margin of expiry is
+      // refreshed BEFORE the request fires, so the provider never has to
+      // 401 us (the 2026-09-06 page-21 mid-leg 401 class).
+      const token = await session.valid();
+      const wait = nextSlot - Date.now();
+      if (wait > 0) await sleep(wait);
+      nextSlot = Date.now() + MIN_INTERVAL_MS;
+      const res = await fetchWithTimeout(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      // Backstop only: early server-side revocation. Bounded once per
+      // request so a dead session still fails boundedly.
+      if (res.status === 401 && !refreshed) {
+        refreshed = true;
+        console.log(
+          "[MailGmail] 401 — access token rejected; refreshing and retrying once",
+        );
+        const next = await session.force();
+        if (next && next !== token) {
+          attempt -= 1; // replay the same attempt; quota budget untouched
+          continue;
+        }
+      }
+      if (res.ok) return res;
+      const reason = await providerErrorReason(res);
+      const quotaLimited =
+        res.status === 429 ||
+        (res.status === 403 &&
+          /quota|rate ?limit|rate ?exceeded|userRateLimitExceeded/i.test(
+            reason,
+          ));
+      if (!quotaLimited) return res;
+      if (attempt === 2) {
+        throw new MailScanUnverifiedError(
+          "Gmail API quota exceeded — Google is rate limiting this app for your account. Try the scan again in a few minutes.",
+        );
+      }
+      const retryAfter = Number(res.headers?.get?.("retry-after"));
+      const backoffMs =
+        Number.isFinite(retryAfter) && retryAfter > 0
+          ? Math.min(retryAfter * 1000, MAX_BACKOFF_MS)
+          : QUOTA_BACKOFF_MS;
+      console.log(
+        `[MailGmail] quota limited (${res.status}) — backing off ${Math.round(
+          backoffMs / 1000,
+        )}s, then one retry`,
+      );
+      // F-4: a quota backoff is server-acknowledged progress (the API told
+      // us to wait); feed so a legitimate ≤120s backoff cannot be
+      // stall-killed by the no-progress clock.
+      feedScanWatchdog();
+      await sleep(backoffMs);
+    }
+    // Unreachable: the loop either returns or throws.
+    throw new MailScanUnverifiedError("Gmail API request failed");
+  }
+
   return {
-    async fetchMessages({ since, limit }) {
+    async fetchMessages({ since, limit }, onChunk) {
+      const pageLimit = Math.min(limit, 100);
       const qParts = [SUBJECT_QUERY];
       if (since?.date) {
         const day = since.date.slice(0, 10).replace(/-/g, "/");
         qParts.push(`after:${day}`);
       }
-      const params = new URLSearchParams({
-        q: qParts.join(" "),
-        maxResults: String(Math.min(limit, 100)),
-      });
-      const listRes = await fetch(
-        `https://gmail.googleapis.com/gmail/v1/users/me/messages?${params}`,
-        { headers: { Authorization: `Bearer ${accessToken}` } },
-      );
-      if (!listRes.ok) {
-        throw new MailScanUnverifiedError(
-          `Gmail list failed (${listRes.status})`,
-        );
-      }
-      const listJson = (await listRes.json()) as {
-        messages?: { id: string }[];
-      };
-      const ids = (listJson.messages || []).map((m) => m.id);
-      const messages: NormalizedMessage[] = [];
-      for (const id of ids) {
-        const getRes = await fetch(
-          `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=full`,
-          { headers: { Authorization: `Bearer ${accessToken}` } },
-        );
-        if (!getRes.ok) continue;
-        const raw = await getRes.json();
-        const headers = raw.payload?.headers as
-          { name: string; value: string }[] | undefined;
-        const body = gmailBody(raw.payload);
-        const internal = raw.internalDate
-          ? new Date(Number(raw.internalDate)).toISOString()
-          : new Date().toISOString();
-        messages.push({
-          mailboxId,
-          messageId: raw.id,
-          from: headerOf(headers, "From"),
-          subject: headerOf(headers, "Subject"),
-          date: internal,
-          text: body.text,
-          html: body.html,
-          attachments: gmailAttachments(raw.payload),
+      let pageToken: string | undefined;
+      let pages = 0;
+      let listed = 0;
+      let bodies = 0;
+      // Phase K: provider-reported listing total for the in-app gauge.
+      let estimate: number | null = null;
+      // Proton/Tuta staging: list ids paged, screen on cheap metadata, and
+      // pull full bodies only for subjects the classifier will actually use
+      // (recurring/sparse need bodies; drop/account/security never do).
+      do {
+        const params = new URLSearchParams({
+          q: qParts.join(" "),
+          maxResults: String(pageLimit),
         });
+        if (pageToken) params.set("pageToken", pageToken);
+        const listRes = await gmailApi(
+          `https://gmail.googleapis.com/gmail/v1/users/me/messages?${params}`,
+        );
+        if (!listRes.ok) {
+          const reason = await providerErrorReason(listRes);
+          throw new MailScanUnverifiedError(
+            `Gmail list failed (${listRes.status})${reason ? `: ${reason}` : ""}`,
+          );
+        }
+        const listJson = (await listRes.json()) as {
+          messages?: { id: string }[];
+          nextPageToken?: string;
+          resultSizeEstimate?: number;
+        };
+        pageToken = listJson.nextPageToken;
+        if (typeof listJson.resultSizeEstimate === "number") {
+          estimate = listJson.resultSizeEstimate;
+        }
+        pages += 1;
+        const ids = (listJson.messages || []).map((m) => m.id);
+        listed += ids.length;
+        // R14 breadcrumbs: any future stall's last log line pinpoints the
+        // park point (which page, how deep into the screening loop).
+        console.log(`[MailGmail] page ${pages}: +${ids.length} ids (total ${listed})`);
+
+        // R19-OOM: bodies accumulate for ONE page only, then flush to the
+        // scan before the next page is listed.
+        const pageMsgs: NormalizedMessage[] = [];
+        let screened = 0;
+        for (const id of ids) {
+          screened += 1;
+          if (screened % 25 === 0) {
+            console.log(`[MailGmail] screening ${screened}/${ids.length} on page ${pages}`);
+          }
+          const metaRes = await gmailApi(
+            `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date&metadataHeaders=List-Unsubscribe&metadataHeaders=List-Id&metadataHeaders=Precedence`,
+          );
+          if (!metaRes.ok) continue;
+          const meta = (await metaRes.json()) as {
+            id?: string;
+            labelIds?: string[];
+            payload?: { headers?: { name: string; value: string }[] };
+          };
+          const headers = meta.payload?.headers ?? [];
+          const subject = headerOf(headers, "Subject");
+          const cls = classifySubject(subject);
+          if (cls !== "recurring" && cls !== "sparse") continue;
+
+          // R27: provider hints are optional scoring weights. Gmail's system
+          // category (CATEGORY_PROMOTIONS…) rides on the metadata response,
+          // and the bulk-sender headers (RFC 8058; Google sender guidelines)
+          // are only returned when named in metadataHeaders. Absent = unset —
+          // other providers classify without them.
+          const gmailCategory = (meta.labelIds ?? []).find((l) =>
+            l.startsWith("CATEGORY_"),
+          );
+          const listUnsubscribe = headerOf(headers, "List-Unsubscribe");
+          const listId = headerOf(headers, "List-Id");
+          const precedence = headerOf(headers, "Precedence");
+          const hints =
+            gmailCategory || listUnsubscribe || listId || precedence
+              ? {
+                  gmailCategory: gmailCategory || undefined,
+                  listUnsubscribe: Boolean(listUnsubscribe),
+                  listId: listId || undefined,
+                  precedence: precedence || undefined,
+                }
+              : undefined;
+
+          const fullRes = await gmailApi(
+            `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=full`,
+          );
+          if (!fullRes.ok) continue;
+          const raw = await fullRes.json();
+          const body = gmailBody(raw.payload);
+          const parsed = new Date(headerOf(headers, "Date"));
+          pageMsgs.push({
+            mailboxId,
+            messageId: meta.id || id,
+            from: headerOf(headers, "From"),
+            subject,
+            date: Number.isNaN(parsed.getTime())
+              ? new Date().toISOString()
+              : parsed.toISOString(),
+            text: body.text,
+            html: body.html,
+            attachments: gmailAttachments(raw.payload),
+            hints,
+          });
+          bodies += 1;
+        }
+        await onChunk(pageMsgs, { listed, total: estimate });
+        // F-4 (2026-09-14 baseline): INITIAL_SCAN_LIMIT was passed down but
+        // only capped the page size — a mailbox with more matches listed
+        // forever (witnessed: 2000+ ids listed against limit=500, the leg
+        // ran 52 minutes). Bound the walk: stop once listed reaches limit.
+      } while (pageToken && listed < limit);
+      if (pageToken) {
+        console.log(
+          `[MailGmail] limit ${limit} reached — truncating listing at ${listed} ids (more pages existed)`,
+        );
       }
-      return messages;
+      console.log(
+        `[MailGmail] listed ${listed} pages=${pages} bodies=${bodies} of ${listed}`,
+      );
     },
   };
 }
 
 export function createGraphFetcher(
-  accessToken: string,
+  /** R17: expiry-aware session — proactive refresh + 401 backstop. */
+  session: TokenSession,
   mailboxId: string,
 ): MessageFetcher {
   return {
-    async fetchMessages({ since, limit }) {
-      const filters = [
-        "contains(subject,'welcome')",
-        "contains(subject,'subscription')",
-        "contains(subject,'renewal')",
-        "contains(subject,'invoice')",
-        "contains(subject,'receipt')",
-        "contains(subject,'password')",
-        "contains(subject,'order')",
-      ];
-      const params = new URLSearchParams({
-        $top: String(Math.min(limit, 50)),
-        $select: "id,subject,from,receivedDateTime,body,hasAttachments",
-        $filter: since?.date
-          ? `receivedDateTime gt ${since.date}`
-          : `(${filters.join(" or ")})`,
-      });
-      const res = await fetch(
-        `https://graph.microsoft.com/v1.0/me/messages?${params}`,
-        { headers: { Authorization: `Bearer ${accessToken}` } },
-      );
-      if (!res.ok) {
-        throw new MailScanUnverifiedError(`Graph list failed (${res.status})`);
-      }
-      const json = (await res.json()) as {
-        value?: {
-          id: string;
-          subject?: string;
-          from?: { emailAddress?: { address?: string; name?: string } };
-          receivedDateTime?: string;
-          body?: { contentType?: string; content?: string };
-        }[];
-      };
-      return (json.value || []).map((m) => {
-        const addr = m.from?.emailAddress?.address || "";
-        const name = m.from?.emailAddress?.name;
-        const html =
-          m.body?.contentType?.toLowerCase() === "html"
-            ? m.body.content
-            : undefined;
-        const text =
-          m.body?.contentType?.toLowerCase() === "text"
-            ? m.body.content
-            : undefined;
-        return {
-          mailboxId,
-          messageId: m.id,
-          from: name ? `${name} <${addr}>` : addr,
-          subject: m.subject || "",
-          date: m.receivedDateTime || new Date().toISOString(),
-          text,
-          html,
+    async fetchMessages({ since, limit }, onChunk) {
+      let pages = 0;
+      let listed = 0;
+      let bodies = 0;
+      let graphTotal: number | null = null;
+      // Proton/Tuta staging: Graph's list returns screening fields directly
+      // ($select — no separate metadata pass), pages are followed via
+      // @odata.nextLink, and bodies ($select=body) load only for subjects the
+      // classifier will actually use.
+      let url: string | null =
+        (() => {
+          const params = new URLSearchParams({
+            $top: String(Math.min(limit, 100)),
+            // R27: internetMessageHeaders rides the list call — Graph returns
+            // a SUBSET of internet headers there (no extra request). Bulk
+            // hints (List-Unsubscribe/List-Id/Precedence) are parsed when
+            // present; absence is neutral, never a negative.
+            $select:
+              "id,subject,from,receivedDateTime,internetMessageHeaders",
+            // Phase K: ask for @odata.count so the gauge has a real total.
+            $count: "true",
+          });
+          if (since?.date) {
+            params.set("$filter", `receivedDateTime gt ${since.date}`);
+          }
+          return `https://graph.microsoft.com/v1.0/me/messages?${params}`;
+        })();
+      while (url) {
+        const res = await fetchWithSession(
+          session,
+          url,
+          undefined,
+          (t) => `Bearer ${t}`,
+          "MailGraph",
+        );
+        if (!res.ok) {
+          const reason = await providerErrorReason(res);
+          throw new MailScanUnverifiedError(
+            `Graph list failed (${res.status})${reason ? `: ${reason}` : ""}`,
+          );
+        }
+        const json = (await res.json()) as {
+          value?: {
+            id: string;
+            subject?: string;
+            from?: { emailAddress?: { address?: string; name?: string } };
+            receivedDateTime?: string;
+            internetMessageHeaders?: { name?: string; value?: string }[];
+          }[];
+          "@odata.nextLink"?: string;
+          "@odata.count"?: number;
         };
-      });
+        url = json["@odata.nextLink"] ?? null;
+        if (typeof json["@odata.count"] === "number") {
+          graphTotal = json["@odata.count"];
+        }
+        pages += 1;
+        const items = json.value || [];
+        listed += items.length;
+
+        // R19-OOM: bodies accumulate for ONE page only, then flush to the
+        // scan (which classifies and stores stripped copies immediately).
+        // Never hold the whole leg's bodies — that is what exhausted the
+        // Java heap mid-leg on 2026-09-07.
+        const pageMsgs: NormalizedMessage[] = [];
+        // R27: bulk-sender hints from the list response's header subset.
+        const graphHeader = (
+          headers: { name?: string; value?: string }[] | undefined,
+          name: string,
+        ): string | undefined =>
+          headers?.find(
+            (h) => (h.name ?? "").toLowerCase() === name.toLowerCase(),
+          )?.value;
+        for (const m of items) {
+          const addr = m.from?.emailAddress?.address || "";
+          const name = m.from?.emailAddress?.name;
+          const from = name ? `${name} <${addr}>` : addr;
+          const subject = m.subject || "";
+          const cls = classifySubject(subject);
+          if (cls !== "recurring" && cls !== "sparse") continue;
+
+          const gListUnsub = graphHeader(
+            m.internetMessageHeaders,
+            "List-Unsubscribe",
+          );
+          const gListId = graphHeader(m.internetMessageHeaders, "List-Id");
+          const gPrecedence = graphHeader(
+            m.internetMessageHeaders,
+            "Precedence",
+          );
+          const hints =
+            gListUnsub || gListId || gPrecedence
+              ? {
+                  listUnsubscribe: Boolean(gListUnsub),
+                  listId: gListId || undefined,
+                  precedence: gPrecedence || undefined,
+                }
+              : undefined;
+
+          const bodyRes = await fetchWithSession(
+            session,
+            `https://graph.microsoft.com/v1.0/me/messages/${encodeURIComponent(
+              m.id,
+            )}?$select=body`,
+            undefined,
+            (t) => `Bearer ${t}`,
+            "MailGraph",
+          );
+          if (!bodyRes.ok) continue;
+          const bj = (await bodyRes.json()) as {
+            body?: { contentType?: string; content?: string };
+          };
+          const html =
+            bj.body?.contentType?.toLowerCase() === "html"
+              ? bj.body.content
+              : undefined;
+          const text =
+            bj.body?.contentType?.toLowerCase() === "text"
+              ? bj.body.content
+              : undefined;
+          pageMsgs.push({
+            mailboxId,
+            messageId: m.id,
+            from,
+            subject,
+            date: m.receivedDateTime || new Date().toISOString(),
+            text,
+            html,
+            hints,
+          });
+          bodies += 1;
+        }
+        await onChunk(pageMsgs, { listed, total: graphTotal });
+        // F-4: same limit enforcement as the Gmail loop — Graph walked
+        // @odata.nextLink without ever checking the requested limit.
+        if (listed >= limit) url = null;
+      }
+      if (url) {
+        console.log(
+          `[MailGraph] limit ${limit} reached — truncating listing at ${listed} ids (more pages existed)`,
+        );
+      }
+      console.log(
+        `[MailGraph] listed ${listed} pages=${pages} bodies=${bodies} of ${listed}`,
+      );
     },
   };
 }
 
 export function createZohoFetcher(
-  accessToken: string,
+  /** R17: expiry-aware session — Zoho tokens expire in 1h; this fetcher
+   * previously had NO refresh path at all (the next live 401 waiting to
+   * happen). */
+  session: TokenSession,
   mailboxId: string,
 ): MessageFetcher {
   return {
-    async fetchMessages({ since, limit }) {
-      const accRes = await fetch("https://mail.zoho.com/api/accounts", {
-        headers: { Authorization: `Zoho-oauthtoken ${accessToken}` },
-      });
+    async fetchMessages({ since, limit }, onChunk) {
+      const accRes = await fetchWithSession(
+        session,
+        "https://mail.zoho.com/api/accounts",
+        undefined,
+        (t) => `Zoho-oauthtoken ${t}`,
+        "MailZoho",
+      );
       if (!accRes.ok) {
         throw new MailScanUnverifiedError(
           `Zoho accounts failed (${accRes.status})`,
@@ -480,9 +880,12 @@ export function createZohoFetcher(
         searchKey,
         limit: String(Math.min(limit, 50)),
       });
-      const res = await fetch(
+      const res = await fetchWithSession(
+        session,
         `https://mail.zoho.com/api/accounts/${accountId}/messages/search?${params}`,
-        { headers: { Authorization: `Zoho-oauthtoken ${accessToken}` } },
+        undefined,
+        (t) => `Zoho-oauthtoken ${t}`,
+        "MailZoho",
       );
       if (!res.ok) {
         throw new MailScanUnverifiedError(`Zoho search failed (${res.status})`);
@@ -497,43 +900,55 @@ export function createZohoFetcher(
           summary?: string;
         }[];
       };
-      return (json.data || []).map((m) => {
-        const received =
-          typeof m.receivedTime === "number"
-            ? new Date(m.receivedTime).toISOString()
-            : m.receivedTime || new Date().toISOString();
-        return {
-          mailboxId,
-          messageId: String(m.messageId || ""),
-          from: m.sender
-            ? `${m.sender} <${m.fromAddress || ""}>`
-            : m.fromAddress || "",
-          subject: m.subject || "",
-          date: received,
-          text: m.summary,
-        };
-      });
+      // R19-OOM: stream the single search batch; bounded by the search limit.
+      // Phase K: Zoho's search API exposes no listing total — count only.
+      const rows = json.data || [];
+      await onChunk(
+        rows.map((m) => {
+          const received =
+            typeof m.receivedTime === "number"
+              ? new Date(m.receivedTime).toISOString()
+              : m.receivedTime || new Date().toISOString();
+          return {
+            mailboxId,
+            messageId: String(m.messageId || ""),
+            from: m.sender
+              ? `${m.sender} <${m.fromAddress || ""}>`
+              : m.fromAddress || "",
+            subject: m.subject || "",
+            date: received,
+            text: m.summary,
+          };
+        }),
+        { listed: rows.length, total: null },
+      );
     },
   };
 }
 
 export function createJmapFetcher(
-  accessToken: string,
+  /** R17: expiry-aware session (passthrough for Fastmail's long-lived
+   * tokens — no expiresAt means `valid()` never refreshes). */
+  session: TokenSession,
   mailboxId: string,
 ): MessageFetcher {
   return {
-    async fetchMessages({ since, limit }) {
-      const sessionRes = await fetch("https://api.fastmail.com/jmap/session", {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
+    async fetchMessages({ since, limit }, onChunk) {
+      const sessionRes = await fetchWithSession(
+        session,
+        "https://api.fastmail.com/jmap/session",
+        undefined,
+        (t) => `Bearer ${t}`,
+        "MailJmap",
+      );
       if (!sessionRes.ok) {
         throw new MailScanUnverifiedError(
           `Fastmail session failed (${sessionRes.status})`,
         );
       }
-      const session = await sessionRes.json();
-      const apiUrl = session.apiUrl as string;
-      const accountId = Object.keys(session.accounts || {})[0];
+      const jmapSession = await sessionRes.json();
+      const apiUrl = jmapSession.apiUrl as string;
+      const accountId = Object.keys(jmapSession.accounts || {})[0];
       if (!apiUrl || !accountId) {
         throw new MailScanUnverifiedError("Fastmail session missing account");
       }
@@ -563,6 +978,8 @@ export function createJmapFetcher(
                 },
             sort: [{ property: "receivedAt", isAscending: false }],
             limit: Math.min(limit, 50),
+            // Phase K: best-effort total — honored only if the bridge supports it.
+            calculateTotal: true,
           },
           "0",
         ],
@@ -585,17 +1002,20 @@ export function createJmapFetcher(
           "1",
         ],
       ];
-      const res = await fetch(apiUrl, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
+      const res = await fetchWithSession(
+        session,
+        apiUrl,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            using: ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+            methodCalls: query,
+          }),
         },
-        body: JSON.stringify({
-          using: ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
-          methodCalls: query,
-        }),
-      });
+        (t) => `Bearer ${t}`,
+        "MailJmap",
+      );
       if (!res.ok) {
         throw new MailScanUnverifiedError(`JMAP get failed (${res.status})`);
       }
@@ -604,22 +1024,197 @@ export function createJmapFetcher(
         (c: unknown[]) => c[0] === "Email/get",
       );
       const list = getCall?.[1]?.list || [];
-      return list.map((m: any) => {
-        const fromObj = m.from?.[0];
-        const from = fromObj
-          ? `${fromObj.name || ""} <${fromObj.email || ""}>`.trim()
-          : "";
-        return {
-          mailboxId,
-          messageId: m.id,
-          from,
-          subject: m.subject || "",
-          date: m.receivedAt || new Date().toISOString(),
-          text: m.preview,
-        };
-      });
+      // Phase K: JMAP Email/query reports `total` when calculateTotal was
+      // requested AND the bridge honors it; otherwise unknown (null).
+      const queryCall = (json.methodResponses || []).find(
+        (c: unknown[]) => c[0] === "Email/query",
+      );
+      const queryTotal = queryCall?.[1]?.total;
+      const jmapTotal: number | null =
+        typeof queryTotal === "number" ? queryTotal : null;
+      // R19-OOM: stream the single Email/get batch; bounded by the query limit.
+      await onChunk(
+        list.map((m: any) => {
+          const fromObj = m.from?.[0];
+          const from = fromObj
+            ? `${fromObj.name || ""} <${fromObj.email || ""}>`.trim()
+            : "";
+          return {
+            mailboxId,
+            messageId: m.id,
+            from,
+            subject: m.subject || "",
+            date: m.receivedAt || new Date().toISOString(),
+            text: m.preview,
+          };
+        }),
+        { listed: list.length, total: jmapTotal },
+      );
     },
   };
+}
+
+/**
+ * fetch that can never hang: rejects after `timeoutMs` (default 20s) AND
+ * aborts the underlying request natively so a timed-out call cannot leak
+ * its socket. A black-holed socket must surface as a per-mailbox error
+ * instead of freezing the whole scan loop (R9: the 2026-09-03 18-min scan
+ * hang).
+ *
+ * F-4 (2026-09-14 baseline): settled HTTP calls NO LONGER feed the R14
+ * watchdog. A page walk completes one metadata call every couple of
+ * seconds while real ingestion is wedged, so per-call feeding kept the
+ * 180s no-progress clock alive through a 13-minute stall (the leg only
+ * "resumed" when the wedge lifted). Progress is fed per flushed chunk in
+ * runIncrementalScan — data that reached the scan, not sockets that moved.
+ */
+async function fetchOnce(
+  url: string,
+  init: RequestInit | undefined,
+  timeoutMs: number,
+): Promise<Response> {
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      controller.abort();
+      reject(new Error(`request timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+  });
+  try {
+    const res = await Promise.race([
+      fetch(url, { ...init, signal: controller.signal }),
+      timeout,
+    ]);
+    return res;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+/**
+ * fetchWithTimeout (R9/R12/R14) + the R15 offline gate: never fetch into a
+ * dead network. Offline -> pause on the native reconnect event (user sees a
+ * Toast; the leg resumes where it stopped). If the network dies MID-request,
+ * wait for reconnection and retry the same request once. Only a pause that
+ * outlasts ONLINE_WAIT_MS fails the leg - boundedly, like every other path.
+ */
+async function fetchWithTimeout(
+  url: string,
+  init?: RequestInit,
+  timeoutMs = 20_000,
+): Promise<Response> {
+  if (!(await ensureOnline())) {
+    throw new Error(
+      "network offline - scan paused too long; try again when you are back online",
+    );
+  }
+  try {
+    return await fetchOnce(url, init, timeoutMs);
+  } catch (error) {
+    if (!(await ensureOnline())) throw error;
+    return await fetchOnce(url, init, timeoutMs);
+  }
+}
+
+// A Google/Microsoft access token lives ~3600s. R1 refreshes when already
+// expired, but a long scan leg outlives a token that is merely "not yet
+// expired" at leg start (2026-09-06: a ~35min Gmail leg 401'd 34s after a
+// token with 34min of remaining life). Legs therefore demand a larger
+// remaining-lifetime margin: refresh unless at least this much is left.
+const OAUTH_LEG_MIN_LIFETIME_MS = 40 * 60_000;
+
+/**
+ * Refresh-before-list glue: if the stored access token is expired (or within
+ * the skew margin) and a refresh token exists, mint a fresh one at the
+ * provider's token endpoint and persist it. A rejected refresh token can only
+ * be fixed by a fresh interactive sign-in, so that surfaces as an explicit
+ * reconnect error; transient failures (network, 5xx) fall back to the stored
+ * token and let the actual list call report any error.
+ */
+async function ensureFreshOAuthTokens(
+  providerId: MailProviderId,
+  mailboxId: string,
+  tokens: TokenBlob,
+  opts?: { force?: boolean; minRemainingMs?: number },
+): Promise<TokenBlob> {
+  // MSAL accounts (M2): token reuse when valid — acquireTokenSilent serves
+  // MSAL's encrypted cache and refreshes internally; interaction-required
+  // maps to the same honest reconnect error as a rejected refresh token.
+  // No auto-retries (see msalAuth.ts).
+  if (
+    (providerId === "outlook" || providerId === "office365") &&
+    tokens.msalAccountId
+  ) {
+    try {
+      const result = await acquireTokenSilently(tokens.msalAccountId);
+      const next: TokenBlob = {
+        ...tokens,
+        accessToken: result.accessToken,
+        expiresAt: result.expiresAt ?? tokens.expiresAt,
+      };
+      await saveTokens(mailboxId, next);
+      console.log(`[MailOAuth] ${providerId} MSAL silent token ok (${mailboxId})`);
+      return next;
+    } catch (error) {
+      const kind = classifyMsalError(error);
+      if (kind === "reconnect") {
+        throw new MailScanUnverifiedError(
+          `${providerId} sign-in expired — reconnect the mailbox (Edit → Reconnect) to scan it.`,
+        );
+      }
+      console.log(
+        `[MailOAuth] ${providerId} MSAL silent acquisition failed (${kind}); using stored token`,
+      );
+      return tokens;
+    }
+  }
+  const stale = tokenNeedsRefresh(tokens, Date.now(), opts?.minRemainingMs);
+  if (!tokens.refreshToken) {
+    console.log(
+      `[MailScan] ${providerId} ${mailboxId} token ${stale ? "expired but no refresh token" : "fresh"} — using as-is`,
+    );
+    return tokens;
+  }
+  if (!stale && !opts?.force) {
+    console.log(`[MailScan] ${providerId} ${mailboxId} token fresh — using as-is`);
+    return tokens;
+  }
+  const clientId = oauthClientId(providerId);
+  if (!clientId) return tokens;
+  console.log(
+    `[MailScan] ${providerId} ${mailboxId} token ${
+      opts?.force
+        ? "rejected mid-leg — force refresh"
+        : "expired or below leg lifetime margin"
+    } — refreshing`,
+  );
+  try {
+    const refreshed = await refreshAccessToken({
+      tokenEndpoint: oauthSpec(providerId).tokenEndpoint,
+      clientId,
+      refreshToken: tokens.refreshToken,
+    });
+    const next: TokenBlob = {
+      ...tokens,
+      accessToken: refreshed.accessToken,
+      refreshToken: refreshed.refreshToken ?? tokens.refreshToken,
+      expiresAt: refreshed.expiresAt ?? tokens.expiresAt,
+    };
+    await saveTokens(mailboxId, next);
+    console.log(`[MailOAuth] ${providerId} access token refreshed (${mailboxId})`);
+    return next;
+  } catch (error) {
+    if (error instanceof TokenRefreshRejectedError) {
+      throw new MailScanUnverifiedError(
+        `${providerId} sign-in expired — reconnect the mailbox (Edit → Reconnect) to scan it.`,
+      );
+    }
+    console.log(
+      `[MailOAuth] ${providerId} token refresh failed; retrying with stored token`,
+    );
+    return tokens;
+  }
 }
 
 async function fetcherFor(
@@ -635,9 +1230,9 @@ async function fetcherFor(
     const { createImapFetcher } = await import("./imapNative");
     const inner = createImapFetcher(creds, mailboxId);
     return {
-      async fetchMessages(opts) {
+      async fetchMessages(opts, onChunk) {
         try {
-          return await inner.fetchMessages(opts);
+          return await inner.fetchMessages(opts, onChunk);
         } catch (error) {
           const message =
             error instanceof Error ? error.message : "IMAP fetch failed";
@@ -673,9 +1268,9 @@ async function fetcherFor(
       },
     );
     return {
-      async fetchMessages(opts) {
+      async fetchMessages(opts, onChunk) {
         try {
-          return await inner.fetchMessages(opts);
+          return await inner.fetchMessages(opts, onChunk);
         } catch (error) {
           const message =
             error instanceof Error ? error.message : "proton fetch failed";
@@ -690,11 +1285,11 @@ async function fetcherFor(
       throw new MailConnectError("tuta is not connected");
     }
     const { createPasswordMailFetcher } = await import("./imapNative");
-    const inner = createPasswordMailFetcher("tuta", creds, mailboxId);
+    const inner = createPasswordMailFetcher(creds, mailboxId);
     return {
-      async fetchMessages(opts) {
+      async fetchMessages(opts, onChunk) {
         try {
-          return await inner.fetchMessages(opts);
+          return await inner.fetchMessages(opts, onChunk);
         } catch (error) {
           const message =
             error instanceof Error ? error.message : "tuta fetch failed";
@@ -708,17 +1303,45 @@ async function fetcherFor(
   if (!tokens?.accessToken) {
     throw new MailConnectError("Not connected");
   }
+  console.log(`[MailScan] fetcherFor ${providerId} ${mailboxId}`);
+  // Refresh-before-list: OAuth access tokens expire long before a typical
+  // re-scan; without this every scan after ~1h failed with a provider 401.
+  // The leg-lifetime margin additionally refreshes a token whose REMAINING
+  // life is shorter than a typical long leg, not just one already expired.
+  const fresh = await ensureFreshOAuthTokens(providerId, mailboxId, tokens, {
+    minRemainingMs: OAUTH_LEG_MIN_LIFETIME_MS,
+  });
+  // R17: every OAuth fetcher runs on an expiry-aware token session. A token
+  // within REQUEST_LIFETIME_MARGIN_MS of expiry is refreshed BEFORE the next
+  // request fires (single-flight; the refresh persists via
+  // ensureFreshOAuthTokens so loadTokens picks up rotation), so the provider
+  // never has to 401 us. The 401 backstop inside the fetchers remains for
+  // early server-side revocation; a rejected refresh token still surfaces
+  // the explicit reconnect error mid-leg - honest and bounded.
+  const refreshMidLeg = async (): Promise<LiveToken | null> => {
+    const latest = (await loadTokens(mailboxId)) ?? tokens;
+    const next = await ensureFreshOAuthTokens(providerId, mailboxId, latest, {
+      force: true,
+    });
+    return next.accessToken
+      ? { accessToken: next.accessToken, expiresAt: next.expiresAt }
+      : null;
+  };
+  const session = createTokenSession(
+    { accessToken: fresh.accessToken, expiresAt: fresh.expiresAt },
+    refreshMidLeg,
+  );
   if (providerId === "gmail" || providerId === "workspace") {
-    return createGmailFetcher(tokens.accessToken, mailboxId);
+    return createGmailFetcher(session, mailboxId);
   }
   if (providerId === "outlook" || providerId === "office365") {
-    return createGraphFetcher(tokens.accessToken, mailboxId);
+    return createGraphFetcher(session, mailboxId);
   }
   if (providerId === "fastmail") {
-    return createJmapFetcher(tokens.accessToken, mailboxId);
+    return createJmapFetcher(session, mailboxId);
   }
   if (providerId === "zoho") {
-    return createZohoFetcher(tokens.accessToken, mailboxId);
+    return createZohoFetcher(session, mailboxId);
   }
   return {
     async fetchMessages() {
@@ -764,6 +1387,9 @@ export function createMailProvider(
         mailboxId: box,
         providerId,
         fetcher,
+        onLegProgress: opts?.onLegProgress,
+        deep: opts?.deep,
+        onListProgress: opts?.onListProgress,
       });
     },
   };

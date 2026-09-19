@@ -16,12 +16,15 @@ import {
   mailboxIdFor,
   oauthClientId,
 } from "@/services/emailscan/providers";
-import { useUser } from "@clerk/expo";
+import { useUser } from "@/context/AuthContext";
+import { NoThumbnail } from "@/components/NoThumbnail";
+import { PROVIDER_BRAND_ICONS } from "@/constants/providerBrandIcons";
 import { Ionicons } from "@expo/vector-icons";
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Keyboard,
   Modal,
   Platform,
@@ -147,6 +150,27 @@ export default function EmailScanSection({
         `${id} OAuth needs a public client id. Not connected.`,
       );
       return;
+    }
+    if (id === "outlook" || id === "office365") {
+      // MSA can interject a verification challenge (e.g. a code emailed to
+      // the recovery address) at any sign-in. Set the expectation up front;
+      // the challenge itself is completed inside Microsoft's own auth
+      // surface (MSAL). A cancelled or failed attempt is never auto-retried.
+      const proceed = await new Promise<boolean>((resolve) => {
+        Alert.alert(
+          "Microsoft sign-in",
+          "Microsoft may verify it's you before finishing sign-in — usually a code emailed to the account's recovery address. Have that inbox handy and enter the code in Microsoft's sign-in window when it asks.",
+          [
+            {
+              text: "Cancel",
+              style: "cancel" as const,
+              onPress: () => resolve(false),
+            },
+            { text: "Continue", onPress: () => resolve(true) },
+          ],
+        );
+      });
+      if (!proceed) return;
     }
     setBusy(true);
     setStatus(null);
@@ -456,17 +480,43 @@ export default function EmailScanSection({
             <Text className="text-xl font-sans-bold text-primary mb-4">
               Add mailbox
             </Text>
-            {MAIL_PROVIDER_CATALOG.map((row) => (
+            {MAIL_PROVIDER_CATALOG.map((row) => {
+              // Phase O: curated brand marks first place; providers without
+              // a curated icon render the muted no-thumbnail glyph.
+              const brand = PROVIDER_BRAND_ICONS[row.id];
+              const brandUri = brand
+                ? { uri: `data:image/${brand.format};base64,${brand.base64}` }
+                : null;
+              return (
               <Pressable
                 key={row.id}
-                className="mb-2 rounded-xl border border-border bg-card p-3"
+                className="mb-2 flex-row items-center rounded-xl border border-border bg-card p-3"
                 onPress={() => addMailbox(row.id)}
               >
+                {brandUri ? (
+                  <Image
+                    source={brandUri}
+                    className="mr-3 size-9 rounded-lg"
+                    resizeMode="contain"
+                  />
+                ) : (
+                  <View className="mr-3">
+                    <NoThumbnail size={36} />
+                  </View>
+                )}
+                <View className="flex-1">
                 <Text className="text-sm font-sans-medium text-primary">
                   {row.label}
                 </Text>
+                {row.note ? (
+                  <Text className="mt-0.5 text-xs font-sans-medium text-muted-foreground">
+                    {row.note}
+                  </Text>
+                ) : null}
+                </View>
               </Pressable>
-            ))}
+              );
+            })}
             <Pressable
               className="mt-2 items-center rounded-2xl bg-muted py-4"
               onPress={() => setPickerOpen(false)}
@@ -499,6 +549,9 @@ export default function EmailScanSection({
             >
               <Text className="text-xl font-sans-bold text-primary mb-2">
                 {editingMailboxId ? "Edit IMAP / IMAPS" : "IMAP / IMAPS"}
+              </Text>
+              <Text className="mb-3 text-xs font-sans-medium text-muted-foreground">
+                {MAIL_PROVIDER_CATALOG.find((r) => r.id === "imap")?.note}
               </Text>
               <TextInput
                 className="rounded-xl border border-border bg-card p-3 mb-2 text-primary"
@@ -585,6 +638,9 @@ export default function EmailScanSection({
               <Text className="text-xl font-sans-bold text-primary mb-2">
                 {editingMailboxId ? "Edit " : ""}
                 {passwordKind === "proton" ? "Proton Mail" : "Tuta"}
+              </Text>
+              <Text className="mb-3 text-xs font-sans-medium text-muted-foreground">
+                {MAIL_PROVIDER_CATALOG.find((r) => r.id === passwordKind)?.note}
               </Text>
               <TextInput
                 className="rounded-xl border border-border bg-card p-3 mb-2 text-primary"

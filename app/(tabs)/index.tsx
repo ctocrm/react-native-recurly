@@ -2,6 +2,7 @@ import CreateSubscriptionModal from "@/components/CreateSubscriptionModal";
 import EditSubscriptionModal from "@/components/EditSubscriptionModal";
 import ListHeading from "@/components/ListHeading";
 import SubscriptionCard from "@/components/SubscriptionCard";
+import SubscriptionDetailsModal from "@/components/SubscriptionDetailsModal";
 import SubscriptionIconPickerModal from "@/components/SubscriptionIconPickerModal";
 import SubscriptionStatsModal from "@/components/SubscriptionStatsModal";
 import UpcomingSubscriptionCard from "@/components/UpcomingSubscriptionCard";
@@ -12,22 +13,34 @@ import { useSubscriptions } from "@/context/SubscriptionContext";
 import "@/global.css";
 import { useBottomClearance } from "@/hooks/useBottomClearance";
 import { useChargeDisplay } from "@/hooks/useChargeDisplay";
+import { DEFAULT_EXPIRED_GRACE_DAYS } from "@/services/subscriptionStatus";
+import {
+  familyDisplayName,
+  familyForName,
+  groupByFamily,
+} from "@/services/merchantFamily";
+import { useScanProgress } from "@/hooks/useScanProgress";
 import { formatCurrency } from "@/lib/utils";
 import { importFromConnectedMailboxes } from "@/services/emailscan";
+import { getScanProgress } from "@/services/emailscan/scanProgress";
+import {
+  setHostDecision,
+  subscribeHostLiveness,
+} from "@/services/domain/hostLiveness";
 import { listMailboxesAsync } from "@/services/emailscan/persist";
-import { useUser } from "@clerk/expo";
+import { useUser } from "@/context/AuthContext";
 import dayjs from "dayjs";
 import { useRouter } from "expo-router";
 import { styled } from "nativewind";
 import { usePostHog } from "posthog-react-native";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   FlatList,
   Image,
   Pressable,
   Text,
+  ToastAndroid,
   View,
 } from "react-native";
 import { SafeAreaView as RNSafeAreaView } from "react-native-safe-area-context";
@@ -51,8 +64,16 @@ const App = () => {
     getUpcomingSubscriptions,
     refreshSubscriptions,
   } = useSubscriptions();
-  const { displayFor, cyclePeriod, monthlySpend } =
+  const { displayFor, sparseLineFor, cyclePeriod, monthlySpend, lapseFor } =
     useChargeDisplay(subscriptions);
+
+  // R36: one card per merchant family (Amazon shape).
+  const familyGroups = useMemo(
+    () => groupByFamily(subscriptions),
+    [subscriptions],
+  );
+  const [detailsSubscription, setDetailsSubscription] =
+    useState<Subscription | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingSubscription, setEditingSubscription] =
     useState<Subscription | null>(null);
@@ -67,7 +88,47 @@ const App = () => {
     useState<Subscription | null>(null);
   const [iconPickerVisible, setIconPickerVisible] = useState(false);
   const [mailboxCount, setMailboxCount] = useState(0);
-  const [scanning, setScanning] = useState(false);
+  const scanProgress = useScanProgress();
+
+  // J5: dead-host popup — when a crawl ends with a defunct-confident
+  // liveness assessment (score ≥85: unregistered / nxdomain / delegation
+  // gone) and the user has not already decided for this domain, surface the
+  // evidence ONCE with Keep / Mark as Canceled / Delete. Never auto-deletes.
+  useEffect(() => {
+    const off = subscribeHostLiveness((event) => {
+      const sub = subscriptions.find((s) => s.icon_key === event.iconKey);
+      if (!sub) return;
+      Alert.alert(
+        `${sub.name}: domain ${event.label.replace(/-/g, " ")}`,
+        `${event.domain} — ${event.evidence.join("; ")}. This subscription may be defunct. What would you like to do?`,
+        [
+          {
+            text: "Keep",
+            style: "cancel",
+            onPress: () => {
+              void setHostDecision(event.domain, "keep", event.score);
+            },
+          },
+          {
+            text: "Mark as Canceled",
+            onPress: () => {
+              void updateSubscription(sub.id, { status: "cancelled" });
+              void setHostDecision(event.domain, "canceled", event.score);
+            },
+          },
+          {
+            text: "Delete",
+            style: "destructive",
+            onPress: () => {
+              void deleteSubscription(sub.id);
+              void setHostDecision(event.domain, "deleted", event.score);
+            },
+          },
+        ],
+      );
+    });
+    return off;
+  }, [subscriptions, updateSubscription, deleteSubscription]);
 
   const refreshMailboxCount = useCallback(async () => {
     try {
@@ -81,6 +142,12 @@ const App = () => {
   useEffect(() => {
     refreshMailboxCount().catch(() => undefined);
   }, [refreshMailboxCount, subscriptions.length]);
+
+  useEffect(() => {
+    console.log("[BOOT] home mounted");
+  }, []);
+
+  console.log(`[BOOT] home render subs=${subscriptions.length}`);
 
   const displayName =
     user?.firstName ||
@@ -117,34 +184,44 @@ const App = () => {
     router.push("/(tabs)/subscriptions");
   };
 
-  const handleHomeScanTap = async () => {
+  // Phase I (J3/I2): the scan runs fire-and-forget — the button never blocks
+  // navigation, live progress comes from the scanProgress store (rendered on
+  // the button), and completion surfaces as a toast. Errors keep the R2 Alert
+  // (per-mailbox detail will not fit a toast).
+  const handleHomeScanTap = () => {
     if (mailboxCount === 0) {
       router.push("/(tabs)/subscriptions?addMailbox=1");
       return;
     }
-    setScanning(true);
-    try {
-      const { imported, errors } = await importFromConnectedMailboxes({
-        userId: user?.id || "anonymous",
-        existing: subscriptions,
-        addSubscription,
-        updateSubscription,
+    if (getScanProgress().active) return;
+    void importFromConnectedMailboxes({
+      userId: user?.id || "anonymous",
+      existing: subscriptions,
+      addSubscription,
+      updateSubscription,
+    })
+      .then(async ({ imported, errors }) => {
+        await refreshSubscriptions();
+        await refreshMailboxCount();
+        if (errors.length) {
+          // R2 parity: per-mailbox errors always surface, even when some rows
+          // imported.
+          Alert.alert("Scan", errors.join("\n"));
+          return;
+        }
+        ToastAndroid.show(
+          imported > 0
+            ? `Scan complete — ${imported} new subscription${imported === 1 ? "" : "s"}`
+            : "Scan complete — no new subscriptions.",
+          ToastAndroid.SHORT,
+        );
+      })
+      .catch((error: unknown) => {
+        Alert.alert(
+          "Scan",
+          error instanceof Error ? error.message : "Scan failed",
+        );
       });
-      await refreshSubscriptions();
-      await refreshMailboxCount();
-      if (imported === 0 && errors.length) {
-        Alert.alert("Scan", errors.join("\n"));
-      } else if (imported === 0) {
-        Alert.alert("Scan", "No new subscriptions.");
-      }
-    } catch (error) {
-      Alert.alert(
-        "Scan",
-        error instanceof Error ? error.message : "Scan failed",
-      );
-    } finally {
-      setScanning(false);
-    }
   };
 
   const handleCreateSubscription = async (subscription: Subscription) => {
@@ -279,58 +356,73 @@ const App = () => {
                 mailboxCount > 0 ? "bg-accent" : "bg-muted"
               }`}
               onPress={handleHomeScanTap}
-              disabled={scanning}
+              disabled={scanProgress.active}
             >
-              {scanning ? (
-                <ActivityIndicator size="small" color="white" />
-              ) : (
-                <Text
-                  className={`text-sm font-sans-bold ${
-                    mailboxCount > 0 ? "text-white" : "text-primary"
-                  }`}
-                >
-                  {mailboxCount > 0
+              <Text
+                className={`text-sm font-sans-bold ${
+                  mailboxCount > 0 ? "text-white" : "text-primary"
+                }`}
+              >
+                {scanProgress.active
+                  ? `Scanning… leg ${scanProgress.legIndex + 1}/${scanProgress.legTotal}`
+                  : mailboxCount > 0
                     ? "Scan mailbox for subscriptions"
                     : "Add at least one mailbox to scan"}
-                </Text>
-              )}
+              </Text>
             </Pressable>
           </>
         }
-        data={subscriptions}
-        keyExtractor={(item) => item.id}
+        data={familyGroups}
+        keyExtractor={(item) => item.primary.id}
         renderItem={({ item }) => (
           <SubscriptionCard
-            {...item}
-            expanded={expandedSubscriptionId === item.id}
-            displayPrice={displayFor(item).amount}
-            displayUnknown={displayFor(item).unknown}
-            displayPeriodLabel={displayFor(item).label}
-            onCyclePeriod={() => cyclePeriod(item)}
+            {...item.primary}
+            expanded={expandedSubscriptionId === item.primary.id}
+            displayPrice={displayFor(item.primary).amount}
+            displayUnknown={displayFor(item.primary).unknown}
+            displayPeriodLabel={displayFor(item.primary).label}
+            onCyclePeriod={() => cyclePeriod(item.primary)}
+            sparseLine={sparseLineFor(item.primary)}
+            lapsed={lapseFor(item.primary, DEFAULT_EXPIRED_GRACE_DAYS)}
+            familyTitle={
+              item.members.length > 1
+                ? familyDisplayName(familyForName(item.primary.name) ?? "")
+                : undefined
+            }
+            familyMembers={
+              item.members.length > 1
+                ? item.members
+                    .filter((m) => m.id !== item.primary.id)
+                    .map((m) => m.name)
+                : undefined
+            }
             onPress={() => {
-              const isExpanding = expandedSubscriptionId !== item.id;
+              const isExpanding = expandedSubscriptionId !== item.primary.id;
               setExpandedSubscriptionId((currentId) =>
-                currentId === item.id ? null : item.id,
+                currentId === item.primary.id ? null : item.primary.id,
               );
               posthog.capture(
                 isExpanding
                   ? "subscription_card_expanded"
                   : "subscription_card_collapsed",
                 {
-                  subscription_id: item.id,
-                  subscription_name: item.name,
-                  subscription_category: item.category ?? "",
-                  billing_cycle: item.billing,
+                  subscription_id: item.primary.id,
+                  subscription_name: item.primary.name,
+                  subscription_category: item.primary.category ?? "",
+                  billing_cycle: item.primary.billing,
                 },
               );
             }}
-            onEdit={() => handleEdit(item)}
-            onDelete={() => handleDelete(item)}
-            onMarkActive={() => handleStatusChange(item, "active")}
-            onMarkPaused={() => handleStatusChange(item, "paused")}
-            onMarkCancelled={() => handleStatusChange(item, "cancelled")}
-            onViewStats={() => handleViewStats(item)}
-            onIconLongPress={() => handleIconLongPress(item)}
+            onEdit={() => handleEdit(item.primary)}
+            onDelete={() => handleDelete(item.primary)}
+            onMarkActive={() => handleStatusChange(item.primary, "active")}
+            onMarkPaused={() => handleStatusChange(item.primary, "paused")}
+            onMarkCancelled={() =>
+              handleStatusChange(item.primary, "cancelled")
+            }
+            onViewStats={() => handleViewStats(item.primary)}
+            onViewDetails={() => setDetailsSubscription(item.primary)}
+            onIconLongPress={() => handleIconLongPress(item.primary)}
           />
         )}
         extraData={expandedSubscriptionId}
@@ -373,6 +465,13 @@ const App = () => {
       <UserSettingsModal
         visible={userSettingsVisible}
         onClose={() => setUserSettingsVisible(false)}
+      />
+
+      {/* Details Modal (R18) */}
+      <SubscriptionDetailsModal
+        visible={detailsSubscription !== null}
+        subscription={detailsSubscription}
+        onClose={() => setDetailsSubscription(null)}
       />
 
       {/* Icon Picker Modal */}

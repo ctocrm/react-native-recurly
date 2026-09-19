@@ -2,9 +2,78 @@
  * Phase 4 email-scan types. Shared parser does not know Gmail vs IMAP.
  * A subscription is an account; a bill is optional evidence.
  */
+import type { OrderMarkup } from "./orderMarkup";
 
-export const PARSER_VERSION = 11;
-
+// 13: F-2 canonical brands — zohoaccounts mints as Zoho (reclassifies cached
+//      From-hosts so mail history re-keys onto the canonical brand).
+// 14: M triage honesty — freemail hosts (gmail/googlemail/outlook/hotmail/
+//      yahoo/icloud) never mint the merchant from the host alone: a forward
+//      re-keys to the original issuer's From-host or drops, a non-forwarded
+//      freemail sender falls back to display-name/body evidence and imports
+//      sparse. google.com-family senders resolve to the right Google product,
+//      never "Gmail".
+// v15→v16 (Phase L): the proton/tuta/imap legs now recover message HTML from
+// the native `text` payload (htmlFromNativeText), changing what the
+// classifier can extract. Bump forces one full restage so stored rows gain
+// emailIconUrls.
+// v18→v19 (Tuta bill-number fix): extractBillNumber now handles Tuta's long
+// numeric references (tag-strip, no length cap, invoice-keyword digit-run
+// fallback). Bump re-classifies the tuta rows so the July 14 invoice gains
+// its bill number (bump-restore: full fresh-body restage).
+// v19→v20 (R27 purchase-proof): a price in an email is not a charge. Amounts
+// are extracted only when a payment anchor exists (total charged, order
+// number, card ending, …); marketing signals (pre-order, % off, shop-now,
+// List-Unsubscribe, Gmail PROMOTIONS) drop proof-less messages. google.com-
+// family senders resolve products from subject/URLs only (no bare body
+// words — a social-footer "YouTube" no longer keys the email), google-store
+// is its own product, and cadence requires a strong billing statement (or
+// weak word + proof on a recurring hit). Bump restages all legs with fresh
+// bodies (and, on Gmail/Workspace, provider hints).
+// v20→v21 (R27 tuning, device evidence): proof is tiered — STRONG charge
+// artifacts (doc number, total, card, GPA id) always beat marketing, but
+// GENERIC soft anchors ("payment method", bare receipt/invoice words)
+// survive only a light marketing footprint (<4). The Pixel Watch 5 pre-
+// order ad's fine-print proof no longer saves it. One more fresh-body
+// restage so v20-classified ad rows re-derive under the tiered gate.
+// v21→v22 (R29 ESP rails): shopifyemail.com (and the ESP family) never
+// mints a merchant — the real store resolves from the From display name or
+// body purchase phrasing and imports sparse; bare ESP mail drops. Kills
+// the "Shopifyemail $1,439 Monthly" ghost class. Bump restages so stored
+// shopifyemail hits re-key.
+// v22→v23 (R33): temuemail.com joins the ESP rails — Temu's sending domain
+// minted a "Temuemail" ghost the same way shopifyemail.com minted
+// "Shopifyemail". Bump restages stored temuemail hits under the ESP rules.
+// v23→v24 (R37): ESP-brand DISPLAY names ("Shopifyemail
+// <orders@shopifyemail.com>") no longer mint — the ghost's re-mint source.
+// v24→v25 (R37c): the ESP-brand guard moved into titleCaseMerchant — every
+// naming tier (freemail/forward/body included) re-derives under it.
+// v25→v26 (R37d): the guard also covers host-label variants that escape the
+// ESP_HOSTS base list (shopifyemail.co.uk minted "Shopifyemail" live).
+// v26→v27 (R38 P1): schema.org Order markup (ld+json) is the top evidence
+// tier — an Order payload with a price is strong payment proof, its price
+// is authoritative over body regex, and seller/items/orderNumber ride on
+// the classified row for the rail policy. Bump restages so stored rows can
+// gain markup facts where senders embed them.
+// v27→v28 (R38 P2): billing rails never mint in their own name. Play/Apple
+//      receipts re-key to the receipt's item app (P1 markup items first); an
+//      unresolvable item is the honest aggregate "Google Play"/"Apple" SPARSE,
+//      never recurring. Squarespace joins PAYMENT_PROCESSORS: its mail resolves
+//      the receipt site/domain (the real subscription) or DROPS. Bump restages
+//      so stored rail rows re-derive under the per-item keys.
+// v28→v29 (R38 P3): marketing-shaped mail never mints RECURRING on generic
+//      proof alone (Order markup with a real price/orderStatus is STRONG proof
+//      and keeps the recurring read); $0 license receipts never anchor a
+//      cadence ("renewal price", "domain registration") — the import's $0→free
+//      rule then owns the flip; ONE proven-payment message with no cadence
+//      words may clear a legacy sparse stamp (R34 ≥2-message rule loosened;
+//      scan-born rows only, hand-entered protected, never recurring rows).
+// v29→v30 (R38 audit fixes): the marketing demotion now requires SUBJECT-tier
+//      ad shapes (body CTA noise and bulk-send hints never demote a legit
+//      renewal); rail item extraction rejects prose tails (stopwords/word cap);
+//      rollup no longer lets a last-arriving /bin/bash receipt collapse a merchant
+//      that has real charges. Restages so stored rows re-derive under the
+//      corrected rules.
+export const PARSER_VERSION = 30;
 
 export type MailProviderId =
   | "gmail"
@@ -22,13 +91,30 @@ export type SubjectClass =
 
 export type CandidateKind = "recurring" | "sparse" | "free";
 
-export type Cadence = "monthly" | "yearly" | "unknown";
+export type Cadence = "weekly" | "monthly" | "yearly" | "unknown";
 
 export interface MailAttachment {
   filename: string;
   mimeType?: string;
   /** Extracted text if already available. Phase 4 may omit PDF bytes. */
   text?: string;
+}
+
+/**
+ * R27: provider-supplied classification hints. OPTIONAL and source-tagged —
+ * a fetcher sets them only when its API exposes them (Gmail/Workspace: the
+ * labelIds + list headers are already in the metadata response; Outlook: the
+ * Graph internetMessageHeaders subset). Absent hints are neutral: the
+ * classifier's payment-proof and marketing heuristics must stand on their
+ * own for every provider (Proton/Tuta/IMAP send no hints today).
+ */
+export interface MessageHints {
+  /** Gmail system category (CATEGORY_PROMOTIONS, CATEGORY_SOCIAL, …). */
+  gmailCategory?: string;
+  /** List-Unsubscribe header present — the sender self-identifies as bulk. */
+  listUnsubscribe?: boolean;
+  listId?: string;
+  precedence?: string;
 }
 
 export interface NormalizedMessage {
@@ -41,6 +127,7 @@ export interface NormalizedMessage {
   text?: string;
   html?: string;
   attachments?: MailAttachment[];
+  hints?: MessageHints;
 }
 
 export interface ClassifiedMessage {
@@ -50,16 +137,33 @@ export interface ClassifiedMessage {
   merchantName: string;
   /** Sanitized From-host for icon crawl. Null for processor/ESP mail. */
   officialDomain?: string | null;
+  /**
+   * Phase C: brand-sent icon URLs extracted from the email HTML at classify
+   * time (body is stripped right after, so this is the only chance). Ordered
+   * best-first (logo-ish first-party, logo-ish, signature). cid refs are only
+   * ever evidence — no provider supplies a fetchable ref yet.
+   */
+  emailIconUrls?: string[];
   /** Null when subjectClass is drop. */
   kind: CandidateKind | null;
   amount?: number;
   currency?: string;
   cadence?: Cadence;
+  /** R18: best-effort invoice/order/receipt number from the body. */
+  billNumber?: string | null;
   /** Invoice-like PDF present but no parseable total. */
   amountUnknown: boolean;
   needsBody: boolean;
   evidence: string[];
   confidence: "low" | "medium" | "high";
+  /**
+   * R38 Phase 1: schema.org Order payload parsed from the email's ld+json —
+   * the top evidence tier. Present only when the sender actually embedded
+   * markup (the common case is absent — regex tiers apply). The rail policy
+   * (R38 Phase 2) reads seller/items to key processor/rail receipts to the
+   * real merchant instead of the rail brand.
+   */
+  orderMarkup?: OrderMarkup;
 }
 
 export interface ScanCandidate {
@@ -73,6 +177,21 @@ export interface ScanCandidate {
   currency?: string;
   cadence?: Cadence;
   nextDate?: string;
+  /**
+   * Earliest evidence email date (ISO) across the candidate corpus. The
+   * scan-date bug fix: the import mints startDate from this instead of the
+   * scan wall-clock, so a May receipt imported in September starts in May.
+   */
+  firstSeen?: string;
+  /**
+   * R40-A: latest evidence email date (ISO) across the candidate corpus —
+   * the "most recent" ordering key. Max where firstSeen is the min.
+   */
+  lastReceived?: string;
+  /** R18: best-effort bill number carried to import. */
+  billNumber?: string | null;
+  /** Phase C: brand-sent icon seeds for the scan-fired crawl (best-first). */
+  emailIconUrls?: string[];
   amountUnknown: boolean;
   evidence: string[];
   messageIds: string[];
@@ -93,6 +212,25 @@ export const DEFAULT_DISPLAY_FILTERS: DisplayFilters = {
 
 /** First-connect recency cap. Later scans use the cursor, not this. */
 export const INITIAL_SCAN_LIMIT = 500;
+
+/**
+ * Phase K deep re-list: the user explicitly opted into listing the ENTIRE
+ * mailbox history, so the recency cap is replaced by a large safety ceiling
+ * (it guards against a runaway provider loop, not against legitimate work).
+ */
+export const DEEP_SCAN_LIMIT = 50_000;
+
+/**
+ * Phase K: progress metadata a fetcher MAY attach to each streamed chunk.
+ * `listed` counts every id seen (screened or staged) in the leg so far;
+ * `total` is the provider-reported size of the listing when the API exposes
+ * one (Gmail resultSizeEstimate, Graph @odata.count) and null when it does
+ * not — the UI must render unknown totals honestly ("scanned N").
+ */
+export interface ChunkMeta {
+  listed: number;
+  total: number | null;
+}
 
 export type MailAuthKind = "oauth" | "imap" | "password";
 
@@ -135,11 +273,27 @@ export interface FetchSince {
 }
 
 export interface MessageFetcher {
-  fetchMessages(opts: {
-    mailboxId: string;
-    since: FetchSince | null;
-    limit: number;
-  }): Promise<NormalizedMessage[]>;
+  /**
+   * R19-OOM streaming contract: fetchers MUST deliver messages per page or
+   * native batch via `onChunk` and MUST NOT retain the whole leg's messages
+   * in memory until the leg ends. Body-bearing messages are the peak-memory
+   * hazard: a Workspace leg listing 500 messages while pulling full HTML
+   * bodies exhausted the 192MB Java heap MID-LEG (2026-09-07 fresh
+   * reproduction: 17MB -> 213MB Java in ~35s, FATAL OutOfMemoryError). The
+   * scan classifies each chunk as it arrives and stores body-stripped
+   * copies, so a body only lives for the duration of one chunk.
+   */
+  fetchMessages(
+    opts: {
+      mailboxId: string;
+      since: FetchSince | null;
+      limit: number;
+    },
+    onChunk: (
+      chunk: NormalizedMessage[],
+      meta?: ChunkMeta,
+    ) => void | Promise<void>,
+  ): Promise<void>;
 }
 
 export interface ScanCacheStore {
@@ -165,5 +319,16 @@ export interface MailProvider {
   connect(): Promise<void>;
   disconnect(): Promise<void>;
   isConnected(): Promise<boolean>;
-  scan(opts?: { mailboxId?: string }): Promise<IncrementalScanResult>;
+  scan(opts?: {
+    mailboxId?: string;
+    onLegProgress?: (staged: number) => void;
+    /**
+     * Phase K deep re-list: ignore the scan cursor and the recency cap so
+     * the entire mailbox history is listed (user opted in via the warn
+     * modal). Cached messages at the current parser version still skip.
+     */
+    deep?: boolean;
+    /** Phase K: per-chunk listing progress for the in-app gauge. */
+    onListProgress?: (listed: number, total: number | null) => void;
+  }): Promise<IncrementalScanResult>;
 }

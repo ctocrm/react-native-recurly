@@ -261,3 +261,96 @@ describe("iconQuality (pure functions)", () => {
     });
   });
 });
+
+describe("og/twitter demotion (I2)", () => {
+  const brand = "porkbun";
+  const officialHost = "porkbun.com";
+
+  it("never lets an og:image wordmark outrank the favicon family", () => {
+    const og = scoreIconQuality({
+      source: "official_og_image",
+      format: "png",
+      originalUrl: "https://porkbun.com/images/porkbun-logo-1200x1200.png",
+      originalWidth: 1200,
+      originalHeight: 1200,
+      brand,
+      officialHost,
+    });
+    const apple = scoreIconQuality({
+      source: "official_apple_touch",
+      format: "png",
+      originalUrl: "https://porkbun.com/images/favicons/apple-icon-180x180.png",
+      originalWidth: 180,
+      originalHeight: 180,
+      brand,
+      officialHost,
+    });
+    expect(apple).toBeGreaterThan(og);
+  });
+
+  it("demotes og/twitter sources below same-class favicon-family sources", () => {
+    const og = scoreIconQuality({
+      source: "official_og_image",
+      format: "png",
+      originalUrl: "https://brand.test/images/logo-share.png",
+      originalWidth: 512,
+      originalHeight: 512,
+      brand: "brand",
+      officialHost: "brand.test",
+    });
+    const pwa = scoreIconQuality({
+      source: "official_pwa",
+      format: "png",
+      originalUrl: "https://brand.test/android-chrome-192x192.png",
+      originalWidth: 192,
+      originalHeight: 192,
+      brand: "brand",
+      officialHost: "brand.test",
+    });
+    expect(pwa).toBeGreaterThan(og);
+  });
+
+  it("ranks curated brand_catalog sources at official tier", () => {
+    const curated = scoreIconQuality({
+      source: "brand_catalog",
+      format: "png",
+      originalUrl: "https://tuta.com/favicon/logo-favicon-192.png",
+      originalWidth: 192,
+      originalHeight: 192,
+      brand: "tuta",
+      officialHost: "tuta.com",
+    });
+    const bing = scoreIconQuality({
+      source: "bing_images",
+      format: "png",
+      originalUrl: "https://thumbs.bing.test/tuta-mark-512.png",
+      originalWidth: 512,
+      originalHeight: 512,
+      brand: "tuta",
+      officialHost: "tuta.com",
+    });
+    expect(curated).toBeGreaterThan(bing);
+  });
+
+  it("an official crawled icon with a much larger image beats a small curated one", () => {
+    const officialBig = scoreIconQuality({
+      source: "official_pwa",
+      format: "png",
+      originalUrl: "https://tuta.com/android-chrome-512x512.png",
+      originalWidth: 512,
+      originalHeight: 512,
+      brand: "tuta",
+      officialHost: "tuta.com",
+    });
+    const curatedSmall = scoreIconQuality({
+      source: "brand_catalog",
+      format: "png",
+      originalUrl: "https://tuta.com/favicon/logo-favicon-192.png",
+      originalWidth: 192,
+      originalHeight: 192,
+      brand: "tuta",
+      officialHost: "tuta.com",
+    });
+    expect(officialBig).toBeGreaterThan(curatedSmall);
+  });
+});

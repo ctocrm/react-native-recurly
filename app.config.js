@@ -3,10 +3,12 @@ const appJson = require("./app.json");
 module.exports = {
   expo: {
     ...appJson.expo,
+    // Product is Cadence. Expo slug stays jsmastery until EAS is retargeted.
+    // npm package.json name stays jsmastery (local leftover).
     owner: "ctocrm",
     android: {
       ...appJson.expo.android,
-      package: "com.ctocrm.jsmastery",
+      package: "app.picksandshovels.cadence",
     },
     extra: {
       ...(appJson.expo.extra || {}),
@@ -17,6 +19,7 @@ module.exports = {
       ...(appJson.expo.plugins || []),
       "react-native-fast-tflite",
       "./plugins/mail-imap/withMailImap",
+      "./plugins/with-msal",
     ],
   },
 };

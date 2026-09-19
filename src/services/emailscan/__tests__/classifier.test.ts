@@ -1,10 +1,14 @@
 import {
+  resolveMerchant,
   classifyMessage,
   classifySubject,
+  isSelfMail,
   merchantFromAddress,
 } from "../classifier";
 import {
   ALL_FIXTURES,
+  FIXTURE_FREEMAIL_BUSINESS,
+  FIXTURE_FRIEND_FORWARD,
   FIXTURE_NEWSLETTER,
   FIXTURE_ORDER,
   FIXTURE_OTP_DROP,
@@ -46,6 +50,17 @@ describe("emailscan classifier (subject-first)", () => {
     expect(merchantFromAddress("noreply@x.com")).toEqual({
       merchantKey: "x",
       merchantName: "X",
+    });
+    // F-2: Zoho's accounts host is not a brand — mint the canonical brand.
+    expect(
+      merchantFromAddress("Zoho <notification@zohoaccounts.com>"),
+    ).toEqual({
+      merchantKey: "zoho",
+      merchantName: "Zoho",
+    });
+    expect(merchantFromAddress("notification@accounts.zoho.com")).toEqual({
+      merchantKey: "zoho",
+      merchantName: "Zoho",
     });
   });
 
@@ -297,6 +312,42 @@ describe("emailscan subject amounts + no fake $0", () => {
     expect(sub.icon_key).toBe("tuta");
   });
 
+  it("never defaults the cadence: a cadence-less candidate mints without one (2026-09-16)", () => {
+    const sub = candidateToSubscription({
+      mailboxId: "gmail:david@bohbotweb.com",
+      merchantKey: "uber",
+      merchant: "Uber",
+      kind: "sparse",
+      amount: 47.25,
+      amountUnknown: false,
+      currency: "USD",
+      evidence: ["amount-regex"],
+      messageIds: ["uber-1"],
+      confidence: "high",
+    });
+    expect(sub.billing).toBe("");
+    expect(sub.frequency).toBe("");
+    expect(sub.category).toBe("sparse");
+  });
+
+  it("imports a known-$0 candidate as free (the definition of free, 2026-09-16)", () => {
+    const sub = candidateToSubscription({
+      mailboxId: "gmail:david@bohbotweb.com",
+      merchantKey: "transunion",
+      merchant: "Transunion",
+      kind: "sparse",
+      amount: 0,
+      amountUnknown: false,
+      currency: "USD",
+      evidence: ["amount-regex"],
+      messageIds: ["tu-1"],
+      confidence: "high",
+    });
+    expect(sub.category).toBe("free");
+    expect(sub.price).toBe(0);
+    expect(sub.priceUnknown).toBe(false);
+  });
+
   it("keeps Porkbun verify + welcome as $0 and upgrades the order to $47.74 yearly", () => {
     const verify = classifyMessage({
       mailboxId: "tuta:picksandshovels@tutamail.com",
@@ -416,5 +467,238 @@ describe("emailscan subject amounts + no fake $0", () => {
     });
     expect(sub.name).toBe("xAI");
     expect(sub.icon_key).toBe("xai");
+  });
+});
+
+describe("isSelfMail — owner-domain drop (R3)", () => {
+  const base = {
+    id: "m1",
+    messageId: "m1",
+    subject: "Invoice",
+    date: "2026-09-01T00:00:00Z",
+  };
+
+  it("drops same-domain senders as self-mail", () => {
+    expect(
+      isSelfMail({
+        ...base,
+        mailboxId: "workspace:david@bohbotweb.com",
+        from: "Bohbot Web <no-reply@bohbotweb.com>",
+      }),
+    ).toBe(true);
+  });
+
+  it("keeps other-domain senders", () => {
+    expect(
+      isSelfMail({
+        ...base,
+        mailboxId: "workspace:david@bohbotweb.com",
+        from: "Linode <no-reply@linode.com>",
+      }),
+    ).toBe(false);
+  });
+
+  it("keeps lookalike domains that merely contain the owner domain", () => {
+    expect(
+      isSelfMail({
+        ...base,
+        mailboxId: "workspace:david@bohbotweb.com",
+        from: "Scam <billing@notbohbotweb.com>",
+      }),
+    ).toBe(false);
+  });
+
+  it("still drops the exact owner address", () => {
+    expect(
+      isSelfMail({
+        ...base,
+        mailboxId: "workspace:david@bohbotweb.com",
+        from: "David <david@bohbotweb.com>",
+      }),
+    ).toBe(true);
+  });
+});
+
+describe("isSelfMail — provider-hosted mailboxes keep vendor mail", () => {
+  const base = {
+    id: "m2",
+    messageId: "m2",
+    subject: "Welcome to Tuta",
+    date: "2026-09-01T00:00:00Z",
+  };
+
+  it("does not drop same-domain mail on provider-hosted mailboxes", () => {
+    expect(
+      isSelfMail({
+        ...base,
+        mailboxId: "tuta:picksandshovels@tutamail.com",
+        from: "Tuta <welcome@tutamail.com>",
+      }),
+    ).toBe(false);
+  });
+});
+
+describe("resolveMerchant — generic single-word guard (R7)", () => {
+  it("drops a generic Bot sender instead of importing it", () => {
+    const r = resolveMerchant({
+      messageId: "m3",
+      mailboxId: "workspace:david@bohbotweb.com",
+      from: "Bot <bot@bot.com>",
+      subject: "Your weekly summary",
+      date: "2026-09-01T00:00:00Z",
+    });
+    expect(r.drop).toBe(true);
+    expect(r.evidence).toContain("drop:generic-name:bot");
+  });
+
+  it("keeps a real merchant sender", () => {
+    const r = resolveMerchant({
+      messageId: "m4",
+      mailboxId: "workspace:david@bohbotweb.com",
+      from: "Linode <no-reply@linode.com>",
+      subject: "Your invoice is available",
+      date: "2026-09-01T00:00:00Z",
+    });
+    expect(r.drop).toBe(false);
+    expect(r.merchantName.toLowerCase()).toContain("linode");
+  });
+});
+
+describe("Phase M — freemail triage honesty", () => {
+  const base = {
+    mailboxId: "workspace:david@bohbotweb.com",
+    date: "2026-09-01T00:00:00Z",
+  };
+
+  it("never mints a merchant from a bare freemail host", () => {
+    const r = resolveMerchant({
+      ...base,
+      messageId: "m10",
+      from: "someone@gmail.com",
+      subject: "Your invoice is available",
+    });
+    expect(r.drop).toBe(true);
+    expect(r.evidence).toContain("drop:freemail-no-identity");
+    expect(r.merchantKey).toBe("unknown");
+  });
+
+  it("re-keys a forwarded bill to the original issuer's From-host", () => {
+    const r = resolveMerchant(FIXTURE_FRIEND_FORWARD);
+    expect(r.drop).toBe(false);
+    expect(r.merchantKey).toBe("linode");
+    expect(r.officialDomain).toBe("linode.com");
+    expect(r.evidence).toContain("forward:linode.com");
+    const hit = classifyMessage(FIXTURE_FRIEND_FORWARD);
+    expect(hit.kind).toBe("sparse");
+    expect(hit.merchantKey).toBe("linode");
+    expect(hit.officialDomain).toBe("linode.com");
+  });
+
+  it("drops a forward whose inner sender is also freemail", () => {
+    const r = resolveMerchant({
+      ...base,
+      messageId: "m11",
+      from: "Buddy <friend@gmail.com>",
+      subject: "Fwd: look at this bill",
+      text: "---------- Forwarded message ---------\nFrom: Other <other@yahoo.com>\n\nYour invoice $5.00",
+    });
+    expect(r.drop).toBe(true);
+    expect(r.evidence).toContain("drop:forward-unresolved");
+  });
+
+  it("drops a forward with no inner From line", () => {
+    const r = resolveMerchant({
+      ...base,
+      messageId: "m12",
+      from: "Buddy <friend@gmail.com>",
+      subject: "Fwd: bill",
+      text: "Forwarded message\n\nLook at this bill for $60.00",
+    });
+    expect(r.drop).toBe(true);
+    expect(r.evidence).toContain("drop:forward-unresolved");
+  });
+
+  it("imports a non-forwarded freemail business via display-name evidence as sparse", () => {
+    const r = resolveMerchant(FIXTURE_FREEMAIL_BUSINESS);
+    expect(r.drop).toBe(false);
+    expect(r.merchantKey).toBe("joes-plumbing");
+    expect(r.evidence).toContain("freemail:display-name");
+    const hit = classifyMessage(FIXTURE_FREEMAIL_BUSINESS);
+    expect(hit.kind).toBe("sparse");
+    // A recurring-looking subject still imports sparse from a freemail host.
+    const downgraded = classifyMessage({
+      ...FIXTURE_FREEMAIL_BUSINESS,
+      subject: "Your monthly subscription renewal",
+    });
+    expect(downgraded.kind).toBe("sparse");
+  });
+
+  it("falls back to body evidence when the display name cannot mint", () => {
+    const r = resolveMerchant({
+      ...base,
+      messageId: "m17",
+      from: "Stripe <stripe.receipts@gmail.com>",
+      subject: "Your receipt",
+      text: "Payment receipt from Acme Corp",
+    });
+    expect(r.drop).toBe(false);
+    expect(r.merchantKey).toBe("acme-corp");
+    expect(r.evidence).toContain("freemail:body");
+  });
+
+  it("resolves google.com senders to the right product, never Gmail", () => {
+    const cloud = resolveMerchant({
+      ...base,
+      messageId: "m13",
+      from: "Google Payments <googlepayments@google.com>",
+      subject: "Your Google Cloud payment receipt",
+    });
+    expect(cloud.merchantKey).toBe("google-cloud");
+    expect(cloud.merchantName).toBe("Google Cloud");
+    expect(cloud.officialDomain).toBe("cloud.google.com");
+
+    const workspace = resolveMerchant({
+      ...base,
+      messageId: "m14",
+      from: "Google Payments <googlepayments@google.com>",
+      subject: "Invoice for Google Workspace",
+    });
+    expect(workspace.merchantKey).toBe("google-workspace");
+    expect(workspace.officialDomain).toBe("workspace.google.com");
+
+    const generic = resolveMerchant({
+      ...base,
+      messageId: "m15",
+      from: "Google Payments <googlepayments@google.com>",
+      subject: "Your receipt",
+    });
+    expect(generic.merchantKey).toBe("google");
+    expect(generic.merchantName).toBe("Google");
+    expect(generic.officialDomain).toBe("google.com");
+  });
+
+  it("re-keys a forwarded Google bill through a freemail friend to the product", () => {
+    const r = resolveMerchant({
+      ...base,
+      messageId: "m16",
+      from: "Buddy <friend@gmail.com>",
+      subject: "Fwd: Invoice for Google Workspace",
+      text:
+        "---------- Forwarded message ---------\n" +
+        "From: Google Payments <googlepayments@google.com>\n" +
+        "\n" +
+        "Invoice for Google Workspace — $25.20",
+    });
+    expect(r.drop).toBe(false);
+    expect(r.merchantKey).toBe("google-workspace");
+    expect(r.officialDomain).toBe("workspace.google.com");
+    expect(r.evidence).toContain("forward:google.com");
+  });
+
+  it("keeps youtube.com minting YouTube from the host", () => {
+    expect(merchantFromAddress("YouTube <noreply@youtube.com>")).toEqual({
+      merchantKey: "youtube",
+      merchantName: "Youtube",
+    });
   });
 });

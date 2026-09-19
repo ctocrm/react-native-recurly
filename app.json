@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "jsmastery",
+    "name": "Cadence",
     "slug": "jsmastery",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "jsmastery",
+    "scheme": "cadence",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
@@ -19,7 +19,19 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": false,
+          "data": [
+            {
+              "scheme": "com.googleusercontent.apps.9790232816-rjcr83dmck9b34ctu4kie1k7a85le2b8"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     },
     "web": {
       "output": "static",
@@ -52,7 +64,6 @@
           ]
         }
       ],
-      "@clerk/expo",
       "expo-secure-store",
       [
         "expo-sqlite",

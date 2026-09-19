@@ -112,6 +112,54 @@ export function officialHostFromCompoundSlug(slug: string): string | null {
   return host;
 }
 
+/**
+ * Curated canonical brand identities for slugs that are NOT the brand itself —
+ * product/infra host labels a scan can mint as a merchant ("zohoaccounts" is
+ * Zoho's accounts host, not a company called "Zohoaccounts").
+ *
+ * Every entry MUST be verified live and brand-owned before adding:
+ *  - zoho / zohoaccounts → zoho.com: zoho.com A 136.143.190.155, MX smtpin.zoho.com;
+ *    zohoaccounts.com MX zc-mx.zohocorp.com (DNS checked 2026-09-14); device RDAP
+ *    2026-09-12 read org "Zoho Canada Corporation" for zohoaccounts.ca. The user
+ *    locked the identity: "it's just zoho".
+ *  - wert.io: Wert's official NFT checkout / fiat onramp site, operated by SHA2
+ *    Solutions Inc. — confirmed live 2026-09-12.
+ *  - cline.bot: RDAP-backed oddball TLD (2026-09-12).
+ * Pure lookup; the crawler persists the host as the TIER 0 seed and uses the
+ * display name for search queries and library-slug candidates.
+ */
+const CANONICAL_BRANDS: Record<
+  string,
+  { key: string; host: string; display: string }
+> = {
+  wert: { key: "wert", host: "wert.io", display: "Wert" },
+  cline: { key: "cline", host: "cline.bot", display: "Cline" },
+  clinebotinc: { key: "cline", host: "cline.bot", display: "Cline" },
+  zoho: { key: "zoho", host: "zoho.com", display: "Zoho" },
+  zohoaccounts: { key: "zoho", host: "zoho.com", display: "Zoho" },
+};
+
+export interface CanonicalBrand {
+  /** Canonical brand slug — the merchant key scans should mint. */
+  key: string;
+  host: string;
+  display: string;
+}
+
+/** Canonical brand identity for a scan-minted slug, or null when uncurated. */
+export function canonicalBrandFor(brand: string): CanonicalBrand | null {
+  const key = brand.toLowerCase().trim().replace(/[^a-z0-9]/g, "");
+  const entry = CANONICAL_BRANDS[key];
+  if (!entry) return null;
+  const host = sanitizeOfficialHost(entry.host);
+  if (!host) return null;
+  return { key: entry.key, host, display: entry.display };
+}
+
+export function knownOfficialDomainForBrand(brand: string): string | null {
+  return canonicalBrandFor(brand)?.host ?? null;
+}
+
 export function officialDomainFromAddress(from: string): string | null {
   const angled = from.match(/<([^>]+)>/);
   const raw = (angled ? angled[1] : from).trim().toLowerCase();

@@ -82,6 +82,35 @@ export const FIXTURE_OTP_DROP: NormalizedMessage = msg(
   "Your code is 482193",
 );
 
+/** M: a friend forwards a vendor bill from a personal gmail address — the
+ * original issuer's From-host inside the forward is the merchant. */
+export const FIXTURE_FRIEND_FORWARD: NormalizedMessage = msg(
+  "forward-linode",
+  "Buddy <friend@gmail.com>",
+  "Fwd: Your Linode invoice is available",
+  {
+    text:
+      "Check this out\n" +
+      "---------- Forwarded message ---------\n" +
+      "From: Linode Billing <billing@linode.com>\n" +
+      "Date: Fri, 24 Jul 2026 09:00:00 +0000\n" +
+      "Subject: Your Linode invoice is available\n" +
+      "\n" +
+      "Your invoice for $20.00 is available.",
+  },
+);
+
+/** M: a small business billing from a personal gmail address (no forward) —
+ * display-name evidence, imports sparse. */
+export const FIXTURE_FREEMAIL_BUSINESS: NormalizedMessage = msg(
+  "freemail-business",
+  "Joe's Plumbing <joes.plumbing@gmail.com>",
+  "Invoice for June services",
+  {
+    text: "Invoice #A-1042 — total $120.00. Thanks for your business!",
+  },
+);
+
 export const ALL_FIXTURES: NormalizedMessage[] = [
   FIXTURE_WELCOME,
   FIXTURE_RESET,
@@ -91,4 +120,6 @@ export const ALL_FIXTURES: NormalizedMessage[] = [
   FIXTURE_PDF_AMOUNT_UNKNOWN,
   FIXTURE_NEWSLETTER,
   FIXTURE_OTP_DROP,
+  FIXTURE_FRIEND_FORWARD,
+  FIXTURE_FREEMAIL_BUSINESS,
 ];

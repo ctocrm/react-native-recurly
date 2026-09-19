@@ -1,4 +1,4 @@
-package com.ctocrm.jsmastery.imap
+package app.picksandshovels.cadence.imap
 
 import com.facebook.react.ReactPackage
 import com.facebook.react.bridge.NativeModule
@@ -11,6 +11,7 @@ class ImapPackage : ReactPackage {
       ImapModule(reactContext),
       ProtonModule(reactContext),
       TutaModule(reactContext),
+      WatchdogModule(reactContext),
     )
   }
 

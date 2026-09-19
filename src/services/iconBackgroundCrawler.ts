@@ -18,14 +18,32 @@ import {
   setCachedIcon,
   updateIconCrawlSession,
 } from "@/services/database";
+import { isScanActive, waitIfScanActive } from "@/services/scanState";
 import { rankOfficialDomainCandidates } from "@/services/domain/domainDiscovery";
 import {
+  canonicalBrandFor,
   officialHostFromCompoundSlug,
   officialSiteUrlForHost,
   sanitizeOfficialHost,
 } from "@/services/domain/officialDomain";
 import {
+  registeredDomainOf,
+  rdapCorroborateBrand,
+} from "@/services/domain/rdap";
+import {
+  assessHostLiveness,
+  isKnownDeadHost,
+  isKnownDeadOrUnreachableHost,
+  isKnownUnreachableHost,
+  recordHostLiveness,
+} from "@/services/domain/hostLiveness";
+import {
+  admitsWithHostCap,
+  canCandidateBeatCached,
   classifyTrustedCandidate,
+  hasDiscoveryUrlSignal,
+  isJunkIconFarmHost,
+  isPartnerOrUnrelatedMark,
   isPickerPublishableCandidate,
   isPublishableExtractedIcon,
   isUiChromeImage,
@@ -73,6 +91,20 @@ let isProcessingQueue = false;
 let queueRerunRequested = false;
 /** In-flight crawls so double-tap Search does not stack workers for same key. */
 const activeCrawls = new Set<string>();
+/**
+ * Each key's live crawl-worker promise (discovery + first batch + promote).
+ * startIconCrawl resolves at setup — background passes that must NOT stack
+ * discovery flows (iconSelfHeal's OOM-guard chain) await this instead.
+ */
+const crawlWorkers = new Map<string, Promise<void>>();
+
+/**
+ * Resolves when the key's current crawl worker truly finishes. Resolves
+ * immediately when nothing is running for the key.
+ */
+export function awaitCrawlCompletion(iconKey: string): Promise<void> {
+  return crawlWorkers.get(iconKey) ?? Promise.resolve();
+}
 
 /**
  * Explicit mobile-safe deep-discovery policy. These caps are deliberately
@@ -238,7 +270,7 @@ async function loadLocalIconAsBase64(iconKey: string): Promise<string | null> {
 
 // Download image and save to DB (rate-limit aware, short transient retries)
 const FETCH_TIMEOUT_MS = 15_000;
-const FETCH_MAX_ATTEMPTS = 3;
+const FETCH_MAX_ATTEMPTS = 2;
 
 function parseRetryAfterMs(header: string | null): number | undefined {
   if (!header) return undefined;
@@ -660,6 +692,102 @@ async function fetchAndSaveUrl(
 }
 
 /**
+ * L2 residual (user-approved design): brand-sent email seeds for an
+ * ALREADY-ICON'D subscription are acquired into the crawl collection —
+ * download + validate + save with email_* provenance. The existing quality
+ * scorer + report filter inside promoteFirstIconToCache then decide display:
+ * weak cached source → the email icon promotes; official stays first with
+ * email second; user-chosen is never overwritten; reported seeds are
+ * filtered out of promotion. NO web-crawl fallback: an already-icon'd brand
+ * never triggers discovery — acquisition failure just means status quo.
+ */
+export async function acquireEmailIconCollection(
+  iconKey: string,
+  emailIconUrls: string[],
+): Promise<void> {
+  for (const url of emailIconUrls.slice(0, 3)) {
+    const source = /(?:^|[/?#_.=-])(?:signature|sig)(?:$|[/?#_.=-])/i.test(url)
+      ? "email_signature"
+      : "email_logo";
+    await fetchAndSaveUrl(url, source, iconKey, detectUrlFormat(url));
+  }
+}
+
+/**
+ * Phase L (email-icon immediate populate): the brand's own email carried logo
+ * URLs (extracted at classify time, ranked best-first). Try to populate the
+ * card DIRECTLY from ≤3 of them — download + validate + save with `email_*`
+ * provenance + promote through the same report-stick, cache-ownership-aware
+ * auto-assign the crawl uses (downloadImageAsBase64 promotes on every save)
+ * — BEFORE any web discovery runs.
+ *
+ * Returns true only when the card icon cache now holds a valid EMAIL-sourced
+ * icon, in which case the caller skips the web crawl entirely. Every other
+ * outcome (no seeds, crawl already active, card already populated, downloads
+ * failed, promote skipped/downgraded) returns false and the caller falls back
+ * to the seeded crawl — exactly the previous behavior. Runs at drain (the
+ * scan-crawl chain parks on waitIfScanActive first), so the apply lands the
+ * moment the scan ends, ahead of every crawl.
+ */
+export async function tryApplyEmailIconDirect(
+  iconKey: string,
+  seedUrls?: string[],
+): Promise<boolean> {
+  if (!seedUrls || seedUrls.length === 0) return false;
+  if (isLeftoverTypingSlug(iconKey)) return false;
+  // A crawl mid-flight for this key owns publication — never race it (the
+  // caller's startIconCrawl handles the duplicate-start case gracefully).
+  if (activeCrawls.has(iconKey)) return false;
+  // Card already populated: nothing to immediately populate, and the crawl
+  // path stays the owner of picker-collection enrichment (today's behavior).
+  const cachedBefore = await getCachedIcon(iconKey);
+  if (
+    cachedBefore?.imageData &&
+    isBase64IconValid(cachedBefore.imageData, cachedBefore.format)
+  ) {
+    return false;
+  }
+  const picks = seedUrls.slice(0, 3);
+  const existingUrls = new Set(
+    (await getCrawlResults(iconKey))
+      .map((r) => r.originalUrl)
+      .filter((u): u is string => Boolean(u)),
+  );
+  console.log(
+    `[EMAIL-DIRECT] ${iconKey}: trying ${picks.length} email icon URL(s) directly before web crawl`,
+  );
+  for (const url of picks) {
+    // Same provenance split + format sniff as the seed enqueue in findIconUrls.
+    const source = /(?:^|[/?#_.=-])(?:signature|sig)(?:$|[/?#_.=-])/i.test(url)
+      ? "email_signature"
+      : "email_logo";
+    const formatMatch = url.match(/\.(svg|png|jpe?g|webp|ico)(?:[?#]|$)/i);
+    const format = (formatMatch?.[1] ?? "png").toLowerCase();
+    if (!existingUrls.has(url)) {
+      // Record the candidate even if the download fails, so the fallback
+      // crawl's discovery dedupes it and the shared queue can retry it.
+      await saveCrawlResult(iconKey, "", source, format, url);
+      existingUrls.add(url);
+    }
+    await fetchAndSaveUrl(url, source, iconKey, format);
+  }
+  const cachedAfter = await getCachedIcon(iconKey);
+  const applied =
+    !!cachedAfter?.imageData &&
+    isBase64IconValid(cachedAfter.imageData, cachedAfter.format) &&
+    (cachedAfter.source === "email_logo" ||
+      cachedAfter.source === "email_signature");
+  if (applied) {
+    console.log(`[EMAIL-DIRECT] ${iconKey}: card icon applied from email`);
+  } else {
+    console.log(
+      `[EMAIL-DIRECT] ${iconKey}: email direct-apply did not land — falling back to web crawl`,
+    );
+  }
+  return applied;
+}
+
+/**
  * Start the high-confidence candidates immediately. Deep search continues to
  * expand the same persistent per-icon collection; it never gates first icons.
  */
@@ -719,7 +847,10 @@ const crawlGens = new CrawlGenerationRegistry();
 // This is called when user types or taps search - spinner stops after this returns.
 // Returns the number of provider failures so the caller can report a truthful
 // terminal status (a provider outage must not read as a clean "complete").
-export async function findIconUrls(iconKey: string): Promise<number> {
+export async function findIconUrls(
+  iconKey: string,
+  emailSeeds?: string[],
+): Promise<number> {
   console.log(`[SEARCH] ===== STARTING SEARCH for ${iconKey} =====`);
   let providerFailures = 0;
   const counts: CrawlCounts = {
@@ -735,6 +866,45 @@ export async function findIconUrls(iconKey: string): Promise<number> {
     existing.map((r) => r.originalUrl).filter((u): u is string => Boolean(u)),
   );
 
+  // J5: derive the probe domain (email seed host first, then stored crawl
+  // rows) — a known-dead host short-circuits the whole web discovery.
+  let livenessDomain: string | null = null;
+  const firstSeedHost = (() => {
+    try {
+      return emailSeeds?.[0] ? new URL(emailSeeds[0]).hostname : null;
+    } catch {
+      return null;
+    }
+  })();
+  if (firstSeedHost) livenessDomain = registeredDomainOf(firstSeedHost);
+  if (!livenessDomain) {
+    const firstStored = existing.find((r) => r.originalUrl);
+    if (firstStored?.originalUrl) {
+      try {
+        livenessDomain = registeredDomainOf(
+          new URL(firstStored.originalUrl).hostname,
+        );
+      } catch {
+        livenessDomain = null;
+      }
+    }
+  }
+  if (livenessDomain && (await isKnownDeadHost(livenessDomain))) {
+    console.log(
+      `[SEARCH] short-circuit: ${livenessDomain} is a known dead host (cached liveness ≥85) — skipping web discovery for ${iconKey}`,
+    );
+    return 0;
+  }
+  // R30 (J5b): tier-5 unreachable verdicts short-circuit too, for 30 days —
+  // a blocked/geo host earns ONE full attempt per window, not one per heal
+  // pass (the 2026-09-17 leadingedgehealthemails retry-storm loop).
+  if (livenessDomain && (await isKnownUnreachableHost(livenessDomain))) {
+    console.log(
+      `[SEARCH] short-circuit: ${livenessDomain} is unreachable (tier-5 cached, re-probe window open) — skipping web discovery for ${iconKey}`,
+    );
+    return 0;
+  }
+
   // LOCAL ICON - immediate, no download needed
   console.log(`[SEARCH] LOCAL: Checking for ${iconKey}`);
   const localIcon = icons[iconKey as keyof typeof icons];
@@ -745,7 +915,36 @@ export async function findIconUrls(iconKey: string): Promise<number> {
   // Track URLs we need to fetch immediately
   const urlsToFetch: CrawlCandidate[] = [];
 
-  // TIER 0: Discover official website. Scan seeds skip search.
+  // EMAIL SEEDS (Phase C): icon URLs extracted from the brand's own email at
+  // scan/classify time. Queued before every network tier — the brand sent the
+  // mail, so these outrank bing_images/web discovery (`email_*` provenance = 5)
+  // while a cached official-site icon (6) still wins. Seeds are best-effort:
+  // junk farms / social art / UI chrome were already filtered by the extractor.
+  if (emailSeeds && emailSeeds.length > 0) {
+    let seeded = 0;
+    for (const url of emailSeeds) {
+      if (existingUrls.has(url)) continue;
+      const source = /(?:^|[/?#_.=-])(?:signature|sig)(?:$|[/?#_.=-])/i.test(
+        url,
+      )
+        ? "email_signature"
+        : "email_logo";
+      const formatMatch = url.match(/\.(svg|png|jpe?g|webp|ico)(?:[?#]|$)/i);
+      const format = (formatMatch?.[1] ?? "png").toLowerCase();
+      await saveCrawlResult(iconKey, "", source, format, url);
+      urlsToFetch.push({ url, source, format });
+      existingUrls.add(url);
+      seeded += 1;
+      counts.discovered += 1;
+    }
+    console.log(
+      `[SEARCH] EMAIL-SEEDS: queued ${seeded} of ${emailSeeds.length} brand-sent URL(s) for ${iconKey}`,
+    );
+  }
+
+  // TIER 0: Discover official website. Scan seeds skip search — but a curated
+  // canonical brand identity outranks everything: email seeds have entrenched
+  // wrong-market hosts before (zohoaccounts.ca for brand Zoho — dead for icons).
   console.log(`[SEARCH] TIER 0: Discovering official website`);
   let officialSiteUrl: string | null = null;
   let officialHosts = officialHostsForBrand(iconKey);
@@ -754,7 +953,17 @@ export async function findIconUrls(iconKey: string): Promise<number> {
     ? sanitizeOfficialHost(sessionHint.officialDomain)
     : null;
   const reconstructedHost = officialHostFromCompoundSlug(iconKey);
-  if (seededHost) {
+  const canonicalBrand = canonicalBrandFor(iconKey);
+  if (canonicalBrand) {
+    officialSiteUrl = officialSiteUrlForHost(canonicalBrand.host);
+    officialHosts = officialHostsForBrand(iconKey, canonicalBrand.host);
+    await updateIconCrawlSession(iconKey, {
+      officialDomain: canonicalBrand.host,
+    });
+    console.log(
+      `[SEARCH] TIER 0: Canonical brand ${canonicalBrand.display} — official site ${officialSiteUrl} (overrides any seed)`,
+    );
+  } else if (seededHost) {
     officialSiteUrl = officialSiteUrlForHost(seededHost);
     officialHosts = officialHostsForBrand(iconKey, seededHost);
     console.log(`[SEARCH] TIER 0: Using seeded official site: ${officialSiteUrl}`);
@@ -840,6 +1049,18 @@ export async function findIconUrls(iconKey: string): Promise<number> {
     }
   }
 
+  // PHASE D: RDAP corroboration of the discovered official domain. Evidence +
+  // log only — never changes ranks or replaces an icon by itself
+  // (plan.md "D — RDAP resolver").
+  if (officialSiteUrl) {
+    try {
+      const rdapOfficialHost = new URL(officialSiteUrl).hostname;
+      await rdapCorroborateBrand(iconKey, rdapOfficialHost, seededHost);
+    } catch {
+      // Evidence-only: RDAP failures must never fail the crawl.
+    }
+  }
+
   // TIER 0.5: Scrape official website for icons and favicon
   if (officialSiteUrl) {
     console.log(`[SEARCH] TIER 0.5: Scraping official site for icons`);
@@ -894,6 +1115,10 @@ export async function findIconUrls(iconKey: string): Promise<number> {
           for (const icon of extracted) {
             if (added >= MAX_OFFICIAL_SITE_IMGS) break;
             if (!isPublishableExtractedIcon(icon.url, icon.source)) continue;
+            // I1: partner/sponsor marks hosted on the official site (Scotts on
+            // Ace, tuta.com's EU-SME-alliance badge, porkbun's Forbes logo)
+            // must never become candidates.
+            if (isPartnerOrUnrelatedMark(iconKey, icon.url)) continue;
             if (existingUrls.has(icon.url)) continue;
             const source =
               icon.source === "favicon" || icon.source === "common_path"
@@ -980,6 +1205,9 @@ export async function findIconUrls(iconKey: string): Promise<number> {
   // keeps maximum-search behavior without making first results wait on DDG,
   // Bing, Google, or a multi-page spider crawl.
   const officialHostHint = [...officialHosts][0] ?? null;
+  // J2: a flow can reach this point as a scan starts — park here too, not
+  // only at chain start (enqueueScanIconCrawl), so no stage runs mid-scan.
+  await waitIfScanActive();
   const immediatelyAttempted = await fetchInitialCandidates(
     iconKey,
     urlsToFetch,
@@ -989,6 +1217,8 @@ export async function findIconUrls(iconKey: string): Promise<number> {
 
   // TIER 3: Multi-engine image/dork search (direct logo URLs) + page links to spider
   // Restored searchAllSources — removed in 1a7cf9c and left as dead code.
+  // Query the canonical brand, not a scan-minted artifact slug ("zoho", not
+  // "zohoaccounts") — searching a non-brand finds nothing brand-correct.
   console.log(`[SEARCH] TIER 3: Image/dork search + links to spider`);
   await reportCrawlProgress(
     iconKey,
@@ -999,8 +1229,9 @@ export async function findIconUrls(iconKey: string): Promise<number> {
   const isSearchEngineHost = (u: string) =>
     /google\.|bing\.|duckduckgo\.|yandex\./i.test(u);
 
+  const searchBrand = canonicalBrand?.display ?? iconKey;
   const [searchResults, linkResults] = await Promise.all([
-    searchAllSources(iconKey).catch((e) => {
+    searchAllSources(searchBrand, waitIfScanActive).catch((e) => {
       providerFailures++;
       console.log(
         `[SEARCH] TIER 3: searchAllSources failed:`,
@@ -1008,7 +1239,7 @@ export async function findIconUrls(iconKey: string): Promise<number> {
       );
       return [] as Awaited<ReturnType<typeof searchAllSources>>;
     }),
-    searchForLinksToSpider(iconKey).catch((e) => {
+    searchForLinksToSpider(searchBrand, waitIfScanActive).catch((e) => {
       providerFailures++;
       console.log(
         `[SEARCH] TIER 3: searchForLinksToSpider failed:`,
@@ -1024,9 +1255,22 @@ export async function findIconUrls(iconKey: string): Promise<number> {
 
   let directAdded = 0;
   let untrustedRejected = 0;
+  // G1: per-host admission cap state (official/library hosts exempt inside
+  // admitsWithHostCap). Shared with queueDirectFromLink below.
+  const hostAdmission = new Map<string, number>();
+  let farmRejected = 0;
+  let signalRejected = 0;
+  let hostCapped = 0;
   for (const result of searchResults.slice(0, MAX_WEB_SEARCH_RESULTS)) {
     if (existingUrls.has(result.url)) continue;
     if (isSearchEngineHost(result.url)) continue;
+
+    // G1: junk PNG farms never enter discovery, even with a brand token
+    // in the path ("Gmail-Logo-PNG.png" on pngmart.com in the G0 window).
+    if (isJunkIconFarmHost(result.url)) {
+      farmRejected++;
+      continue;
+    }
 
     const classified = classifyTrustedCandidate(
       iconKey,
@@ -1035,6 +1279,22 @@ export async function findIconUrls(iconKey: string): Promise<number> {
     );
     if (!classified.trusted) {
       untrustedRejected++;
+      continue;
+    }
+
+    // G1: a brand-token match on an unknown host is only credible when the
+    // URL itself looks like a logo asset (reclaimthenet.org/.../tuta.jpg
+    // was auto-assigned in G0 — a news photo, not a logo).
+    if (
+      classified.prov === "brand-token" &&
+      !hasDiscoveryUrlSignal(result.url)
+    ) {
+      signalRejected++;
+      continue;
+    }
+
+    if (!admitsWithHostCap(result.url, officialHosts, hostAdmission)) {
+      hostCapped++;
       continue;
     }
 
@@ -1049,12 +1309,17 @@ export async function findIconUrls(iconKey: string): Promise<number> {
     }
   }
   console.log(
-    `[SEARCH] TIER 3: Queued ${directAdded} direct image URLs; rejected ${untrustedRejected} untrusted-provenance URLs`,
+    `[SEARCH] TIER 3: Queued ${directAdded} direct image URLs; rejected ${untrustedRejected} untrusted-provenance, ${farmRejected} junk-farm, ${signalRejected} brand-token-no-signal, ${hostCapped} over-host-cap URLs`,
   );
 
   const linkUrls: string[] = [];
   const queueDirectFromLink = async (linkUrl: string) => {
     if (existingUrls.has(linkUrl)) return;
+    // G1: same admission gates as the direct-image loop above.
+    if (isJunkIconFarmHost(linkUrl)) {
+      farmRejected++;
+      return;
+    }
     const classified = classifyTrustedCandidate(
       iconKey,
       officialHosts,
@@ -1062,6 +1327,17 @@ export async function findIconUrls(iconKey: string): Promise<number> {
     );
     if (!classified.trusted) {
       untrustedRejected++;
+      return;
+    }
+    if (
+      classified.prov === "brand-token" &&
+      !hasDiscoveryUrlSignal(linkUrl)
+    ) {
+      signalRejected++;
+      return;
+    }
+    if (!admitsWithHostCap(linkUrl, officialHosts, hostAdmission)) {
+      hostCapped++;
       return;
     }
     const fmt = detectUrlFormat(linkUrl);
@@ -1220,6 +1496,26 @@ export async function findIconUrls(iconKey: string): Promise<number> {
     await retryPendingDownloads(iconKey, retryRows);
   }
 
+  // J5: nothing valid anywhere? The host itself may be dead — probe DNS/RDAP
+  // once, cache the liveness, and (if defunct-confident and undecided) raise
+  // the UI event. Best-effort: its own errors never break the crawl.
+  if (counts.downloaded === 0 && livenessDomain) {
+    try {
+      const assessment = await assessHostLiveness(livenessDomain, {
+        httpDead: true,
+      });
+      console.log(
+        `[SEARCH] host liveness: ${livenessDomain} = ${assessment.label} (score ${assessment.score})`,
+      );
+      await recordHostLiveness(livenessDomain, iconKey, assessment);
+    } catch (err) {
+      console.log(
+        `[SEARCH] host liveness probe FAILED for ${livenessDomain}`,
+        err instanceof Error ? err.message : String(err),
+      );
+    }
+  }
+
   console.log(`[SEARCH] ===== FINISHED SEARCH for ${iconKey} =====`);
   await reportCrawlProgress(
     iconKey,
@@ -1228,6 +1524,31 @@ export async function findIconUrls(iconKey: string): Promise<number> {
     counts,
   );
   return providerFailures;
+}
+
+// R4: hosts that ship non-brand imagery (wallpaper/photo farms, template
+// defaults, wiki assets). These failed brand inspection in the 2026-08-13
+// characterization (docs/crawler-baseline.md F1) and must never be downloaded
+// as icon candidates.
+const JUNK_ICON_HOST_PATTERNS: RegExp[] = [
+  /(^|\.)wikipedia\.org$/i,
+  /(^|\.)wikimedia\.org$/i,
+  /(^|\.)wsimg\.com$/i,
+  /(^|\.)superlander\.com$/i,
+  /fitliferegime\.com$/i,
+  /(^|\.)apps\.microsoft\.com$/i,
+  /(^|\.)netplus\.com$/i,
+  /(^|\.)cicgroup\.com$/i,
+  /(wallpaper|wallpapers|pexels|pixabay|unsplash|freepik|pngkey|pngwing|cleanpng|stickpng)\./i,
+];
+
+function isJunkIconHost(url: string): boolean {
+  try {
+    const host = new URL(url).hostname;
+    return JUNK_ICON_HOST_PATTERNS.some((re) => re.test(host));
+  } catch {
+    return true;
+  }
 }
 
 // Background fetch worker — processes queued downloads
@@ -1248,6 +1569,17 @@ export async function processIconQueue(): Promise<void> {
       console.log(`[QUEUE] Found ${queued.length} items in queue`);
 
       for (const item of queued) {
+        // Gate A (agreed 2026-09-11): no crawl network while an email scan
+        // runs — pause BETWEEN items; untouched items stay queued (dequeue
+        // only happens after an item is processed) and the drain resumes
+        // when importFromConnectedMailboxes' finally re-fires this after
+        // endScan().
+        if (isScanActive()) {
+          console.log(
+            `[QUEUE] Email scan active — pausing drain (${item.icon_key} and the rest stay queued)`,
+          );
+          break;
+        }
         console.log(`[QUEUE] Fetching icons for ${item.icon_key}`);
 
         try {
@@ -1257,6 +1589,46 @@ export async function processIconQueue(): Promise<void> {
             .filter((r) => !r.imageData) // No image data means not yet downloaded
             .map((r) => r.originalUrl)
             .filter((u): u is string => Boolean(u));
+          const preFilterCount = unfetchedUrls.length;
+          const admittedUrls = unfetchedUrls.filter(
+            (u) => !isJunkIconHost(u) && !isJunkIconFarmHost(u),
+          );
+          if (admittedUrls.length < preFilterCount) {
+            console.log(
+              `[R4] Filtered ${preFilterCount - admittedUrls.length} junk-host URLs for ${item.icon_key}`,
+            );
+          }
+
+          // R30: queue backlog can also point at dead hosts — stored URLs
+          // from earlier sessions are fetched blind on every drain, keeping
+          // a retry storm alive even after discovery is short-circuited.
+          // A defunct or fresh-unreachable host (30-day window) contributes
+          // nothing; its URLs skip the fetch loop. Items stay queued — the
+          // window may reopen.
+          const liveUrls: string[] = [];
+          let deadHostSkipped = 0;
+          for (const u of admittedUrls) {
+            let host: string | null = null;
+            try {
+              host = new URL(u).hostname;
+            } catch {
+              host = null;
+            }
+            if (
+              host &&
+              (await isKnownDeadOrUnreachableHost(host))
+            ) {
+              deadHostSkipped += 1;
+              continue;
+            }
+            liveUrls.push(u);
+          }
+          if (deadHostSkipped > 0) {
+            console.log(
+              `[QUEUE] Skipped ${deadHostSkipped} dead-host URL(s) for ${item.icon_key} (cached liveness)`,
+            );
+          }
+          const fetchableUrls = liveUrls;
 
           console.log(
             `[QUEUE] Found ${unfetchedUrls.length} URLs to fetch for ${item.icon_key}`,
@@ -1264,7 +1636,7 @@ export async function processIconQueue(): Promise<void> {
 
           // Prefer high-quality candidates; skip domains still in cooldown
           const candidates = sortUrlsByQuality(
-            unfetchedUrls
+            fetchableUrls
               .map((url) => {
                 const crawlResult = crawlResults.find(
                   (r) => r.originalUrl === url,
@@ -1283,9 +1655,32 @@ export async function processIconQueue(): Promise<void> {
             item.icon_key,
           );
 
+          // G1: one cached-icon snapshot before the fetch loop so candidates
+          // that cannot outrank the cache skip the network entirely. G0
+          // measured 22+ full downloads spent learning "bing_images not
+          // better than bing_images". The post-loop promotion below still
+          // re-reads the (possibly updated) cache.
+          const preLoopCached = await getCachedIcon(item.icon_key);
+          const preLoopCachedValid =
+            !!preLoopCached?.imageData &&
+            isBase64IconValid(preLoopCached.imageData, preLoopCached.format);
+          const preLoopUserChosen =
+            preLoopCached?.chosen === true ||
+            isUserChosenCacheSource(preLoopCached?.source);
+
           for (const c of candidates) {
             if (await isDomainRateLimited(c.url)) {
               console.log(`[QUEUE] Skip rate-limited ${c.url}`);
+              continue;
+            }
+            if (
+              preLoopCachedValid &&
+              !preLoopUserChosen &&
+              !canCandidateBeatCached(c.source, preLoopCached?.source)
+            ) {
+              console.log(
+                `[QUEUE] Skip pre-fetch downgrade for ${item.icon_key} (${c.source} cannot beat cached ${preLoopCached?.source ?? "unknown"})`,
+              );
               continue;
             }
             const success = await downloadImageAsBase64(
@@ -1310,9 +1705,22 @@ export async function processIconQueue(): Promise<void> {
           const userChosen =
             cached?.chosen === true || isUserChosenCacheSource(cached?.source);
           if (canAutoAssignCache(!!cached?.imageData, cachedValid, userChosen)) {
-            const all = await getCrawlResults(item.icon_key);
+            const [all, reports] = await Promise.all([
+              getCrawlResults(item.icon_key),
+              getReportsForIcon(item.icon_key),
+            ]);
+            const activeReportedHashes = new Set(
+              reports.filter((r) => !r.rejected).map((r) => r.imageData),
+            );
             const withData = all.filter(
-              (r) => r.imageData && isPaintableCardIcon(r.imageData, r.format),
+              (r) =>
+                r.imageData &&
+                isPaintableCardIcon(r.imageData, r.format) &&
+                !activeReportedHashes.has(r.imageData) &&
+                !(
+                  r.originalUrl &&
+                  isPartnerOrUnrelatedMark(item.icon_key, r.originalUrl)
+                ),
             );
             if (withData.length > 0) {
               const session = await getIconCrawlSession(item.icon_key);
@@ -1426,10 +1834,22 @@ export async function promoteFirstIconToCache(iconKey: string): Promise<void> {
       return;
     }
 
-    const all = await getCrawlResults(iconKey);
-    // Never auto-assign empty / fully-transparent / unpaintable SVG to the card.
+    const [all, reports] = await Promise.all([
+      getCrawlResults(iconKey),
+      getReportsForIcon(iconKey),
+    ]);
+    const activeReportedHashes = new Set(
+      reports.filter((r) => !r.rejected).map((r) => r.imageData),
+    );
+    // Never auto-assign empty / fully-transparent / unpaintable SVG to the
+    // card; never auto-assign partner marks or user-reported-wrong icons
+    // (I1/I3).
     const withData = all.filter(
-      (r) => r.imageData && isPaintableCardIcon(r.imageData, r.format),
+      (r) =>
+        r.imageData &&
+        isPaintableCardIcon(r.imageData, r.format) &&
+        !activeReportedHashes.has(r.imageData) &&
+        !(r.originalUrl && isPartnerOrUnrelatedMark(iconKey, r.originalUrl)),
     );
     if (withData.length === 0) {
       console.log(
@@ -1517,6 +1937,13 @@ export async function promoteFirstIconToCache(iconKey: string): Promise<void> {
 // - Runs discovery as a detached promise never awaited by any UI.
 export type IconCrawlOptions = {
   officialDomain?: string | null;
+  /**
+   * Phase C: brand-sent icon URLs extracted from the merchant's own email at
+   * classify time. One-shot per crawl (not persisted) — fetched first with
+   * `email_*` provenance, which outranks all web discovery but never a cached
+   * official-site icon.
+   */
+  seedUrls?: string[];
 };
 
 export async function startIconCrawl(
@@ -1542,6 +1969,14 @@ export async function startIconCrawl(
     if (seeded) {
       await updateIconCrawlSession(iconKey, { officialDomain: seeded });
     }
+    if (options?.seedUrls?.length) {
+      // Honest drop: a crawl is already mid-flight for this key and seeds are
+      // one-shot discovery inputs, not persisted state. The next scan-fired
+      // (or picker-fired) crawl re-seeds.
+      console.log(
+        `[EMAIL-SEEDS] ${iconKey}: ${options.seedUrls.length} seed(s) dropped — crawl already active`,
+      );
+    }
     return;
   }
   activeCrawls.add(iconKey);
@@ -1559,11 +1994,13 @@ export async function startIconCrawl(
   setIconLoading(iconKey, true);
 
   // Fire-and-forget background worker. Not awaited by any caller/modal.
-  void (async () => {
+  // The promise IS recorded (crawlWorkers) so background passes can await a
+  // key's true completion; startIconCrawl itself still resolves at setup.
+  const worker: Promise<void> = (async () => {
     try {
       // findIconUrls runs discovery and a small immediate fetch, then enqueues
       // remaining URLs on the shared worker without awaiting that worker.
-      const providerFailures = await findIconUrls(iconKey);
+      const providerFailures = await findIconUrls(iconKey, options?.seedUrls);
       // Stale-cancellation: a newer crawl for this key owns publication now.
       if (!crawlGens.isCurrent(iconKey, gen)) return;
       await promoteFirstIconToCache(iconKey);
@@ -1608,8 +2045,10 @@ export async function startIconCrawl(
       // via notifyCacheUpdate. Do not wait on other keys' leftover URLs.
       setIconLoading(iconKey, false);
       activeCrawls.delete(iconKey);
+      crawlWorkers.delete(iconKey);
     }
   })();
+  crawlWorkers.set(iconKey, worker);
 }
 
 // Backwards-compatible alias kept so existing call sites keep working.

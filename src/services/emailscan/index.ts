@@ -45,6 +45,8 @@ export {
 
 export {
     ALL_FIXTURES,
+    FIXTURE_FREEMAIL_BUSINESS,
+    FIXTURE_FRIEND_FORWARD,
     FIXTURE_NEWSLETTER,
     FIXTURE_ORDER,
     FIXTURE_OTP_DROP,
@@ -73,11 +75,15 @@ export {
     convertStoredPrice,
     defaultDisplayPeriod,
     displayedAmount,
+    lastRecurringChargeDate,
     monthlySpendContribution,
     nextDisplayPeriod,
+    sparseSecondaryLine,
     thisMonthInsights,
     monthlyChartFromMail,
 } from "./chargeDisplay";
+export { isLapsedRecurring } from "./lapse";
+export { projectionLastRecurringChargeDate } from "./projectionDisplay";
 export type { DisplayPeriod } from "./chargeDisplay";
 
 export { importFromConnectedMailboxes } from "./scanConnected";

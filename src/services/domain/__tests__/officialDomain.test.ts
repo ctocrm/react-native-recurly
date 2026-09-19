@@ -1,4 +1,6 @@
 import {
+  canonicalBrandFor,
+  knownOfficialDomainForBrand,
   officialDomainFromAddress,
   officialHostFromCompoundSlug,
   sanitizeOfficialHost,
@@ -37,5 +39,40 @@ describe("officialDomain (Hop 1 scan seed)", () => {
     expect(officialHostFromCompoundSlug("home")).toBeNull();
     expect(officialHostFromCompoundSlug("figma")).toBeNull();
     expect(officialHostFromCompoundSlug("netflix")).toBeNull();
+  });
+
+  it("serves curated known official domains (oddball TLDs)", () => {
+    expect(knownOfficialDomainForBrand("wert")).toBe("wert.io");
+    expect(knownOfficialDomainForBrand("Wert")).toBe("wert.io");
+    expect(knownOfficialDomainForBrand("cline")).toBe("cline.bot");
+    expect(knownOfficialDomainForBrand("cline-bot-inc")).toBe("cline.bot");
+    expect(knownOfficialDomainForBrand("proton")).toBeNull();
+    expect(knownOfficialDomainForBrand("unknownbrand")).toBeNull();
+  });
+
+  it("maps Zoho product-host slugs to the canonical Zoho brand", () => {
+    // User-locked identity: "zohoaccounts" is Zoho's accounts host, not a brand.
+    expect(canonicalBrandFor("zohoaccounts")).toEqual({
+      key: "zoho",
+      host: "zoho.com",
+      display: "Zoho",
+    });
+    expect(canonicalBrandFor("zohoaccounts ")).toEqual({
+      key: "zoho",
+      host: "zoho.com",
+      display: "Zoho",
+    });
+    expect(canonicalBrandFor("Zoho Accounts")).toEqual({
+      key: "zoho",
+      host: "zoho.com",
+      display: "Zoho",
+    });
+    expect(canonicalBrandFor("zoho")).toEqual({
+      key: "zoho",
+      host: "zoho.com",
+      display: "Zoho",
+    });
+    expect(canonicalBrandFor("netflix")).toBeNull();
+    expect(knownOfficialDomainForBrand("zohoaccounts")).toBe("zoho.com");
   });
 });

@@ -2,6 +2,7 @@
  * SQLite scan cache. Local-only (not cloud-synced).
  */
 import { getDatabase } from "@/services/db/connection";
+import { rebuildProjectionAsync } from "./projection";
 import type {
   CachedMessage,
   ClassifiedMessage,
@@ -29,6 +30,17 @@ interface MessageRow {
   body_text: string | null;
   html: string | null;
   attachments_json: string | null;
+  classified_json: string;
+  parser_version: number;
+}
+
+/** Lean projection of MessageRow — never carries body_text/html. */
+interface ClassifiedLeanRow {
+  mailbox_id: string;
+  message_id: string;
+  from_addr: string;
+  subject: string;
+  date: string;
   classified_json: string;
   parser_version: number;
 }
@@ -69,6 +81,44 @@ export function createSqliteScanStore(): ScanCacheStore {
   };
 }
 
+let rebuildRunning = false;
+let rebuildDirty = false;
+
+/**
+ * R26b: schedule the full projection rebuild OFF the write path.
+ *
+ * `rebuildProjectionAsync` re-folds every mail_messages row (~1000 bucket
+ * INSERTs on a real mailbox). Awaited at leg end (fbad4ed) it convoyed behind
+ * the scan-fired icon crawl's SQLite queue for 70+ minutes on 2026-09-09 and
+ * stalled the 4-leg scan's completion — the exact blocking class R14–R20
+ * removed. The projection is a deterministic, rebuildable cache over the
+ * mail_messages SSOT, so coalescing is safe: at most one rebuild runs at a
+ * time, writes landing mid-rebuild set a dirty flag, and a single trailing
+ * rebuild folds them. Write paths must call this fire-and-forget, never
+ * await it.
+ */
+export function scheduleProjectionRebuild(reason: string): void {
+  if (rebuildRunning) {
+    rebuildDirty = true;
+    return;
+  }
+  rebuildRunning = true;
+  void rebuildProjectionAsync()
+    .catch((err) => {
+      console.log(
+        `[MailScan] projection rebuild FAILED (${reason})`,
+        err instanceof Error ? err.message : String(err),
+      );
+    })
+    .finally(() => {
+      rebuildRunning = false;
+      if (rebuildDirty) {
+        rebuildDirty = false;
+        scheduleProjectionRebuild(`${reason}:trailing`);
+      }
+    });
+}
+
 export async function getMailboxAsync(
   mailboxId: string,
 ): Promise<MailboxScanState | undefined> {
@@ -90,6 +140,8 @@ export async function getMailboxAsync(
       PARSER_VERSION,
       mailboxId,
     );
+    // R26: removed rows change the actuals; rebuild off the critical path.
+    scheduleProjectionRebuild("parser bump");
     return {
       mailboxId: box.id,
       providerId: box.provider_id as MailProviderId,
@@ -123,12 +175,299 @@ export async function getMailboxAsync(
   };
 }
 
-export async function listClassifiedMessagesAsync(): Promise<
+let inflightLoad: Promise<ClassifiedMessage[]> | null = null;
+
+/**
+ * Cached classified messages only, lean projection. Deduped: the boot effect
+ * re-fires when subscriptions arrive (~300ms after mount), and two concurrent
+ * paging loops contended the connection and doubled the cold load (R24).
+ */
+export function listClassifiedMessagesAsync(): Promise<ClassifiedMessage[]> {
+  inflightLoad ??= listClassifiedMessagesUncancelledAsync().finally(() => {
+    inflightLoad = null;
+  });
+  return inflightLoad;
+}
+
+async function listClassifiedMessagesUncancelledAsync(): Promise<
   ClassifiedMessage[]
 > {
   const db = getDatabase();
-  const rows = await db.getAllAsync<MessageRow>("SELECT * FROM mail_messages");
-  return rows.map((row) => rowToMessage(row).classified);
+  // Lean read, paged by rowid keyset: never SELECT * (legacy classified_json
+  // embeds the full message body) and never materialize the whole table in
+  // one getAllAsync — either one OOMs the app at boot (R19). R23: keyset
+  // (`rowid > last`) replaced LIMIT/OFFSET — OFFSET makes SQLite re-walk
+  // every discarded row on each page, and over fat legacy pages the
+  // cold-boot classified load took ~60s, leaving Monthly Spend showing
+  // recurring-only ($177.08) for a full minute before sparse actuals landed.
+  // Keyset seeks straight to each page: O(N) total.
+  const hits: ClassifiedMessage[] = [];
+  const BATCH = 1000;
+  // R24: split db-wait from JS parse so the cold-load tail names its owner.
+  const t0 = Date.now();
+  const shape = await db.getFirstAsync<{
+    page_count: number;
+    freelist_count: number;
+    journal_mode: string;
+  }>("PRAGMA page_count");
+  const freelist = await db.getFirstAsync<{ freelist_count: number }>(
+    "PRAGMA freelist_count",
+  );
+  const journal = await db.getFirstAsync<{ journal_mode: string }>(
+    "PRAGMA journal_mode",
+  );
+  console.log(
+    `[MailScan] db shape: pageCount=${shape?.page_count ?? "?"} ` +
+      `freelist=${freelist?.freelist_count ?? "?"} ` +
+      `journal=${journal?.journal_mode ?? "?"}`,
+  );
+  let page = 0;
+  let dbMs = 0;
+  let lastRowid = 0;
+  // R24: liveness ticker — if these ticks gap out, the JS thread (not the
+  // DB) owns the stall; if they keep beating while a phase hangs, the DB
+  // side owns it. Split prepare/execute/fetch so the phase names itself.
+  let lastTick = Date.now();
+  const tick = setInterval(() => {
+    const now = Date.now();
+    console.log(`[MailScan] js-tick +${now - lastTick}ms`);
+    lastTick = now;
+  }, 500);
+  try {
+    for (;;) {
+      const tq = Date.now();
+      const statement = await db.prepareAsync(
+        `SELECT rowid AS rid, mailbox_id, message_id, from_addr, subject, date,
+                classified_json, parser_version
+         FROM mail_messages
+         WHERE rowid > ?
+         ORDER BY rowid
+         LIMIT ?`,
+      );
+      const prepMs = Date.now() - tq;
+      const tex = Date.now();
+      const result = await statement.executeAsync(lastRowid, BATCH);
+      const execMs = Date.now() - tex;
+      const tfe = Date.now();
+      const rows = (await result.getAllAsync()) as (ClassifiedLeanRow & {
+        rid: number;
+      })[];
+      const fetchMs = Date.now() - tfe;
+      await statement.finalizeAsync();
+      dbMs += Date.now() - tq;
+      page += 1;
+      console.log(
+        `[MailScan] classified page ${page}: rows=${rows.length} ` +
+          `prepMs=${prepMs} execMs=${execMs} fetchMs=${fetchMs}`,
+      );
+      if (rows.length === 0) break;
+      for (const row of rows) hits.push(leanRowToClassified(row));
+      if (rows.length < BATCH) break;
+      lastRowid = rows[rows.length - 1].rid;
+    }
+  } finally {
+    clearInterval(tick);
+  }
+  console.log(
+    `[MailScan] classified load: pages=${page} rows=${hits.length} ` +
+      `dbMs=${dbMs} totalMs=${Date.now() - t0}`,
+  );
+  // Fire-and-forget: rewrite legacy fat rows (NULL body columns, stub the
+  // embedded message), then reclaim the dead space their era left behind.
+  // Batched, memory-bound, never blocks this load.
+  void ensureLegacyBodiesStrippedAsync().then(() => {
+    void ensureDbCompactedAsync();
+  });
+  return hits;
+}
+
+const VACUUM_MIN_FREE_PAGES = 1000;
+const VACUUM_FREE_RATIO = 0.2;
+let vacuumOnce: Promise<void> | null = null;
+
+/**
+ * SQLite refuses VACUUM inside any open transaction, and on the shared
+ * expo-sqlite connection another task's async transaction (scan save,
+ * projection rebuild, body-strip batch) can interleave with this statement —
+ * the live "cannot VACUUM from within a transaction" seen at scan-end since
+ * R26. Those transactions are always transient, so defer with backoff
+ * (~93s total window) instead of failing the compaction for the session.
+ */
+const VACUUM_RETRY_DELAYS_MS = [3_000, 6_000, 12_000, 24_000, 48_000];
+
+function sleepAsync(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function execVacuumAsync(
+  db: ReturnType<typeof getDatabase>,
+): Promise<void> {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      await db.execAsync("VACUUM");
+      return;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (
+        attempt < VACUUM_RETRY_DELAYS_MS.length &&
+        /cannot VACUUM/i.test(msg)
+      ) {
+        console.log(
+          `[MailScan] db vacuum deferred (txn open, attempt ${attempt + 1}); ` +
+            `retrying in ${VACUUM_RETRY_DELAYS_MS[attempt]}ms`,
+        );
+        await sleepAsync(VACUUM_RETRY_DELAYS_MS[attempt]);
+        continue;
+      }
+      throw err;
+    }
+  }
+}
+
+/**
+ * R24: the legacy fat-body era left the DB ~86% free pages (33897 total,
+ * 29230 free ≈ 114MB dead) — every cold classified read paid for a 132MB
+ * file to serve 2209 lean rows. VACUUM once per session when dead space
+ * dominates; self-limiting, no preference flag — the freelist collapses
+ * after the first run, so the guard never fires again until a future mass
+ * delete re-fragments the file.
+ */
+export function ensureDbCompactedAsync(): Promise<void> {
+  vacuumOnce ??= compactIfFragmentedAsync().catch((err) => {
+    console.log(
+      "[MailScan] db vacuum FAILED",
+      err instanceof Error ? err.message : String(err),
+    );
+  });
+  return vacuumOnce;
+}
+
+async function compactIfFragmentedAsync(): Promise<void> {
+  const db = getDatabase();
+  const pc = await db.getFirstAsync<{ page_count: number }>(
+    "PRAGMA page_count",
+  );
+  const fl = await db.getFirstAsync<{ freelist_count: number }>(
+    "PRAGMA freelist_count",
+  );
+  const pageCount = pc?.page_count ?? 0;
+  const freePages = fl?.freelist_count ?? 0;
+  if (
+    freePages < VACUUM_MIN_FREE_PAGES ||
+    (pageCount > 0 && freePages / pageCount < VACUUM_FREE_RATIO)
+  ) {
+    console.log(
+      `[MailScan] db vacuum: skipped (pageCount=${pageCount} freelist=${freePages})`,
+    );
+    return;
+  }
+  const t0 = Date.now();
+  await execVacuumAsync(db);
+  const after = await db.getFirstAsync<{ page_count: number }>(
+    "PRAGMA page_count",
+  );
+  console.log(
+    `[MailScan] db vacuum: ${pageCount} -> ${after?.page_count ?? "?"} pages ` +
+      `in ${Date.now() - t0}ms`,
+  );
+}
+
+function leanRowToClassified(row: ClassifiedLeanRow): ClassifiedMessage {
+  const classified = JSON.parse(row.classified_json) as ClassifiedMessage;
+  classified.message = {
+    mailboxId: row.mailbox_id,
+    messageId: row.message_id,
+    from: row.from_addr,
+    subject: row.subject,
+    date: row.date,
+  };
+  return classified;
+}
+
+/**
+ * R26: single classified row by message id (details modal "Source email"
+ * line). Replaces the modal's full-array .find so boot no longer needs the
+ * whole in-memory message list. Lean read — never body_text/html.
+ */
+export async function getCachedMessageByIdAsync(
+  messageId: string,
+): Promise<ClassifiedMessage | null> {
+  const db = getDatabase();
+  try {
+    const row = await db.getFirstAsync<ClassifiedLeanRow>(
+      `SELECT mailbox_id, message_id, from_addr, subject, date,
+              classified_json, parser_version
+       FROM mail_messages
+       WHERE message_id = ?
+       LIMIT 1`,
+      messageId,
+    );
+    return row ? leanRowToClassified(row) : null;
+  } catch (err) {
+    console.log(
+      "[MailScan] source-message lookup FAILED",
+      err instanceof Error ? err.message : String(err),
+    );
+    return null;
+  }
+}
+
+const STRIP_BATCH = 100;
+let stripBodiesOnce: Promise<void> | null = null;
+
+/**
+ * One-time per session: NULL legacy body_text/html columns. Rows written
+ * before body-stripping store full bodies, which made boot-time loads OOM
+ * (R19). Batches small ID sets so memory stays bounded; a no-op once every
+ * row is stripped. Failures never wedge the caller — retried next session.
+ */
+export function ensureLegacyBodiesStrippedAsync(): Promise<void> {
+  stripBodiesOnce ??= stripLegacyBodiesAsync()
+    .then((stripped) => {
+      if (stripped > 0)
+        console.log(`[MailScan] legacy body strip: ${stripped} rows stripped`);
+    })
+    .catch((err) => {
+      // R23: this catch was silent, so a strip that failed every session
+      // kept fat rows (and the slow cold-boot load they cause) forever.
+      // Log it; retried next session via the reset below.
+      console.log(
+        "[MailScan] legacy body strip FAILED",
+        err instanceof Error ? err.message : String(err),
+      );
+      stripBodiesOnce = null;
+    });
+  return stripBodiesOnce;
+}
+
+async function stripLegacyBodiesAsync(): Promise<number> {
+  const db = getDatabase();
+  let stripped = 0;
+  for (;;) {
+    const batch = await db.getAllAsync<ClassifiedLeanRow>(
+      `SELECT mailbox_id, message_id, from_addr, subject, date,
+              classified_json, parser_version
+       FROM mail_messages
+       WHERE body_text IS NOT NULL OR html IS NOT NULL
+       LIMIT ?`,
+      STRIP_BATCH,
+    );
+    if (batch.length === 0) return stripped;
+    for (const row of batch) {
+      // Stub the embedded message too: classified_json carries a full
+      // serialized NormalizedMessage (body included) in legacy rows.
+      const lean = leanRowToClassified(row);
+      await db.runAsync(
+        `UPDATE mail_messages
+         SET body_text = NULL, html = NULL, classified_json = ?
+         WHERE mailbox_id = ? AND message_id = ?`,
+        JSON.stringify(lean),
+        row.mailbox_id,
+        row.message_id,
+      );
+      stripped += 1;
+    }
+  }
 }
 
 export async function listMailboxesAsync(): Promise<
@@ -190,6 +529,10 @@ export async function saveMailboxAsync(state: MailboxScanState): Promise<void> {
       cached.parserVersion,
     );
   }
+
+  // R26b: keep the actuals projection consistent after message upserts —
+  // scheduled, never awaited (see scheduleProjectionRebuild).
+  scheduleProjectionRebuild("mailbox save");
 }
 
 export async function clearMailboxAsync(mailboxId: string): Promise<void> {
@@ -199,6 +542,8 @@ export async function clearMailboxAsync(mailboxId: string): Promise<void> {
     mailboxId,
   );
   await db.runAsync("DELETE FROM mail_mailboxes WHERE id = ?", mailboxId);
+  // R26: keep the actuals projection consistent after message removal.
+  scheduleProjectionRebuild("mailbox clear");
 }
 
 /** Cached classified messages only. Does not drop mailbox rows or SecureStore. */
@@ -240,6 +585,11 @@ export async function runPersistedScan(opts: {
   providerId: MailProviderId;
   fetcher: import("./types").MessageFetcher;
   limit?: number;
+  onLegProgress?: (staged: number) => void;
+  /** Phase K: deep re-list — ignore cursor + recency cap (user opted in). */
+  deep?: boolean;
+  /** Phase K: per-chunk listing progress for the in-app gauge. */
+  onListProgress?: (listed: number, total: number | null) => void;
 }) {
   const { runIncrementalScan } = await import("./scan");
   const existing = await getMailboxAsync(opts.mailboxId);
@@ -260,6 +610,9 @@ export async function runPersistedScan(opts: {
     fetcher: opts.fetcher,
     store,
     limit: opts.limit,
+    onLegProgress: opts.onLegProgress,
+    deep: opts.deep,
+    onListProgress: opts.onListProgress,
   });
   const next = memory.get(opts.mailboxId);
   if (next) await saveMailboxAsync(next);

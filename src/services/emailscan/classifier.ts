@@ -2,14 +2,25 @@
  * Subject-first classifier. Body and invoice-like attachments run only
  * for money classes (recurring / sparse). No LLM.
  */
-import { officialDomainFromAddress } from "@/services/domain/officialDomain";
+import {
+  canonicalBrandFor,
+  officialDomainFromAddress,
+} from "@/services/domain/officialDomain";
+import {
+  hasDiscoveryUrlSignal,
+  isGenericSocialImage,
+  isJunkIconFarmHost,
+  isUiChromeImage,
+} from "@/services/iconCandidate";
 import type {
   Cadence,
+  CandidateKind,
   ClassifiedMessage,
   MailAttachment,
   NormalizedMessage,
   SubjectClass,
 } from "./types";
+import { extractOrderMarkup } from "./orderMarkup";
 
 const LOCAL_PARTS_TO_STRIP = new Set([
   "noreply",
@@ -89,6 +100,9 @@ const PAYMENT_PROCESSORS = new Set([
   "wise",
   "transferwise",
   "worldpay",
+  // R38 P2: Squarespace is a store-builder rail — its mail bills the SITE or
+  // domain the user runs there, never "Squarespace" the merchant.
+  "squarespace",
 ]);
 
 const SELF_DISPLAY_NAMES = new Set(["me", "you", "myself", "self"]);
@@ -115,6 +129,105 @@ const RECURRING_MONEY_RE =
   /(\/mo\b|per\s+month|monthly|annual(?:ly)?|\/yr\b|per\s+year|renews)/i;
 const USAGE_MONEY_RE =
   /\b(usage|overage|this\s+period|pay[- ]as[- ]you[- ]go)\b/i;
+
+/**
+ * R27 purchase-proof gate: a price in an email is not a charge. Marketing
+ * email routinely quotes prices, while a real charge names the payment
+ * event. STRONG anchors are concrete charge artifacts (a document number, a
+ * total, a card, a GPA order id) — they beat marketing every time. GENERIC
+ * anchors are soft phrases ("payment method", the word "receipt") that ad
+ * fine-print also uses: they beat only a light marketing footprint (<4);
+ * heavy marketing (pre-order + bulk headers, ≥4) beats generic-only proof.
+ */
+const PAYMENT_PROOF_STRONG_RES: { re: RegExp; tag: string }[] = [
+  { re: /\btotal\s+(?:charged|due|amount)\b/i, tag: "total" },
+  { re: /\bamount\s+(?:charged|paid|due)\b/i, tag: "amount-paid" },
+  { re: /\byou\s+paid\b/i, tag: "you-paid" },
+  {
+    re: /\bwe(?:'ve)?\s+(?:charged|received\s+(?:your\s+)?payment)/i,
+    tag: "we-charged",
+  },
+  {
+    re: /\b(?:visa|mastercard|amex|discover|card)\s+(?:ending|·|•)\b/i,
+    tag: "card-ending",
+  },
+  {
+    re: /\b(?:invoice|receipt|order)\s*(?:#|no\.?|number)\b/i,
+    tag: "doc-number",
+  },
+  {
+    re: /\bthank you for your (?:purchase|order|payment)\b/i,
+    tag: "thanks-purchase",
+  },
+  { re: /\border confirmation\b/i, tag: "order-confirmation" },
+  { re: /\bGPA\.[A-Z0-9]+-[A-Z0-9]+-[A-Z0-9]+\b/, tag: "gpa-order" },
+  // Renewal/total shapes from real billing mail (Prime "membership renews
+  // for $14.99/mo", Amazon "Order total $12.49", "Total: $47.74").
+  {
+    re: /\b(?:membership|subscription|plan)\s+renews?\b/i,
+    tag: "renewal-event",
+  },
+  {
+    re: /\b(?:renewal|registration)\s+(?:price|fee|total)\b/i,
+    tag: "renewal-price",
+  },
+  { re: /\bdomain\s+registration\b/i, tag: "domain-registration" },
+  { re: /\border\s+total\b/i, tag: "order-total" },
+  { re: /\btotal\b[^\n]{0,16}(?:USD\s*)?(?:US)?\$\s*\d/i, tag: "total-price" },
+];
+
+/** Soft anchors: legit in receipts, but ad fine-print uses them too. */
+const PAYMENT_PROOF_GENERIC_RES: { re: RegExp; tag: string }[] = [
+  {
+    re: /\bpayment\s+(?:method|received|complete|successful|confirmed|failed)\b/i,
+    tag: "payment-event",
+  },
+  { re: /\bbilled\s+to\b/i, tag: "billed-to" },
+  { re: /\breceipt\b/i, tag: "receipt-word" },
+  { re: /\binvoice\b/i, tag: "invoice-word" },
+  { re: /\bstatement\b/i, tag: "statement-word" },
+];
+
+const PAYMENT_PROOF_RES = [
+  ...PAYMENT_PROOF_STRONG_RES,
+  ...PAYMENT_PROOF_GENERIC_RES,
+];
+
+/** R27: marketing markers. Subject hits weigh most (the pitch IS the mail);
+ * body hits are CTA noise. Any of these without payment proof drops the
+ * message — the Pixel Watch 5 pre-order ad class. */
+const MARKETING_SUBJECT_RES: { re: RegExp; tag: string }[] = [
+  { re: /\bpre[- ]?order\b/i, tag: "subject:pre-order" },
+  { re: /\b\d{1,3}\s*%\s*off\b/i, tag: "subject:percent-off" },
+  { re: /\b(?:black\s+friday|cyber\s+monday)\b/i, tag: "subject:sale-event" },
+  {
+    re: /\b(?:introducing|meet|discover)\s+the\s+new\b/i,
+    tag: "subject:launch",
+  },
+  { re: /\bnow\s+available\b/i, tag: "subject:now-available" },
+  { re: /\bjust\s+dropped\b/i, tag: "subject:just-dropped" },
+  { re: /\b(?:shop|store)\s+(?:now|today|the)\b/i, tag: "subject:shop" },
+  { re: /\blimited\s+(?:time|offer|stock)\b/i, tag: "subject:limited" },
+  { re: /\bback\s+in\s+stock\b/i, tag: "subject:restock" },
+  { re: /\bsave\s+\$/i, tag: "subject:save" },
+  { re: /\bexclusive\s+(?:offer|deal|discount)\b/i, tag: "subject:exclusive" },
+];
+
+const MARKETING_BODY_RES: { re: RegExp; tag: string }[] = [
+  { re: /\bshop\s+(?:now|today)\b/i, tag: "body:shop-now" },
+  { re: /\bbuy\s+now\b/i, tag: "body:buy-now" },
+  { re: /\bpre[- ]?order\s+(?:now|today|yours)\b/i, tag: "body:pre-order-now" },
+  { re: /\blearn\s+more\b/i, tag: "body:learn-more" },
+  { re: /\bsave\s+(?:up\s+to\s+)?\$/i, tag: "body:save" },
+  { re: /\blimited\s+(?:time|quantit|stock|offer)\b/i, tag: "body:limited" },
+  { re: /\bsale\s+ends\b/i, tag: "body:sale-ends" },
+  { re: /\bview\s+in\s+(?:your\s+)?browser\b/i, tag: "body:view-browser" },
+  { re: /\bunsubscribe\b/i, tag: "body:unsubscribe" },
+];
+
+/** Pricing grammar that only exists in advertising: a range/starting price. */
+const MARKETING_PRICE_RES =
+  /(?:\bfrom|\bas\s+low\s+as|\bstarting\s+at|\bonly|\bjust)\s+(?:US)?\$\s*\d/i;
 
 const INVOICE_NAME_RE = /(invoice|receipt|statement)\.pdf$/i;
 const IMAGE_NAME_RE = /\.(png|jpe?g|gif|webp|svg|ico)$/i;
@@ -203,13 +316,58 @@ export function merchantFromAddress(from: string): {
   if (key === "tutanota" || key === "tutamail") {
     return { merchantKey: "tuta", merchantName: "Tuta" };
   }
+  // R37: ESP-brand labels (host variants like shopifyemail.co.uk or
+  // e.shopifyemail.net that escape the ESP_HOSTS base list) are rails —
+  // return unknown so the caller's body/forward tiers can resolve the real
+  // store. Never mint the rail.
+  if (isEspBrandName(key)) {
+    return { merchantKey: "unknown", merchantName: "Unknown" };
+  }
   const merchantName = label
     .split(/[-_]/)
     .filter(Boolean)
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(" ");
+  // F-2: a product/infra host label is not a brand ("zohoaccounts" is Zoho's
+  // accounts host — user-locked: "it's just zoho"). Mint the canonical brand.
+  const canonical = canonicalBrandFor(key);
+  if (canonical) {
+    return { merchantKey: canonical.key, merchantName: canonical.display };
+  }
   return { merchantKey: key, merchantName };
 }
+
+const GENERIC_MERCHANT_KEYS = new Set([
+  "bot",
+  "bots",
+  "no-reply",
+  "noreply",
+  "donotreply",
+  "do-not-reply",
+  "admin",
+  "administrator",
+  "notifications",
+  "notification",
+  "newsletter",
+  "newsletters",
+  "mailer",
+  "mailer-daemon",
+  "postmaster",
+  "bounce",
+  "bounces",
+  "webmaster",
+  "system",
+]);
+
+const SELF_DOMAIN_MAILBOX_KINDS = new Set([
+  "gmail",
+  "workspace",
+  "outlook",
+  "office365",
+  "fastmail",
+  "zoho",
+  "imap",
+]);
 
 export function ownerAddressFromMailbox(mailboxId: string): string | null {
   const colon = mailboxId.indexOf(":");
@@ -238,6 +396,23 @@ export function isSelfMail(message: NormalizedMessage): boolean {
   const fromEmail = extractEmailAddress(message.from);
   const owner = ownerAddressFromMailbox(message.mailboxId);
   if (owner && fromEmail === owner) return true;
+  // R3: on custom-domain mailboxes any sender on the owner's own domain is
+  // the user's own company (no-reply@bohbotweb.com for david@bohbotweb.com)
+  // — never a merchant. Provider-hosted mailboxes (tuta:, proton:) are
+  // excluded: their domain belongs to the vendor, and vendor receipts
+  // (Tuta/Proton plans) are genuine subscriptions.
+  const colon = message.mailboxId.indexOf(":");
+  const kind = colon > 0 ? message.mailboxId.slice(0, colon).toLowerCase() : "";
+  if (
+    owner &&
+    fromEmail.includes("@") &&
+    owner.includes("@") &&
+    SELF_DOMAIN_MAILBOX_KINDS.has(kind)
+  ) {
+    const ownerDomain = owner.slice(owner.indexOf("@") + 1);
+    const fromDomain = fromEmail.slice(fromEmail.indexOf("@") + 1);
+    if (ownerDomain && fromDomain === ownerDomain) return true;
+  }
   const display = displayNameFrom(message.from);
   if (SELF_DISPLAY_NAMES.has(display)) {
     if (!owner) return true;
@@ -269,7 +444,15 @@ function titleCaseMerchant(raw: string): {
     .join("-")
     .toLowerCase()
     .replace(/[^a-z0-9-]/g, "");
-  if (!key || PAYMENT_PROCESSORS.has(key) || SELF_DISPLAY_NAMES.has(key)) {
+  if (
+    !key ||
+    PAYMENT_PROCESSORS.has(key) ||
+    SELF_DISPLAY_NAMES.has(key) ||
+    // R37: ESP brand names ("Shopifyemail", "Temu Email") are rails, never
+    // merchants — no matter which tier extracted the name (display, body,
+    // freemail, forward). One guard, every caller.
+    isEspBrandName(key)
+  ) {
     return { merchantKey: "unknown", merchantName: "Unknown" };
   }
   const merchantName = words
@@ -297,13 +480,504 @@ export function merchantFromProcessorText(text: string): {
   return null;
 }
 
-export function resolveMerchant(message: NormalizedMessage): {
+/**
+ * R38 P2: item names that are the rail itself (or receipt scaffolding), not
+ * the subscribed app.
+ */
+const RAIL_ITEM_NOISE = new Set([
+  "google play",
+  "play store",
+  "google",
+  "apple",
+  "app store",
+  "itunes",
+  "android",
+  "ios",
+  "order",
+  "receipt",
+  "subscription",
+  "in-app purchase",
+  "purchase",
+  "payment",
+]);
+
+/** Apple first-party services — the item IS Apple's own product. */
+const APPLE_FIRST_PARTY_RE = /\b(apple|icloud|itunes|arcade|apple\s+one|apple\s+music|apple\s+tv)\b/i;
+
+/**
+ * R38 P2 audit fix: prose tails ("order for your continued support") are
+ * receipt scaffolding, not app names. A tail that starts with a stopword or
+ * runs past four words is never a merchant.
+ */
+const RAIL_ITEM_STOPWORD_RE =
+  /^(?:your|you|my|our|the|this|that|these|those|a|an|continued|being|being\s+a|to|for|of|all|it|its|their)\b/i;
+const RAIL_ITEM_MAX_WORDS = 4;
+
+/**
+ * R38 P2: the real merchant of a Play/Apple rail receipt — the APP the
+ * charge is for. Candidates come from the P1 markup items (top tier), then
+ * the receipt subject/body "for X" phrasing. Returns:
+ *  - a {merchantKey,merchantName} to re-key to,
+ *  - "keep" when the item is first-party (the rail IS the merchant — Apple
+ *    One receipts stay Apple),
+ *  - null when unresolvable (caller falls to the honest aggregate SPARSE).
+ * Two or more distinct clean items is an aggregate receipt, not one app.
+ */
+export function railItemFromReceipt(
+  orderMarkup: { items: string[] } | null | undefined,
+  subject: string,
+  body: string | null,
+): { merchantKey: string; merchantName: string } | "keep" | null {
+  const candidates: string[] = [];
+  if (orderMarkup?.items?.length) candidates.push(...orderMarkup.items);
+  const subjectM = subject.match(
+    /\b(?:order|purchase|subscription|charge)\s+(?:for|of)\s+(.+)$/i,
+  );
+  if (subjectM?.[1]) candidates.push(subjectM[1]);
+  const bodyM = body?.match(
+    /\b(?:subscription to|purchase of|order of|your app|the app|the game)\s+([A-Za-z0-9][A-Za-z0-9 .:&'!-]{1,38})/i,
+  );
+  if (bodyM?.[1]) candidates.push(bodyM[1]);
+
+  const cleaned: { merchantKey: string; merchantName: string }[] = [];
+  for (const raw of candidates) {
+    const trimmed = raw.replace(/[\s.,;:!]+$|"[^"]*"$/g, "").trim();
+    if (!trimmed) continue;
+    if (RAIL_ITEM_NOISE.has(trimmed.toLowerCase())) continue;
+    if (RAIL_ITEM_STOPWORD_RE.test(trimmed)) continue;
+    if (trimmed.split(/\s+/).length > RAIL_ITEM_MAX_WORDS) continue;
+    const named = titleCaseMerchant(trimmed);
+    if (named.merchantKey === "unknown") continue;
+    if (isPaymentProcessor(named.merchantKey) || isEspBrandName(named.merchantKey))
+      continue;
+    if (!cleaned.some((c) => c.merchantKey === named.merchantKey))
+      cleaned.push(named);
+  }
+  if (cleaned.length === 0) return null;
+  if (cleaned.length > 1) return null; // multi-item receipt = honest aggregate
+  if (APPLE_FIRST_PARTY_RE.test(cleaned[0].merchantName)) return "keep";
+  return cleaned[0];
+}
+
+/**
+ * R38 P2: a Squarespace receipt bills the SITE/DOMAIN the user runs on the
+ * rail — extract it as the merchant. Domains only (the subscription IS the
+ * domain/website); the rail's own host never qualifies. Null if absent.
+ */
+export function squarespaceSiteFromText(text: string): {
+  merchantKey: string;
+  merchantName: string;
+} | null {
+  const patterns = [
+    /(?:domain|website|site|plan|subscription)\s+(?:renewal|subscription|plan)?\s*(?:for|of)?\s+([a-z0-9][a-z0-9-]*(?:\.[a-z0-9-]+)+)/i,
+    /(?:renew(?:al|ing)?|subscrib\w*|charg\w*)\s+(?:to|for|of)?\s*([a-z0-9][a-z0-9-]*(?:\.[a-z0-9-]+)+)/i,
+  ];
+  for (const re of patterns) {
+    const m = text.match(re);
+    if (!m?.[1]) continue;
+    const domain = m[1].toLowerCase().replace(/\.$/, "");
+    const labels = domain.split(".");
+    const tld = labels[labels.length - 1];
+    if (labels.length < 2 || tld.length < 2 || tld.length > 10) continue;
+    if (/^(squarespace|google|apple|gstatic)\b/.test(domain)) continue;
+    if (/\.(png|jpg|jpeg|gif|webp|svg|css|js|html)$/i.test(domain)) continue;
+    return {
+      merchantKey: domain.replace(/[^a-z0-9]+/g, "-"),
+      merchantName: domain,
+    };
+  }
+  return null;
+}
+
+/**
+ * Phase M (triage honesty): freemail hosts are mailbox providers, not
+ * companies. A sender on one of these hosts can NEVER mint the merchant from
+ * the host alone — a forwarded bill is re-keyed to the original issuer's
+ * From-host inside the forward, and a non-forwarded freemail sender (a small
+ * business billing from a personal address) falls back to display-name / body
+ * evidence and imports sparse. Not every email is a subscription.
+ */
+const FREEMAIL_HOSTS = [
+  "gmail.com",
+  "googlemail.com",
+  "outlook.com",
+  "hotmail.com",
+  "yahoo.com",
+  "icloud.com",
+];
+
+/**
+ * R29: email-service-provider (ESP) hosts are delivery rails, not merchants.
+ * A store running on Shopify sends its order mail from
+ * orders@shopifyemail.com — the STORE is the merchant (From display name or
+ * body), never the host. The 2026-09-17 device state had "Shopifyemail
+ * sparse $1,439.00 Monthly" minted this way (a one-off order total stamped
+ * by the old default-cadence bug — the user's "$1,439/month is absurd"
+ * report). Same treatment as freemail hosts: resolve the real merchant and
+ * import sparse, or drop — not every email is a subscription.
+ */
+const ESP_HOSTS = [
+  "shopifyemail.com",
+  "email.shopify.com",
+  "checkout.shopify.com",
+  "temuemail.com",
+  "sendgrid.net",
+  "mailgun.net",
+  "mailgun.org",
+  "mandrillapp.com",
+  "sparkpostmail.com",
+  "amazonses.com",
+  "sendinblue.com",
+  "brevo.com",
+];
+
+/** R33: shared with the esp-orphan migration (name-token derivation). */
+export { ESP_HOSTS };
+
+function isEspHost(host: string): boolean {
+  const h = host.toLowerCase();
+  return ESP_HOSTS.some((base) => hostMatchesBase(h, base));
+}
+
+/**
+ * R37: ESP brand names ("Shopifyemail", "Temuemail") are rails even when
+ * they arrive as a From DISPLAY name — Shopify's own system mail comes as
+ * `Shopifyemail <orders@shopifyemail.com>` and the ESP display-name tier
+ * re-minted the exact ghost R33 archives at every boot. Derived from the
+ * single-label ESP host bases.
+ */
+const ESP_BRAND_SLUGS = new Set(
+  ESP_HOSTS.flatMap((host) => {
+    const parts = host.split(".");
+    return parts.length === 2 ? [parts[0]] : [];
+  }),
+);
+
+export function isEspBrandName(name: string): boolean {
+  return ESP_BRAND_SLUGS.has(name.toLowerCase().replace(/[^a-z0-9]+/g, ""));
+}
+
+function hostMatchesBase(host: string, base: string): boolean {
+  return host === base || host.endsWith(`.${base}`);
+}
+
+function isFreemailHost(host: string): boolean {
+  const h = host.toLowerCase();
+  return FREEMAIL_HOSTS.some((base) => hostMatchesBase(h, base));
+}
+
+function hostFromAddress(from: string): string | null {
+  const email = extractEmailAddress(from);
+  const at = email.lastIndexOf("@");
+  return at >= 0 ? email.slice(at + 1) : null;
+}
+
+/**
+ * google.com-family senders are Google the company — resolve to the specific
+ * product from subject/body cues, never to "Gmail" (the "$1,439 Gmail"
+ * phantom). No cue means the bill is from Google as a whole, not a product
+ * the classifier can name; it still never mints a mailbox label.
+ */
+function isGoogleFamilyHost(host: string): boolean {
+  return hostMatchesBase(host.toLowerCase(), "google.com");
+}
+
+/**
+ * R27: subject-tier regexes decide the product from the subject; body-tier
+ * patterns require a product URL or a qualified product phrase. A bare
+ * "YouTube" in body text (social footer, cross-sell link) no longer keys
+ * the email — that is how a Google Store ad became a "YouTube" charge.
+ */
+const GOOGLE_PRODUCT_MATCHERS: {
+  re: RegExp;
+  /** Body-tier: stricter — URL or qualified product phrase only. */
+  bodyRe?: RegExp;
+  key: string;
+  name: string;
+  host: string;
+}[] = [
+  {
+    re: /\bgoogle\s+store\b|store\.google\.com|\bgooglestore\b/i,
+    bodyRe: /\bgoogle\s+store\b|store\.google\.com|\bgooglestore\b/i,
+    key: "google-store",
+    name: "Google Store",
+    host: "store.google.com",
+  },
+  {
+    re: /\bgoogle\s+workspace\b|\bgsuite\b|\bg\s?suite\b/i,
+    bodyRe: /\bgoogle\s+workspace\b|\bgsuite\b|workspace\.google\.com/i,
+    key: "google-workspace",
+    name: "Google Workspace",
+    host: "workspace.google.com",
+  },
+  {
+    re: /\bgoogle\s+cloud\b|\bgoogle\s+cloud\s+platform\b|\bgcp\b/i,
+    bodyRe: /\bgoogle\s+cloud\b|\bgcp\b|cloud\.google\.com/i,
+    key: "google-cloud",
+    name: "Google Cloud",
+    host: "cloud.google.com",
+  },
+  {
+    re: /\bgoogle\s+ads(?:ense|words)?\b/i,
+    bodyRe: /\bgoogle\s+ads(?:ense|words)?\b|ads\.google\.com/i,
+    key: "google-ads",
+    name: "Google Ads",
+    host: "ads.google.com",
+  },
+  {
+    re: /\bgoogle\s+one\b/i,
+    bodyRe: /\bgoogle\s+one\b|one\.google\.com/i,
+    key: "google-one",
+    name: "Google One",
+    host: "one.google.com",
+  },
+  {
+    re: /\bgoogle\s+play\b|\bplay\s+billing\b/i,
+    bodyRe:
+      /\bgoogle\s+play\b|\bplay\s+billing\b|play\.google\.com|\bGPA\.[A-Z0-9]+/i,
+    key: "google-play",
+    name: "Google Play",
+    host: "play.google.com",
+  },
+  {
+    re: /\bgoogle\s+drive\b/i,
+    bodyRe: /\bgoogle\s+drive\b|drive\.google\.com/i,
+    key: "google-drive",
+    name: "Google Drive",
+    host: "drive.google.com",
+  },
+  {
+    re: /\byoutube\b/i,
+    bodyRe: /\byoutube\s+(?:premium|tv|music|kids)\b|youtube\.com/i,
+    key: "youtube",
+    name: "YouTube",
+    host: "youtube.com",
+  },
+];
+
+function googleProductFromText(
+  text: string | null | undefined,
+  tier: "subject" | "body",
+): (typeof GOOGLE_PRODUCT_MATCHERS)[number] | null {
+  if (!text) return null;
+  for (const m of GOOGLE_PRODUCT_MATCHERS) {
+    if (tier === "subject" ? m.re.test(text) : m.bodyRe && m.bodyRe.test(text))
+      return m;
+  }
+  return null;
+}
+
+const FORWARD_SUBJECT_RE = /(?:^|\s)fwd?\s*:/i;
+const FORWARD_BODY_RE = /forwarded message/i;
+const QUOTED_FROM_RE = /^\s*From:\s*(.+)$/gim;
+
+/** The first From: line inside a forwarded body whose host can be an issuer
+ * (dotted, non-freemail). Freemail inner senders are skipped, not fatal. */
+function originalIssuerInForward(
+  body: string,
+): { from: string; host: string } | null {
+  QUOTED_FROM_RE.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = QUOTED_FROM_RE.exec(body)) !== null) {
+    const from = m[1].trim();
+    const host = hostFromAddress(from);
+    if (!host || !host.includes(".") || isFreemailHost(host)) continue;
+    return { from, host };
+  }
+  return null;
+}
+
+interface MerchantResolution {
   merchantKey: string;
   merchantName: string;
   officialDomain: string | null;
   evidence: string[];
   drop: boolean;
-} {
+  /** M: freemail fallback mints import sparse, never recurring. */
+  forceSparse?: boolean;
+}
+
+function resolveGoogleSender(message: NormalizedMessage): MerchantResolution {
+  // R27: the sender's local part is the strongest product cue — Google's
+  // no-reply addresses name the product line (googlestore-noreply@…).
+  const fromEmail = extractEmailAddress(message.from).toLowerCase();
+  const localPart = fromEmail.split("@")[0] ?? "";
+  if (/googlestore/.test(localPart)) {
+    return {
+      merchantKey: "google-store",
+      merchantName: "Google Store",
+      officialDomain: "store.google.com",
+      evidence: ["google-sender:googlestore"],
+      drop: false,
+    };
+  }
+  if (/\bplay\b/.test(localPart)) {
+    return {
+      merchantKey: "google-play",
+      merchantName: "Google Play",
+      officialDomain: "play.google.com",
+      evidence: ["google-sender:play"],
+      drop: false,
+    };
+  }
+  const product =
+    googleProductFromText(message.subject, "subject") ??
+    googleProductFromText(moneyBodyText(message), "body");
+  if (product) {
+    return {
+      merchantKey: product.key,
+      merchantName: product.name,
+      officialDomain: product.host,
+      evidence: [`google-product:${product.key}`],
+      drop: false,
+    };
+  }
+  return {
+    merchantKey: "google",
+    merchantName: "Google",
+    officialDomain: "google.com",
+    evidence: ["google:generic"],
+    drop: false,
+  };
+}
+
+/**
+ * R29: an ESP-host sender resolves to the real STORE — From display name
+ * first, then the body's purchase/order phrasing — and imports sparse (a
+ * store order is a one-off). A bare ESP address with no store evidence
+ * drops: infrastructure mail, not a subscription.
+ */
+function resolveEspSender(message: NormalizedMessage): MerchantResolution {
+  if (message.from.indexOf("<") >= 0) {
+    const display = displayNameFrom(message.from);
+    if (display && !display.includes("@")) {
+      const named = titleCaseMerchant(display);
+      // R37: a display name that IS the ESP brand ("Shopifyemail") is the
+      // rail branding itself, not a store — fall through to the body tier.
+      if (
+        named.merchantKey !== "unknown" &&
+        !isEspBrandName(named.merchantName)
+      ) {
+        return {
+          ...named,
+          officialDomain: null,
+          evidence: ["esp:display-name"],
+          drop: false,
+          forceSparse: true,
+        };
+      }
+    }
+  }
+  const body = moneyBodyText(message);
+  const storePatterns = [
+    /\b(?:purchase|order)\s+(?:from|at)\s+([A-Za-z0-9][A-Za-z0-9 &''-]{1,40}?)(?:\s*[.!,\n]|$)/i,
+    /\b([A-Za-z0-9][A-Za-z0-9 &''-]{1,40}?)\s+order\s*(?:#|no\.?|number)/i,
+  ];
+  for (const re of storePatterns) {
+    const m = body.match(re);
+    if (m?.[1]) {
+      const named = titleCaseMerchant(m[1].trim());
+      if (
+        named.merchantKey !== "unknown" &&
+        !isEspBrandName(named.merchantName)
+      ) {
+        return {
+          ...named,
+          officialDomain: null,
+          evidence: ["esp:body-store"],
+          drop: false,
+          forceSparse: true,
+        };
+      }
+    }
+  }
+  return {
+    merchantKey: "unknown",
+    merchantName: "Unknown",
+    officialDomain: null,
+    evidence: ["drop:esp-unresolved"],
+    drop: true,
+  };
+}
+
+function resolveFreemailSender(message: NormalizedMessage): MerchantResolution {
+  const body = moneyBodyText(message);
+  if (FORWARD_SUBJECT_RE.test(message.subject) || FORWARD_BODY_RE.test(body)) {
+    // The quoted From: line must keep its <address> — moneyBodyText strips
+    // anything angle-bracketed as markup, so scan the raw text first and the
+    // stripped html as a second chance.
+    let original = originalIssuerInForward(message.text ?? "");
+    if (!original && message.html) {
+      original = originalIssuerInForward(stripHtml(message.html));
+    }
+    if (
+      !original &&
+      (FORWARD_BODY_RE.test(body) || FORWARD_BODY_RE.test(message.text ?? ""))
+    ) {
+      return {
+        merchantKey: "unknown",
+        merchantName: "Unknown",
+        officialDomain: null,
+        evidence: ["drop:forward-unresolved"],
+        drop: true,
+      };
+    }
+    if (original) {
+      if (isGoogleFamilyHost(original.host)) {
+        const resolved = resolveGoogleSender(message);
+        return {
+          ...resolved,
+          evidence: [`forward:${original.host}`, ...resolved.evidence],
+        };
+      }
+      return {
+        ...merchantFromAddress(original.from),
+        officialDomain: officialDomainFromAddress(original.from),
+        evidence: [`forward:${original.host}`],
+        drop: false,
+      };
+    }
+  }
+  // Not forwarded: a small business billing from a personal address falls
+  // back to display-name, then body, evidence — and imports sparse. A bare
+  // address (no angled display name) must not mint from the local part.
+  if (message.from.indexOf("<") >= 0) {
+    const display = displayNameFrom(message.from);
+    if (display && !display.includes("@")) {
+      const named = titleCaseMerchant(display);
+      if (named.merchantKey !== "unknown") {
+        return {
+          ...named,
+          officialDomain: null,
+          evidence: ["freemail:display-name"],
+          drop: false,
+          forceSparse: true,
+        };
+      }
+    }
+  }
+  const named = merchantFromProcessorText(body);
+  if (named) {
+    return {
+      ...named,
+      officialDomain: null,
+      evidence: ["freemail:body"],
+      drop: false,
+      forceSparse: true,
+    };
+  }
+  return {
+    merchantKey: "unknown",
+    merchantName: "Unknown",
+    officialDomain: null,
+    evidence: ["drop:freemail-no-identity"],
+    drop: true,
+  };
+}
+
+export function resolveMerchant(
+  message: NormalizedMessage,
+): MerchantResolution {
   if (isSelfMail(message)) {
     return {
       merchantKey: "self",
@@ -315,6 +989,31 @@ export function resolveMerchant(message: NormalizedMessage): {
   }
   const fromMerchant = merchantFromAddress(message.from);
   const fromDomain = officialDomainFromAddress(message.from);
+  // R7: generic single-word senders ("Bot", "no-reply", "admin", …) are
+  // infrastructure, not merchants — never import them as subscription rows.
+  if (GENERIC_MERCHANT_KEYS.has(fromMerchant.merchantKey)) {
+    return {
+      merchantKey: fromMerchant.merchantKey,
+      merchantName: fromMerchant.merchantName,
+      officialDomain: fromDomain,
+      evidence: [`drop:generic-name:${fromMerchant.merchantKey}`],
+      drop: true,
+    };
+  }
+  // Phase M (triage honesty): freemail hosts never mint the merchant from
+  // the host alone, and google.com-family senders resolve to the specific
+  // Google product — never "Gmail".
+  const fromHost = hostFromAddress(message.from);
+  if (fromHost && isFreemailHost(fromHost)) {
+    return resolveFreemailSender(message);
+  }
+  if (fromHost && isGoogleFamilyHost(fromHost)) {
+    return resolveGoogleSender(message);
+  }
+  // R29: ESP hosts are rails — resolve the store, never mint the ESP.
+  if (fromHost && isEspHost(fromHost)) {
+    return resolveEspSender(message);
+  }
   if (!isPaymentProcessor(fromMerchant.merchantKey)) {
     return {
       ...fromMerchant,
@@ -323,7 +1022,15 @@ export function resolveMerchant(message: NormalizedMessage): {
       drop: false,
     };
   }
+  // R38 P2: Squarespace receipts bill the site/domain — try that before the
+  // generic processor phrasing (its "domain renewal" copy matches none of it).
+  const squarespaceNamed =
+    fromMerchant.merchantKey === "squarespace"
+      ? squarespaceSiteFromText(message.subject) ||
+        (message.text ? squarespaceSiteFromText(message.text) : null)
+      : null;
   const named =
+    squarespaceNamed ||
     merchantFromProcessorText(message.subject) ||
     (message.text ? merchantFromProcessorText(message.text) : null);
   if (!named) {
@@ -371,16 +1078,17 @@ function stripHtml(html: string): string {
     .replace(/<[^>]+>/g, " ")
     .replace(/&nbsp;/gi, " ")
     .replace(/&amp;/g, "&")
-    .replace(/&#(\d+);/g, (_, n) =>
-      String.fromCharCode(Number.parseInt(n, 10)),
-    )
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number.parseInt(n, 10)))
     .replace(/&/g, "&")
     .replace(/\s+/g, " ")
     .trim();
 }
 
 function looksLikeMarkup(text: string): boolean {
-  return /<\/?[a-z][\s\S]*>/i.test(text) || /&(nbsp|amp|lt|gt|quot|#\d+);/i.test(text);
+  return (
+    /<\/?[a-z][\s\S]*>/i.test(text) ||
+    /&(nbsp|amp|lt|gt|quot|#\d+);/i.test(text)
+  );
 }
 
 function parseAmount(
@@ -403,17 +1111,293 @@ function parseAmount(
   return null;
 }
 
-function inferCadence(text: string): Cadence | undefined {
-  if (
-    /(\/yr\b|per\s+year|annual(?:ly)?|domain\s+registration|renewal\s+price)/i.test(
-      text,
-    )
-  ) {
-    return "yearly";
+interface CadenceEvidence {
+  cadence?: Cadence;
+  strong: boolean;
+  tag: string;
+}
+
+/**
+ * R27: cadence by evidence, not by word-match. STRONG anchors state the
+ * billing relationship (billed/renews + cadence, "your monthly plan", a
+ * price with its billing unit "$13.99/mo") and are sufficient alone. A bare
+ * cadence word in prose ("monthly") is WEAK: it only counts on a
+ * payment-proven recurring hit — a pre-order ad that says "monthly" in
+ * marketing copy never earns a cadence, and sparse one-offs never do from
+ * weak words.
+ */
+const STRONG_CADENCE_RES: { re: RegExp; cadence: Cadence; tag: string }[] = [
+  {
+    re: /\bbilled\s+(?:yearly|annually|every\s+year)\b/i,
+    cadence: "yearly",
+    tag: "billed-yearly",
+  },
+  {
+    re: /\bbilled\s+(?:monthly|every\s+month)\b/i,
+    cadence: "monthly",
+    tag: "billed-monthly",
+  },
+  { re: /\bbilled\s+weekly\b/i, cadence: "weekly", tag: "billed-weekly" },
+  {
+    re: /\brenew(?:s|ed)?\s+(?:yearly|annually)\b/i,
+    cadence: "yearly",
+    tag: "renews-yearly",
+  },
+  {
+    re: /\brenew(?:s|ed)?\s+(?:monthly|weekly)\b/i,
+    cadence: "monthly",
+    tag: "renews-monthly",
+  },
+  {
+    re: /\byour\s+(?:yearly|annual)\s+(?:plan|subscription|membership)\b/i,
+    cadence: "yearly",
+    tag: "your-yearly-plan",
+  },
+  {
+    re: /\byour\s+(?:monthly|weekly)\s+(?:plan|subscription|membership)\b/i,
+    cadence: "monthly",
+    tag: "your-monthly-plan",
+  },
+  {
+    re: /\b(?:yearly|annual)\s+(?:plan|subscription|membership)\b/i,
+    cadence: "yearly",
+    tag: "yearly-plan",
+  },
+  {
+    re: /\b(?:monthly|weekly)\s+(?:plan|subscription|membership)\b/i,
+    cadence: "monthly",
+    tag: "monthly-plan",
+  },
+  {
+    re: /(?:US)?\$\s*\d[\d.,]*\s*(?:\/|per\s+)\s*(?:yr|year)\b/i,
+    cadence: "yearly",
+    tag: "price-per-year",
+  },
+  {
+    re: /(?:US)?\$\s*\d[\d.,]*\s*(?:\/|per\s+)\s*(?:mo|month)\b/i,
+    cadence: "monthly",
+    tag: "price-per-month",
+  },
+  {
+    re: /(?:US)?\$\s*\d[\d.,]*\s*(?:\/|per\s+)\s*(?:wk|week)\b/i,
+    cadence: "weekly",
+    tag: "price-per-week",
+  },
+  {
+    re: /\bdomain\s+registration\b/i,
+    cadence: "yearly",
+    tag: "domain-registration",
+  },
+  {
+    re: /\brenewal\s+price\b/i,
+    cadence: "yearly",
+    tag: "renewal-price",
+  },
+];
+
+const WEAK_CADENCE_RES: { re: RegExp; cadence: Cadence; word: string }[] = [
+  {
+    re: /\byearly\b|\bannually\b|\bannual\b/i,
+    cadence: "yearly",
+    word: "yearly",
+  },
+  { re: /\bmonthly\b/i, cadence: "monthly", word: "monthly" },
+  { re: /\bweekly\b/i, cadence: "weekly", word: "weekly" },
+];
+
+function inferCadenceEvidence(
+  text: string,
+  hasProof: boolean,
+  kind: CandidateKind,
+): CadenceEvidence {
+  for (const m of STRONG_CADENCE_RES) {
+    if (m.re.test(text)) {
+      return { cadence: m.cadence, strong: true, tag: m.tag };
+    }
   }
-  if (/(\/mo\b|per\s+month|monthly)/i.test(text)) return "monthly";
-  if (/\brenews\b/i.test(text)) return "unknown";
+  if (hasProof && kind === "recurring") {
+    for (const m of WEAK_CADENCE_RES) {
+      if (m.re.test(text)) {
+        return { cadence: m.cadence, strong: false, tag: `weak-${m.word}` };
+      }
+    }
+  }
+  return { strong: false, tag: "none" };
+}
+
+/** R18: clockwork payment-spacing inference. When the same merchant charges
+ * like clockwork — EVERY gap between consecutive charges sits inside one
+ * cadence band (weekly ≈7d, monthly ≈30d, yearly ≈365d) — that cadence is
+ * safe to assume even when the email text never names it. Conservative by
+ * design: fewer than 3 charges (2 gaps) or one irregular gap → unknown.
+ * Never used to promote sparse merchants to recurring (A-decision). */
+export function inferCadenceFromPayments(
+  dates: string[],
+): "weekly" | "monthly" | "yearly" | undefined {
+  const DAY = 86_400_000;
+  const times = dates
+    .map((d) => new Date(d).getTime())
+    .filter((t) => !Number.isNaN(t))
+    .sort((a, b) => a - b);
+  if (times.length < 3) return undefined;
+  const intervals: number[] = [];
+  for (let i = 1; i < times.length; i += 1) {
+    intervals.push((times[i] - times[i - 1]) / DAY);
+  }
+  const bands: {
+    cadence: "weekly" | "monthly" | "yearly";
+    min: number;
+    max: number;
+  }[] = [
+    { cadence: "weekly", min: 5, max: 9 },
+    { cadence: "monthly", min: 26, max: 34 },
+    { cadence: "yearly", min: 355, max: 375 },
+  ];
+  for (const band of bands) {
+    if (intervals.every((iv) => iv >= band.min && iv <= band.max)) {
+      return band.cadence;
+    }
+  }
   return undefined;
+}
+
+/** R18: best-effort bill reference (invoice/order/receipt number). Deliberately
+ * conservative: the keyword must sit right next to the id and the id must
+ * contain a digit, so prose like "in order to confirm" never matches. Often
+ * null — the field stays user-editable.
+ * 2026-09-16: invoice emails are HTML — tags between the keyword and the
+ * number are stripped before matching; the id length cap is removed (Tuta's
+ * numeric references grow over time); and a bare long digit run in an email
+ * whose subject says "invoice" is accepted even when markup separated it from
+ * the keyword (the 2026-07-14 "New invoice for Tuta" case). */
+const BILL_NUMBER_RE =
+  /\b(?:invoice|order|receipt)\s*(?:#|no\.?|number)?\s*[:#-]?\s*([A-Z0-9][A-Z0-9/-]{3,})\b/i;
+const LONG_DIGIT_RUN_RE = /\b\d{10,}\b/;
+
+export function extractBillNumber(text: string): string | undefined {
+  if (!text) return undefined;
+  const plain = text.replace(/<[^>]*>/g, " ").replace(/&nbsp;/gi, " ");
+  const token = plain.match(BILL_NUMBER_RE)?.[1];
+  if (token && /\d/.test(token)) return token;
+  // Link-style invoices (Tuta): the subject says "invoice" and the body
+  // carries a bare long numeric reference. Ten digits or more keeps prose
+  // numbers (years, totals) out.
+  if (/\binvoice\b/i.test(plain)) {
+    return plain.match(LONG_DIGIT_RUN_RE)?.[0];
+  }
+  return undefined;
+}
+
+// ---------------------------------------------------------------------------
+// Phase C: icon-from-email. Brand-sent mail regularly carries the merchant's
+// own logo (header <img>, cid inline image, signature mark). Extraction runs
+// at classify time because stripBodyForStore drops the html right after; only
+// fetchable https URLs survive into emailIconUrls — cid refs are recorded as
+// evidence and skipped honestly until a provider supplies fetchable refs.
+// ---------------------------------------------------------------------------
+
+const MAX_EMAIL_ICON_URLS = 5;
+const EMAIL_IMG_TAG_RE = /<img\b[^>]*>/gi;
+const EMAIL_SRC_RE = /\bsrc\s*=\s*["']([^"']+)["']/i;
+const EMAIL_ALT_RE = /\balt\s*=\s*["']([^"']*)["']/i;
+const EMAIL_WIDTH_RE = /\bwidth\s*=\s*["']?(\d{1,4})/i;
+const EMAIL_HEIGHT_RE = /\bheight\s*=\s*["']?(\d{1,4})/i;
+const EMAIL_TRACKING_RE =
+  /(?:pixel|tracking|open(?:\.aspx|\bstat)|\/o[._]gif|dblclk|beacon|analytics)/i;
+const EMAIL_SIGNATURE_TOKEN_RE =
+  /(?:^|[/?#_.=-])(?:signature|sig)(?:$|[/?#_.=-])/i;
+// Anything under 8px is a tracking/beacon image, never a logo.
+const EMAIL_MIN_DIMENSION = 8;
+
+export function extractEmailIconUrls(
+  message: NormalizedMessage,
+  officialDomain?: string | null,
+): { urls: string[]; cidSkipped: string[] } {
+  const urls: string[] = [];
+  const cidSkipped: string[] = [];
+  const html = message.html;
+  if (!html || !html.trim()) return { urls, cidSkipped };
+
+  const firstPartyHost = officialDomain
+    ? officialDomain.replace(/^www\./i, "").toLowerCase()
+    : null;
+
+  const seen = new Set<string>();
+  const firstParty: string[] = [];
+  const logoish: string[] = [];
+  const signatures: string[] = [];
+
+  for (const tag of html.match(EMAIL_IMG_TAG_RE) ?? []) {
+    const src = tag.match(EMAIL_SRC_RE)?.[1]?.trim();
+    if (!src) continue;
+    if (/^cid:/i.test(src)) {
+      // Inline attachment refs are the STRONGEST provenance, but no provider
+      // supplies a fetchable ref today — record and skip, never fake a URL.
+      cidSkipped.push(src.slice(4).split("?")[0]);
+      continue;
+    }
+    if (/^data:/i.test(src)) continue;
+    // Email CDNs commonly serve http://; the crawl fetches https cleanly and
+    // an https-only candidate list keeps every seed on an upgraded origin.
+    let url = src.replace(/^http:\/\//i, "https://");
+    let host = "";
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol !== "https:") continue;
+      url = parsed.href;
+      host = parsed.hostname.replace(/^www\./i, "").toLowerCase();
+    } catch {
+      continue;
+    }
+    const alt = tag.match(EMAIL_ALT_RE)?.[1] ?? "";
+    const width = Number.parseInt(tag.match(EMAIL_WIDTH_RE)?.[1] ?? "0", 10);
+    const height = Number.parseInt(tag.match(EMAIL_HEIGHT_RE)?.[1] ?? "0", 10);
+    if (
+      (width > 0 && width < EMAIL_MIN_DIMENSION) ||
+      (height > 0 && height < EMAIL_MIN_DIMENSION) ||
+      EMAIL_TRACKING_RE.test(url.toLowerCase())
+    ) {
+      continue;
+    }
+    // Junk PNG farms / social-share art / UI chrome stay out regardless of
+    // who sent the mail — the brand forwarded them, it did not make them.
+    if (
+      isJunkIconFarmHost(url) ||
+      isGenericSocialImage(url, "") ||
+      isUiChromeImage(url, "")
+    ) {
+      continue;
+    }
+
+    const logoToken =
+      hasDiscoveryUrlSignal(url) || hasDiscoveryUrlSignal(alt.toLowerCase());
+    const signatureToken = EMAIL_SIGNATURE_TOKEN_RE.test(url.toLowerCase());
+    // Explicit logo-sized dimensions (24–256px) also mark a header image.
+    const sizedLogo =
+      !signatureToken &&
+      width >= 24 &&
+      width <= 256 &&
+      height >= 24 &&
+      height <= 256;
+    if (!logoToken && !signatureToken && !sizedLogo) continue;
+
+    if (seen.has(url)) continue;
+    seen.add(url);
+    const firstPartyMatch =
+      firstPartyHost !== null &&
+      (host === firstPartyHost || host.endsWith(`.${firstPartyHost}`));
+    if (signatureToken) signatures.push(url);
+    else if (firstPartyMatch) firstParty.push(url);
+    else logoish.push(url);
+  }
+
+  return {
+    urls: [...firstParty, ...logoish, ...signatures].slice(
+      0,
+      MAX_EMAIL_ICON_URLS,
+    ),
+    cidSkipped,
+  };
 }
 
 function isInvoiceAttachment(att: MailAttachment): boolean {
@@ -470,6 +1454,7 @@ export function classifyMessage(message: NormalizedMessage): ClassifiedMessage {
       merchantKey,
       merchantName,
       officialDomain,
+      ...emailIconFields(message, officialDomain, evidence),
       kind: "free",
       amountUnknown: false,
       needsBody: false,
@@ -479,35 +1464,264 @@ export function classifyMessage(message: NormalizedMessage): ClassifiedMessage {
   }
 
   const body = moneyBodyText(message);
+
+  // R38 Phase 1: schema.org Order markup (ld+json in the email HTML) is the
+  // top evidence tier — the sender states seller/items/price as data instead
+  // of us mining rendered text. Absent markup (the common case) changes
+  // nothing: regex tiers apply unchanged.
+  const orderMarkup = extractOrderMarkup(
+    message.html ??
+      (message.text && looksLikeMarkup(message.text) ? message.text : null),
+  );
+
+  // R38 P2: billing rails never mint in their own name. A Play/Apple
+  // receipt's merchant is the APP the charge is for — re-key from the P1
+  // markup items (top tier) or the receipt's "for X" phrasing. First-party
+  // Apple items keep the rail key (Apple One IS Apple). No resolvable item
+  // means the honest AGGREGATE row keyed to the rail — SPARSE always, never
+  // a recurring subscription in the rail's own name.
+  let finalKey = merchantKey;
+  let finalName = merchantName;
+  let finalDomain = officialDomain;
+  let railForceSparse = false;
+  if (merchantKey === "google-play" || merchantKey === "apple") {
+    const railItem = railItemFromReceipt(orderMarkup, message.subject, body);
+    if (railItem === "keep") {
+      evidence.push("rail:first-party-item");
+    } else if (railItem) {
+      finalKey = railItem.merchantKey;
+      finalName = railItem.merchantName;
+      finalDomain = null;
+      evidence.push(`rail-item:${railItem.merchantKey}`);
+    } else {
+      railForceSparse = true;
+      evidence.push("rail:aggregate-sparse");
+    }
+  }
+
+  // R27 purchase-proof gate: payment anchors decide everything downstream.
+  // Hints are optional provider weights (Gmail/Workspace only) — the gate
+  // must stand on its own without them.
+  const strongProofTags = PAYMENT_PROOF_STRONG_RES.filter((p) =>
+    p.re.test(`${message.subject}\n${body}`),
+  ).map((p) => `proof:${p.tag}`);
+  const genericProofTags = PAYMENT_PROOF_GENERIC_RES.filter((p) =>
+    p.re.test(`${message.subject}\n${body}`),
+  ).map((p) => `proof:${p.tag}`);
+  // An Order payload with a price is a machine-readable charge artifact —
+  // it outranks regex proof and must count BEFORE the marketing drop gate,
+  // so a promo-looking subject carrying a real Order never drops.
+  if (
+    orderMarkup &&
+    (orderMarkup.price !== undefined || orderMarkup.orderStatus)
+  ) {
+    strongProofTags.push("proof:order-markup");
+  }
+  const proofTags = [...strongProofTags, ...genericProofTags];
+  const marketingTags: string[] = [];
+  let marketingScore = 0;
+  for (const m of MARKETING_SUBJECT_RES) {
+    if (m.re.test(message.subject)) {
+      marketingTags.push(m.tag);
+      marketingScore += 2;
+    }
+  }
+  for (const m of MARKETING_BODY_RES) {
+    if (body && m.re.test(body)) {
+      marketingTags.push(m.tag);
+      marketingScore += 1;
+    }
+  }
+  if (MARKETING_PRICE_RES.test(message.subject)) {
+    marketingTags.push("subject:marketing-price");
+    marketingScore += 2;
+  }
+  if (body && MARKETING_PRICE_RES.test(body)) {
+    marketingTags.push("body:marketing-price");
+    marketingScore += 2;
+  }
+  if (message.hints?.gmailCategory === "CATEGORY_PROMOTIONS") {
+    marketingTags.push("gmail:promotions");
+    marketingScore += 3;
+  }
+  if (message.hints?.gmailCategory === "CATEGORY_SOCIAL") {
+    marketingTags.push("gmail:social");
+    marketingScore += 2;
+  }
+  if (message.hints?.listUnsubscribe) {
+    marketingTags.push("header:list-unsubscribe");
+    marketingScore += 3;
+  }
+  if (message.hints?.listId) {
+    marketingTags.push("header:list-id");
+    marketingScore += 1;
+  }
+  if (
+    message.hints?.precedence &&
+    /bulk|junk|list/i.test(message.hints.precedence)
+  ) {
+    marketingTags.push("header:precedence-bulk");
+    marketingScore += 1;
+  }
+
+  // Marketing evidence with zero payment anchors = advertising (the Pixel
+  // Watch 5 pre-order class): drop — no kind, no amount, no row. STRONG
+  // proof always wins (real receipts keep their unsubscribe footers), but
+  // GENERIC proof alone survives only a light marketing footprint: heavy
+  // marketing (≥4 — e.g. a pre-order pitch with List-Unsubscribe +
+  // Precedence: bulk) with no concrete charge artifact is still an ad —
+  // its "payment method" fine-print is not a payment event.
+  // Threshold 2 for the no-proof case: one soft body marker ("learn
+  // more") alone must not drop a plain statement email.
+  if (
+    strongProofTags.length === 0 &&
+    ((proofTags.length === 0 && marketingScore >= 2) ||
+      (proofTags.length > 0 && marketingScore >= 4))
+  ) {
+    return {
+      message,
+      subjectClass,
+      merchantKey,
+      merchantName,
+      officialDomain,
+      kind: null,
+      amountUnknown: false,
+      needsBody: false,
+      evidence: [
+        ...evidence,
+        ...proofTags,
+        ...marketingTags,
+        "drop:marketing-no-proof",
+      ],
+      confidence: "high",
+    };
+  }
+
+  // Amounts are only believed when a payment anchor exists — ad copy prices
+  // ("$549.99") must never mint charges. Exception: a money-classified
+  // subject carrying a price with zero marketing evidence (Proton's "Your
+  // Proton subscription $4.99") is a subject-anchored price, not ad copy.
+  const subjectAnchored =
+    proofTags.length === 0 &&
+    marketingScore === 0 &&
+    /\$\s*\d/.test(message.subject);
+  // R38 Phase 1: a stated Order price is authoritative — the sender encoded
+  // it as data; regex mining of stripped HTML never overrides it.
   const parsed =
-    (body ? parseAmount(body) : null) || parseAmount(message.subject);
-  const cadence = body
-    ? inferCadence(body) || inferCadence(message.subject)
-    : inferCadence(message.subject);
+    orderMarkup?.price !== undefined
+      ? {
+          amount: orderMarkup.price,
+          currency: orderMarkup.currency ?? "USD",
+        }
+      : proofTags.length > 0 || subjectAnchored
+        ? (body ? parseAmount(body) : null) || parseAmount(message.subject)
+        : undefined;
+  if (subjectAnchored && proofTags.length === 0) {
+    evidence.push("proof:subject-amount");
+  }
+  const hasProof = proofTags.length > 0;
+  let kind: CandidateKind =
+    resolved.forceSparse || railForceSparse
+      ? "sparse"
+      : subjectClass === "recurring"
+        ? "recurring"
+        : "sparse";
+  // P3 (R38 audit fix): only SUBJECT-tier ad shapes demote a renewal —
+  // ad words or ad pricing grammar in the subject line itself. Body CTA
+  // noise ("unsubscribe", "learn more") and bulk-send hints are carried by
+  // every legit commercial mail and never demote; heavy marketing with no
+  // strong proof already DROPS via the R27 gate above.
+  const subjectMarketing =
+    MARKETING_SUBJECT_RES.some((m) => m.re.test(message.subject)) ||
+    MARKETING_PRICE_RES.test(message.subject);
+  if (
+    kind === "recurring" &&
+    subjectMarketing &&
+    strongProofTags.length === 0
+  ) {
+    kind = "sparse";
+    marketingTags.push("demote:marketing-no-strong-proof");
+  }
+  // P3: a $0 receipt is a license/account artifact (Netgate, Rotaryengine
+  // class) - cadence anchors (renewal price, domain registration) must
+  // never stamp a cadence onto it. The import's $0-to-free rule then owns
+  // the recurring-to-free flip.
+  const zeroLicense = parsed?.amount === 0;
+  const cadenceEvidence = zeroLicense
+    ? { strong: false, tag: "zero-license-suppressed" }
+    : inferCadenceEvidence(`${message.subject}\n${body}`, hasProof, kind);
+  const cadence = zeroLicense ? undefined : cadenceEvidence.cadence;
   const amountUnknown = !parsed;
 
+  evidence.push(...proofTags);
+  if (marketingTags.length > 0) {
+    evidence.push(...marketingTags, "marketing-with-proof");
+  }
+  if (orderMarkup) {
+    evidence.push("markup:order");
+    if (orderMarkup.seller)
+      evidence.push(`markup:seller ${orderMarkup.seller}`.slice(0, 80));
+    if (orderMarkup.orderNumber)
+      evidence.push(`markup:order-no ${orderMarkup.orderNumber}`.slice(0, 80));
+    if (orderMarkup.items.length > 0)
+      evidence.push(
+        `markup:items ${orderMarkup.items.join(" | ")}`.slice(0, 120),
+      );
+  }
   if (parsed) evidence.push(`amount:${parsed.currency} ${parsed.amount}`);
   if (amountUnknown) evidence.push("amount-unknown");
-  if (cadence) evidence.push(`cadence:${cadence}`);
+  if (cadence) evidence.push(`cadence:${cadenceEvidence.tag}`);
   if (body && RECURRING_MONEY_RE.test(body))
     evidence.push("body:recurring-cue");
   if (body && USAGE_MONEY_RE.test(body)) evidence.push("body:usage-cue");
 
-  const kind = subjectClass === "recurring" ? "recurring" : "sparse";
-
-  return {
+  const keep: ClassifiedMessage = {
     message,
     subjectClass,
-    merchantKey,
-    merchantName,
-    officialDomain,
+    merchantKey: finalKey,
+    merchantName: finalName,
+    officialDomain: finalDomain,
+    ...emailIconFields(message, finalDomain, evidence),
     kind,
     amount: parsed?.amount,
     currency: parsed?.currency,
     cadence: cadence ?? (kind === "recurring" ? "unknown" : undefined),
+    billNumber: extractBillNumber(`${message.subject}\n${body}`),
     amountUnknown,
     needsBody: true,
     evidence,
-    confidence: parsed ? "high" : amountUnknown ? "medium" : "medium",
+    confidence:
+      orderMarkup?.price !== undefined
+        ? "high"
+        : parsed
+          ? "high"
+          : hasProof
+            ? "medium"
+            : "low",
+    ...(orderMarkup ? { orderMarkup } : {}),
   };
+  return keep;
+}
+
+/** Phase C: attach extracted brand-sent icon seeds + compact evidence lines.
+ *  Spread into every non-drop ClassifiedMessage. Drops carry no seeds. */
+function emailIconFields(
+  message: NormalizedMessage,
+  officialDomain: string | null | undefined,
+  evidence: string[],
+): { emailIconUrls?: string[] } {
+  const extracted = extractEmailIconUrls(message, officialDomain);
+  if (extracted.urls.length > 0) {
+    evidence.push(`icon:email:${extracted.urls.length} url(s)`);
+  }
+  if (extracted.cidSkipped.length > 0) {
+    // Honest record: inline images were seen but are not fetchable yet.
+    evidence.push(
+      `icon:cid-skip:${extracted.cidSkipped.slice(0, 3).join(",")}` +
+        (extracted.cidSkipped.length > 3
+          ? ` +${extracted.cidSkipped.length - 3}`
+          : ""),
+    );
+  }
+  return extracted.urls.length > 0 ? { emailIconUrls: extracted.urls } : {};
 }

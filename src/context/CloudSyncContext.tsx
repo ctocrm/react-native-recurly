@@ -5,7 +5,12 @@ import {
 } from "@/services/database";
 import { CloudSyncService } from "@/services/cloudsync/CloudSyncService";
 import { CloudProvider, SyncResult } from "@/services/cloudsync/types";
-import { useUser } from "@clerk/expo";
+import {
+  buildDropboxAuthUrl,
+  createDropboxVerifier,
+  exchangeDropboxCode,
+} from "@/services/cloudsync/dropboxOAuth";
+import { useUser } from "@/context/AuthContext";
 import * as AuthSession from "expo-auth-session";
 import * as SecureStore from "expo-secure-store";
 import * as WebBrowser from "expo-web-browser";
@@ -209,11 +214,31 @@ export const CloudSyncProvider = ({ children }: { children: ReactNode }) => {
           const result = await authRequest.promptAsync(discovery);
 
           if (result.type === "success") {
+            // R17 fix: tokens come from the TOKEN exchange, not the authorize
+            // response. The old code read result.params.accessToken — always
+            // undefined in the code flow — so connect stored empty tokens and
+            // sync could never work.
+            const code = result.params?.code;
+            if (!code) {
+              throw new Error("OAuth returned no authorization code");
+            }
+            const tokenResult = await AuthSession.exchangeCodeAsync(
+              {
+                clientId,
+                code,
+                redirectUri,
+                extraParams: { code_verifier: authRequest.codeVerifier! },
+              },
+              { tokenEndpoint: discovery.tokenEndpoint },
+            );
+            if (!tokenResult?.accessToken) {
+              throw new Error("OAuth token exchange returned no access token");
+            }
             const tokens = {
-              accessToken: result.params.accessToken,
-              refreshToken: result.params.refreshToken,
-              expiresAt: result.params.expiresIn
-                ? Date.now() + parseInt(result.params.expiresIn) * 1000
+              accessToken: tokenResult.accessToken,
+              refreshToken: tokenResult.refreshToken,
+              expiresAt: tokenResult.expiresIn
+                ? Date.now() + tokenResult.expiresIn * 1000
                 : undefined,
             };
             await SecureStore.setItemAsync(
@@ -245,11 +270,30 @@ export const CloudSyncProvider = ({ children }: { children: ReactNode }) => {
           const result = await authRequest.promptAsync(discovery);
 
           if (result.type === "success") {
+            // R17 fix: same as Google — exchange the code at the token
+            // endpoint (offline_access is already in scopes, so a refresh
+            // token is issued).
+            const code = result.params?.code;
+            if (!code) {
+              throw new Error("OAuth returned no authorization code");
+            }
+            const tokenResult = await AuthSession.exchangeCodeAsync(
+              {
+                clientId,
+                code,
+                redirectUri,
+                extraParams: { code_verifier: authRequest.codeVerifier! },
+              },
+              { tokenEndpoint: discovery.tokenEndpoint },
+            );
+            if (!tokenResult?.accessToken) {
+              throw new Error("OAuth token exchange returned no access token");
+            }
             const tokens = {
-              accessToken: result.params.accessToken,
-              refreshToken: result.params.refreshToken,
-              expiresAt: result.params.expiresIn
-                ? Date.now() + parseInt(result.params.expiresIn) * 1000
+              accessToken: tokenResult.accessToken,
+              refreshToken: tokenResult.refreshToken,
+              expiresAt: tokenResult.expiresIn
+                ? Date.now() + tokenResult.expiresIn * 1000
                 : undefined,
             };
             await SecureStore.setItemAsync(
@@ -265,7 +309,15 @@ export const CloudSyncProvider = ({ children }: { children: ReactNode }) => {
           }
 
           const redirectUri = AuthSession.makeRedirectUri();
-          const authUrl = `https://www.dropbox.com/oauth2/authorize?client_id=${appKey}&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}`;
+          // R17 fix: authorization-code + PKCE + offline refresh tokens.
+          // The old implicit flow (response_type=token) never issues a
+          // refresh token, so Dropbox sync died at every token expiry.
+          const { verifier, challenge } = await createDropboxVerifier();
+          const authUrl = buildDropboxAuthUrl({
+            appKey,
+            redirectUri,
+            codeChallenge: challenge,
+          });
 
           const result = await WebBrowser.openAuthSessionAsync(
             authUrl,
@@ -273,16 +325,21 @@ export const CloudSyncProvider = ({ children }: { children: ReactNode }) => {
           );
 
           if (result.type === "success") {
-            const url = new URL(result.url);
-            const accessToken = url.hash?.match(/access_token=([^&]+)/)?.[1];
-            if (accessToken) {
-              const tokens = { accessToken };
-              await SecureStore.setItemAsync(
-                `dropbox_tokens_${userId || "anonymous"}`,
-                JSON.stringify(tokens),
-              );
-              authSuccess = true;
+            const code = new URL(result.url).searchParams.get("code");
+            if (!code) {
+              throw new Error("Dropbox OAuth returned no authorization code");
             }
+            const tokens = await exchangeDropboxCode({
+              appKey,
+              code,
+              redirectUri,
+              codeVerifier: verifier,
+            });
+            await SecureStore.setItemAsync(
+              `dropbox_tokens_${userId || "anonymous"}`,
+              JSON.stringify(tokens),
+            );
+            authSuccess = true;
           }
         } else if (provider === "icloud") {
           // iCloud uses Apple Sign-In / iCloud Drive entitlements

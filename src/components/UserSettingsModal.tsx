@@ -2,7 +2,7 @@ import images from "@/constants/images";
 import { useSubscriptions } from "@/context/SubscriptionContext";
 import { useBottomClearance } from "@/hooks/useBottomClearance";
 import { setPreference } from "@/services/database";
-import { useUser } from "@clerk/expo";
+import { useUser } from "@/context/AuthContext";
 import * as DocumentPicker from "expo-document-picker";
 import { readAsStringAsync } from "expo-file-system/legacy";
 import React, { useEffect, useState } from "react";
@@ -66,28 +66,6 @@ const UserSettingsModal = ({ visible, onClose }: UserSettingsModalProps) => {
 
     setSaving(true);
     try {
-      // Update Clerk user
-      if (firstName.trim() || lastName.trim()) {
-        await user?.update({
-          firstName: firstName.trim() || undefined,
-          lastName: lastName.trim() || undefined,
-        });
-      }
-
-      // Update profile image via Clerk if avatarUrl changed
-      if (avatarUrl && avatarUrl !== user?.imageUrl) {
-        try {
-          await user?.setProfileImage({ file: avatarUrl });
-        } catch (profileImageError) {
-          console.error("Failed to update profile image:", profileImageError);
-          Alert.alert(
-            "Warning",
-            "Profile updated but failed to update avatar. Please try again.",
-          );
-        }
-      }
-
-      // Store in SQLite preferences for offline/local access
       if (firstName.trim()) {
         await setPreference("user_first_name", firstName.trim());
       }
@@ -99,7 +77,7 @@ const UserSettingsModal = ({ visible, onClose }: UserSettingsModalProps) => {
       }
 
       setEditMode(false);
-      Alert.alert("Success", "Profile updated successfully!");
+      Alert.alert("Success", "Profile updated on this device.");
     } catch (error) {
       console.error("Failed to update profile:", error);
       Alert.alert("Error", "Failed to update profile. Please try again.");
@@ -147,10 +125,7 @@ const UserSettingsModal = ({ visible, onClose }: UserSettingsModalProps) => {
 
   const handleRemoveAvatar = async () => {
     try {
-      // Remove avatar from Clerk
-      await user?.setProfileImage({ file: null });
       setAvatarUrl("");
-      // Clear from local storage
       await setPreference("user_avatar_url", "");
       Alert.alert("Success", "Avatar removed successfully!");
     } catch (error) {
@@ -162,7 +137,7 @@ const UserSettingsModal = ({ visible, onClose }: UserSettingsModalProps) => {
   const handleChangePassword = () => {
     Alert.alert(
       "Change Password",
-      "To change your password, please visit your account settings in the Clerk-powered authentication.",
+      "Local login has no password. A product account service will replace this later.",
       [{ text: "OK" }],
     );
   };

@@ -12,7 +12,7 @@ export const MAIL_PROVIDER_CATALOG: MailProviderCatalogEntry[] = [
     branded: true,
     auth: "oauth",
     liveScanInPhase4: true,
-    note: "Consumer Google. Not Workspace.",
+    note: "Gmail API. Consumer Google. Not Workspace.",
   },
   {
     id: "workspace",
@@ -28,6 +28,7 @@ export const MAIL_PROVIDER_CATALOG: MailProviderCatalogEntry[] = [
     branded: true,
     auth: "oauth",
     liveScanInPhase4: true,
+    note: "Microsoft Graph API.",
   },
   {
     id: "office365",

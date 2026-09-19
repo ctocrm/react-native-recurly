@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   getCachedIcon,
+  getCachedIconBatched,
   getQueuedIcons,
   setCachedIcon,
 } from "@/services/database";
@@ -11,6 +12,20 @@ import {
 } from "@/services/iconLoadingRegistry";
 import { mimeForFormat, upscaleIconIfSmall } from "@/services/iconUpscaler";
 import { isPaintableCardIcon } from "@/services/iconValidation";
+
+// R25: every card used to re-read the WHOLE icon_crawl_queue table (then
+// .some() over it) and re-read its own base64 blob — with 100+ cards that
+// saturated mqt_v_js for ~10s at boot. Share one queued-set for 5s.
+let queuedSetCache: { at: number; keys: Set<string> } | null = null;
+async function queuedIconKeys(): Promise<Set<string>> {
+  if (queuedSetCache && Date.now() - queuedSetCache.at < 5000) {
+    return queuedSetCache.keys;
+  }
+  const queued = await getQueuedIcons();
+  const keys = new Set(queued.map((item) => item.icon_key));
+  queuedSetCache = { at: Date.now(), keys };
+  return keys;
+}
 
 export type IconStatus =
   "placeholder" | "loading" | "cached" | "error" | "no_icon";
@@ -39,13 +54,15 @@ export function useCachedIcon(iconKey: string | undefined): IconState {
 
     // Check cache on mount - but also check if icon is queued
     const checkCache = async () => {
-      const cached = await getCachedIcon(iconKey);
+      const t0 = Date.now();
+      const cached = await getCachedIconBatched(iconKey);
+      const t1 = Date.now();
       if (!active) return;
 
+      // A "local_asset:" sentinel in the cache is not a real image — it
+      // means "use the static brand asset". Treat it as no override so the
+      // card falls back to the bundled icon instead of a blank/broken URI.
       if (cached?.imageData) {
-        // A "local_asset:" sentinel in the cache is not a real image — it
-        // means "use the static brand asset". Treat it as no override so the
-        // card falls back to the bundled icon instead of a blank/broken URI.
         if (cached.imageData.startsWith("local_asset:")) {
           setIconUri(null);
           setFormat(null);
@@ -55,15 +72,24 @@ export function useCachedIcon(iconKey: string | undefined): IconState {
           setFormat(null);
         } else {
           await applyCachedImage(cached, active);
+          console.log(
+            `[ICON] ${iconKey} applied readMs=${t1 - t0} ` +
+              `totalMs=${Date.now() - t0} bytes=${cached.imageData.length}`,
+          );
           return;
         }
       }
 
       // Check if icon is in the queue (needs loading state)
-      const queued = await getQueuedIcons();
+      const keys = await queuedIconKeys();
       if (!active) return;
 
-      const isQueued = queued.some((item) => item.icon_key === iconKey);
+      const isQueued = keys.has(iconKey);
+
+      console.log(
+        `[ICON] ${iconKey} checked readMs=${t1 - t0} ` +
+          `queueMs=${Date.now() - t1} bytes=${cached?.imageData?.length ?? 0}`,
+      );
 
       if (isQueued || isIconLoading(iconKey)) {
         setLoading(true);
@@ -102,7 +128,7 @@ export function useCachedIcon(iconKey: string | undefined): IconState {
     let active = true;
 
     const checkCache = async () => {
-      const cached = await getCachedIcon(iconKey);
+      const cached = await getCachedIconBatched(iconKey);
       if (!active) return;
 
       if (cached?.imageData) {
@@ -118,9 +144,9 @@ export function useCachedIcon(iconKey: string | undefined): IconState {
         }
       } else {
         // No cached data - clear loading if icon is no longer queued
-        const queued = await getQueuedIcons();
+        const keys = await queuedIconKeys();
         if (!active) return;
-        const isQueued = queued.some((item) => item.icon_key === iconKey);
+        const isQueued = keys.has(iconKey);
         if (!isQueued && !isIconLoading(iconKey)) {
           setLoading(false);
         }

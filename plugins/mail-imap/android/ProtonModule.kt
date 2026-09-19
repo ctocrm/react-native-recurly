@@ -1,4 +1,4 @@
-package com.ctocrm.jsmastery.imap
+package app.picksandshovels.cadence.imap
 
 import android.util.Log
 import at.favre.lib.crypto.bcrypt.BCrypt
@@ -74,6 +74,15 @@ class ProtonModule(reactContext: ReactApplicationContext) :
         promise.resolve(protonSessionToMap(session))
       } catch (e: ProtonHvRequired) {
         promise.reject("PROTON_HV", e.message, e.toMap())
+      } catch (e: ProtonApiError) {
+        Log.e(TAG, "Proton login failed (${e.httpCode}/${e.apiCode})")
+        when {
+          e.apiCode == 2028 || e.httpCode == 429 ->
+            promise.reject("PROTON_ABUSE", e.message, e)
+          e.httpCode == 401 || e.httpCode == 422 || e.apiCode == 8002 ->
+            promise.reject("PROTON_CREDENTIALS", e.message, e)
+          else -> promise.reject("PROTON_ERROR", e.message, e)
+        }
       } catch (e: Exception) {
         Log.e(TAG, "Proton login failed", e)
         promise.reject("PROTON_ERROR", e.message ?: "Proton login failed", e)
@@ -92,6 +101,17 @@ class ProtonModule(reactContext: ReactApplicationContext) :
       try {
         val session = ProtonClient().refresh(uid, refreshToken, accessToken.orEmpty())
         promise.resolve(protonSessionToMap(session))
+      } catch (e: ProtonApiError) {
+        Log.e(TAG, "Proton refresh failed (${e.httpCode}/${e.apiCode})")
+        if (e.apiCode == 2028 || e.httpCode == 429) {
+          promise.reject("PROTON_ABUSE", e.message, e)
+        } else {
+          promise.reject(
+            "PROTON_SESSION_DEAD",
+            "Proton session expired — reconnect the mailbox (Edit → Reconnect) to scan it.",
+            e,
+          )
+        }
       } catch (e: Exception) {
         Log.e(TAG, "Proton refresh failed", e)
         promise.reject("PROTON_ERROR", e.message ?: "Proton refresh failed", e)
@@ -104,6 +124,7 @@ class ProtonModule(reactContext: ReactApplicationContext) :
     uid: String,
     accessToken: String,
     sinceIso: String?,
+    untilIso: String?,
     limit: Int,
     password: String?,
     promise: Promise,
@@ -113,10 +134,20 @@ class ProtonModule(reactContext: ReactApplicationContext) :
         val messages = ProtonClient().listMessages(
           ProtonSession(uid, accessToken, ""),
           sinceIso,
+          untilIso,
           limit.coerceIn(1, 500),
           password,
         )
         promise.resolve(protonMessagesToMap(messages))
+      } catch (e: ProtonApiError) {
+        Log.e(TAG, "Proton list failed (${e.httpCode}/${e.apiCode})")
+        when {
+          e.httpCode == 401 || e.apiCode == 12087 ->
+            promise.reject("PROTON_SESSION_DEAD", "Proton access token expired.", e)
+          e.apiCode == 2028 || e.httpCode == 429 ->
+            promise.reject("PROTON_ABUSE", e.message, e)
+          else -> promise.reject("PROTON_ERROR", e.message, e)
+        }
       } catch (e: Exception) {
         Log.e(TAG, "Proton list failed", e)
         promise.reject("PROTON_ERROR", e.message ?: "Proton list failed", e)
@@ -137,10 +168,19 @@ class ProtonModule(reactContext: ReactApplicationContext) :
       try {
         val client = ProtonClient()
         val session = client.login(username.trim(), password, totp, null, null)
-        val messages = client.listMessages(session, sinceIso, limit.coerceIn(1, 500), password)
+        val messages = client.listMessages(session, sinceIso, null, limit.coerceIn(1, 500), password)
         promise.resolve(protonMessagesToMap(messages))
       } catch (e: ProtonHvRequired) {
         promise.reject("PROTON_HV", e.message, e.toMap())
+      } catch (e: ProtonApiError) {
+        Log.e(TAG, "Proton fetch failed (${e.httpCode}/${e.apiCode})")
+        when {
+          e.apiCode == 2028 || e.httpCode == 429 ->
+            promise.reject("PROTON_ABUSE", e.message, e)
+          e.httpCode == 401 || e.httpCode == 422 || e.apiCode == 8002 ->
+            promise.reject("PROTON_CREDENTIALS", e.message, e)
+          else -> promise.reject("PROTON_ERROR", e.message, e)
+        }
       } catch (e: Exception) {
         Log.e(TAG, "Proton fetch failed", e)
         promise.reject("PROTON_ERROR", e.message ?: "Proton failed", e)
@@ -193,6 +233,16 @@ internal class ProtonHvRequired(
   }
 }
 
+/**
+ * Typed API error carrying the HTTP status and Proton `Code` so callers can
+ * distinguish session-dead / anti-abuse / wrong-credentials (P1).
+ */
+internal class ProtonApiError(
+  val httpCode: Int,
+  val apiCode: Int,
+  message: String,
+) : IllegalStateException(message)
+
 internal data class ProtonSession(
   val uid: String,
   val accessToken: String,
@@ -218,6 +268,25 @@ private data class UnlockedProtonKeys(
   val addrKeyCount: Int,
   val privateKeys: List<PGPPrivateKey>,
 )
+
+// P3: uid -> accessToken whose locked scope was already SRP-unlocked in this
+// process. ProtonClient is re-instantiated per listWithSession call, so the
+// cache lives at file scope to persist across batches. Keyed by the CURRENT
+// access token: the P2 reactive refresh path mints a new token, the key no
+// longer matches, and the next batch re-runs the SRP unlock (self-invalidation).
+private val unlockedScopes = java.util.concurrent.ConcurrentHashMap<String, String>()
+
+// P4: client fingerprints per docs/research-2026-09-03-proton-reauth-icon-ranking.md
+// §1.6 P4 ("stable UA") — amended by SERVER EVIDENCE 2026-09-13 (two 2064 rejections):
+// `cadence@1.0.0` → "platform and product must be separated by a dash";
+// `android-cadence@1.0.0` → "Product `cadence` is not valid". Proton ALLOWLISTS
+// products in x-pm-appversion; third-party apps cannot register one. The only
+// server-accepted appversion for unknown clients is "Other" (the value every
+// previous successful scan used). Kept improvement: stable, honest UA naming the
+// product (UA is not allowlist-validated). Spoofing official client strings was
+// considered and rejected as out of scope without an explicit user order.
+private const val P4_APP_VERSION = "Other"
+private const val P4_USER_AGENT = "Cadence/1.0.0"
 
 private class ProtonClient {
   private val api = "https://mail.proton.me/api"
@@ -312,6 +381,7 @@ private class ProtonClient {
   fun listMessages(
     session: ProtonSession,
     sinceIso: String?,
+    untilIso: String?,
     limit: Int,
     password: String?,
   ): List<ProtonMsg> {
@@ -321,6 +391,11 @@ private class ProtonClient {
     val labelId = "15"
     val out = mutableListOf<ProtonMsg>()
     val sinceMs = sinceIso?.let { parseIsoMs(it) }
+    // R11: exclusive NEWER bound — keep only messages at or older than
+    // untilMs so the JS staging loop can page backward through history in
+    // bounded chunks. Non-strict on purpose: same-second neighbours at the
+    // boundary are re-returned and deduped JS-side instead of being skipped.
+    val untilMs = untilIso?.let { parseIsoMs(it) }
     var page = 0
     var total = -1
     var pages = 0
@@ -344,6 +419,7 @@ private class ProtonClient {
         val m = arr.getJSONObject(i)
         val time = m.optLong("Time") * 1000
         if (sinceMs != null && time <= sinceMs) continue
+        if (untilMs != null && time > untilMs) continue
         val sender = m.optJSONObject("Sender")
         val from = sender?.optString("Address") ?: sender?.optString("Name") ?: ""
         out.add(
@@ -511,6 +587,13 @@ private class ProtonClient {
    * then PUT /core/v4/users/unlock with the same SRP proofs as login.
    */
   private fun unlockLockedScope(session: ProtonSession, password: String) {
+    if (unlockedScopes[session.uid] == session.accessToken) {
+      Log.i(
+        ProtonModule.TAG,
+        "Proton locked-scope unlock cached (P3) — skipping SRP reauth for this scan",
+      )
+      return
+    }
     val info = postJson(
       "$api/auth/v4/info",
       JSONObject().put("Intent", "Proton").put("ReauthScope", "locked").toString(),
@@ -538,6 +621,7 @@ private class ProtonClient {
       .put("ClientProof", srp.clientProof)
       .put("SRPSession", srpSession)
     putJson("$api/core/v4/users/unlock", body.toString(), session)
+    unlockedScopes[session.uid] = session.accessToken
     Log.i(ProtonModule.TAG, "Proton locked-scope unlock ok")
   }
 
@@ -735,8 +819,8 @@ private class ProtonClient {
     conn.connectTimeout = 20_000
     conn.readTimeout = 25_000
     conn.setRequestProperty("Content-Type", "application/json")
-    conn.setRequestProperty("x-pm-appversion", "Other")
-    conn.setRequestProperty("User-Agent", "jsmastery/1.0")
+    conn.setRequestProperty("x-pm-appversion", P4_APP_VERSION)
+    conn.setRequestProperty("User-Agent", P4_USER_AGENT)
     if (session != null) {
       conn.setRequestProperty("Authorization", "Bearer ${session.accessToken}")
       conn.setRequestProperty("x-pm-uid", session.uid)
@@ -758,8 +842,8 @@ private class ProtonClient {
     conn.setRequestProperty("Content-Type", "application/json")
     conn.setRequestProperty("Authorization", "Bearer ${session.accessToken}")
     conn.setRequestProperty("x-pm-uid", session.uid)
-    conn.setRequestProperty("x-pm-appversion", "Other")
-    conn.setRequestProperty("User-Agent", "jsmastery/1.0")
+    conn.setRequestProperty("x-pm-appversion", P4_APP_VERSION)
+    conn.setRequestProperty("User-Agent", P4_USER_AGENT)
     conn.doOutput = true
     OutputStreamWriter(conn.outputStream, StandardCharsets.UTF_8).use { it.write(body) }
     return read(conn)
@@ -772,8 +856,8 @@ private class ProtonClient {
     conn.readTimeout = 25_000
     conn.setRequestProperty("Authorization", "Bearer ${session.accessToken}")
     conn.setRequestProperty("x-pm-uid", session.uid)
-    conn.setRequestProperty("x-pm-appversion", "Other")
-    conn.setRequestProperty("User-Agent", "jsmastery/1.0")
+    conn.setRequestProperty("x-pm-appversion", P4_APP_VERSION)
+    conn.setRequestProperty("User-Agent", P4_USER_AGENT)
     return read(conn)
   }
 
@@ -816,12 +900,15 @@ private class ProtonClient {
         }
         throw ProtonHvRequired(webUrl, hvToken, methods)
       }
-      if (conn.responseCode == 401 || conn.responseCode == 422) {
-        throw IllegalStateException(
-          "Proton rejected the password or 2FA code (HTTP ${conn.responseCode}).",
-        )
+      val message = when {
+        apiCode == 8002 ->
+          "Proton rejected the username, password or 2FA code."
+        apiCode == 2028 ->
+          "Proton temporarily blocked this client (anti-abuse). Wait a while, then retry."
+        else ->
+          "Proton HTTP ${conn.responseCode} Code $apiCode: ${apiError.ifEmpty { text.take(200) }}"
       }
-      throw IllegalStateException("Proton HTTP ${conn.responseCode}: $text")
+      throw ProtonApiError(conn.responseCode, apiCode, message)
     }
     return JSONObject(text)
   }

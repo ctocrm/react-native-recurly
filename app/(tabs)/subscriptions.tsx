@@ -3,13 +3,34 @@ import EditSubscriptionModal from "@/components/EditSubscriptionModal";
 import EmailScanSection from "@/components/EmailScanSection";
 import ListHeading from "@/components/ListHeading";
 import SubscriptionCard from "@/components/SubscriptionCard";
+import SubscriptionDetailsModal from "@/components/SubscriptionDetailsModal";
 import SubscriptionIconPickerModal from "@/components/SubscriptionIconPickerModal";
 import SubscriptionStatsModal from "@/components/SubscriptionStatsModal";
 import { icons } from "@/constants/icons";
 import { useSubscriptions } from "@/context/SubscriptionContext";
+import {
+  getExpiredGraceDays,
+  getPreference,
+  setPreference,
+} from "@/services/database";
+import {
+  DEFAULT_EXPIRED_GRACE_DAYS as DEFAULT_GRACE,
+  subscriptionBucket,
+} from "@/services/subscriptionStatus";
+import {
+  SUBS_SORT_LABELS,
+  SUBS_SORT_OPTIONS,
+  sortSubscriptions,
+  type SubsSort,
+} from "@/services/subscriptionOrder";
 import "@/global.css";
 import { useBottomClearance } from "@/hooks/useBottomClearance";
 import { useChargeDisplay } from "@/hooks/useChargeDisplay";
+import {
+  familyDisplayName,
+  familyForName,
+  groupByFamily,
+} from "@/services/merchantFamily";
 import clsx from "clsx";
 import { useLocalSearchParams } from "expo-router";
 import { styled } from "nativewind";
@@ -27,11 +48,20 @@ import { SafeAreaView as RNSafeAreaView } from "react-native-safe-area-context";
 
 const SafeAreaView = styled(RNSafeAreaView);
 
-const FILTER_OPTIONS = ["All", "Upcoming"] as const;
+const FILTER_OPTIONS = [
+  "All",
+  "Active",
+  "Upcoming",
+  "Sparse",
+  "Expired",
+] as const;
 
 const Subscriptions = () => {
   const { tabListPadding, pagePadding } = useBottomClearance();
   const posthog = usePostHog();
+  // Phase N: the may-have-expired grace period (user-configurable in
+  // Settings); re-read on foreground so a Settings change applies on return.
+  const [graceDays, setGraceDays] = useState(DEFAULT_GRACE);
   const { filter: initialFilter, addMailbox } = useLocalSearchParams<{
     filter?: string;
     addMailbox?: string;
@@ -45,7 +75,10 @@ const Subscriptions = () => {
     getUpcomingSubscriptions,
     refreshSubscriptions,
   } = useSubscriptions();
-  const { displayFor, cyclePeriod } = useChargeDisplay(subscriptions);
+  const { displayFor, sparseLineFor, cyclePeriod, lapseFor } =
+    useChargeDisplay(subscriptions);
+  const [detailsSubscription, setDetailsSubscription] =
+    useState<Subscription | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedSubscriptionId, setExpandedSubscriptionId] = useState<
     string | null
@@ -53,6 +86,10 @@ const Subscriptions = () => {
   const [activeFilter, setActiveFilter] = useState<string>(
     initialFilter === "upcoming" ? "Upcoming" : "All",
   );
+  // R40-A: persisted sort + persisted default view (Active). The DB read
+  // order is already received-evidence DESC, so "recent" is honest from the
+  // first frame; the prefs load refines it right after mount.
+  const [activeSort, setActiveSort] = useState<SubsSort>("recent");
   const [editingSubscription, setEditingSubscription] =
     useState<Subscription | null>(null);
   const [editModalVisible, setEditModalVisible] = useState(false);
@@ -77,17 +114,94 @@ const Subscriptions = () => {
     }
   }, [initialFilter]);
 
+  // R40-A: restore the persisted sort + default view once. An explicit nav
+  // filter (Home's "Upcoming" deep-link) wins over the stored view; the
+  // stored view defaults to Active on first ever run (R39 spec).
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const [storedFilter, storedSort] = await Promise.all([
+          getPreference("subs_default_filter"),
+          getPreference("subs_sort"),
+        ]);
+        if (cancelled) return;
+        if (!initialFilter) {
+          const view =
+            storedFilter &&
+            (FILTER_OPTIONS as readonly string[]).includes(storedFilter)
+              ? storedFilter
+              : "Active";
+          setActiveFilter(view);
+        }
+        if (
+          storedSort &&
+          (SUBS_SORT_OPTIONS as readonly string[]).includes(storedSort)
+        ) {
+          setActiveSort(storedSort as SubsSort);
+        }
+      } catch {
+        // defaults stand: recent sort, Active view (nav-dependent)
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleFilterChange = (filter: string) => {
+    setActiveFilter(filter);
+    // Persisted default view: the app reopens where the user left it.
+    setPreference("subs_default_filter", filter).catch(() => {});
+    posthog.capture("subscriptions_filter_changed", { filter });
+  };
+
+  const handleSortChange = (sort: SubsSort) => {
+    setActiveSort(sort);
+    setPreference("subs_sort", sort).catch(() => {});
+    posthog.capture("subscriptions_sort_changed", { sort });
+  };
+
   const upcomingIds = useMemo(() => {
     const upcoming = getUpcomingSubscriptions(7);
     return new Set(upcoming.map((u) => u.id));
   }, [getUpcomingSubscriptions]);
 
+  const expiredCount = useMemo(() => {
+    return subscriptions.filter(
+      (sub) => subscriptionBucket(sub, graceDays) === "expired",
+    ).length;
+  }, [subscriptions, graceDays]);
+
+  useEffect(() => {
+    getExpiredGraceDays()
+      .then(setGraceDays)
+      .catch(() => setGraceDays(DEFAULT_GRACE));
+  }, []);
+
   const filteredSubscriptions = useMemo(() => {
     let filtered = subscriptions;
 
-    // Apply filter
+    // Apply filter (Phase N buckets)
     if (activeFilter === "Upcoming") {
       filtered = filtered.filter((sub) => upcomingIds.has(sub.id));
+    } else if (activeFilter === "Active") {
+      filtered = filtered.filter(
+        (sub) =>
+          subscriptionBucket(sub, graceDays) === "active" &&
+          !lapseFor(sub, graceDays),
+      );
+    } else if (activeFilter === "Sparse") {
+      filtered = filtered.filter(
+        (sub) => subscriptionBucket(sub, graceDays) === "sparse",
+      );
+    } else if (activeFilter === "Expired") {
+      filtered = filtered.filter(
+        (sub) =>
+          subscriptionBucket(sub, graceDays) === "expired" ||
+          lapseFor(sub, graceDays),
+      );
     }
 
     // Apply search
@@ -106,8 +220,22 @@ const Subscriptions = () => {
       });
     }
 
-    return filtered;
-  }, [searchQuery, subscriptions, activeFilter, upcomingIds]);
+    // R40-A: the five-sort spec. Applied before family grouping so a
+    // merchant family card takes its front member's position.
+    filtered = sortSubscriptions(filtered, activeSort);
+
+    // R36: one card per merchant family (Amazon shape) — the recurring
+    // member fronts the card, the family's sparse actuals stack under it.
+    return groupByFamily(filtered);
+  }, [
+    searchQuery,
+    subscriptions,
+    activeFilter,
+    activeSort,
+    upcomingIds,
+    graceDays,
+    lapseFor,
+  ]);
 
   const handleSearchChange = (text: string) => {
     setSearchQuery(text);
@@ -214,12 +342,7 @@ const Subscriptions = () => {
                       ? "border-accent bg-accent/10"
                       : "border-border bg-background",
                   )}
-                  onPress={() => {
-                    setActiveFilter(filter);
-                    posthog.capture("subscriptions_filter_changed", {
-                      filter,
-                    });
-                  }}
+                  onPress={() => handleFilterChange(filter)}
                 >
                   <Text
                     className={clsx(
@@ -231,6 +354,37 @@ const Subscriptions = () => {
                   >
                     {filter}
                     {filter === "Upcoming" && ` (${upcomingIds.size})`}
+                    {filter === "Expired" && ` (${expiredCount})`}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            {/* Sort chips (R40-A): most-recent received / oldest / sparse /
+                recurring / next charge. Visible options, persisted choice. */}
+            <View className="mb-4 flex-row flex-wrap gap-2">
+              {SUBS_SORT_OPTIONS.map((sort) => (
+                <Pressable
+                  key={sort}
+                  className={clsx(
+                    "rounded-full border px-3 py-1.5",
+                    activeSort === sort
+                      ? "border-accent bg-accent/10"
+                      : "border-border bg-background",
+                  )}
+                  onPress={() => handleSortChange(sort)}
+                  accessibilityLabel={`Sort by ${SUBS_SORT_LABELS[sort]}`}
+                  accessibilityRole="button"
+                >
+                  <Text
+                    className={clsx(
+                      "text-xs font-sans-semibold",
+                      activeSort === sort
+                        ? "text-accent"
+                        : "text-muted-foreground",
+                    )}
+                  >
+                    {SUBS_SORT_LABELS[sort]}
                   </Text>
                 </Pressable>
               ))}
@@ -248,39 +402,57 @@ const Subscriptions = () => {
           </>
         }
         data={filteredSubscriptions}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item.primary.id}
         renderItem={({ item }) => (
           <SubscriptionCard
-            {...item}
-            expanded={expandedSubscriptionId === item.id}
-            displayPrice={displayFor(item).amount}
-            displayUnknown={displayFor(item).unknown}
-            displayPeriodLabel={displayFor(item).label}
-            onCyclePeriod={() => cyclePeriod(item)}
+            {...item.primary}
+            graceDays={graceDays}
+            expanded={expandedSubscriptionId === item.primary.id}
+            displayPrice={displayFor(item.primary).amount}
+            displayUnknown={displayFor(item.primary).unknown}
+            displayPeriodLabel={displayFor(item.primary).label}
+            onCyclePeriod={() => cyclePeriod(item.primary)}
+            sparseLine={sparseLineFor(item.primary)}
+            lapsed={lapseFor(item.primary, graceDays)}
+            familyTitle={
+              item.members.length > 1
+                ? familyDisplayName(familyForName(item.primary.name) ?? "")
+                : undefined
+            }
+            familyMembers={
+              item.members.length > 1
+                ? item.members
+                    .filter((m) => m.id !== item.primary.id)
+                    .map((m) => m.name)
+                : undefined
+            }
             onPress={() => {
-              const isExpanding = expandedSubscriptionId !== item.id;
+              const isExpanding = expandedSubscriptionId !== item.primary.id;
               setExpandedSubscriptionId((currentId) =>
-                currentId === item.id ? null : item.id,
+                currentId === item.primary.id ? null : item.primary.id,
               );
               posthog.capture(
                 isExpanding
                   ? "subscription_card_expanded"
                   : "subscription_card_collapsed",
                 {
-                  subscription_id: item.id,
-                  subscription_name: item.name,
-                  subscription_category: item.category ?? "",
-                  billing_cycle: item.billing,
+                  subscription_id: item.primary.id,
+                  subscription_name: item.primary.name,
+                  subscription_category: item.primary.category ?? "",
+                  billing_cycle: item.primary.billing,
                 },
               );
             }}
-            onEdit={() => handleEdit(item)}
-            onDelete={() => handleDelete(item)}
-            onMarkActive={() => handleStatusChange(item, "active")}
-            onMarkPaused={() => handleStatusChange(item, "paused")}
-            onMarkCancelled={() => handleStatusChange(item, "cancelled")}
-            onViewStats={() => handleViewStats(item)}
-            onIconLongPress={() => handleIconLongPress(item)}
+            onEdit={() => handleEdit(item.primary)}
+            onDelete={() => handleDelete(item.primary)}
+            onMarkActive={() => handleStatusChange(item.primary, "active")}
+            onMarkPaused={() => handleStatusChange(item.primary, "paused")}
+            onMarkCancelled={() =>
+              handleStatusChange(item.primary, "cancelled")
+            }
+            onViewStats={() => handleViewStats(item.primary)}
+            onViewDetails={() => setDetailsSubscription(item.primary)}
+            onIconLongPress={() => handleIconLongPress(item.primary)}
           />
         )}
         extraData={expandedSubscriptionId}
@@ -326,6 +498,13 @@ const Subscriptions = () => {
         onRenew={(id) => {
           updateSubscription(id, {});
         }}
+      />
+
+      {/* Details Modal (R18) */}
+      <SubscriptionDetailsModal
+        visible={detailsSubscription !== null}
+        subscription={detailsSubscription}
+        onClose={() => setDetailsSubscription(null)}
       />
 
       {/* Icon Picker Modal */}

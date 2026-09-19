@@ -35,7 +35,13 @@ import {
 } from "@/services/rateLimitTracker";
 import { detectWhiteBg, removeWhiteBg } from "@/services/whiteBgRemoval";
 import { usePostHog } from "posthog-react-native";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -92,6 +98,9 @@ const SubscriptionIconPickerModal = ({
   const [availableIcons, setAvailableIcons] = useState<PickerIcon[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [crawlDetail, setCrawlDetail] = useState<string | null>(null);
+  // True while the collection for a freshly-changed key is still loading —
+  // the cleared gap shows a spinner instead of the "no icons" empty state.
+  const [isLoadingCollection, setIsLoadingCollection] = useState(false);
   const [rateLimitedDomains, setRateLimitedDomains] = useState<string[]>([]);
   // Toggle to reveal reported ("incorrect") icons.
   const [showIncorrect, setShowIncorrect] = useState(false);
@@ -119,11 +128,41 @@ const SubscriptionIconPickerModal = ({
   );
   const isMounted = useRef(true);
   const latestKeyRef = useRef(iconKey);
+  /** Key whose collection is currently on screen (set when a load resolves). */
+  const loadedKeyRef = useRef<string | null>(null);
+  /** Tiles the current loadedKeyRef list is showing (0 = nothing kept). */
+  const loadedCountRef = useRef(0);
   /** True while white-bg / AI upscale runs — skip cache-driven reloads that race the list. */
   const processingRef = useRef(false);
 
   useEffect(() => {
     latestKeyRef.current = iconKey;
+  }, [iconKey]);
+
+  // Shared-instance reset: this modal stays mounted across opens, so per-key
+  // state would otherwise keep showing the PREVIOUS subscription's tiles,
+  // crawl detail, or report form until the new key's async load resolves
+  // (the stale-tiles flash). Transient in-sheet state resets on every close
+  // or switch; the tile list itself is only cleared when the key actually
+  // differs from what is on screen, so a same-key reopen stays instant.
+  useEffect(() => {
+    setCrawlDetail(null);
+    setReportState({ icon: null, type: null, comment: "" });
+    setProcessing(null);
+    processingRef.current = false;
+    if (iconKey === null) {
+      // Close: KEEP the loaded tiles (and loadedKeyRef) so the next same-key
+      // reopen renders instantly; only drop transient load state.
+      setIsLoadingCollection(false);
+      return;
+    }
+    if (loadedKeyRef.current !== iconKey) {
+      // Different subscription: drop the previous tiles BEFORE the first
+      // paint of the new key so they can never flash (the stale-tiles bug).
+      setAvailableIcons([]);
+      loadedCountRef.current = 0;
+      setIsLoadingCollection(true);
+    }
   }, [iconKey]);
 
   const refreshCrawlDetail = useCallback(async () => {
@@ -258,8 +297,20 @@ const SubscriptionIconPickerModal = ({
     [],
   );
 
-  const loadIcons = useCallback(async () => {
+  const loadIcons = useCallback(async (force = false) => {
     if (!iconKey) return;
+    // Same-key reopen with tiles already on screen: skip the refetch so the
+    // sheet renders instantly. Empty collections always refetch — they are
+    // cheap and may have gained icons from a crawl that finished while the
+    // sheet was closed.
+    if (
+      !force &&
+      loadedKeyRef.current === iconKey &&
+      loadedCountRef.current > 0
+    ) {
+      console.log(`[PICKER] Same-key reopen — keep tiles for ${iconKey}`);
+      return;
+    }
     const requestKey = iconKey;
     try {
       const collection = await getIconCollection(iconKey);
@@ -292,25 +343,26 @@ const SubscriptionIconPickerModal = ({
           };
         });
 
-        // Default: hide reported icons. Toggles reveal them.
-        const visible = mapped.filter((i) => {
-          if (!i.reportedType) return true;
-          if (i.reportedType === "wrong") return showIncorrect;
-          if (i.reportedType === "broken") return showBroken;
-          return true;
-        });
+        // Store the FULL mapped list; reveal-toggles filter at render time
+        // (visibleIcons useMemo) so flipping a toggle never depends on a
+        // callback closure — the stale-closure that killed the toggles before.
 
         // Never clobber a non-empty in-progress list with empty mid-upscale.
-        if (processingRef.current && visible.length === 0) {
+        if (processingRef.current && mapped.length === 0) {
           console.log(
             `[PICKER] Skip empty collection reload while processing for ${iconKey}`,
           );
+          loadedKeyRef.current = requestKey;
+          setIsLoadingCollection(false);
           return;
         }
 
-        setAvailableIcons(visible);
+        loadedKeyRef.current = requestKey;
+        loadedCountRef.current = mapped.length;
+        setIsLoadingCollection(false);
+        setAvailableIcons(mapped);
         console.log(
-          `[PICKER] Loaded ${visible.length} icons for ${iconKey} (${mapped.length} total, reports hidden by default)`,
+          `[PICKER] Loaded ${mapped.length} icons for ${iconKey} (reports hidden by default via visibleIcons)`,
         );
 
         // Run per-icon white-bg / low-res detection for the corrective chips.
@@ -319,8 +371,23 @@ const SubscriptionIconPickerModal = ({
     } catch (error) {
       console.error("[PICKER] Failed to load icons:", error);
       // Do not setAvailableIcons([]) — keep current list on failure.
+      setIsLoadingCollection(false);
     }
-  }, [iconKey, showIncorrect, showBroken, detectIcons]);
+  }, [iconKey, detectIcons]);
+
+  // Reveal-toggles are DERIVED, not load-time: reported icons reappear the
+  // moment a toggle flips, with no reload and no closure-capture of the old
+  // flag (the stale closure that made the toggles + "✓ Good" unreachable).
+  const visibleIcons = useMemo(
+    () =>
+      availableIcons.filter((i) => {
+        if (!i.reportedType) return true;
+        if (i.reportedType === "wrong") return showIncorrect;
+        if (i.reportedType === "broken") return showBroken;
+        return true;
+      }),
+    [availableIcons, showIncorrect, showBroken],
+  );
 
   useEffect(() => {
     isMounted.current = true;
@@ -351,7 +418,7 @@ const SubscriptionIconPickerModal = ({
         console.log("[PICKER] Skip cache reload while processing");
         return;
       }
-      loadIcons();
+      loadIcons(true);
     });
     return unsubscribeCache;
   }, [iconKey, visible, loadIcons]);
@@ -631,9 +698,13 @@ const SubscriptionIconPickerModal = ({
     setReportState({ icon: null, type: null, comment: "" });
 
     if (saved) {
-      // Drop it from the visible list immediately (it will stay hidden on reopen).
+      // Mark it in place; the derived visibleIcons filter hides it while the
+      // reveal-toggles are off — and flipping a toggle brings it back without
+      // any reload (removing it from the list would make the toggles dead).
       setAvailableIcons((prev) =>
-        prev.filter((i) => i.imageData !== icon.imageData),
+        prev.map((i) =>
+          i.imageData === icon.imageData ? { ...i, reportedType: type } : i,
+        ),
       );
       Alert.alert(
         "Icon Reported",
@@ -650,8 +721,12 @@ const SubscriptionIconPickerModal = ({
   const handleMarkAsGood = async (icon: PickerIcon) => {
     if (!iconKey) return;
     await rejectReportedIcon(iconKey, icon.imageData);
+    // Flip the tile back to a normal candidate in place (chips become
+    // Wrong/Broken again) — matches the alert text without a reload.
     setAvailableIcons((prev) =>
-      prev.filter((i) => i.imageData !== icon.imageData),
+      prev.map((i) =>
+        i.imageData === icon.imageData ? { ...i, reportedType: null } : i,
+      ),
     );
     Alert.alert("Restored", "This icon will no longer be hidden.");
   };
@@ -794,10 +869,7 @@ const SubscriptionIconPickerModal = ({
             <View className="flex-row items-center gap-2">
               <Switch
                 value={showIncorrect}
-                onValueChange={(v) => {
-                  setShowIncorrect(v);
-                  loadIcons();
-                }}
+                onValueChange={setShowIncorrect}
               />
               <Text className="text-xs text-muted-foreground">
                 Show incorrect
@@ -806,10 +878,7 @@ const SubscriptionIconPickerModal = ({
             <View className="flex-row items-center gap-2">
               <Switch
                 value={showBroken}
-                onValueChange={(v) => {
-                  setShowBroken(v);
-                  loadIcons();
-                }}
+                onValueChange={setShowBroken}
               />
               <Text className="text-xs text-muted-foreground">Show broken</Text>
             </View>
@@ -862,14 +931,14 @@ const SubscriptionIconPickerModal = ({
             </View>
           </View>
 
-          {availableIcons.length > 0 && (
+          {visibleIcons.length > 0 && (
             <>
               <Text className="mb-2 text-xs text-muted-foreground">
-                {availableIcons.length} icon
-                {availableIcons.length !== 1 ? "s" : ""} available
+                {visibleIcons.length} icon
+                {visibleIcons.length !== 1 ? "s" : ""} available
               </Text>
               <FlatList
-                data={availableIcons}
+                data={visibleIcons}
                 keyExtractor={(item) => item.id}
                 renderItem={renderIconItem}
                 horizontal
@@ -879,14 +948,25 @@ const SubscriptionIconPickerModal = ({
             </>
           )}
 
-          {availableIcons.length === 0 && (
+          {visibleIcons.length === 0 && (
             <View className="items-center py-8">
-              <Text className="text-sm text-muted-foreground">
-                No alternative icons found
-              </Text>
-              <Text className="mt-1 text-xs text-muted-foreground">
-                Tap the button below to find icons for {subscriptionName}
-              </Text>
+              {isLoadingCollection ? (
+                <>
+                  <ActivityIndicator size="small" color="#8b5cf6" />
+                  <Text className="mt-2 text-sm text-muted-foreground">
+                    Loading icons for {subscriptionName}...
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <Text className="text-sm text-muted-foreground">
+                    No alternative icons found
+                  </Text>
+                  <Text className="mt-1 text-xs text-muted-foreground">
+                    Tap the button below to find icons for {subscriptionName}
+                  </Text>
+                </>
+              )}
             </View>
           )}
 

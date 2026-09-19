@@ -29,6 +29,16 @@ declare global {
     frequency?: string;
     renewalDate?: string;
     color?: string;
+    /** R18: paper-trail — mailbox message id of the first scan candidate. */
+    sourceMessageId?: string | null;
+    /** R18: best-effort invoice/order/receipt number; often null; editable. */
+    billNumber?: string | null;
+    /**
+     * R40-A: latest received-evidence email date (ISO) for this row — the
+     * max corpus message date across matched candidates. The list orders by
+     * received evidence (last → start → created), never the scan wall-clock.
+     */
+    lastReceivedAt?: string | null;
   }
 
   interface SubscriptionCardProps extends Subscription {

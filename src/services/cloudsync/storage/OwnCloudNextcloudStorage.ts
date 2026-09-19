@@ -1,12 +1,18 @@
 import * as FileSystem from "expo-file-system/legacy";
 import * as SecureStore from "expo-secure-store";
 import { CloudStorageProvider } from "@/services/cloudsync/types";
+import {
+  authedRequest,
+  createCloudSession,
+} from "@/services/cloudsync/authedRequest";
+import type { TokenSession } from "@/services/emailscan/oauthSession";
 
 export class OwnCloudNextcloudStorage implements CloudStorageProvider {
   private tokens: any = null;
   private userId: string = "";
   private serverUrl: string = "";
   private provider: "owncloud" | "nextcloud" = "nextcloud";
+  private session: TokenSession | null = null;
 
   constructor(
     userId: string,
@@ -16,6 +22,29 @@ export class OwnCloudNextcloudStorage implements CloudStorageProvider {
     this.userId = userId;
     this.serverUrl = serverUrl.replace(/\/$/, ""); // Remove trailing slash
     this.provider = provider;
+  }
+
+  /** R17: expiry-aware session — ownCloud/Nextcloud credentials are
+   * app-passwords/long-lived tokens without a refresh endpoint, so the
+   * session is a passthrough (no expiresAt => never refreshes); the point
+   * is that every Bearer now comes from ONE place. */
+  private ensureSession(): TokenSession {
+    if (!this.session) {
+      const key = `${this.provider}_tokens_${this.userId}`;
+      this.session = createCloudSession({
+        tokens: this.tokens ?? { accessToken: "" },
+        storageKey: key,
+        refresher: null,
+      });
+    }
+    return this.session;
+  }
+
+  private req(url: string, init?: RequestInit): Promise<Response> {
+    if (!this.tokens?.accessToken) {
+      throw new Error("Not authenticated");
+    }
+    return authedRequest(this.ensureSession(), url, init, this.provider);
   }
 
   async authenticate(): Promise<void> {
@@ -72,7 +101,7 @@ export class OwnCloudNextcloudStorage implements CloudStorageProvider {
       encoding: FileSystem.EncodingType.Base64,
     } as any);
 
-    const response = await fetch(remoteUrl, {
+    const response = await this.req(remoteUrl, {
       method: "PUT",
       headers: {
         Authorization: `Bearer ${this.tokens.accessToken}`,
@@ -109,7 +138,7 @@ export class OwnCloudNextcloudStorage implements CloudStorageProvider {
       throw new Error("Not authenticated");
     }
 
-    const response = await fetch(fileId, {
+    const response = await this.req(fileId, {
       headers: {
         Authorization: `Bearer ${this.tokens.accessToken}`,
       },
@@ -146,7 +175,7 @@ export class OwnCloudNextcloudStorage implements CloudStorageProvider {
       throw new Error("Not authenticated");
     }
 
-    const response = await fetch(fileId, {
+    const response = await this.req(fileId, {
       method: "DELETE",
       headers: {
         Authorization: `Bearer ${this.tokens.accessToken}`,
@@ -169,7 +198,7 @@ export class OwnCloudNextcloudStorage implements CloudStorageProvider {
     }
 
     try {
-      const response = await fetch(fileId, {
+      const response = await this.req(fileId, {
         method: "HEAD",
         headers: {
           Authorization: `Bearer ${this.tokens.accessToken}`,
@@ -210,7 +239,7 @@ export class OwnCloudNextcloudStorage implements CloudStorageProvider {
     const remoteUrl = this.getRemotePath(fileName);
 
     try {
-      const response = await fetch(remoteUrl, {
+      const response = await this.req(remoteUrl, {
         method: "HEAD",
         headers: {
           Authorization: `Bearer ${this.tokens.accessToken}`,
@@ -253,7 +282,7 @@ export class OwnCloudNextcloudStorage implements CloudStorageProvider {
     const remoteUrl = `${this.serverUrl}/remote.php/dav/files/${this.tokens?.user_id || "user"}/SubTracker${folderPath}`;
 
     try {
-      const response = await fetch(remoteUrl, {
+      const response = await this.req(remoteUrl, {
         method: "PROPFIND",
         headers: {
           Authorization: `Bearer ${this.tokens.accessToken}`,

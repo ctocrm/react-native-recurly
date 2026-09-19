@@ -1,5 +1,14 @@
 import ConfirmModal from "@/components/ConfirmModal";
 import ConflictResolutionModal from "@/components/ConflictResolutionModal";
+import { AppLockCard } from "@/components/auth/AppLockCard";
+import { PasswordInput } from "@/components/auth/PasswordInput";
+import { ExpiredGraceCard } from "@/components/settings/ExpiredGraceCard";
+import {
+  decryptEncryptedBackupToPlain,
+  deleteImportTemp,
+  exportEncryptedBackup,
+} from "@/services/backup/encryptedBackup";
+import { validateExportPassphrase } from "@/services/backup/encryptedBackupEnvelope";
 import images from "@/constants/images";
 import { useCloudSync } from "@/context/CloudSyncContext";
 import { useDatabase } from "@/context/DatabaseProvider";
@@ -19,11 +28,13 @@ import {
   type IconCacheStats,
   type ImportScanResult,
 } from "@/services/database";
+import { importFromConnectedMailboxes } from "@/services/emailscan";
 import {
   clearScanCacheAsync,
   countScanCacheAsync,
 } from "@/services/emailscan/persist";
-import { useClerk, useUser } from "@clerk/expo";
+import { getScanProgress } from "@/services/emailscan/scanProgress";
+import { useAuth, useUser } from "@/context/AuthContext";
 import * as DocumentPicker from "expo-document-picker";
 import * as Sharing from "expo-sharing";
 import { styled } from "nativewind";
@@ -33,9 +44,11 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Modal,
   Pressable,
   ScrollView,
   Text,
+  ToastAndroid,
   View,
 } from "react-native";
 import { SafeAreaView as RNSafeAreaView } from "react-native-safe-area-context";
@@ -45,12 +58,17 @@ type ClearTarget = "iconCache" | "crawlHistory" | "emailScanCache" | null;
 const SafeAreaView = styled(RNSafeAreaView);
 
 const Settings = () => {
-  const { tabListPadding, pagePadding } = useBottomClearance();
-  const { signOut } = useClerk();
+  const { tabListPadding, pagePadding, sheetPadding } = useBottomClearance();
+  const { signOut, userId } = useAuth();
   const { user } = useUser();
   const posthog = usePostHog();
   const { isReady } = useDatabase();
-  const { refreshSubscriptions } = useSubscriptions();
+  const {
+    subscriptions,
+    addSubscription,
+    updateSubscription,
+    refreshSubscriptions,
+  } = useSubscriptions();
   const { clearCache } = useIconCache();
   const {
     syncMetadata,
@@ -105,6 +123,19 @@ const Settings = () => {
   const [scanCacheCount, setScanCacheCount] = useState(0);
   const [confirmTarget, setConfirmTarget] = useState<ClearTarget>(null);
   const [clearing, setClearing] = useState(false);
+
+  // Phase O: encrypted cross-install backup
+  const [encSheet, setEncSheet] = useState<"export" | "import" | null>(null);
+  const [encPass, setEncPass] = useState("");
+  const [encPass2, setEncPass2] = useState("");
+  const [encError, setEncError] = useState<string | null>(null);
+  const [encBusy, setEncBusy] = useState(false);
+  const [encPickedUri, setEncPickedUri] = useState<string | null>(null);
+
+  // Phase K: deep re-list
+  const [deepSheetOpen, setDeepSheetOpen] = useState(false);
+  const [deepOfferOpen, setDeepOfferOpen] = useState(false);
+  const [deepStarting, setDeepStarting] = useState(false);
 
   const loadStats = useCallback(async () => {
     if (!isReady) return;
@@ -168,36 +199,12 @@ const Settings = () => {
   // Import
   // ---------------------------------------------------------------------------
 
-  const handleImport = async () => {
-    if (!isReady) return;
-    setImportStep("selecting");
-    setImportResult(null);
-    setImportUri(null);
-    setConflictRows([]);
-    posthog.capture("settings_import_started");
+  // Shared scan phase for both plain and encrypted imports (Phase O).
+  const runImportScan = async (fileUri: string) => {
+    setImportUri(fileUri);
+    setImportStep("scanning");
 
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: "*/*",
-        copyToCacheDirectory: true,
-      });
-
-      if (result.canceled) {
-        setImportStep("idle");
-        return;
-      }
-
-      const file = result.assets?.[0];
-      if (!file) {
-        setImportStep("idle");
-        return;
-      }
-
-      const fileUri = file.uri;
-      setImportUri(fileUri);
-      setImportStep("scanning");
-
-      const scanResult: ImportScanResult = await importBackup(fileUri);
+    const scanResult: ImportScanResult = await importBackup(fileUri);
 
       if (scanResult.conflictingIds.length > 0) {
         setImportResult({
@@ -245,12 +252,116 @@ const Settings = () => {
           rows_imported: imported,
         });
       }
+  };
+
+  const handleImport = async () => {
+    if (!isReady) return;
+    setImportStep("selecting");
+    setImportResult(null);
+    setImportUri(null);
+    setConflictRows([]);
+    posthog.capture("settings_import_started");
+
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: "*/*",
+        copyToCacheDirectory: true,
+      });
+
+      if (result.canceled) {
+        setImportStep("idle");
+        return;
+      }
+
+      const file = result.assets?.[0];
+      if (!file) {
+        setImportStep("idle");
+        return;
+      }
+
+      await runImportScan(file.uri);
     } catch (error) {
       console.error("Import failed:", error);
       setImportStep("idle");
       posthog.capture("settings_import_failed", {
         error: error instanceof Error ? error.message : "Unknown error",
       });
+    }
+  };
+
+  // ---------------------------------------------------------------------------
+  // Encrypted cross-install backup (Phase O)
+  // ---------------------------------------------------------------------------
+
+  const handleEncryptedExport = async () => {
+    if (!isReady || !userId) return;
+    const problem = validateExportPassphrase(encPass, encPass2);
+    if (problem) {
+      setEncError(problem);
+      return;
+    }
+    setEncBusy(true);
+    setEncError(null);
+    posthog.capture("settings_encrypted_export_started");
+    try {
+      const uri = await exportEncryptedBackup(userId, encPass);
+      await Sharing.shareAsync(uri, {
+        mimeType: "application/octet-stream",
+        dialogTitle: "Save encrypted backup",
+      });
+      posthog.capture("settings_encrypted_export_completed");
+      setEncSheet(null);
+      setEncPass("");
+      setEncPass2("");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Export failed";
+      setEncError(message);
+      posthog.capture("settings_encrypted_export_failed", { error: message });
+    } finally {
+      setEncBusy(false);
+    }
+  };
+
+  const openEncryptedImportPicker = async () => {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: "*/*",
+      copyToCacheDirectory: true,
+    });
+    if (result.canceled) return;
+    const file = result.assets?.[0];
+    if (!file) return;
+    setEncPickedUri(file.uri);
+    setEncError(null);
+    setEncSheet("import");
+  };
+
+  const handleEncryptedImport = async () => {
+    if (!isReady || !userId || !encPickedUri) return;
+    setEncBusy(true);
+    setEncError(null);
+    posthog.capture("settings_encrypted_import_started");
+    try {
+      const plainUri = await decryptEncryptedBackupToPlain(
+        encPickedUri,
+        encPass,
+        userId,
+      );
+      setEncSheet(null);
+      setEncPass("");
+      setEncPass2("");
+      setEncPickedUri(null);
+      setEncBusy(false);
+      setImportResult(null);
+      setImportUri(null);
+      setConflictRows([]);
+      setImportStep("selecting");
+      await runImportScan(plainUri);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Import failed";
+      setEncError(message);
+      setEncBusy(false);
+      posthog.capture("settings_encrypted_import_failed", { error: message });
     }
   };
 
@@ -304,6 +415,9 @@ const Settings = () => {
 
   const handleConflictCancel = () => {
     setConflictModalVisible(false);
+    if (importUri?.includes("import_plain_")) {
+      void deleteImportTemp(importUri);
+    }
     setImportStep("idle");
     posthog.capture("settings_import_cancelled");
   };
@@ -313,6 +427,9 @@ const Settings = () => {
   // ---------------------------------------------------------------------------
 
   const resetImport = () => {
+    if (importUri?.includes("import_plain_")) {
+      void deleteImportTemp(importUri);
+    }
     setImportStep("idle");
     setImportResult(null);
     setImportUri(null);
@@ -360,6 +477,9 @@ const Settings = () => {
       } else {
         await clearScanCacheAsync();
         posthog.capture("settings_clear_email_scan_cache");
+        // Phase K: the recency window is gone — offer the deep re-list so
+        // brands older than the newest 500 ids can come back.
+        setDeepOfferOpen(true);
       }
       await loadStats();
     } catch (error) {
@@ -368,6 +488,51 @@ const Settings = () => {
     } finally {
       setClearing(false);
     }
+  };
+
+  // ---------------------------------------------------------------------------
+  // Deep re-list (Phase K)
+  // ---------------------------------------------------------------------------
+
+  const startDeepRelist = () => {
+    if (getScanProgress().active) {
+      ToastAndroid.show("A scan is already running.", ToastAndroid.SHORT);
+      return;
+    }
+    setDeepSheetOpen(false);
+    setDeepOfferOpen(false);
+    setDeepStarting(true);
+    posthog.capture("deep_relist_started");
+    void importFromConnectedMailboxes({
+      userId: user?.id || "anonymous",
+      existing: subscriptions,
+      addSubscription,
+      updateSubscription,
+      deep: true,
+    })
+      .then(async ({ imported, errors }) => {
+        await refreshSubscriptions();
+        posthog.capture("deep_relist_completed", { imported });
+        if (errors.length) {
+          // R2 parity: per-mailbox errors always surface, even when some rows
+          // imported.
+          Alert.alert("Deep re-list", errors.join("\n"));
+          return;
+        }
+        ToastAndroid.show(
+          imported > 0
+            ? `Deep re-list complete — ${imported} new subscription${imported === 1 ? "" : "s"}`
+            : "Deep re-list complete — no new subscriptions found.",
+          ToastAndroid.LONG,
+        );
+      })
+      .catch((error: unknown) => {
+        Alert.alert(
+          "Deep re-list",
+          error instanceof Error ? error.message : "Deep re-list failed",
+        );
+      })
+      .finally(() => setDeepStarting(false));
   };
 
   // ---------------------------------------------------------------------------
@@ -718,6 +883,43 @@ const Settings = () => {
             the native share sheet.
           </Text>
 
+          {/* Phase O: encrypted cross-install backup */}
+          <View className="mb-3 rounded-2xl border border-border bg-card p-3">
+            <Text className="text-sm font-sans-bold text-primary">
+              Cross-device backup
+            </Text>
+            <Text className="mt-1 text-xs font-sans-medium text-muted-foreground">
+              Restorable on a fresh install with a passphrase you choose. The
+              passphrase is the only key — it cannot be recovered. The plain
+              Export above only restores on THIS install.
+            </Text>
+            <View className="mt-3 flex-row gap-2">
+              <Pressable
+                className="flex-1 items-center rounded-xl bg-muted py-3"
+                onPress={() => {
+                  setEncPass("");
+                  setEncPass2("");
+                  setEncError(null);
+                  setEncSheet("export");
+                }}
+                disabled={!isReady}
+              >
+                <Text className="text-xs font-sans-bold text-primary">
+                  Encrypted export
+                </Text>
+              </Pressable>
+              <Pressable
+                className="flex-1 items-center rounded-xl bg-muted py-3"
+                onPress={openEncryptedImportPicker}
+                disabled={!isReady}
+              >
+                <Text className="text-xs font-sans-bold text-primary">
+                  Encrypted import
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+
           {/* Import Backup */}
           {importStep === "idle" && (
             <Pressable
@@ -778,6 +980,10 @@ const Settings = () => {
           )}
         </View>
 
+        {/* App Lock Section (Phase A) */}
+        {userId ? <AppLockCard userId={userId} /> : null}
+        <ExpiredGraceCard />
+
         {/* Cache & Crawl Data Section */}
         <View className="auth-card mb-5">
           <Text className="text-base font-sans-semibold text-primary mb-3">
@@ -787,6 +993,17 @@ const Settings = () => {
             Clear cached icon data, spider/crawl history, or the email-scan
             cache. Mailbox logins stay signed in.
           </Text>
+
+          {/* Phase K: deep re-list */}
+          <Pressable
+            className={`auth-button bg-accent mb-4 ${deepStarting ? "opacity-50" : ""}`}
+            onPress={() => setDeepSheetOpen(true)}
+            disabled={deepStarting}
+          >
+            <Text className="auth-button-text text-white">
+              Deep Re-list (entire mailbox history)
+            </Text>
+          </Pressable>
 
           <Pressable
             className={`auth-button bg-destructive mb-3 ${clearing || !isReady ? "opacity-50" : ""}`}
@@ -830,6 +1047,101 @@ const Settings = () => {
           <Text className="auth-button-text text-white">Sign Out</Text>
         </Pressable>
 
+        {/* Phase K: deep re-list warn sheet */}
+        <Modal
+          visible={deepSheetOpen}
+          animationType="slide"
+          transparent
+          onRequestClose={() => setDeepSheetOpen(false)}
+        >
+          <View className="flex-1 justify-end bg-black/50">
+            <Pressable
+              className="flex-1"
+              onPress={() => setDeepSheetOpen(false)}
+            />
+            <View
+              className="rounded-t-3xl bg-background p-5"
+              style={{ maxHeight: "85%", paddingBottom: sheetPadding }}
+            >
+              <Text className="text-xl font-sans-bold text-primary mb-2">
+                Deep Re-list
+              </Text>
+              <Text className="mb-2 text-sm font-sans-medium text-muted-foreground">
+                Lists your ENTIRE mailbox history — every matching email, not
+                just the newest 500. Subscriptions whose mail has aged out of
+                the recent window will be found again.
+              </Text>
+              <Text className="mb-4 text-xs font-sans-medium text-muted-foreground">
+                This can take 30–60+ minutes and uses more network. You can
+                keep using the app — a progress bubble shows live counts.
+              </Text>
+              <Pressable
+                className="mb-3 items-center rounded-2xl bg-accent py-4"
+                onPress={startDeepRelist}
+                disabled={deepStarting}
+              >
+                <Text className="text-base font-sans-bold text-white">
+                  {deepStarting ? "Starting…" : "Start deep re-list"}
+                </Text>
+              </Pressable>
+              <Pressable
+                className="items-center rounded-2xl bg-muted py-4"
+                onPress={() => setDeepSheetOpen(false)}
+              >
+                <Text className="text-base font-sans-bold text-primary">
+                  Cancel
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Phase K: offer after Clear Email Scan Cache */}
+        <Modal
+          visible={deepOfferOpen}
+          animationType="slide"
+          transparent
+          onRequestClose={() => setDeepOfferOpen(false)}
+        >
+          <View className="flex-1 justify-end bg-black/50">
+            <Pressable
+              className="flex-1"
+              onPress={() => setDeepOfferOpen(false)}
+            />
+            <View
+              className="rounded-t-3xl bg-background p-5"
+              style={{ maxHeight: "85%", paddingBottom: sheetPadding }}
+            >
+              <Text className="text-xl font-sans-bold text-primary mb-2">
+                Re-list your entire mailbox history?
+              </Text>
+              <Text className="mb-4 text-sm font-sans-medium text-muted-foreground">
+                The scan cache was cleared, so only the newest emails would be
+                re-listed. A deep re-list walks the entire history instead —
+                subscriptions older than that window come back. It can take
+                30–60+ minutes; a progress bubble shows live counts.
+              </Text>
+              <Pressable
+                className="mb-3 items-center rounded-2xl bg-accent py-4"
+                onPress={startDeepRelist}
+                disabled={deepStarting}
+              >
+                <Text className="text-base font-sans-bold text-white">
+                  {deepStarting ? "Starting…" : "Deep re-list now"}
+                </Text>
+              </Pressable>
+              <Pressable
+                className="items-center rounded-2xl bg-muted py-4"
+                onPress={() => setDeepOfferOpen(false)}
+              >
+                <Text className="text-base font-sans-bold text-primary">
+                  Later
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </Modal>
+
         {/* Conflict Resolution Modal */}
         <ConflictResolutionModal
           visible={conflictModalVisible}
@@ -849,6 +1161,94 @@ const Settings = () => {
           onCancel={() => setConfirmTarget(null)}
         />
       </ScrollView>
+
+      {/* Phase O: encrypted backup passphrase modal */}
+      <Modal
+        visible={encSheet !== null}
+        animationType="fade"
+        transparent
+        onRequestClose={() => {
+          if (!encBusy) setEncSheet(null);
+        }}
+      >
+        <Pressable
+          className="flex-1 justify-end bg-black/50"
+          onPress={() => {
+            if (!encBusy) setEncSheet(null);
+          }}
+        >
+          <Pressable
+            className="rounded-t-3xl bg-background p-5"
+            style={{ paddingBottom: sheetPadding }}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <Text className="mb-2 text-xl font-sans-bold text-primary">
+              {encSheet === "export" ? "Encrypted export" : "Encrypted import"}
+            </Text>
+            <Text className="mb-4 text-xs font-sans-medium text-muted-foreground">
+              {encSheet === "export"
+                ? "Choose a passphrase for this backup. It is the ONLY way to restore it on a fresh install — it cannot be recovered."
+                : "Enter the passphrase this backup was exported with."}
+            </Text>
+            <PasswordInput
+              value={encPass}
+              onChange={setEncPass}
+              placeholder="Passphrase"
+              autoFocus
+            />
+            {encSheet === "export" ? (
+              <View className="mt-3">
+                <PasswordInput
+                  value={encPass2}
+                  onChange={setEncPass2}
+                  placeholder="Confirm passphrase"
+                />
+              </View>
+            ) : null}
+            {encError ? (
+              <Text className="mt-2 text-xs font-sans-bold text-destructive">
+                {encError}
+              </Text>
+            ) : null}
+            <View className="mt-5 flex-row gap-2">
+              <Pressable
+                className="flex-1 items-center rounded-xl bg-muted py-3"
+                onPress={() => {
+                  setEncSheet(null);
+                  setEncPass("");
+                  setEncPass2("");
+                  setEncError(null);
+                  setEncPickedUri(null);
+                }}
+                disabled={encBusy}
+              >
+                <Text className="text-sm font-sans-bold text-primary">
+                  Cancel
+                </Text>
+              </Pressable>
+              <Pressable
+                className={`flex-1 items-center rounded-xl bg-accent py-3 ${
+                  encBusy ? "opacity-50" : ""
+                }`}
+                onPress={
+                  encSheet === "export"
+                    ? handleEncryptedExport
+                    : handleEncryptedImport
+                }
+                disabled={encBusy}
+              >
+                {encBusy ? (
+                  <ActivityIndicator size="small" color="white" />
+                ) : (
+                  <Text className="text-sm font-sans-bold text-white">
+                    {encSheet === "export" ? "Export" : "Restore"}
+                  </Text>
+                )}
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 };

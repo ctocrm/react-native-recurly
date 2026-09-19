@@ -3,9 +3,10 @@
  * SCHEMA_SQL is the full shape for new DBs. MIGRATIONS upgrade older files.
  */
 import type { SQLiteDatabase } from "expo-sqlite";
+import { nameToSlug } from "@/services/iconScraper";
 
 /** Bump when adding a migration. Stored in PRAGMA user_version. */
-export const SCHEMA_VERSION = 13;
+export const SCHEMA_VERSION = 21;
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS subscriptions (
@@ -24,6 +25,9 @@ CREATE TABLE IF NOT EXISTS subscriptions (
   renewal_date  TEXT,
   color         TEXT,
   icon_key      TEXT,
+  source_message_id TEXT,
+  bill_number   TEXT,
+  last_received_at TEXT,
   created_at    TEXT DEFAULT (datetime('now')),
   updated_at    TEXT DEFAULT (datetime('now'))
 );
@@ -135,6 +139,19 @@ CREATE TABLE IF NOT EXISTS mail_messages (
   PRIMARY KEY (mailbox_id, message_id)
 );
 CREATE INDEX IF NOT EXISTS idx_mail_messages_mailbox ON mail_messages(mailbox_id);
+
+CREATE TABLE IF NOT EXISTS merchant_day_actuals (
+  bucket_type TEXT NOT NULL,
+  bucket_key  TEXT NOT NULL,
+  mailbox_id  TEXT NOT NULL,
+  kind        TEXT NOT NULL,
+  day         TEXT NOT NULL,
+  total       REAL NOT NULL DEFAULT 0,
+  count       INTEGER NOT NULL DEFAULT 0,
+  unknown_count INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (bucket_type, bucket_key, mailbox_id, kind, day)
+);
+CREATE INDEX IF NOT EXISTS idx_merchant_day_actuals_key ON merchant_day_actuals(bucket_type, bucket_key);
 
 CREATE TABLE IF NOT EXISTS sync_metadata (
   id                     INTEGER PRIMARY KEY CHECK (id = 1),
@@ -394,6 +411,274 @@ export const MIGRATIONS: ((db: SQLiteDatabase) => Promise<void>)[] = [
       `UPDATE icon_cache SET chosen = 1
        WHERE lower(IFNULL(source,'')) IN ('ai_upscale','subscription','user');`,
     );
+  },
+  // 14 (R18): subscription details paper-trail — source scan email reference
+  // and best-effort bill number.
+  async (db) => {
+    const names = await columnNames(db, "subscriptions");
+    if (!names.includes("source_message_id")) {
+      await db.execAsync(
+        `ALTER TABLE subscriptions ADD COLUMN source_message_id TEXT;`,
+      );
+    }
+    if (!names.includes("bill_number")) {
+      await db.execAsync(
+        `ALTER TABLE subscriptions ADD COLUMN bill_number TEXT;`,
+      );
+    }
+  },
+
+  // 15: R26/DEC-001 merchant actuals projection (rebuildable cache over
+  // mail_messages; see src/services/emailscan/projection.ts).
+  async (db) => {
+    if (!(await tableExists(db, "merchant_day_actuals"))) {
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS merchant_day_actuals (
+          bucket_type TEXT NOT NULL,
+          bucket_key  TEXT NOT NULL,
+          mailbox_id  TEXT NOT NULL,
+          kind        TEXT NOT NULL,
+          day         TEXT NOT NULL,
+          total       REAL NOT NULL DEFAULT 0,
+          count       INTEGER NOT NULL DEFAULT 0,
+          unknown_count INTEGER NOT NULL DEFAULT 0,
+          PRIMARY KEY (bucket_type, bucket_key, mailbox_id, kind, day)
+        );
+        CREATE INDEX IF NOT EXISTS idx_merchant_day_actuals_key ON merchant_day_actuals(bucket_type, bucket_key);
+      `);
+    }
+  },
+
+  // 16 (F-2): canonical Zoho identity. "zohoaccounts" is Zoho's product/infra
+  // host label, not a brand (user-locked: "it's just zoho"). Rename the card,
+  // its icon keys, crawl state, reports, and projection buckets in lockstep so
+  // the merchant joins survive the rename: nameToSlug("Zoho") === "zoho" ===
+  // the key future scans mint (classifier canonical map, PARSER_VERSION 13).
+  // Idempotent: every statement matches only 'zohoaccounts' rows, and PK/UNIQUE
+  // conflicts (a pre-existing 'zoho' row) fall back to the target row via
+  // UPDATE OR IGNORE + DELETE of the leftover source. Icon/queue/session/report
+  // and bucket renames are gated on the subscriptions rename having happened
+  // (or no zohoaccounts card existing at all), so a pre-existing separate
+  // "zoho" card is never merged into by accident.
+  async (db) => {
+    await db.execAsync(`
+      UPDATE subscriptions
+         SET name = 'Zoho',
+             icon_key = 'zoho',
+             updated_at = datetime('now')
+       WHERE (icon_key = 'zohoaccounts' OR lower(name) = 'zohoaccounts')
+         AND NOT EXISTS (
+           SELECT 1 FROM subscriptions WHERE icon_key = 'zoho'
+         );
+    `);
+    const renamed = await db.getFirstAsync<{ n: number }>(
+      `SELECT COUNT(*) AS n FROM subscriptions
+        WHERE icon_key = 'zoho' AND lower(name) = 'zoho'`,
+    );
+    if (!renamed || renamed.n === 0) return;
+    await db.execAsync(`
+      UPDATE OR IGNORE icon_cache SET icon_key = 'zoho'
+       WHERE icon_key = 'zohoaccounts';
+      DELETE FROM icon_cache WHERE icon_key = 'zohoaccounts';
+
+      UPDATE OR IGNORE icon_crawl_queue SET icon_key = 'zoho'
+       WHERE icon_key = 'zohoaccounts';
+      DELETE FROM icon_crawl_queue WHERE icon_key = 'zohoaccounts';
+
+      UPDATE OR IGNORE icon_crawl_sessions
+         SET icon_key = 'zoho', official_domain = 'zoho.com'
+       WHERE icon_key = 'zohoaccounts';
+      DELETE FROM icon_crawl_sessions WHERE icon_key = 'zohoaccounts';
+
+      UPDATE icon_crawl_results SET icon_key = 'zoho'
+       WHERE icon_key = 'zohoaccounts';
+      UPDATE icon_reports SET icon_key = 'zoho'
+       WHERE icon_key = 'zohoaccounts';
+
+      UPDATE OR IGNORE merchant_day_actuals SET bucket_key = 'zoho'
+       WHERE bucket_key = 'zohoaccounts';
+      DELETE FROM merchant_day_actuals WHERE bucket_key = 'zohoaccounts';
+    `);
+  },
+  // 17 (2026-09-16): paid-unknown window anchoring. merchant_day_actuals
+  // gains unknown_count — the fold buckets a charge whose evidence proves a
+  // payment but whose amount was unreadable (Tuta-invoice class) with total 0
+  // and unknown_count 1, so window readers render "?" anchored to the
+  // payment's OWN window instead of any window the row's priceUnknown flag
+  // touches. Pre-projection DBs ALTER in with DEFAULT 0; the projection
+  // rebuild re-folds local rows (the SSOT) so no data backfill is needed.
+  async (db) => {
+    if (!(await tableExists(db, "merchant_day_actuals"))) return;
+    const names = await columnNames(db, "merchant_day_actuals");
+    if (!names.includes("unknown_count")) {
+      await db.execAsync(
+        `ALTER TABLE merchant_day_actuals ADD COLUMN unknown_count INTEGER NOT NULL DEFAULT 0;`,
+      );
+    }
+  },
+  // 18 (2026-09-17): ONE card per merchant+mailbox. Rows used to be matched
+  // by display name, so name variants ("YouTube" vs "Youtube" — product map
+  // vs From-host mint, or restore-era names) minted duplicate cards instead
+  // of repairing. Group stored rows by NAME SLUG + mailbox (icon_key is NOT
+  // identity — it may be the default "plus" or a user-picked icon); keep the
+  // FRESHEST row (scan-era rows postdate restore-era stamps), then
+  // paper-trail, then known price; merge any missing paper-trail links from
+  // the twin, delete the twin. Known price must rank LAST: a stale twin
+  // often carries a wrong-but-known price while the honest fresh row is
+  // priceUnknown. merchant_day_actuals is merchant-keyed, so twins share
+  // buckets — nothing to clean there. Idempotent.
+  async (db) => {
+    const rows = await db.getAllAsync<{
+      id: string;
+      name: string;
+      payment_method: string | null;
+      source_message_id: string | null;
+      bill_number: string | null;
+      start_date: string | null;
+      price_unknown: number | null;
+    }>(
+      `SELECT id, name, payment_method, source_message_id,
+              bill_number, start_date, price_unknown
+       FROM subscriptions`,
+    );
+    const groups = new Map<string, typeof rows>();
+    for (const row of rows) {
+      const slug = nameToSlug(row.name).toLowerCase();
+      const key = `${slug}::${row.payment_method ?? ""}`;
+      const list = groups.get(key);
+      if (list) list.push(row);
+      else groups.set(key, [row]);
+    }
+    let removed = 0;
+    let merged = 0;
+    let groupsHit = 0;
+    for (const list of groups.values()) {
+      if (list.length < 2) continue;
+      groupsHit += 1;
+      const sorted = [...list].sort((a, b) => {
+        const date = (b.start_date ?? "").localeCompare(a.start_date ?? "");
+        if (date !== 0) return date;
+        const score = (r: (typeof rows)[number]) =>
+          (r.source_message_id ? 2 : 0) + (r.price_unknown ? 0 : 1);
+        return score(b) - score(a);
+      });
+      const keeper = sorted[0];
+      for (const twin of sorted.slice(1)) {
+        const patchSource = !keeper.source_message_id && twin.source_message_id;
+        const patchBill = !keeper.bill_number && twin.bill_number;
+        if (patchSource || patchBill) {
+          await db.runAsync(
+            `UPDATE subscriptions SET
+               source_message_id = COALESCE(source_message_id, ?),
+               bill_number = COALESCE(bill_number, ?)
+             WHERE id = ?`,
+            twin.source_message_id,
+            twin.bill_number,
+            keeper.id,
+          );
+          merged += 1;
+        }
+        await db.runAsync(`DELETE FROM subscriptions WHERE id = ?`, twin.id);
+        removed += 1;
+      }
+    }
+    if (removed > 0) {
+      console.log(
+        `[MIGRATE] subscription dedupe v18: ${removed} twin row(s) removed across ${groupsHit} group(s), ${merged} paper-trail merge(s)`,
+      );
+    }
+  },
+  // 19: ESP-orphan retirement (R33) — runs LAST so mail_messages certainly
+  // exists on every DB shape. Dynamic import keeps classifier out of the
+  // module-init path of schema consumers that never migrate.
+  async (db) => {
+    const { migrateEspOrphans } = await import("../emailscan/espOrphan");
+    await migrateEspOrphans(db);
+  },
+  // 20: null-mailbox twin merge (R37). Restore-era rows with a NULL
+  // payment_method could never match a scan candidate's slug::mailbox key,
+  // so scans minted twins; the twins the boot dedupes missed (different
+  // payment_method grouping) lingered (the "Amazon · Primevideo · Amazon"
+  // triple). Merge SCAN-BORN null-mailbox rows (source_message_id set) into
+  // the freshest same-slug BOUND row — paper-trail holes backfilled, twin
+  // deleted. Hand-entered null rows (no source message) and lone null rows
+  // survive untouched. Idempotent.
+  async (db) => {
+    const rows = await db.getAllAsync<{
+      id: string;
+      name: string;
+      payment_method: string | null;
+      source_message_id: string | null;
+      bill_number: string | null;
+      start_date: string | null;
+    }>(
+      `SELECT id, name, payment_method, source_message_id, bill_number,
+              start_date
+       FROM subscriptions`,
+    );
+    const bySlug = new Map<string, typeof rows>();
+    for (const row of rows) {
+      const slug = nameToSlug(row.name).toLowerCase();
+      const list = bySlug.get(slug);
+      if (list) list.push(row);
+      else bySlug.set(slug, [row]);
+    }
+    let removed = 0;
+    let merged = 0;
+    for (const list of bySlug.values()) {
+      const bound = list
+        .filter((r) => r.payment_method)
+        .sort((a, b) =>
+          (b.start_date ?? "").localeCompare(a.start_date ?? ""),
+        );
+      if (bound.length === 0) continue;
+      const keeper = bound[0];
+      const twins = list.filter(
+        (r) => !r.payment_method && r.source_message_id,
+      );
+      for (const twin of twins) {
+        if (!keeper.source_message_id && twin.source_message_id) {
+          await db.runAsync(
+            `UPDATE subscriptions
+                SET source_message_id = COALESCE(source_message_id, ?)
+              WHERE id = ?`,
+            twin.source_message_id,
+            keeper.id,
+          );
+          merged += 1;
+        }
+        if (!keeper.bill_number && twin.bill_number) {
+          await db.runAsync(
+            `UPDATE subscriptions
+                SET bill_number = COALESCE(bill_number, ?)
+              WHERE id = ?`,
+            twin.bill_number,
+            keeper.id,
+          );
+          merged += 1;
+        }
+        await db.runAsync(`DELETE FROM subscriptions WHERE id = ?`, twin.id);
+        removed += 1;
+      }
+    }
+    if (removed > 0) {
+      console.log(
+        `[MIGRATE] null-mailbox twin merge v20: ${removed} twin row(s) removed, ${merged} paper-trail merge(s)`,
+      );
+    }
+  },
+
+  // 21 (R40-A): evidence-derived list ordering — the row's LATEST received
+  // email date, alongside start_date (earliest). The subscriptions list
+  // sorts by received evidence (COALESCE(last_received_at, start_date,
+  // created_at)), never by the scan wall-clock alone.
+  async (db) => {
+    const names = await columnNames(db, "subscriptions");
+    if (!names.includes("last_received_at")) {
+      await db.execAsync(
+        `ALTER TABLE subscriptions ADD COLUMN last_received_at TEXT;`,
+      );
+    }
   },
 ];
 

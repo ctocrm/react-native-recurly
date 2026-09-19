@@ -7,6 +7,9 @@ import {
 import clsx from "clsx";
 import React, { useState } from "react";
 import { ActivityIndicator, Image, Pressable, Text, View } from "react-native";
+import { icons } from "@/constants/icons";
+import { NoThumbnail } from "@/components/NoThumbnail";
+import { isMayHaveExpired } from "@/services/subscriptionStatus";
 import SubscriptionCardMenu from "./SubscriptionCardMenu";
 
 interface SubscriptionCardProps {
@@ -33,11 +36,20 @@ interface SubscriptionCardProps {
   onMarkPaused?: () => void;
   onMarkCancelled?: () => void;
   onViewStats?: () => void;
+  onViewDetails?: () => void;
   onIconLongPress?: () => void;
   displayPrice?: number;
   displayUnknown?: boolean;
   displayPeriodLabel?: string;
+  sparseLine?: { amount: number; label: string } | null;
   onCyclePeriod?: () => void;
+  /** Phase N: grace period (days) for the may-have-expired chip. */
+  graceDays?: number;
+  /** R35: corpus-derived lapse (last charge older than period + grace). */
+  lapsed?: boolean;
+  /** R36: family card — display title + member names for the meta line. */
+  familyTitle?: string;
+  familyMembers?: string[];
 }
 
 const SubscriptionCard = ({
@@ -64,11 +76,17 @@ const SubscriptionCard = ({
   onMarkPaused,
   onMarkCancelled,
   onViewStats,
+  onViewDetails,
   onIconLongPress,
   displayPrice,
   displayUnknown,
   displayPeriodLabel,
+  sparseLine,
   onCyclePeriod,
+  graceDays,
+  lapsed,
+  familyTitle,
+  familyMembers,
 }: SubscriptionCardProps) => {
   const [menuVisible, setMenuVisible] = useState(false);
   const { status: iconStatus, iconUri } = useCachedIcon(icon_key);
@@ -96,10 +114,23 @@ const SubscriptionCard = ({
       );
     }
 
-    // No cached icon available - use the static icon asset
-    // This is either the brand icon or the "plus" default icon set at creation time
+    // No cached icon available - use the static icon asset, UNLESS it is
+    // the plus.png default (no icon chosen/acquired): Phase O renders a
+    // muted no-thumbnail glyph instead of a plus image.
+    if (icon === icons.plus) {
+      return <NoThumbnail size={64} />;
+    }
     return <Image source={icon} className="size-16 rounded-xl" />;
   };
+
+  // Phase N: may-have-expired — the renewal lapsed past the grace period
+  // while the row is still active. Deliberately non-destructive.
+  // R35: scanned rows never carry a renewalDate, so a corpus-derived lapse
+  // (no charge in a full period + grace) drives the same chip.
+  const mayHaveExpired =
+    status !== "paused" &&
+    status !== "cancelled" &&
+    (isMayHaveExpired(renewalDate, graceDays ?? 7) || (lapsed ?? false));
 
   return (
     <>
@@ -123,13 +154,24 @@ const SubscriptionCard = ({
             </View>
             <View className="sub-copy">
               <Text numberOfLines={1} className="sub-title">
-                {name}
+                {familyTitle ?? name}
               </Text>
               <Text numberOfLines={1} ellipsizeMode="tail" className="sub-meta">
-                {category?.trim() ||
-                  plan?.trim() ||
-                  (renewalDate ? formatSubscriptionDateTime(renewalDate) : "")}
+                {familyMembers?.length
+                  ? familyMembers.join(" · ")
+                  : category?.trim() ||
+                    plan?.trim() ||
+                    (renewalDate
+                      ? formatSubscriptionDateTime(renewalDate)
+                      : "")}
               </Text>
+              {mayHaveExpired ? (
+                <View className="self-start rounded-full bg-destructive/10 px-2 py-0.5 mt-1">
+                  <Text className="text-destructive text-xs font-sans-medium">
+                    May have expired
+                  </Text>
+                </View>
+              ) : null}
             </View>
           </View>
 
@@ -151,6 +193,18 @@ const SubscriptionCard = ({
             <Text className="sub-billing">
               {displayPeriodLabel ?? billing}
             </Text>
+            {/* R18: stacked second line — this month's sparse purchases for
+                this merchant; hidden entirely when there is none.
+                R36: divider only when both streams render (family shape). */}
+            {sparseLine ? (
+              <>
+                <View className="my-1 h-px w-full bg-border" />
+                <Text className="sub-billing">
+                  +{formatCurrency(sparseLine.amount, currency, false)}{" "}
+                  {sparseLine.label}
+                </Text>
+              </>
+            ) : null}
           </Pressable>
         </View>
 
@@ -247,6 +301,7 @@ const SubscriptionCard = ({
         onMarkCancelled={() => onMarkCancelled?.()}
         onDelete={() => onDelete?.()}
         onViewStats={() => onViewStats?.()}
+        onDetails={() => onViewDetails?.()}
       />
     </>
   );

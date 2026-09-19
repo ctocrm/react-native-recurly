@@ -1,4 +1,4 @@
-package com.ctocrm.jsmastery.imap
+package app.picksandshovels.cadence.imap
 
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise

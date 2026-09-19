@@ -93,3 +93,9 @@ These are mandatory invariants for every Cline task in this project. The detaile
 - Follow the native repair workflow for bug/recovery work: Analyse → Edit → Lint/Syntax → Commit → Build+Emulator → Test → Docs/Hygiene → Commit → Repeat.
 - Update documentation after the user-facing gate is proven, not after a failed attempt.
 
+
+## The test suite is not the acceptance gate
+
+- When a change class has an established visual/behavioral bar (UI walkthrough, real emulator/device reproduction, human inspection of on-screen output), unit tests, type checks, and architecture reading are supporting evidence only. They never substitute for the gate.
+- If the real gate is expensive, the report must say the gate is still open and the task stays open. A summary led by "all tests green" on work whose bar is visual is the substitute-not-done failure.
+- Deferring the user's named verification ("next session", "needs eyes") while listing the work as fixed is bypassing the gate, not completing it.

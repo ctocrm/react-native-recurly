@@ -6,6 +6,7 @@ const {
   withDangerousMod,
   withMainApplication,
   withAppBuildGradle,
+  withAndroidManifest,
 } = require("@expo/config-plugins");
 const fs = require("fs");
 const path = require("path");
@@ -14,6 +15,63 @@ const SRC_DIR = path.join(__dirname, "android");
 const BCRYPT_DEP = 'implementation("at.favre.lib:bcrypt:0.10.2")';
 const BCPROV_DEP = 'implementation("org.bouncycastle:bcprov-jdk18on:1.78.1")';
 const BCPG_DEP = 'implementation("org.bouncycastle:bcpg-jdk18on:1.78.1")';
+const OSGI_META_EXCLUDE =
+  '            "META-INF/versions/9/OSGI-INF/MANIFEST.MF",';
+
+// R10 follow-up: Android Conscrypt has a platform race where a failed TLS
+// handshake can NPE inside ConscryptEngineSocket.drainOutgoingQueue while
+// OkHttp's closeQuietly runs on the shared Dispatcher thread, killing the
+// whole process mid-scan. Inject a default uncaught-exception guard that
+// suppresses only that known NPE; everything else still crashes normally.
+const CONSCRYPT_GUARD_FN = [
+  "  /**",
+  "   * Suppresses the Conscrypt close NPE (see git blame / R10). Every other",
+  "   * throwable still goes to the previous uncaught-exception handler.",
+  "   */",
+  "  private fun installConscryptCloseGuard() {",
+  "    val previous = Thread.getDefaultUncaughtExceptionHandler()",
+  "    Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->",
+  "      val isConscryptCloseNpe = throwable is NullPointerException &&",
+  "          thread.name.startsWith(\"OkHttp\") &&",
+  "          throwable.stackTrace.any { it.className.contains(\"ConscryptEngineSocket\") }",
+  "      if (isConscryptCloseNpe) {",
+  "        Log.w(\"ConscryptCloseGuard\", \"Suppressed Conscrypt close NPE on \" + thread.name, throwable)",
+  "        return@setDefaultUncaughtExceptionHandler",
+  "      }",
+  "      previous?.uncaughtException(thread, throwable)",
+  "    }",
+  "  }",
+  "",
+].join("\n");
+
+// R12: RN's fetch client (OkHttpClientProvider) ships with connect/read/write
+// timeouts of 0 (infinite). A black-holed socket wedges the fetch forever and
+// the JS-side Promise.race timeout cannot rescue the scan because its timer
+// never gets serviced while the fetch hangs (proven live 2026-09-04). Live
+// proof also showed that on a POOLED HTTP/2 connection neither callTimeout
+// nor readTimeout fires (OkHttp clears the socket read timeout on h2
+// upgrade; the h2 reader has no deadline), so we force HTTP/1.1 where every
+// call owns its connection and readTimeout is a hard SO_TIMEOUT on the call
+// thread. 25s sits above the 20s JS wrapper (providers.ts
+// fetchWithTimeout) — native is the backstop.
+const FETCH_CALL_TIMEOUT_FN = [
+  "  /**",
+  "   * R12 backstop: bounds every RN fetch natively (see plugin source / plan).",
+  "   */",
+  "  private fun installFetchCallTimeout() {",
+  "    val appContext = applicationContext",
+  "    OkHttpClientProvider.setOkHttpClientFactory {",
+  "      OkHttpClientProvider.createClientBuilder(appContext)",
+  "          .protocols(listOf(okhttp3.Protocol.HTTP_1_1))",
+  "          .connectTimeout(15, TimeUnit.SECONDS)",
+  "          .readTimeout(25, TimeUnit.SECONDS)",
+  "          .writeTimeout(25, TimeUnit.SECONDS)",
+  "          .callTimeout(30, TimeUnit.SECONDS)",
+  "          .build()",
+  "    }",
+  "  }",
+  "",
+].join("\n");
 
 function withMailImap(config) {
   config = withDangerousMod(config, [
@@ -21,7 +79,7 @@ function withMailImap(config) {
     async (cfg) => {
       const destDir = path.join(
         cfg.modRequest.platformProjectRoot,
-        "app/src/main/java/com/ctocrm/jsmastery/imap",
+        "app/src/main/java/app/picksandshovels/cadence/imap",
       );
       fs.mkdirSync(destDir, { recursive: true });
       for (const file of [
@@ -29,6 +87,7 @@ function withMailImap(config) {
         "ImapPackage.kt",
         "ProtonModule.kt",
         "TutaModule.kt",
+        "WatchdogModule.kt",
       ]) {
         const src = path.join(SRC_DIR, file);
         const dest = path.join(destDir, file);
@@ -38,18 +97,65 @@ function withMailImap(config) {
     },
   ]);
 
+  // R15 offline gate: ConnectivityManager queries + registerDefaultNetworkCallback
+  // both require ACCESS_NETWORK_STATE, which a default Expo manifest does not
+  // declare. Idempotent.
+  config = withAndroidManifest(config, (cfg) => {
+    const manifest = cfg.modResults.manifest;
+    manifest["uses-permission"] = manifest["uses-permission"] || [];
+    const has = manifest["uses-permission"].some(
+      (p) => p && p.$ && p.$["android:name"] === "android.permission.ACCESS_NETWORK_STATE",
+    );
+    if (!has) {
+      manifest["uses-permission"].push({
+        $: { "android:name": "android.permission.ACCESS_NETWORK_STATE" },
+      });
+    }
+    return cfg;
+  });
+
   config = withMainApplication(config, (cfg) => {
     let contents = cfg.modResults.contents;
-    if (!contents.includes("com.ctocrm.jsmastery.imap.ImapPackage")) {
+    if (!contents.includes("import android.util.Log")) {
+      contents = contents.replace(
+        /import android\.app\.Application/,
+        "import android.app.Application\nimport android.util.Log",
+      );
+    }
+    if (!contents.includes("installConscryptCloseGuard()")) {
+      contents = contents.replace(
+        /super\.onCreate\(\)\n/,
+        "super.onCreate()\n    installConscryptCloseGuard()\n",
+      );
+      contents = contents.replace(
+        /  override fun onConfigurationChanged\(/,
+        CONSCRYPT_GUARD_FN + "  override fun onConfigurationChanged(",
+      );
+    }
+    if (!contents.includes("app.picksandshovels.cadence.imap.ImapPackage")) {
       contents = contents.replace(
         /import expo\.modules\.ReactNativeHostWrapper/,
-        "import com.ctocrm.jsmastery.imap.ImapPackage\nimport expo.modules.ReactNativeHostWrapper",
+        "import app.picksandshovels.cadence.imap.ImapPackage\nimport expo.modules.ReactNativeHostWrapper",
       );
     }
     if (!contents.includes("add(ImapPackage())")) {
       contents = contents.replace(
         /PackageList\(this\)\.packages\.apply \{/,
         "PackageList(this).packages.apply {\n              add(ImapPackage())",
+      );
+    }
+    if (!contents.includes("installFetchCallTimeout()")) {
+      contents = contents.replace(
+        /import com\.facebook\.react\.common\.ReleaseLevel/,
+        "import com.facebook.react.common.ReleaseLevel\nimport com.facebook.react.modules.network.OkHttpClientProvider\n\nimport java.util.concurrent.TimeUnit",
+      );
+      contents = contents.replace(
+        /installConscryptCloseGuard\(\)\n/,
+        "installConscryptCloseGuard()\n    installFetchCallTimeout()\n",
+      );
+      contents = contents.replace(
+        /  override fun onConfigurationChanged\(/,
+        FETCH_CALL_TIMEOUT_FN + "  override fun onConfigurationChanged(",
       );
     }
     cfg.modResults.contents = contents;
@@ -73,6 +179,22 @@ function withMailImap(config) {
       cfg.modResults.contents = cfg.modResults.contents.replace(
         BCPROV_DEP,
         `${BCPROV_DEP}\n    ${BCPG_DEP}`,
+      );
+    }
+    if (
+      !cfg.modResults.contents.includes(
+        "META-INF/versions/9/OSGI-INF/MANIFEST.MF",
+      )
+    ) {
+      cfg.modResults.contents = cfg.modResults.contents.replace(
+        new RegExp("packagingOptions \\{\n        jniLibs \\{"),
+        `packagingOptions {
+        resources {
+            excludes += [
+${OSGI_META_EXCLUDE}
+            ]
+        }
+        jniLibs {`,
       );
     }
     return cfg;

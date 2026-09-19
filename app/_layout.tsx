@@ -1,5 +1,7 @@
-import { ClerkProvider } from "@clerk/expo";
-import { tokenCache } from "@clerk/expo/token-cache";
+import { AuthProvider } from "@/context/AuthContext";
+import { IconCacheProvider } from "@/context/IconCacheContext";
+import DeepScanBubble from "@/components/DeepScanBubble";
+import { posthog } from "@/config/posthog";
 import { useFonts } from "expo-font";
 import {
   SplashScreen,
@@ -9,16 +11,8 @@ import {
 } from "expo-router";
 import { PostHogProvider } from "posthog-react-native";
 import React, { useEffect, useRef } from "react";
-import { posthog } from "@/config/posthog";
-import { IconCacheProvider } from "@/context/IconCacheContext";
 
 SplashScreen.preventAutoHideAsync();
-
-const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
-
-if (!publishableKey) {
-  throw new Error("Add you Clerk Publishable key to the .env file");
-}
 
 const RootLayout = () => {
   const pathname = usePathname();
@@ -45,7 +39,10 @@ const RootLayout = () => {
   });
 
   useEffect(() => {
-    if (fontsLoaded) SplashScreen.hideAsync();
+    if (fontsLoaded) {
+      console.log("[BOOT] root fonts loaded");
+      SplashScreen.hideAsync();
+    }
   }, [fontsLoaded]);
 
   if (!fontsLoaded) return null;
@@ -60,11 +57,13 @@ const RootLayout = () => {
         maxElementsCaptured: 20,
       }}
     >
-      <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
+      <AuthProvider>
         <IconCacheProvider>
           <Stack screenOptions={{ headerShown: false }} />
+          {/* Phase K: deep re-list gauge bubble — floats over every screen. */}
+          <DeepScanBubble />
         </IconCacheProvider>
-      </ClerkProvider>
+      </AuthProvider>
     </PostHogProvider>
   );
 };

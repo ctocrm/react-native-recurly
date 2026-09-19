@@ -1,6 +1,13 @@
 import * as FileSystem from "expo-file-system/legacy";
 import * as SecureStore from "expo-secure-store";
 import { CloudStorageProvider } from "@/services/cloudsync/types";
+import {
+  authedRequest,
+  type CloudTokenBlob,
+  createCloudSession,
+  makeOAuthTokenRefresher,
+} from "@/services/cloudsync/authedRequest";
+import type { TokenSession } from "@/services/emailscan/oauthSession";
 
 const DROPBOX_API_BASE = "https://api.dropboxapi.com/2";
 const DROPBOX_CONTENT_BASE = "https://content.dropboxapi.com/2";
@@ -8,9 +15,38 @@ const DROPBOX_CONTENT_BASE = "https://content.dropboxapi.com/2";
 export class DropboxStorage implements CloudStorageProvider {
   private tokens: any = null;
   private userId: string = "";
+  private session: TokenSession | null = null;
 
   constructor(userId: string) {
     this.userId = userId;
+  }
+
+  /** R17: expiry-aware session — Dropbox access tokens live ~4h but now
+   * carry an offline refresh token (code+PKCE flow), so the session can
+   * refresh BEFORE each request (persisted) + one 401 backstop retry. */
+  private ensureSession(): TokenSession {
+    if (!this.session) {
+      const tokens = (this.tokens ?? { accessToken: "" }) as CloudTokenBlob;
+      this.session = createCloudSession({
+        tokens,
+        storageKey: `dropbox_tokens_${this.userId}`,
+        refresher:
+          tokens.refreshToken && process.env.EXPO_PUBLIC_DROPBOX_APP_KEY
+            ? makeOAuthTokenRefresher({
+                tokenEndpoint: "https://api.dropboxapi.com/oauth2/token",
+                clientId: process.env.EXPO_PUBLIC_DROPBOX_APP_KEY,
+              })
+            : null,
+      });
+    }
+    return this.session;
+  }
+
+  private req(url: string, init?: RequestInit): Promise<Response> {
+    if (!this.tokens?.accessToken) {
+      throw new Error("Not authenticated");
+    }
+    return authedRequest(this.ensureSession(), url, init, "Dropbox");
   }
 
   async authenticate(): Promise<void> {
@@ -58,7 +94,7 @@ export class DropboxStorage implements CloudStorageProvider {
       encoding: FileSystem.EncodingType.Base64,
     } as any);
 
-    const response = await fetch(`${DROPBOX_CONTENT_BASE}/files/upload`, {
+    const response = await this.req(`${DROPBOX_CONTENT_BASE}/files/upload`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${this.tokens.accessToken}`,
@@ -97,7 +133,7 @@ export class DropboxStorage implements CloudStorageProvider {
       throw new Error("Not authenticated");
     }
 
-    const response = await fetch(`${DROPBOX_CONTENT_BASE}/files/download`, {
+    const response = await this.req(`${DROPBOX_CONTENT_BASE}/files/download`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${this.tokens.accessToken}`,
@@ -137,7 +173,7 @@ export class DropboxStorage implements CloudStorageProvider {
       throw new Error("Not authenticated");
     }
 
-    const response = await fetch(`${DROPBOX_API_BASE}/files/delete_v2`, {
+    const response = await this.req(`${DROPBOX_API_BASE}/files/delete_v2`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${this.tokens.accessToken}`,
@@ -163,7 +199,7 @@ export class DropboxStorage implements CloudStorageProvider {
     }
 
     try {
-      const response = await fetch(`${DROPBOX_API_BASE}/files/get_metadata`, {
+      const response = await this.req(`${DROPBOX_API_BASE}/files/get_metadata`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${this.tokens.accessToken}`,
@@ -204,7 +240,7 @@ export class DropboxStorage implements CloudStorageProvider {
     const dropboxPath = `/SubTracker/${fileName}`;
 
     try {
-      const response = await fetch(`${DROPBOX_API_BASE}/files/search_v2`, {
+      const response = await this.req(`${DROPBOX_API_BASE}/files/search_v2`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${this.tokens.accessToken}`,

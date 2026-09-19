@@ -4,6 +4,7 @@ import {
   isLeftoverTypingSlug,
   leftoverSlugSkipReason,
   nameToSlug,
+  slugCandidatesForBrand,
 } from "../iconScraper";
 
 describe("iconScraper (pure functions)", () => {
@@ -114,4 +115,26 @@ describe("iconScraper (pure functions)", () => {
       expect(isCrawlableSlug("netflix")).toBe(true);
     });
   });
+describe("slugCandidatesForBrand (canonical brand token)", () => {
+  it("adds the canonical brand token for a scan-minted product-host slug", () => {
+    // F-2: "zohoaccounts" has no hyphen so the fuzzy alternatives are just
+    // itself — simple-icons keys the logo under "zoho", which was never tried.
+    const { slug, altSlugs } = slugCandidatesForBrand("zohoaccounts");
+    expect(slug).toBe("zohoaccounts");
+    expect(altSlugs).toContain("zoho");
+  });
+
+  it("keeps the exact slug first and never duplicates it", () => {
+    const { slug, altSlugs } = slugCandidatesForBrand("zoho");
+    expect(slug).toBe("zoho");
+    expect(altSlugs).not.toContain("zoho");
+  });
+
+  it("adds nothing for uncurated slugs — no speculative splits", () => {
+    const { slug, altSlugs } = slugCandidatesForBrand("mondly");
+    expect(slug).toBe("mondly");
+    expect(altSlugs).toEqual([]);
+    expect(altSlugs).not.toContain("mond");
+  });
+});
 });

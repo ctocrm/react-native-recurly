@@ -11,14 +11,17 @@ import {
   setPreference,
   updateCrawledUrlAttempt,
 } from "@/services/database";
+import { selfHealMissingIcons } from "@/services/iconSelfHeal";
+import { nextExpectedChargeFor } from "@/services/subscriptionOrder";
 import { processIconQueue } from "@/services/iconBackgroundCrawler";
+import { seedProviderBrandIcons } from "@/services/iconBrandCatalog";
+import { setCachedIcon } from "@/services/database";
 import dayjs from "dayjs";
 import React, {
   createContext,
   useCallback,
   useContext,
   useEffect,
-  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -52,16 +55,45 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
   const { db, isReady } = useDatabase();
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [notificationEnabled, setNotificationEnabledState] = useState(true);
-  const hasProcessedOnStartup = useRef(false);
 
-  // Process queued icons when app comes to foreground.
+  // Curated provider-brand icons (2026-09-15): seed brand-correct icons for
+  // supported mailbox providers once the DB is ready. Idempotent — skips
+  // user-chosen and already-seeded keys. Runs BEFORE processIconQueue so the
+  // curated icon wins first place before any crawl noise is considered.
+  useEffect(() => {
+    if (!isReady) return;
+    seedProviderBrandIcons(
+      (key) => import("@/services/database").then((m) => m.getCachedIcon(key)),
+      (key, imageData, source, format, originalUrl, width, height) =>
+        setCachedIcon(
+          key,
+          imageData,
+          source,
+          format,
+          originalUrl,
+          0,
+          width,
+          height,
+        ),
+    ).catch(console.error);
+  }, [isReady]);
+
+  // Process queued icons when the app comes to the foreground.
   // This runs inside DatabaseProvider, so the DB is always ready.
-  // Guarded to not double-trigger on startup when state is already "active".
+  // processIconQueue is internally single-flight (isProcessingQueue +
+  // queueRerunRequested) and a no-op SELECT when the queue is empty, so
+  // calling on every foreground transition is safe — no first-time flag:
+  // pre-setting the flag when AppState.currentState === "active" at mount
+  // disarmed BOTH this listener and the startup effect below, so queued
+  // icon crawls (e.g. a scan-left zohoaccounts entry) were never drained.
   useEffect(() => {
     const handleAppStateChange = (state: string) => {
-      if (state === "active" && !hasProcessedOnStartup.current) {
-        hasProcessedOnStartup.current = true;
+      if (state === "active") {
         processIconQueue().catch(console.error);
+        // Self-heal (2026-09-11): re-crawl subscriptions whose icon_cache row
+        // vanished (e.g. a cache wipe) — single-flighted, scan-aware, and a
+        // cheap SQL no-op when nothing is missing.
+        selfHealMissingIcons().catch(console.error);
       }
     };
 
@@ -69,10 +101,6 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
       "change",
       handleAppStateChange,
     );
-    // Check initial state - if already active, mark as processed
-    if (AppState.currentState === "active") {
-      hasProcessedOnStartup.current = true;
-    }
     return () => subscription.remove();
   }, []);
 
@@ -145,11 +173,12 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
     if (isReady && db) {
       refreshSubscriptions();
       loadPreferences();
-      // Process any queued icons on startup (first time only)
-      if (!hasProcessedOnStartup.current) {
-        hasProcessedOnStartup.current = true;
-        processIconQueue().catch(console.error);
-      }
+      // Drain any icon crawl queue left pending by a previous session (e.g.
+      // a scan-enqueued zohoaccounts entry). Safe even if a foreground
+      // transition already ran it: single-flight + no-op when empty.
+      console.log("[BOOT] calling processIconQueue");
+      processIconQueue().catch(console.error);
+      selfHealMissingIcons().catch(console.error);
     }
   }, [isReady, db]);
 
@@ -270,27 +299,40 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
   const getUpcomingSubscriptions = useCallback(
     (daysAhead = 7): UpcomingSubscription[] => {
       const now = dayjs();
+      // R40-A: Upcoming is evidence-derived, not renewalDate-gated. Scan
+      // rows never carried renewal_date, so this was permanently empty;
+      // the next charge now projects from the row's own cadence + dates
+      // (renewalDate when future, else start + k×period). Display-only.
       const upcoming = subscriptions
-        .filter((sub) => {
-          if (sub.status === "cancelled" || sub.status === "paused")
-            return false;
-          if (!sub.renewalDate) return false;
-          const daysLeft = dayjs(sub.renewalDate).diff(now, "day");
-          return daysLeft >= 0 && daysLeft <= daysAhead;
-        })
+        .filter((sub) => sub.status !== "cancelled" && sub.status !== "paused")
         .map((sub) => {
-          const daysLeft = dayjs(sub.renewalDate).diff(now, "day");
-          return {
-            id: sub.id,
-            icon: sub.icon,
-            name: sub.name,
-            price: sub.price,
-            priceUnknown: sub.priceUnknown,
-            currency: sub.currency || "USD",
-            daysLeft,
-          } satisfies UpcomingSubscription;
+          const base = sub.renewalDate ? dayjs(sub.renewalDate) : null;
+          const projected = nextExpectedChargeFor(sub, now.toDate());
+          const when =
+            base && base.isAfter(now)
+              ? base
+              : projected
+                ? dayjs(projected)
+                : null;
+          return when
+            ? { sub, daysLeft: when.diff(now, "day") }
+            : null;
         })
-        .sort((a, b) => a.daysLeft - b.daysLeft);
+        .filter(
+          (entry): entry is { sub: Subscription; daysLeft: number } =>
+            entry !== null,
+        )
+        .filter(({ daysLeft }) => daysLeft >= 0 && daysLeft <= daysAhead)
+        .sort((a, b) => a.daysLeft - b.daysLeft)
+        .map(({ sub, daysLeft }) => ({
+          id: sub.id,
+          icon: sub.icon,
+          name: sub.name,
+          price: sub.price,
+          priceUnknown: sub.priceUnknown,
+          currency: sub.currency || "USD",
+          daysLeft,
+        }));
 
       return upcoming;
     },

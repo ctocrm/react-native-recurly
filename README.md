@@ -1,6 +1,10 @@
-# Recurly (jsmastery)
+# Cadence
 
 Subscription tracker for mobile — Expo Router, SQLite, optional cloud sync, and on-device TFLite icon upscaling.
+
+Publisher: **Picks & Shovels Software**.
+
+**Identity:** launcher **Cadence**, Android package **`app.picksandshovels.cadence`**, scheme **`cadence://`**. Auth is local Continue (no Clerk). Expo slug `jsmastery`, Expo owner `ctocrm`, GitHub `ctocrm/react-native-recurly` stay until retargeted (not in the APK).
 
 **Roadmap:** [`docs/plan.md`](./docs/plan.md) (phases **1–5.5 done**; **6** ship polish next).  
 **AI / training:** [`docs/AI_UPSCALING.md`](./docs/AI_UPSCALING.md)  
@@ -14,7 +18,7 @@ Subscription tracker for mobile — Expo Router, SQLite, optional cloud sync, an
 npm install
 ```
 
-Copy `.env` with Clerk (and any cloud) keys as needed. Native AI requires a **dev/release build** — not Expo Go (`react-native-fast-tflite`).
+Copy `.env` with any cloud keys as needed. Clerk is not required. Native AI requires a **dev/release build** — not Expo Go (`react-native-fast-tflite`).
 
 ### Prerequisites (Android)
 

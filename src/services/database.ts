@@ -61,13 +61,23 @@ function rowToSubscription(row: Record<string, any>): Subscription {
     frequency: row.frequency ?? undefined,
     renewalDate: row.renewal_date ?? undefined,
     color: row.color ?? undefined,
+    sourceMessageId: row.source_message_id ?? null,
+    billNumber: row.bill_number ?? null,
+    lastReceivedAt: row.last_received_at ?? null,
   };
 }
 
 export async function getAllSubscriptions(): Promise<Subscription[]> {
   const db = getDatabase();
+  // R33: archived rows (ESP orphans) stay in the DB for audit but leave the
+  // app-wide read — every consumer (list, spend, upcoming, filters) skips
+  // them consistently. Backup/import paths use their own full reads.
+  // R40-A: the list orders by RECEIVED EVIDENCE — the row's latest email
+  // date, falling to its start date, falling to creation for hand-entered
+  // rows with no dates. Scan order (created_at first) is never the order.
   const rows = await db.getAllAsync<Record<string, any>>(
-    "SELECT * FROM subscriptions ORDER BY created_at DESC",
+    `SELECT * FROM subscriptions WHERE status != 'archived'
+     ORDER BY COALESCE(last_received_at, start_date, created_at) DESC`,
   );
   return rows.map(rowToSubscription);
 }
@@ -95,8 +105,8 @@ export async function addSubscription(
     iconKey = match ? match[0] : "plus";
   }
   await db.runAsync(
-    `INSERT INTO subscriptions (id, name, plan, category, payment_method, status, start_date, price, price_unknown, currency, billing, frequency, renewal_date, color, icon_key)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO subscriptions (id, name, plan, category, payment_method, status, start_date, price, price_unknown, currency, billing, frequency, renewal_date, color, icon_key, source_message_id, bill_number, last_received_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     subscription.id,
     subscription.name,
     subscription.plan ?? null,
@@ -112,6 +122,9 @@ export async function addSubscription(
     subscription.renewalDate ?? null,
     subscription.color ?? null,
     iconKey,
+    subscription.sourceMessageId ?? null,
+    subscription.billNumber ?? null,
+    subscription.lastReceivedAt ?? null,
   );
 }
 
@@ -135,6 +148,9 @@ export async function updateSubscription(
     renewalDate: "renewal_date",
     color: "color",
     icon_key: "icon_key",
+    sourceMessageId: "source_message_id",
+    billNumber: "bill_number",
+    lastReceivedAt: "last_received_at",
   };
   const setClauses: string[] = [];
   const params: any[] = [];
@@ -157,6 +173,25 @@ export async function updateSubscription(
 export async function deleteSubscription(id: string): Promise<void> {
   const db = getDatabase();
   await db.runAsync("DELETE FROM subscriptions WHERE id = ?", id);
+}
+
+export const DEFAULT_EXPIRED_GRACE_DAYS = 7;
+
+export async function getExpiredGraceDays(): Promise<number> {
+  const db = getDatabase();
+  const row = await db.getFirstAsync<{ value: string }>(
+    "SELECT value FROM preferences WHERE key = 'expired_grace_days'",
+  );
+  const n = row ? Number(row.value) : NaN;
+  return Number.isFinite(n) && n > 0 ? n : DEFAULT_EXPIRED_GRACE_DAYS;
+}
+
+export async function setExpiredGraceDays(days: number): Promise<void> {
+  const db = getDatabase();
+  await db.runAsync(
+    "INSERT OR REPLACE INTO preferences (key, value) VALUES ('expired_grace_days', ?)",
+    String(days),
+  );
 }
 
 export async function updateSubscriptionStatus(
@@ -249,6 +284,86 @@ function detectFormatFromBase64(base64: string, source: string): string {
     if (decoded.startsWith("RIFF") && decoded.includes("WEBP")) return "webp";
   } catch {}
   return "png";
+}
+
+// R25: when a list mounts, every visible card fires its own icon-blob
+// SELECT. Those N encrypted-blob reads serialize on the single connection
+// (~300-500ms each on device) and saturated mqt_v_js for ~8-10s at boot.
+// Lookups requested within the same 50ms window now share one IN(...) query.
+type PendingIconLookup = {
+  key: string;
+  resolve: (row: CachedIconData | null) => void;
+};
+let pendingIconLookups: PendingIconLookup[] = [];
+let iconLookupFlushTimer: ReturnType<typeof setTimeout> | null = null;
+
+async function flushIconLookups(): Promise<void> {
+  iconLookupFlushTimer = null;
+  const batch = pendingIconLookups;
+  pendingIconLookups = [];
+  if (batch.length === 0) return;
+  const db = getDatabase();
+  const uniqueKeys = [...new Set(batch.map((l) => l.key))];
+  let rows: {
+    icon_key: string;
+    image_data: string;
+    source: string;
+    format: string;
+    original_url: string | null;
+    fallback_tier: number;
+    original_width: number | null;
+    original_height: number | null;
+    chosen: number | null;
+  }[] = [];
+  try {
+    rows = await db.getAllAsync<{
+      icon_key: string;
+      image_data: string;
+      source: string;
+      format: string;
+      original_url: string | null;
+      fallback_tier: number;
+      original_width: number | null;
+      original_height: number | null;
+      chosen: number | null;
+    }>(
+      `SELECT icon_key, image_data, source, format, original_url, fallback_tier, original_width, original_height, chosen FROM icon_cache WHERE icon_key IN (${uniqueKeys.map(() => "?").join(", ")})`,
+      ...uniqueKeys,
+    );
+  } catch {
+    // Same failure semantics as getCachedIcon: lookups resolve null.
+  }
+  const byKey = new Map(rows.map((r) => [r.icon_key, r]));
+  for (const { key, resolve } of batch) {
+    const row = byKey.get(key);
+    if (row) {
+      resolve({
+        imageData: row.image_data,
+        source: row.source,
+        format: row.format,
+        originalUrl: row.original_url ?? null,
+        fallbackTier: row.fallback_tier,
+        originalWidth: row.original_width ?? undefined,
+        originalHeight: row.original_height ?? undefined,
+        chosen: row.chosen === 1,
+      });
+    } else {
+      resolve(null);
+    }
+  }
+}
+
+export function getCachedIconBatched(
+  iconKey: string,
+): Promise<CachedIconData | null> {
+  return new Promise<CachedIconData | null>((resolve) => {
+    pendingIconLookups.push({ key: iconKey, resolve });
+    if (iconLookupFlushTimer === null) {
+      iconLookupFlushTimer = setTimeout(() => {
+        void flushIconLookups();
+      }, 50);
+    }
+  });
 }
 
 export async function getCachedIcon(
@@ -763,6 +878,24 @@ export async function getQueuedIcons(): Promise<QueuedIcon[]> {
   );
 }
 
+/**
+ * Icon keys referenced by subscriptions that have NO icon_cache row at all.
+ * (Invalid/SVG rows are hop-2 heal territory — this query targets the wipe/
+ * flood case: any cache clear strands every existing subscription, so the
+ * self-heal pass re-crawls whatever this returns.)
+ */
+export async function listIconKeysMissingCache(): Promise<string[]> {
+  const db = getDatabase();
+  const rows = await db.getAllAsync<{ icon_key: string }>(
+    `SELECT DISTINCT s.icon_key AS icon_key
+     FROM subscriptions s
+     LEFT JOIN icon_cache c ON c.icon_key = s.icon_key
+     WHERE s.icon_key IS NOT NULL AND s.icon_key != 'plus' AND c.icon_key IS NULL
+     ORDER BY s.icon_key`,
+  );
+  return rows.map((row) => row.icon_key);
+}
+
 export async function dequeueIcon(iconKey: string): Promise<void> {
   const db = getDatabase();
   await db.runAsync("DELETE FROM icon_crawl_queue WHERE icon_key = ?", iconKey);
@@ -1028,6 +1161,27 @@ export async function executeNonConflictingImport(
     const allRows = await importDb.getAllAsync<Record<string, any>>(
       "SELECT * FROM subscriptions",
     );
+    // The classified corpus and the spend buckets folded from it. Encrypted
+    // backups carry both; cloud-sync payloads strip them at export, making
+    // these reads 0-row no-ops there. Without the corpus + buckets a fresh
+    // install folds subscriptions-only spend and loses every sparse charge
+    // (2026-09-16 gate: $74.84 of $355.79 missing, Home rendered $0.00).
+    let corpusRows: Record<string, any>[] = [];
+    try {
+      corpusRows = await importDb.getAllAsync<Record<string, any>>(
+        "SELECT * FROM mail_messages",
+      );
+    } catch {
+      /* legacy backup without the table */
+    }
+    let bucketRows: Record<string, any>[] = [];
+    try {
+      bucketRows = await importDb.getAllAsync<Record<string, any>>(
+        "SELECT * FROM merchant_day_actuals",
+      );
+    } catch {
+      /* legacy backup without the table */
+    }
     const conflictSet = new Set(nonConflictingIds);
     let inserted = 0;
     await db.withTransactionAsync(async () => {
@@ -1052,6 +1206,33 @@ export async function executeNonConflictingImport(
           );
           inserted++;
         }
+      }
+      for (const r of corpusRows) {
+        await db.runAsync(
+          `INSERT OR IGNORE INTO mail_messages (mailbox_id,message_id,from_addr,subject,date,body_text,html,attachments_json,classified_json,parser_version) VALUES(?,?,?,?,?,?,?,?,?,?)`,
+          r.mailbox_id,
+          r.message_id,
+          r.from_addr,
+          r.subject,
+          r.date,
+          r.body_text ?? null,
+          r.html ?? null,
+          r.attachments_json ?? null,
+          r.classified_json,
+          r.parser_version,
+        );
+      }
+      for (const b of bucketRows) {
+        await db.runAsync(
+          `INSERT OR IGNORE INTO merchant_day_actuals (bucket_type,bucket_key,mailbox_id,kind,day,total,count) VALUES(?,?,?,?,?,?,?)`,
+          b.bucket_type,
+          b.bucket_key,
+          b.mailbox_id,
+          b.kind,
+          b.day,
+          b.total,
+          b.count,
+        );
       }
     });
     return inserted;
@@ -1342,17 +1523,56 @@ export async function getIconCacheStats(): Promise<IconCacheStats> {
 }
 
 /**
+ * R32: the cache/crawl clears run while the background icon chain writes on
+ * the same SQLite connection. With the non-exclusive withTransactionAsync,
+ * Expo absorbs interleaved queries into the open transaction (SDK 54 docs),
+ * which can end it out from under the clear — the observed transient
+ * "cannot rollback - no transaction is active" (ERR_INTERNAL_SQLITE_ERROR).
+ * A bounded retry on that transient signature is safe (idempotent DELETEs).
+ *
+ * NOT withExclusiveTransactionAsync: it opens a second native connection
+ * (expo-sqlite Transaction.createAsync → useNewConnection) that does NOT
+ * inherit the SQLCipher `PRAGMA key`, so it reads ciphertext and fails with
+ * "file is not a database". Never use it on this encrypted DB.
+ */
+async function runClearWithRetry(
+  label: string,
+  op: () => Promise<void>,
+): Promise<void> {
+  const MAX_ATTEMPTS = 3;
+  for (let attempt = 1; ; attempt++) {
+    try {
+      await op();
+      return;
+    } catch (error) {
+      const err = error as { code?: string; message?: string };
+      const message = err?.message ?? String(error);
+      const transient =
+        message.includes("no transaction is active") ||
+        message.includes("has been rejected");
+      if (!transient || attempt >= MAX_ATTEMPTS) throw error;
+      console.warn(
+        `[DB] ${label} hit transient contention (attempt ${attempt}/${MAX_ATTEMPTS}); retrying`,
+      );
+      await new Promise((resolve) => setTimeout(resolve, 300 * attempt));
+    }
+  }
+}
+
+/**
  * Clears stored icon image data: the chosen icon cache, all crawl candidate
  * results, and the pending background fetch queue. The crawled_urls dedup
  * table is preserved, so previously crawled URLs may not be re-downloaded.
  */
 export async function clearIconCache(): Promise<void> {
   const db = getDatabase();
-  await db.withTransactionAsync(async () => {
-    await db.execAsync("DELETE FROM icon_cache");
-    await db.execAsync("DELETE FROM icon_crawl_results");
-    await db.execAsync("DELETE FROM icon_crawl_queue");
-    await db.execAsync("DELETE FROM icon_crawl_sessions");
+  await runClearWithRetry("clearIconCache", async () => {
+    await db.withTransactionAsync(async () => {
+      await db.execAsync("DELETE FROM icon_cache");
+      await db.execAsync("DELETE FROM icon_crawl_results");
+      await db.execAsync("DELETE FROM icon_crawl_queue");
+      await db.execAsync("DELETE FROM icon_crawl_sessions");
+    });
   });
   // Notify listeners so in-memory cache state is invalidated.
   setTimeout(async () => {
@@ -1368,15 +1588,17 @@ export async function clearIconCache(): Promise<void> {
  */
 export async function clearCrawlHistory(): Promise<void> {
   const db = getDatabase();
-  await db.withTransactionAsync(async () => {
-    await db.execAsync("DELETE FROM crawled_urls");
-    await db.execAsync("DELETE FROM icon_crawl_sessions");
-    // icon_reports is created lazily; swallow errors if it doesn't exist yet.
-    try {
-      await db.execAsync("DELETE FROM icon_reports");
-    } catch {
-      /* table not yet created */
-    }
+  await runClearWithRetry("clearCrawlHistory", async () => {
+    await db.withTransactionAsync(async () => {
+      await db.execAsync("DELETE FROM crawled_urls");
+      await db.execAsync("DELETE FROM icon_crawl_sessions");
+      // icon_reports is created lazily; swallow errors if it doesn't exist yet.
+      try {
+        await db.execAsync("DELETE FROM icon_reports");
+      } catch {
+        /* table not yet created */
+      }
+    });
   });
   // Reset persisted rate-limit cooldowns (SecureStore + in-memory).
   try {
