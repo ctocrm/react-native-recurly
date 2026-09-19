@@ -1500,7 +1500,10 @@ export function classifyMessage(message: NormalizedMessage): ClassifiedMessage {
   // An Order payload with a price is a machine-readable charge artifact —
   // it outranks regex proof and must count BEFORE the marketing drop gate,
   // so a promo-looking subject carrying a real Order never drops.
-  if (orderMarkup && orderMarkup.price !== undefined) {
+  if (
+    orderMarkup &&
+    (orderMarkup.price !== undefined || orderMarkup.orderStatus)
+  ) {
     strongProofTags.push("proof:order-markup");
   }
   const proofTags = [...strongProofTags, ...genericProofTags];
@@ -1606,18 +1609,33 @@ export function classifyMessage(message: NormalizedMessage): ClassifiedMessage {
     evidence.push("proof:subject-amount");
   }
   const hasProof = proofTags.length > 0;
-  const kind: CandidateKind =
+  // P3: a marketing-shaped message (offer/promo footprint >= 2; >= 4 with
+  // no strong proof already DROPS via R27) never mints RECURRING on GENERIC
+  // proof alone - demote to sparse. STRONG charge artifacts (an Order payload
+  // with real price/orderStatus, pushed above) keep the recurring read.
+  let kind: CandidateKind =
     resolved.forceSparse || railForceSparse
       ? "sparse"
       : subjectClass === "recurring"
         ? "recurring"
         : "sparse";
-  const cadenceEvidence = inferCadenceEvidence(
-    `${message.subject}\n${body}`,
-    hasProof,
-    kind,
-  );
-  const cadence = cadenceEvidence.cadence;
+  if (
+    kind === "recurring" &&
+    marketingScore >= 2 &&
+    strongProofTags.length === 0
+  ) {
+    kind = "sparse";
+    marketingTags.push("demote:marketing-no-strong-proof");
+  }
+  // P3: a $0 receipt is a license/account artifact (Netgate, Rotaryengine
+  // class) - cadence anchors (renewal price, domain registration) must
+  // never stamp a cadence onto it. The import's $0-to-free rule then owns
+  // the recurring-to-free flip.
+  const zeroLicense = parsed?.amount === 0;
+  const cadenceEvidence = zeroLicense
+    ? { strong: false, tag: "zero-license-suppressed" }
+    : inferCadenceEvidence(`${message.subject}\n${body}`, hasProof, kind);
+  const cadence = zeroLicense ? undefined : cadenceEvidence.cadence;
   const amountUnknown = !parsed;
 
   evidence.push(...proofTags);

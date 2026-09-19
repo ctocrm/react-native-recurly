@@ -287,12 +287,22 @@ async function runScan(opts: {
           // cadences. Scan-born rows only — a hand-entered row keeps its
           // cadence — and never on a recurring row (its cadence is
           // load-bearing).
+          // P3 (R38): ONE proven-payment message with no cadence words also
+          // clears a legacy stamp (a real charge is decisive evidence the
+          // corpus never supported the stamp). Still scan-born rows only,
+          // never a recurring row; without proof the R34 >= 2-message bar
+          // stands.
+          const provenPayment = candidate.evidence.some((e) =>
+            e.startsWith("proof:"),
+          );
           const cadenceClear =
             already.category === "sparse" &&
             next.category === "sparse" &&
             next.billing === "" &&
             already.billing !== "" &&
-            (candidate.messageIds?.length ?? 0) >= 2 &&
+            ((candidate.messageIds?.length ?? 0) >= 2 ||
+              (provenPayment &&
+                (candidate.messageIds?.length ?? 0) >= 1)) &&
             !!already.sourceMessageId;
           // Scan-date bug: a row minted with the scan wall-clock as its
           // start heals to the corpus's earliest evidence email when the
@@ -330,7 +340,15 @@ async function runScan(opts: {
             // R34: billing rides the patch only when the candidate carries a
             // cadence or the stamp is being cleared — a paper-trail backfill
             // alone must never rewrite (or wipe) a row's cadence.
-            if (next.billing !== "" || cadenceRepair || cadenceClear) {
+            if (
+              next.billing !== "" ||
+              cadenceRepair ||
+              cadenceClear ||
+              // P3: the $0->free stream flip owns its stamp too — a candidate
+              // with no cadence evidence flipping the row to FREE clears a
+              // legacy "Monthly" (a free row has no cadence).
+              (streamFlip && next.category === "free" && next.billing === "")
+            ) {
               patch.billing = next.billing;
               patch.frequency = next.frequency;
             }

@@ -60,7 +60,14 @@ import type { OrderMarkup } from "./orderMarkup";
 //      never recurring. Squarespace joins PAYMENT_PROCESSORS: its mail resolves
 //      the receipt site/domain (the real subscription) or DROPS. Bump restages
 //      so stored rail rows re-derive under the per-item keys.
-export const PARSER_VERSION = 28;
+// v28→v29 (R38 P3): marketing-shaped mail never mints RECURRING on generic
+//      proof alone (Order markup with a real price/orderStatus is STRONG proof
+//      and keeps the recurring read); $0 license receipts never anchor a
+//      cadence ("renewal price", "domain registration") — the import's $0→free
+//      rule then owns the flip; ONE proven-payment message with no cadence
+//      words may clear a legacy sparse stamp (R34 ≥2-message rule loosened;
+//      scan-born rows only, hand-entered protected, never recurring rows).
+export const PARSER_VERSION = 29;
 
 export type MailProviderId =
   | "gmail"
