@@ -89,6 +89,19 @@ describe("unresolvable rail receipts are the honest aggregate SPARSE", () => {
     expect(hit.merchantKey).toBe("google-play");
     expect(hit.kind).toBe("sparse");
   });
+
+  it("a prose tail ('order for your continued support') never mints a merchant", () => {
+    // R38 P2 audit fix: subject-tail extraction must not turn receipt
+    // scaffolding into a merchant — stopwords and long tails are rejected
+    // and the receipt falls back to the honest aggregate.
+    const hit = classifyMessage(
+      base({ subject: "Your Google Play order for your continued support" }),
+    );
+    expect(hit.merchantKey).toBe("google-play");
+    expect(hit.kind).toBe("sparse");
+    expect(hit.evidence).toContain("rail:aggregate-sparse");
+    expect(hit.merchantName).toBe("Google Play");
+  });
 });
 
 describe("Apple rail: first-party stays Apple, third-party re-keys", () => {

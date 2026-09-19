@@ -293,3 +293,35 @@ describe("importFromConnectedMailboxes startDateRepair (scan-date bug)", () => {
     expect(updateSubscription).not.toHaveBeenCalled();
   });
 });
+
+describe("R38 P3 audit: a $0 tail never collapses a paid merchant", () => {
+  it("a last-arriving $0 receipt keeps the candidate at its real charge", () => {
+    const candidates = rollupCandidates([
+      hit("2026-01-10T00:00:00.000Z"),
+      hit("2026-02-10T00:00:00.000Z"),
+      hit("2026-03-10T00:00:00.000Z", { amount: 0 }),
+    ]);
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0].amount).toBe(59.99);
+    expect(candidates[0].amountUnknown).toBe(false);
+  });
+
+  it("a $0 receipt FIRST, then real charges, recovers the real charge", () => {
+    const candidates = rollupCandidates([
+      hit("2026-01-10T00:00:00.000Z", { amount: 0 }),
+      hit("2026-02-10T00:00:00.000Z"),
+    ]);
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0].amount).toBe(59.99);
+  });
+
+  it("a pure-$0 corpus (license mail) stays $0 -> free", () => {
+    const candidates = rollupCandidates([
+      hit("2026-01-10T00:00:00.000Z", { amount: 0 }),
+      hit("2026-02-10T00:00:00.000Z", { amount: 0 }),
+    ]);
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0].amount).toBe(0);
+    expect(candidateToSubscription(candidates[0]).category).toBe("free");
+  });
+});

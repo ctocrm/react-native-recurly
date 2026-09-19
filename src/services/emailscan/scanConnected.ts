@@ -243,15 +243,18 @@ async function runScan(opts: {
           // one-off purchases (xAI tokens, domain orders) are not the
           // subscription's price. A recurring candidate MAY repair a sparse
           // row (e.g. Porkbun's yearly order receipt).
-          // P3 (R38): a FREE candidate (a $0 license receipt — Netgate,
-          // Rotaryengine class) may flip a RECURRING row to free; the flip
-          // itself is still gated by streamFlip below, and price repairs
-          // stay blocked (richer demands kindCompatible, so a $0 candidate
-          // can never rewrite a stored price).
+          // P3 (R38): a $0 MONEY candidate (amount parsed to exactly 0, kind
+          // recurring/sparse — NEVER a welcome/account kind-free mail, which
+          // carries no amount at all) may flip a RECURRING row to free; the
+          // flip itself is still gated by streamFlip below, and richer stays
+          // blocked for free candidates so a $0 receipt never rewrites a
+          // stored price.
           const kindCompatible =
             next.category === "recurring" ||
-            next.category === "free" ||
-            already.category === "sparse";
+            already.category === "sparse" ||
+            (next.category === "free" &&
+              candidate.amount === 0 &&
+              candidate.kind !== "free");
           // R37: a claimed unbound row binds to this mailbox for the rest
           // of the scan (and, for scan-born rows, in storage) — the claim
           // must stick even when no other repair gate fires.
@@ -299,11 +302,19 @@ async function runScan(opts: {
           // load-bearing).
           // P3 (R38): ONE proven-payment message with no cadence words also
           // clears a legacy stamp (a real charge is decisive evidence the
-          // corpus never supported the stamp). Still scan-born rows only,
-          // never a recurring row; without proof the R34 >= 2-message bar
-          // stands.
-          const provenPayment = candidate.evidence.some((e) =>
-            e.startsWith("proof:"),
+          // corpus never supported the stamp). "Proven" means a STRONG charge
+          // artifact — generic soft anchors (receipt/invoice/statement words,
+          // payment-method mentions) are exactly what R27 distrusts and never
+          // qualify. Still scan-born rows only, never a recurring row;
+          // without strong proof the R34 >= 2-message bar stands.
+          const provenPayment = candidate.evidence.some(
+            (e) =>
+              e.startsWith("proof:") &&
+              !e.startsWith("proof:payment-event") &&
+              !e.startsWith("proof:billed-to") &&
+              !e.startsWith("proof:receipt-word") &&
+              !e.startsWith("proof:invoice-word") &&
+              !e.startsWith("proof:statement-word"),
           );
           const cadenceClear =
             already.category === "sparse" &&

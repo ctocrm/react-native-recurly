@@ -505,6 +505,15 @@ const RAIL_ITEM_NOISE = new Set([
 const APPLE_FIRST_PARTY_RE = /\b(apple|icloud|itunes|arcade|apple\s+one|apple\s+music|apple\s+tv)\b/i;
 
 /**
+ * R38 P2 audit fix: prose tails ("order for your continued support") are
+ * receipt scaffolding, not app names. A tail that starts with a stopword or
+ * runs past four words is never a merchant.
+ */
+const RAIL_ITEM_STOPWORD_RE =
+  /^(?:your|you|my|our|the|this|that|these|those|a|an|continued|being|being\s+a|to|for|of|all|it|its|their)\b/i;
+const RAIL_ITEM_MAX_WORDS = 4;
+
+/**
  * R38 P2: the real merchant of a Play/Apple rail receipt — the APP the
  * charge is for. Candidates come from the P1 markup items (top tier), then
  * the receipt subject/body "for X" phrasing. Returns:
@@ -535,6 +544,8 @@ export function railItemFromReceipt(
     const trimmed = raw.replace(/[\s.,;:!]+$|"[^"]*"$/g, "").trim();
     if (!trimmed) continue;
     if (RAIL_ITEM_NOISE.has(trimmed.toLowerCase())) continue;
+    if (RAIL_ITEM_STOPWORD_RE.test(trimmed)) continue;
+    if (trimmed.split(/\s+/).length > RAIL_ITEM_MAX_WORDS) continue;
     const named = titleCaseMerchant(trimmed);
     if (named.merchantKey === "unknown") continue;
     if (isPaymentProcessor(named.merchantKey) || isEspBrandName(named.merchantKey))
@@ -1609,19 +1620,23 @@ export function classifyMessage(message: NormalizedMessage): ClassifiedMessage {
     evidence.push("proof:subject-amount");
   }
   const hasProof = proofTags.length > 0;
-  // P3: a marketing-shaped message (offer/promo footprint >= 2; >= 4 with
-  // no strong proof already DROPS via R27) never mints RECURRING on GENERIC
-  // proof alone - demote to sparse. STRONG charge artifacts (an Order payload
-  // with real price/orderStatus, pushed above) keep the recurring read.
   let kind: CandidateKind =
     resolved.forceSparse || railForceSparse
       ? "sparse"
       : subjectClass === "recurring"
         ? "recurring"
         : "sparse";
+  // P3 (R38 audit fix): only SUBJECT-tier ad shapes demote a renewal —
+  // ad words or ad pricing grammar in the subject line itself. Body CTA
+  // noise ("unsubscribe", "learn more") and bulk-send hints are carried by
+  // every legit commercial mail and never demote; heavy marketing with no
+  // strong proof already DROPS via the R27 gate above.
+  const subjectMarketing =
+    MARKETING_SUBJECT_RES.some((m) => m.re.test(message.subject)) ||
+    MARKETING_PRICE_RES.test(message.subject);
   if (
     kind === "recurring" &&
-    marketingScore >= 2 &&
+    subjectMarketing &&
     strongProofTags.length === 0
   ) {
     kind = "sparse";

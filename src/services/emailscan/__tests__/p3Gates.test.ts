@@ -28,14 +28,29 @@ function msg(overrides: Partial<NormalizedMessage>): NormalizedMessage {
 describe("P3.1 — marketing never mints recurring on generic proof", () => {
   const hints = { listUnsubscribe: true, gmailCategory: "CATEGORY_PROMOTIONS" };
 
-  it("demotes a marketing-shaped recurring subject to sparse (score 2, generic proof)", () => {
-    // No hints: marketing stays under the R27 drop bar (>= 4) so the message
-    // SURVIVES to the kind decision — exactly the ad-shaped class P3 targets.
+  it("demotes a SUBJECT-tier ad-shaped recurring subject to sparse", () => {
+    // Ad pricing grammar in the SUBJECT ("just $4.99") with generic proof
+    // only — the offer-shaped class P3 targets.
     const hit = classifyMessage(
-      msg({ subject: "Your subscription renewal — just $9.99/mo" }),
+      msg({ subject: "Your subscription renewal — just $4.99/mo" }),
     );
     expect(hit.kind).toBe("sparse");
     expect(hit.evidence).toContain("demote:marketing-no-strong-proof");
+  });
+
+  it("body CTA noise and bulk hints alone never demote a legit renewal", () => {
+    // R38 audit regression guard: the pre-audit >=2 score rule demoted this
+    // exact class (R27 deliberately preserves light marketing + generic
+    // proof as recurring).
+    const hit = classifyMessage(
+      msg({
+        subject: "Your subscription renews tomorrow",
+        text: "Learn more about your plan. Your payment method was updated. Unsubscribe anytime.",
+        hints: undefined,
+      }),
+    );
+    expect(hit.kind).toBe("recurring");
+    expect(hit.evidence).not.toContain("demote:marketing-no-strong-proof");
   });
 
   it("an Order payload with a real price keeps the recurring read", () => {
@@ -241,5 +256,62 @@ describe("P3.3 — one proven-payment message clears a legacy stamp", () => {
     expect(patch.billing).toBe("");
     expect(patch.frequency).toBe("");
     expect(patch.price).toBeUndefined(); // richer stays guarded
+  });
+
+  it("a welcome/account mail (kind free, no amount) never flips a recurring row", async () => {
+    // R38 audit fix: kindCompatible admitted every free-category candidate —
+    // including kind-free account mails that carry NO amount. A welcome mail
+    // must never flip a paid recurring row to free.
+    const recurring = {
+      ...existingRow(),
+      category: "recurring",
+      price: 41,
+      billing: "Monthly",
+      frequency: "Monthly",
+      icon_key: "netgate",
+      name: "Netgate",
+    } as Subscription;
+    mockScan.mockResolvedValueOnce({
+      candidates: [
+        sparseCandidate({
+          merchantKey: "netgate",
+          merchant: "Netgate",
+          kind: "free",
+          amount: undefined,
+          evidence: ["proof:doc-number LT-9"],
+        }),
+      ],
+    });
+
+    await importFromConnectedMailboxes({
+      userId: "u1",
+      existing: [recurring],
+      addSubscription,
+      updateSubscription,
+    });
+
+    expect(updateSubscription).not.toHaveBeenCalled();
+  });
+
+  it("a single message with only GENERIC proof does not clear the stamp", async () => {
+    // R38 audit fix: receipt/invoice/statement WORDS are soft anchors R27
+    // distrusts — they are not a proven payment.
+    mockScan.mockResolvedValueOnce({
+      candidates: [
+        sparseCandidate({
+          amount: 47.25,
+          evidence: ["proof:receipt-word"],
+        }),
+      ],
+    });
+
+    await importFromConnectedMailboxes({
+      userId: "u1",
+      existing: [existingRow()],
+      addSubscription,
+      updateSubscription,
+    });
+
+    expect(updateSubscription).not.toHaveBeenCalled();
   });
 });

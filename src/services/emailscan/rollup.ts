@@ -78,9 +78,25 @@ export function rollupCandidates(hits: ClassifiedMessage[]): ScanCandidate[] {
     existing.evidence = [...existing.evidence, ...evidence];
 
     if (hit.amount !== undefined) {
-      existing.amount = hit.amount;
-      existing.currency = hit.currency ?? existing.currency;
-      existing.amountUnknown = false;
+      // R38 P3 audit fix: a $0 receipt must not collapse a merchant that has
+      // real charges (a comp/statement tail arriving last would otherwise
+      // roll the candidate up as free and flip its paid row via the scan's
+      // free-stream rules). Pure-$0 corpora (license mail) stay $0 -> free.
+      const corpus = amountsByKey.get(key) ?? [];
+      const hasNonzero = corpus.some((a) => a > 0);
+      if (hit.amount === 0 && hasNonzero) {
+        if (existing.amount === undefined || existing.amount === 0) {
+          const lastNonzero = [...corpus].reverse().find((a) => a > 0);
+          if (lastNonzero !== undefined) {
+            existing.amount = lastNonzero;
+            existing.amountUnknown = false;
+          }
+        }
+      } else {
+        existing.amount = hit.amount;
+        existing.currency = hit.currency ?? existing.currency;
+        existing.amountUnknown = false;
+      }
     } else if (existing.amount === undefined) {
       existing.amountUnknown = true;
     }

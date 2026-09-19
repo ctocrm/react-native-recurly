@@ -67,7 +67,13 @@ import type { OrderMarkup } from "./orderMarkup";
 //      rule then owns the flip; ONE proven-payment message with no cadence
 //      words may clear a legacy sparse stamp (R34 ≥2-message rule loosened;
 //      scan-born rows only, hand-entered protected, never recurring rows).
-export const PARSER_VERSION = 29;
+// v29→v30 (R38 audit fixes): the marketing demotion now requires SUBJECT-tier
+//      ad shapes (body CTA noise and bulk-send hints never demote a legit
+//      renewal); rail item extraction rejects prose tails (stopwords/word cap);
+//      rollup no longer lets a last-arriving /bin/bash receipt collapse a merchant
+//      that has real charges. Restages so stored rows re-derive under the
+//      corrected rules.
+export const PARSER_VERSION = 30;
 
 export type MailProviderId =
   | "gmail"
