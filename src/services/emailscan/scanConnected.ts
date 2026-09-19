@@ -294,17 +294,19 @@ async function runScan(opts: {
             already.billing !== "" &&
             (candidate.messageIds?.length ?? 0) >= 2 &&
             !!already.sourceMessageId;
-          // Scan-date bug: a scan-born row minted with the scan wall-clock
-          // as its start heals to the corpus's earliest evidence email when
-          // the candidate's firstSeen is EARLIER. Min-only: a stored start
-          // earlier than any corpus mail (hand-corrected, pre-restore) is
-          // never moved, and a later firstSeen can never push the start
-          // forward. Hand-entered rows (no source message) untouched.
+          // Scan-date bug: a row minted with the scan wall-clock as its
+          // start heals to the corpus's earliest evidence email when the
+          // candidate's firstSeen is EARLIER. Min-only: a stored start
+          // earlier than any corpus mail is never moved, and a later
+          // firstSeen can never push the start forward. Applies to every
+          // matched row — hand-entered included (2026-09-18 user directive:
+          // Started IS the earliest received email date; the price and
+          // cadence protections are untouched, this moves the date only).
           const startDateRepair =
             !!next.startDate &&
             !!already.startDate &&
             next.startDate < already.startDate &&
-            !!already.sourceMessageId;
+            (candidate.messageIds?.length ?? 0) > 0;
           if (
             (richer ||
               cadenceRepair ||

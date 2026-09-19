@@ -107,7 +107,7 @@ describe("candidateToSubscription start date", () => {
       messageIds: ["m1"],
       confidence: "low",
     };
-    const start = candidateToSubscription(candidate).startDate;
+    const start = candidateToSubscription(candidate).startDate ?? "";
     expect(Math.abs(Date.now() - new Date(start).getTime())).toBeLessThan(
       60_000,
     );
@@ -238,7 +238,7 @@ describe("importFromConnectedMailboxes startDateRepair (scan-date bug)", () => {
     expect(updateSubscription).not.toHaveBeenCalled();
   });
 
-  it("a hand-entered row (no source message) is never moved", async () => {
+  it("a hand-entered row's start still heals from mail evidence (2026-09-18 directive)", async () => {
     mockScan.mockResolvedValueOnce({
       candidates: [candidateFixture()],
     });
@@ -252,12 +252,13 @@ describe("importFromConnectedMailboxes startDateRepair (scan-date bug)", () => {
       updateSubscription,
     });
 
-    // The backfill is legitimate R18 behavior (sourceMessageId null ->
-    // backfilled), but a hand-entered row's START must never move.
+    // The paper trail backfills (R18) AND the start heals to the earliest
+    // received email — Started is evidence-derived for every matched row.
+    // Price and cadence protections are separate gates, untouched here.
     expect(updateSubscription).toHaveBeenCalledTimes(1);
     const patch = updateSubscription.mock.calls[0][1];
     expect(patch.sourceMessageId).toBe("m1");
-    expect(patch.startDate).toBeUndefined();
+    expect(patch.startDate).toBe(CORPUS_START);
   });
 
   it("never moves a start LATER — a stored earlier start stays", async () => {
