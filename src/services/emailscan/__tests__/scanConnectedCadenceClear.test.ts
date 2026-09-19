@@ -124,7 +124,12 @@ describe("importFromConnectedMailboxes cadence un-stamp (R34)", () => {
       updateSubscription,
     });
 
-    expect(updateSubscription).not.toHaveBeenCalled();
+    // R40-A: a lastReceivedAt-only write is pure bookkeeping, not a repair
+    // — the R34 un-stamp class must never fire in this scenario.
+    const repairs = updateSubscription.mock.calls
+      .map((c) => c[1] as Record<string, unknown>)
+      .filter((p) => Object.keys(p).some((k) => k !== "lastReceivedAt"));
+    expect(repairs).toEqual([]);
   });
 
   it("a hand-entered row keeps its cadence (paper-trail may still backfill)", async () => {
@@ -156,7 +161,11 @@ describe("importFromConnectedMailboxes cadence un-stamp (R34)", () => {
       updateSubscription,
     });
 
-    expect(updateSubscription).not.toHaveBeenCalled();
+    // R40-A: bookkeeping-only writes allowed; the un-stamp must not fire.
+    const repairs = updateSubscription.mock.calls
+      .map((c) => c[1] as Record<string, unknown>)
+      .filter((p) => Object.keys(p).some((k) => k !== "lastReceivedAt"));
+    expect(repairs).toEqual([]);
   });
 
   it("a paper-trail backfill alone never rewrites (or wipes) billing", async () => {

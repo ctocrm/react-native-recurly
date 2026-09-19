@@ -154,7 +154,12 @@ describe("importFromConnectedMailboxes paper-trail backfill (R22)", () => {
       updateSubscription,
     });
 
-    expect(updateSubscription).not.toHaveBeenCalled();
+    // R40-A: bookkeeping-only writes allowed; a SPARSE candidate must never
+    // backfill (or otherwise repair) a recurring row — R18/R22 hold.
+    const repairs = updateSubscription.mock.calls
+      .map((c) => c[1] as Record<string, unknown>)
+      .filter((p) => Object.keys(p).some((k) => k !== "lastReceivedAt"));
+    expect(repairs).toEqual([]);
     expect(addSubscription).not.toHaveBeenCalled();
     expect(imported).toBe(0);
   });

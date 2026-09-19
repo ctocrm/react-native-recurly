@@ -216,7 +216,11 @@ describe("P3.3 — one proven-payment message clears a legacy stamp", () => {
       updateSubscription,
     });
 
-    expect(updateSubscription).not.toHaveBeenCalled();
+    // R40-A: a lastReceivedAt-only write is bookkeeping, not a repair.
+    const repairs = updateSubscription.mock.calls
+      .map((c) => c[1] as Record<string, unknown>)
+      .filter((p) => Object.keys(p).some((k) => k !== "lastReceivedAt"));
+    expect(repairs).toEqual([]);
   });
 
   it("a $0 license candidate flips a RECURRING row to free and clears the stamp", async () => {
@@ -290,7 +294,12 @@ describe("P3.3 — one proven-payment message clears a legacy stamp", () => {
       updateSubscription,
     });
 
-    expect(updateSubscription).not.toHaveBeenCalled();
+    // R40-A: bookkeeping-only writes allowed; the free flip must not fire
+    // for a kind-free candidate with NO amount (audit fix A).
+    const repairs = updateSubscription.mock.calls
+      .map((c) => c[1] as Record<string, unknown>)
+      .filter((p) => Object.keys(p).some((k) => k !== "lastReceivedAt"));
+    expect(repairs).toEqual([]);
   });
 
   it("a single message with only GENERIC proof does not clear the stamp", async () => {
@@ -312,6 +321,10 @@ describe("P3.3 — one proven-payment message clears a legacy stamp", () => {
       updateSubscription,
     });
 
-    expect(updateSubscription).not.toHaveBeenCalled();
+    // R40-A: bookkeeping-only writes allowed; generic proof must not clear.
+    const repairs = updateSubscription.mock.calls
+      .map((c) => c[1] as Record<string, unknown>)
+      .filter((p) => Object.keys(p).some((k) => k !== "lastReceivedAt"));
+    expect(repairs).toEqual([]);
   });
 });

@@ -8,11 +8,21 @@ import SubscriptionIconPickerModal from "@/components/SubscriptionIconPickerModa
 import SubscriptionStatsModal from "@/components/SubscriptionStatsModal";
 import { icons } from "@/constants/icons";
 import { useSubscriptions } from "@/context/SubscriptionContext";
-import { getExpiredGraceDays } from "@/services/database";
+import {
+  getExpiredGraceDays,
+  getPreference,
+  setPreference,
+} from "@/services/database";
 import {
   DEFAULT_EXPIRED_GRACE_DAYS as DEFAULT_GRACE,
   subscriptionBucket,
 } from "@/services/subscriptionStatus";
+import {
+  SUBS_SORT_LABELS,
+  SUBS_SORT_OPTIONS,
+  sortSubscriptions,
+  type SubsSort,
+} from "@/services/subscriptionOrder";
 import "@/global.css";
 import { useBottomClearance } from "@/hooks/useBottomClearance";
 import { useChargeDisplay } from "@/hooks/useChargeDisplay";
@@ -76,6 +86,10 @@ const Subscriptions = () => {
   const [activeFilter, setActiveFilter] = useState<string>(
     initialFilter === "upcoming" ? "Upcoming" : "All",
   );
+  // R40-A: persisted sort + persisted default view (Active). The DB read
+  // order is already received-evidence DESC, so "recent" is honest from the
+  // first frame; the prefs load refines it right after mount.
+  const [activeSort, setActiveSort] = useState<SubsSort>("recent");
   const [editingSubscription, setEditingSubscription] =
     useState<Subscription | null>(null);
   const [editModalVisible, setEditModalVisible] = useState(false);
@@ -99,6 +113,55 @@ const Subscriptions = () => {
       setActiveFilter("Upcoming");
     }
   }, [initialFilter]);
+
+  // R40-A: restore the persisted sort + default view once. An explicit nav
+  // filter (Home's "Upcoming" deep-link) wins over the stored view; the
+  // stored view defaults to Active on first ever run (R39 spec).
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const [storedFilter, storedSort] = await Promise.all([
+          getPreference("subs_default_filter"),
+          getPreference("subs_sort"),
+        ]);
+        if (cancelled) return;
+        if (!initialFilter) {
+          const view =
+            storedFilter &&
+            (FILTER_OPTIONS as readonly string[]).includes(storedFilter)
+              ? storedFilter
+              : "Active";
+          setActiveFilter(view);
+        }
+        if (
+          storedSort &&
+          (SUBS_SORT_OPTIONS as readonly string[]).includes(storedSort)
+        ) {
+          setActiveSort(storedSort as SubsSort);
+        }
+      } catch {
+        // defaults stand: recent sort, Active view (nav-dependent)
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleFilterChange = (filter: string) => {
+    setActiveFilter(filter);
+    // Persisted default view: the app reopens where the user left it.
+    setPreference("subs_default_filter", filter).catch(() => {});
+    posthog.capture("subscriptions_filter_changed", { filter });
+  };
+
+  const handleSortChange = (sort: SubsSort) => {
+    setActiveSort(sort);
+    setPreference("subs_sort", sort).catch(() => {});
+    posthog.capture("subscriptions_sort_changed", { sort });
+  };
 
   const upcomingIds = useMemo(() => {
     const upcoming = getUpcomingSubscriptions(7);
@@ -157,6 +220,10 @@ const Subscriptions = () => {
       });
     }
 
+    // R40-A: the five-sort spec. Applied before family grouping so a
+    // merchant family card takes its front member's position.
+    filtered = sortSubscriptions(filtered, activeSort);
+
     // R36: one card per merchant family (Amazon shape) — the recurring
     // member fronts the card, the family's sparse actuals stack under it.
     return groupByFamily(filtered);
@@ -164,6 +231,7 @@ const Subscriptions = () => {
     searchQuery,
     subscriptions,
     activeFilter,
+    activeSort,
     upcomingIds,
     graceDays,
     lapseFor,
@@ -274,12 +342,7 @@ const Subscriptions = () => {
                       ? "border-accent bg-accent/10"
                       : "border-border bg-background",
                   )}
-                  onPress={() => {
-                    setActiveFilter(filter);
-                    posthog.capture("subscriptions_filter_changed", {
-                      filter,
-                    });
-                  }}
+                  onPress={() => handleFilterChange(filter)}
                 >
                   <Text
                     className={clsx(
@@ -292,6 +355,36 @@ const Subscriptions = () => {
                     {filter}
                     {filter === "Upcoming" && ` (${upcomingIds.size})`}
                     {filter === "Expired" && ` (${expiredCount})`}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            {/* Sort chips (R40-A): most-recent received / oldest / sparse /
+                recurring / next charge. Visible options, persisted choice. */}
+            <View className="mb-4 flex-row flex-wrap gap-2">
+              {SUBS_SORT_OPTIONS.map((sort) => (
+                <Pressable
+                  key={sort}
+                  className={clsx(
+                    "rounded-full border px-3 py-1.5",
+                    activeSort === sort
+                      ? "border-accent bg-accent/10"
+                      : "border-border bg-background",
+                  )}
+                  onPress={() => handleSortChange(sort)}
+                  accessibilityLabel={`Sort by ${SUBS_SORT_LABELS[sort]}`}
+                  accessibilityRole="button"
+                >
+                  <Text
+                    className={clsx(
+                      "text-xs font-sans-semibold",
+                      activeSort === sort
+                        ? "text-accent"
+                        : "text-muted-foreground",
+                    )}
+                  >
+                    {SUBS_SORT_LABELS[sort]}
                   </Text>
                 </Pressable>
               ))}

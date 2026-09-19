@@ -179,11 +179,14 @@ export function rollupCandidates(hits: ClassifiedMessage[]): ScanCandidate[] {
 
   // Scan-date bug fix: the corpus's earliest email date rides the candidate
   // so the import mints the row's start from evidence, never from the scan
-  // wall-clock. ISO dates sort lexicographically.
+  // wall-clock. ISO dates sort lexicographically. R40-A: the LATEST date
+  // rides along too — the list's "most recent" ordering key.
   for (const [key, candidate] of map) {
     const dates = datesByKey.get(key);
     if (dates?.length) {
-      candidate.firstSeen = [...dates].sort()[0];
+      const sorted = [...dates].sort();
+      candidate.firstSeen = sorted[0];
+      candidate.lastReceived = sorted[sorted.length - 1];
     }
   }
 
@@ -238,6 +241,17 @@ export function collapseFreeIntoMoney(
       for (const id of free.messageIds) {
         if (!messageIds.includes(id)) messageIds.push(id);
       }
+      // R40-A: the received-evidence window spans the absorbed mail too —
+      // the merged candidate's lastReceived is the MAX of both sides.
+      const cLast = c.lastReceived ?? c.firstSeen;
+      const fLast = free.lastReceived ?? free.firstSeen;
+      const lastReceived = !cLast
+        ? fLast
+        : !fLast
+          ? cLast
+          : cLast > fLast
+            ? cLast
+            : fLast;
       return {
         ...c,
         evidence: [...c.evidence, ...free.evidence],
@@ -248,6 +262,7 @@ export function collapseFreeIntoMoney(
         ...(free.firstSeen && (!c.firstSeen || free.firstSeen < c.firstSeen)
           ? { firstSeen: free.firstSeen }
           : {}),
+        ...(lastReceived ? { lastReceived } : {}),
       };
     });
 

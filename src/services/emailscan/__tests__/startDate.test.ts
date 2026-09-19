@@ -273,7 +273,12 @@ describe("importFromConnectedMailboxes startDateRepair (scan-date bug)", () => {
       updateSubscription,
     });
 
-    expect(updateSubscription).not.toHaveBeenCalled();
+    // R40-A: bookkeeping-only writes allowed; the start date never moves
+    // LATER — the stored earlier start stays.
+    const repairs = updateSubscription.mock.calls
+      .map((c) => c[1] as Record<string, unknown>)
+      .filter((p) => Object.keys(p).some((k) => k !== "lastReceivedAt"));
+    expect(repairs).toEqual([]);
   });
 
   it("a candidate whose evidence is NEWER than the stored start never repairs", async () => {
@@ -290,7 +295,12 @@ describe("importFromConnectedMailboxes startDateRepair (scan-date bug)", () => {
       updateSubscription,
     });
 
-    expect(updateSubscription).not.toHaveBeenCalled();
+    // R40-A: bookkeeping-only writes allowed; a NEWER candidate evidence
+    // date never repairs the stored start (min-only rule intact).
+    const repairs = updateSubscription.mock.calls
+      .map((c) => c[1] as Record<string, unknown>)
+      .filter((p) => Object.keys(p).some((k) => k !== "lastReceivedAt"));
+    expect(repairs).toEqual([]);
   });
 });
 

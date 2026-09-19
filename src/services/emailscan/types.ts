@@ -183,6 +183,11 @@ export interface ScanCandidate {
    * scan wall-clock, so a May receipt imported in September starts in May.
    */
   firstSeen?: string;
+  /**
+   * R40-A: latest evidence email date (ISO) across the candidate corpus —
+   * the "most recent" ordering key. Max where firstSeen is the min.
+   */
+  lastReceived?: string;
   /** R18: best-effort bill number carried to import. */
   billNumber?: string | null;
   /** Phase C: brand-sent icon seeds for the scan-fired crawl (best-first). */

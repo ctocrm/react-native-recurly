@@ -63,6 +63,7 @@ function rowToSubscription(row: Record<string, any>): Subscription {
     color: row.color ?? undefined,
     sourceMessageId: row.source_message_id ?? null,
     billNumber: row.bill_number ?? null,
+    lastReceivedAt: row.last_received_at ?? null,
   };
 }
 
@@ -71,8 +72,12 @@ export async function getAllSubscriptions(): Promise<Subscription[]> {
   // R33: archived rows (ESP orphans) stay in the DB for audit but leave the
   // app-wide read — every consumer (list, spend, upcoming, filters) skips
   // them consistently. Backup/import paths use their own full reads.
+  // R40-A: the list orders by RECEIVED EVIDENCE — the row's latest email
+  // date, falling to its start date, falling to creation for hand-entered
+  // rows with no dates. Scan order (created_at first) is never the order.
   const rows = await db.getAllAsync<Record<string, any>>(
-    "SELECT * FROM subscriptions WHERE status != 'archived' ORDER BY created_at DESC",
+    `SELECT * FROM subscriptions WHERE status != 'archived'
+     ORDER BY COALESCE(last_received_at, start_date, created_at) DESC`,
   );
   return rows.map(rowToSubscription);
 }
@@ -100,8 +105,8 @@ export async function addSubscription(
     iconKey = match ? match[0] : "plus";
   }
   await db.runAsync(
-    `INSERT INTO subscriptions (id, name, plan, category, payment_method, status, start_date, price, price_unknown, currency, billing, frequency, renewal_date, color, icon_key, source_message_id, bill_number)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO subscriptions (id, name, plan, category, payment_method, status, start_date, price, price_unknown, currency, billing, frequency, renewal_date, color, icon_key, source_message_id, bill_number, last_received_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     subscription.id,
     subscription.name,
     subscription.plan ?? null,
@@ -119,6 +124,7 @@ export async function addSubscription(
     iconKey,
     subscription.sourceMessageId ?? null,
     subscription.billNumber ?? null,
+    subscription.lastReceivedAt ?? null,
   );
 }
 
@@ -144,6 +150,7 @@ export async function updateSubscription(
     icon_key: "icon_key",
     sourceMessageId: "source_message_id",
     billNumber: "bill_number",
+    lastReceivedAt: "last_received_at",
   };
   const setClauses: string[] = [];
   const params: any[] = [];

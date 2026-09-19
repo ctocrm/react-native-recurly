@@ -33,6 +33,15 @@ export function candidateToSubscription(
   const startDate = Number.isNaN(firstSeenMs)
     ? new Date().toISOString()
     : new Date(firstSeenMs).toISOString();
+  // R40-A: the row's latest received-evidence date rides the candidate too
+  // (max corpus message date); falls back to the start when only one mail
+  // exists (max == min), and to the start's own guarded fallback otherwise.
+  const lastSeenMs = candidate.lastReceived
+    ? new Date(candidate.lastReceived).getTime()
+    : NaN;
+  const lastReceivedAt = Number.isNaN(lastSeenMs)
+    ? startDate
+    : new Date(lastSeenMs).toISOString();
   return {
     id: Date.now().toString(),
     icon: require("@assets/icons/plus.png"),
@@ -50,5 +59,6 @@ export function candidateToSubscription(
     // R18 paper-trail: first candidate email + best-effort bill number
     sourceMessageId: candidate.messageIds[0] ?? null,
     billNumber: candidate.billNumber ?? null,
+    lastReceivedAt,
   };
 }

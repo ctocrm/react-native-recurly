@@ -338,6 +338,16 @@ async function runScan(opts: {
             !!already.startDate &&
             next.startDate < already.startDate &&
             (candidate.messageIds?.length ?? 0) > 0;
+          // R40-A: the row's latest received-evidence date advances MAX-ONLY
+          // — new mail moves it forward, an older candidate corpus never
+          // drags it back. PURE bookkeeping: it is never a key into the
+          // kind-guarded repair block below (a sparse candidate's newer mail
+          // date must not unlock paper-trail/cadence writes onto a
+          // recurring row — R18/R22/R34 guards stay absolute).
+          const lastReceivedAdvance =
+            !!next.lastReceivedAt &&
+            (!already.lastReceivedAt ||
+              next.lastReceivedAt > already.lastReceivedAt);
           if (
             (richer ||
               cadenceRepair ||
@@ -381,6 +391,9 @@ async function runScan(opts: {
             if (startDateRepair) {
               patch.startDate = next.startDate;
             }
+            if (lastReceivedAdvance) {
+              patch.lastReceivedAt = next.lastReceivedAt;
+            }
             // R22: backfill the R18 paper-trail when the stored row predates
             // it or arrived through the rollup path that dropped messageIds
             // (Audible showed Source email "—" forever). Never overwrites.
@@ -399,6 +412,14 @@ async function runScan(opts: {
             await opts.updateSubscription(already.id, patch);
             existingByKey.set(key, { ...already, ...patch, id: already.id });
             imported += 1;
+          } else if (lastReceivedAdvance && opts.updateSubscription) {
+            // Standalone bookkeeping write: lastReceivedAt only. This is not
+            // an import and never counts as a repair.
+            const patch: Partial<Subscription> = {
+              lastReceivedAt: next.lastReceivedAt,
+            };
+            await opts.updateSubscription(already.id, patch);
+            existingByKey.set(key, { ...already, ...patch, id: already.id });
           }
           const existingKey = already.icon_key;
           if (!existingKey || existingKey === "plus") {

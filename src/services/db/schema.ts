@@ -6,7 +6,7 @@ import type { SQLiteDatabase } from "expo-sqlite";
 import { nameToSlug } from "@/services/iconScraper";
 
 /** Bump when adding a migration. Stored in PRAGMA user_version. */
-export const SCHEMA_VERSION = 20;
+export const SCHEMA_VERSION = 21;
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS subscriptions (
@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS subscriptions (
   icon_key      TEXT,
   source_message_id TEXT,
   bill_number   TEXT,
+  last_received_at TEXT,
   created_at    TEXT DEFAULT (datetime('now')),
   updated_at    TEXT DEFAULT (datetime('now'))
 );
@@ -663,6 +664,19 @@ export const MIGRATIONS: ((db: SQLiteDatabase) => Promise<void>)[] = [
     if (removed > 0) {
       console.log(
         `[MIGRATE] null-mailbox twin merge v20: ${removed} twin row(s) removed, ${merged} paper-trail merge(s)`,
+      );
+    }
+  },
+
+  // 21 (R40-A): evidence-derived list ordering — the row's LATEST received
+  // email date, alongside start_date (earliest). The subscriptions list
+  // sorts by received evidence (COALESCE(last_received_at, start_date,
+  // created_at)), never by the scan wall-clock alone.
+  async (db) => {
+    const names = await columnNames(db, "subscriptions");
+    if (!names.includes("last_received_at")) {
+      await db.execAsync(
+        `ALTER TABLE subscriptions ADD COLUMN last_received_at TEXT;`,
       );
     }
   },
