@@ -243,8 +243,15 @@ async function runScan(opts: {
           // one-off purchases (xAI tokens, domain orders) are not the
           // subscription's price. A recurring candidate MAY repair a sparse
           // row (e.g. Porkbun's yearly order receipt).
+          // P3 (R38): a FREE candidate (a $0 license receipt — Netgate,
+          // Rotaryengine class) may flip a RECURRING row to free; the flip
+          // itself is still gated by streamFlip below, and price repairs
+          // stay blocked (richer demands kindCompatible, so a $0 candidate
+          // can never rewrite a stored price).
           const kindCompatible =
-            next.category === "recurring" || already.category === "sparse";
+            next.category === "recurring" ||
+            next.category === "free" ||
+            already.category === "sparse";
           // R37: a claimed unbound row binds to this mailbox for the rest
           // of the scan (and, for scan-born rows, in storage) — the claim
           // must stick even when no other repair gate fires.
@@ -266,6 +273,9 @@ async function runScan(opts: {
               already.frequency !== next.frequency);
           const richer =
             kindCompatible &&
+            // P3: a FREE candidate never rewrites the stored price — a $0
+            // receipt (free tier, comped order) must not zero a real price.
+            next.category !== "free" &&
             ((already.priceUnknown && !next.priceUnknown) ||
               (candidate.amount !== undefined &&
                 candidate.amount !== already.price));

@@ -203,4 +203,43 @@ describe("P3.3 — one proven-payment message clears a legacy stamp", () => {
 
     expect(updateSubscription).not.toHaveBeenCalled();
   });
+
+  it("a $0 license candidate flips a RECURRING row to free and clears the stamp", async () => {
+    // The Netgate class: stored recurring "? Monthly" + a $0 renewal receipt.
+    // kindCompatible must admit the free candidate (streamFlip owns the
+    // change) and richer must NOT zero anything.
+    const recurring = {
+      ...existingRow(),
+      category: "recurring",
+      price: 41,
+      billing: "Monthly",
+      frequency: "Monthly",
+      icon_key: "squarespace",
+      name: "Netgate",
+    } as Subscription;
+    mockScan.mockResolvedValueOnce({
+      candidates: [
+        sparseCandidate({
+          merchantKey: "netgate",
+          merchant: "Netgate",
+          amount: 0,
+          evidence: ["proof:doc-number LT-9"],
+        }),
+      ],
+    });
+
+    await importFromConnectedMailboxes({
+      userId: "u1",
+      existing: [recurring],
+      addSubscription,
+      updateSubscription,
+    });
+
+    expect(updateSubscription).toHaveBeenCalledTimes(1);
+    const patch = updateSubscription.mock.calls[0][1];
+    expect(patch.category).toBe("free");
+    expect(patch.billing).toBe("");
+    expect(patch.frequency).toBe("");
+    expect(patch.price).toBeUndefined(); // richer stays guarded
+  });
 });
