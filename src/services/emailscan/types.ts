@@ -54,7 +54,13 @@ import type { OrderMarkup } from "./orderMarkup";
 // is authoritative over body regex, and seller/items/orderNumber ride on
 // the classified row for the rail policy. Bump restages so stored rows can
 // gain markup facts where senders embed them.
-export const PARSER_VERSION = 27;
+// v27→v28 (R38 P2): billing rails never mint in their own name. Play/Apple
+//      receipts re-key to the receipt's item app (P1 markup items first); an
+//      unresolvable item is the honest aggregate "Google Play"/"Apple" SPARSE,
+//      never recurring. Squarespace joins PAYMENT_PROCESSORS: its mail resolves
+//      the receipt site/domain (the real subscription) or DROPS. Bump restages
+//      so stored rail rows re-derive under the per-item keys.
+export const PARSER_VERSION = 28;
 
 export type MailProviderId =
   | "gmail"

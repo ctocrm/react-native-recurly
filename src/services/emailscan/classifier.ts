@@ -100,6 +100,9 @@ const PAYMENT_PROCESSORS = new Set([
   "wise",
   "transferwise",
   "worldpay",
+  // R38 P2: Squarespace is a store-builder rail — its mail bills the SITE or
+  // domain the user runs there, never "Squarespace" the merchant.
+  "squarespace",
 ]);
 
 const SELF_DISPLAY_NAMES = new Set(["me", "you", "myself", "self"]);
@@ -473,6 +476,104 @@ export function merchantFromProcessorText(text: string): {
     if (!m?.[1]) continue;
     const named = titleCaseMerchant(m[1]);
     if (named.merchantKey !== "unknown") return named;
+  }
+  return null;
+}
+
+/**
+ * R38 P2: item names that are the rail itself (or receipt scaffolding), not
+ * the subscribed app.
+ */
+const RAIL_ITEM_NOISE = new Set([
+  "google play",
+  "play store",
+  "google",
+  "apple",
+  "app store",
+  "itunes",
+  "android",
+  "ios",
+  "order",
+  "receipt",
+  "subscription",
+  "in-app purchase",
+  "purchase",
+  "payment",
+]);
+
+/** Apple first-party services — the item IS Apple's own product. */
+const APPLE_FIRST_PARTY_RE = /\b(apple|icloud|itunes|arcade|apple\s+one|apple\s+music|apple\s+tv)\b/i;
+
+/**
+ * R38 P2: the real merchant of a Play/Apple rail receipt — the APP the
+ * charge is for. Candidates come from the P1 markup items (top tier), then
+ * the receipt subject/body "for X" phrasing. Returns:
+ *  - a {merchantKey,merchantName} to re-key to,
+ *  - "keep" when the item is first-party (the rail IS the merchant — Apple
+ *    One receipts stay Apple),
+ *  - null when unresolvable (caller falls to the honest aggregate SPARSE).
+ * Two or more distinct clean items is an aggregate receipt, not one app.
+ */
+export function railItemFromReceipt(
+  orderMarkup: { items: string[] } | null | undefined,
+  subject: string,
+  body: string | null,
+): { merchantKey: string; merchantName: string } | "keep" | null {
+  const candidates: string[] = [];
+  if (orderMarkup?.items?.length) candidates.push(...orderMarkup.items);
+  const subjectM = subject.match(
+    /\b(?:order|purchase|subscription|charge)\s+(?:for|of)\s+(.+)$/i,
+  );
+  if (subjectM?.[1]) candidates.push(subjectM[1]);
+  const bodyM = body?.match(
+    /\b(?:subscription to|purchase of|order of|your app|the app|the game)\s+([A-Za-z0-9][A-Za-z0-9 .:&'!-]{1,38})/i,
+  );
+  if (bodyM?.[1]) candidates.push(bodyM[1]);
+
+  const cleaned: { merchantKey: string; merchantName: string }[] = [];
+  for (const raw of candidates) {
+    const trimmed = raw.replace(/[\s.,;:!]+$|"[^"]*"$/g, "").trim();
+    if (!trimmed) continue;
+    if (RAIL_ITEM_NOISE.has(trimmed.toLowerCase())) continue;
+    const named = titleCaseMerchant(trimmed);
+    if (named.merchantKey === "unknown") continue;
+    if (isPaymentProcessor(named.merchantKey) || isEspBrandName(named.merchantKey))
+      continue;
+    if (!cleaned.some((c) => c.merchantKey === named.merchantKey))
+      cleaned.push(named);
+  }
+  if (cleaned.length === 0) return null;
+  if (cleaned.length > 1) return null; // multi-item receipt = honest aggregate
+  if (APPLE_FIRST_PARTY_RE.test(cleaned[0].merchantName)) return "keep";
+  return cleaned[0];
+}
+
+/**
+ * R38 P2: a Squarespace receipt bills the SITE/DOMAIN the user runs on the
+ * rail — extract it as the merchant. Domains only (the subscription IS the
+ * domain/website); the rail's own host never qualifies. Null if absent.
+ */
+export function squarespaceSiteFromText(text: string): {
+  merchantKey: string;
+  merchantName: string;
+} | null {
+  const patterns = [
+    /(?:domain|website|site|plan|subscription)\s+(?:renewal|subscription|plan)?\s*(?:for|of)?\s+([a-z0-9][a-z0-9-]*(?:\.[a-z0-9-]+)+)/i,
+    /(?:renew(?:al|ing)?|subscrib\w*|charg\w*)\s+(?:to|for|of)?\s*([a-z0-9][a-z0-9-]*(?:\.[a-z0-9-]+)+)/i,
+  ];
+  for (const re of patterns) {
+    const m = text.match(re);
+    if (!m?.[1]) continue;
+    const domain = m[1].toLowerCase().replace(/\.$/, "");
+    const labels = domain.split(".");
+    const tld = labels[labels.length - 1];
+    if (labels.length < 2 || tld.length < 2 || tld.length > 10) continue;
+    if (/^(squarespace|google|apple|gstatic)\b/.test(domain)) continue;
+    if (/\.(png|jpg|jpeg|gif|webp|svg|css|js|html)$/i.test(domain)) continue;
+    return {
+      merchantKey: domain.replace(/[^a-z0-9]+/g, "-"),
+      merchantName: domain,
+    };
   }
   return null;
 }
@@ -910,7 +1011,15 @@ export function resolveMerchant(
       drop: false,
     };
   }
+  // R38 P2: Squarespace receipts bill the site/domain — try that before the
+  // generic processor phrasing (its "domain renewal" copy matches none of it).
+  const squarespaceNamed =
+    fromMerchant.merchantKey === "squarespace"
+      ? squarespaceSiteFromText(message.subject) ||
+        (message.text ? squarespaceSiteFromText(message.text) : null)
+      : null;
   const named =
+    squarespaceNamed ||
     merchantFromProcessorText(message.subject) ||
     (message.text ? merchantFromProcessorText(message.text) : null);
   if (!named) {
@@ -1354,6 +1463,31 @@ export function classifyMessage(message: NormalizedMessage): ClassifiedMessage {
       (message.text && looksLikeMarkup(message.text) ? message.text : null),
   );
 
+  // R38 P2: billing rails never mint in their own name. A Play/Apple
+  // receipt's merchant is the APP the charge is for — re-key from the P1
+  // markup items (top tier) or the receipt's "for X" phrasing. First-party
+  // Apple items keep the rail key (Apple One IS Apple). No resolvable item
+  // means the honest AGGREGATE row keyed to the rail — SPARSE always, never
+  // a recurring subscription in the rail's own name.
+  let finalKey = merchantKey;
+  let finalName = merchantName;
+  let finalDomain = officialDomain;
+  let railForceSparse = false;
+  if (merchantKey === "google-play" || merchantKey === "apple") {
+    const railItem = railItemFromReceipt(orderMarkup, message.subject, body);
+    if (railItem === "keep") {
+      evidence.push("rail:first-party-item");
+    } else if (railItem) {
+      finalKey = railItem.merchantKey;
+      finalName = railItem.merchantName;
+      finalDomain = null;
+      evidence.push(`rail-item:${railItem.merchantKey}`);
+    } else {
+      railForceSparse = true;
+      evidence.push("rail:aggregate-sparse");
+    }
+  }
+
   // R27 purchase-proof gate: payment anchors decide everything downstream.
   // Hints are optional provider weights (Gmail/Workspace only) — the gate
   // must stand on its own without them.
@@ -1472,11 +1606,12 @@ export function classifyMessage(message: NormalizedMessage): ClassifiedMessage {
     evidence.push("proof:subject-amount");
   }
   const hasProof = proofTags.length > 0;
-  const kind: CandidateKind = resolved.forceSparse
-    ? "sparse"
-    : subjectClass === "recurring"
-      ? "recurring"
-      : "sparse";
+  const kind: CandidateKind =
+    resolved.forceSparse || railForceSparse
+      ? "sparse"
+      : subjectClass === "recurring"
+        ? "recurring"
+        : "sparse";
   const cadenceEvidence = inferCadenceEvidence(
     `${message.subject}\n${body}`,
     hasProof,
@@ -1510,10 +1645,10 @@ export function classifyMessage(message: NormalizedMessage): ClassifiedMessage {
   const keep: ClassifiedMessage = {
     message,
     subjectClass,
-    merchantKey,
-    merchantName,
-    officialDomain,
-    ...emailIconFields(message, officialDomain, evidence),
+    merchantKey: finalKey,
+    merchantName: finalName,
+    officialDomain: finalDomain,
+    ...emailIconFields(message, finalDomain, evidence),
     kind,
     amount: parsed?.amount,
     currency: parsed?.currency,
